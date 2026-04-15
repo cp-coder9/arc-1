@@ -1,0 +1,15 @@
+[install]
+# Use the standard npm registry
+registry = "https://registry.npmjs.org"
+
+[install.cache]
+# Enable disk cache for faster installs
+dir = ".bun-cache"
+
+[run]
+# Environment variables
+env = "./.env.local"
+
+[test]
+# Test configuration
+coverage = true

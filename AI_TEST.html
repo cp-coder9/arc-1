@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architex AI Agents Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 1.5rem;
+    }
+    .agent-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .agent-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .agent-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .agent-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    .agent-icon.orchestrator { background: #4f46e5; color: white; }
+    .agent-icon.wall { background: #7c3aed; color: white; }
+    .agent-icon.window { background: #2563eb; color: white; }
+    .agent-icon.door { background: #dc2626; color: white; }
+    .agent-icon.area { background: #059669; color: white; }
+    .agent-icon.compliance { background: #d97706; color: white; }
+    .agent-icon.sans { background: #0891b2; color: white; }
+    .agent-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .agent-role {
+      font-size: 0.8rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .agent-description {
+      font-size: 0.9rem;
+      color: #4b5563;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+    .test-button {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 8px;
+      background: #4f46e5;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .test-button:hover {
+      background: #4338ca;
+    }
+    .test-button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .result-area {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f3f4f6;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+    }
+    .result-area.active {
+      display: block;
+    }
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-top: 0.5rem;
+    }
+    .status-indicator.online {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status-indicator.offline {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    .status-indicator.online .status-dot {
+      background: #10b981;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .api-test-section {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      margin-top: 2rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    .api-test-section h2 {
+      color: #1f2937;
+      margin-bottom: 1rem;
+    }
+    .endpoint-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      background: #f9fafb;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+    }
+    .method {
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .method.post {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .method.get {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .endpoint-path {
+      font-family: 'JetBrains Mono', monospace;
+      color: #4b5563;
+    }
+    .console-log {
+      background: #1f2937;
+      color: #10b981;
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      margin-top: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .console-log .error {
+      color: #ef4444;
+    }
+    .console-log .warn {
+      color: #f59e0b;
+    }
+    .console-log .info {
+      color: #60a5fa;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 Architex AI Agents Test Console</h1>
+    
+    <div class="test-grid">
+      <!-- Orchestrator -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon orchestrator">🎯</div>
+          <div>
+            <div class="agent-title">Orchestrator</div>
+            <div class="agent-role">Main Coordinator</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Coordinates all specialized agents and produces unified compliance reports. 
+          Manages the AI review workflow from start to finish.
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('orchestrator')">
+          Test Orchestrator
+        </button>
+        <div class="result-area" id="result-orchestrator"></div>
+      </div>
+
+      <!-- Wall Compliance -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon wall">🧱</div>
+          <div>
+            <div class="agent-title">Wall Compliance</div>
+            <div class="agent-role">SANS 10400-K</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Checks wall thickness (min 230mm external, 110mm internal), DPC placement, 
+          masonry quality, and cavity wall construction.
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('wall')">
+          Test Wall Agent
+        </button>
+        <div class="result-area" id="result-wall"></div>
+      </div>
+
+      <!-- Fenestration -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon window">🪟</div>
+          <div>
+            <div class="agent-title">Fenestration</div>
+            <div class="agent-role">SANS 10400-N</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Validates ventilation (5% floor area), natural lighting (10% floor area), 
+          window heights, and safety glazing requirements.
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('window')">
+          Test Window Agent
+        </button>
+        <div class="result-area" id="result-window"></div>
+      </div>
+
+      <!-- Fire Safety -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon door">🚪</div>
+          <div>
+            <div class="agent-title">Fire Safety</div>
+            <div class="agent-role">SANS 10400-T</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Verifies fire door ratings (30min minimum), escape routes (900mm width), 
+          travel distances (45m max), and door swing directions.
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('door')">
+          Test Fire Safety Agent
+        </button>
+        <div class="result-area" id="result-door"></div>
+      </div>
+
+      <!-- Area Sizing -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon area">📐</div>
+          <div>
+            <div class="agent-title">Area & Sizing</div>
+            <div class="agent-role">SANS 10400-C</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Checks minimum room sizes (6m² habitable), ceiling heights (2.4m), 
+          kitchen requirements (5m²), and passage widths (900mm).
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('area')">
+          Test Area Agent
+        </button>
+        <div class="result-area" id="result-area"></div>
+      </div>
+
+      <!-- General Compliance -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon compliance">📋</div>
+          <div>
+            <div class="agent-title">General Compliance</div>
+            <div class="agent-role">Council Ready</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Validates title blocks, north points, scale bars, site addresses, 
+          drawing numbering, and SACAP registration numbers.
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('compliance')">
+          Test Compliance Agent
+        </button>
+        <div class="result-area" id="result-compliance"></div>
+      </div>
+
+      <!-- SANS Specialist -->
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-icon sans">⚖️</div>
+          <div>
+            <div class="agent-title">SANS Specialist</div>
+            <div class="agent-role">Cross-Reference</div>
+          </div>
+        </div>
+        <div class="agent-description">
+          Cross-references findings across all SANS 10400 parts (A, C, K, N, T, V)
+          and identifies gaps or conflicts in compliance.
+        </div>
+        <div class="status-indicator online">
+          <span class="status-dot"></span>
+          <span>Online - Ready</span>
+        </div>
+        <button class="test-button" onclick="testAgent('sans')">
+          Test SANS Specialist
+        </button>
+        <div class="result-area" id="result-sans"></div>
+      </div>
+    </div>
+
+    <div class="api-test-section">
+      <h2>🌐 API Endpoints</h2>
+      
+      <div class="endpoint-row">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/health</span>
+        <span>Health check</span>
+      </div>
+      
+      <div class="endpoint-row">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/gemini/review</span>
+        <span>AI compliance review</span>
+      </div>
+      
+      <div class="endpoint-row">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/payment/notify</span>
+        <span>PayFast webhook</span>
+      </div>
+
+      <button class="test-button" onclick="testAPI()" style="margin-top: 1rem;">
+        Test AI API Endpoint
+      </button>
+
+      <div class="console-log" id="console-log">
+        <span class="info">[INFO]</span> AI Agents Test Console initialized<br>
+        <span class="info">[INFO]</span> Waiting for user interaction...
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const log = (message, type = 'info') => {
+      const consoleEl = document.getElementById('console-log');
+      const timestamp = new Date().toLocaleTimeString();
+      const className = type;
+      consoleEl.innerHTML += `<span class="${className}">[${type.toUpperCase()}] ${timestamp}</span> ${message}<br>`;
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    };
+
+    const SPECIALIZED_AGENTS = {
+      orchestrator: {
+        name: "Orchestrator",
+        systemPrompt: `You are the AI Orchestrator for SANS 10400 compliance checking. Return JSON with status, feedback, categories, and traceLog.`,
+        testPrompt: "Review a residential house drawing for overall SANS 10400 compliance."
+      },
+      wall: {
+        name: "Wall Compliance Agent",
+        systemPrompt: `You are a Wall Compliance Specialist for SANS 10400-K. Check wall thickness (230mm external minimum, 110mm internal), DPC, and masonry.`,
+        testPrompt: "House with 220mm external walls, no DPC specified, brick construction."
+      },
+      window: {
+        name: "Fenestration Agent",
+        systemPrompt: `You are a Fenestration Specialist for SANS 10400-N. Check ventilation (5% floor area), lighting (10% floor area), and window safety.`,
+        testPrompt: "100m² house with 3m² total window area, windows 1.2m from floor."
+      },
+      door: {
+        name: "Fire Safety Agent",
+        systemPrompt: `You are a Fire Safety Specialist for SANS 10400-T. Check fire doors (30min rating), escape routes (900mm width), travel distances (45m max).`,
+        testPrompt: "Two storey house with single stair, doors open inward, 50m travel distance to exit."
+      },
+      area: {
+        name: "Area Sizing Agent",
+        systemPrompt: `You are an Area Sizing Specialist for SANS 10400-C. Check room sizes (6m² min habitable), ceiling heights (2.4m min), kitchen (5m²).`,
+        testPrompt: "House with 5.5m² bedroom, 2.3m ceiling height, 4m² kitchen."
+      },
+      compliance: {
+        name: "General Compliance Agent",
+        systemPrompt: `You are a General Compliance Specialist. Check title blocks, north points, scale bars, site addresses, SACAP numbers.`,
+        testPrompt: "Drawing missing north point, no scale bar, has title block with address."
+      },
+      sans: {
+        name: "SANS Specialist",
+        systemPrompt: `You are a SANS Compliance Specialist. Cross-reference regulations across SANS 10400 parts A, C, K, N, T, V.`,
+        testPrompt: "Review compliance findings: wall thickness issue, ventilation adequate, escape route concerns."
+      }
+    };
+
+    async function testAgent(agentType) {
+      const resultArea = document.getElementById(`result-${agentType}`);
+      const agent = SPECIALIZED_AGENTS[agentType];
+      
+      log(`Testing ${agent.name}...`, 'info');
+      resultArea.classList.add('active');
+      resultArea.innerHTML = '<span style="color: #6b7280;">Testing agent...</span>';
+      
+      try {
+        const response = await fetch('/api/gemini/review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            systemInstruction: agent.systemPrompt,
+            prompt: agent.testPrompt
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Extract the text from Gemini response format
+        let resultText = '';
+        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+          resultText = data.candidates[0].content.parts[0].text;
+          
+          // Try to parse as JSON
+          try {
+            const parsed = JSON.parse(resultText);
+            resultArea.innerHTML = `<pre style="white-space: pre-wrap; color: #059669;">${JSON.stringify(parsed, null, 2)}</pre>`;
+            log(`${agent.name} test completed successfully`, 'info');
+          } catch (e) {
+            resultArea.innerHTML = `<pre style="white-space: pre-wrap; color: #4b5563;">${resultText}</pre>`;
+            log(`${agent.name} returned text response`, 'info');
+          }
+        } else {
+          resultArea.innerHTML = `<pre style="white-space: pre-wrap;">${JSON.stringify(data, null, 2)}</pre>`;
+          log(`${agent.name} returned raw response`, 'info');
+        }
+      } catch (error) {
+        resultArea.innerHTML = `<span style="color: #dc2626;">Error: ${error.message}</span>`;
+        log(`${agent.name} test failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function testAPI() {
+      log('Testing AI API endpoint...', 'info');
+      
+      try {
+        // First test health
+        const healthResponse = await fetch('/api/health');
+        const health = await healthResponse.json();
+        log(`Health check: ${health.status}`, 'info');
+        
+        // Then test AI endpoint
+        const response = await fetch('/api/gemini/review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            systemInstruction: "You are a test agent. Return {status: 'passed', feedback: 'Test passed', categories: [], traceLog: 'Test complete'}",
+            prompt: "Test prompt"
+          })
+        });
+        
+        const data = await response.json();
+        log('AI API test successful', 'info');
+        log(JSON.stringify(data, null, 2), 'info');
+      } catch (error) {
+        log(`API test failed: ${error.message}`, 'error');
+      }
+    }
+
+    // Auto-test on load
+    window.addEventListener('load', () => {
+      log('Page loaded. Ready to test AI agents.', 'info');
+    });
+  </script>
+</body>
+</html>

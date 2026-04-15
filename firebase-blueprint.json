@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user information and roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "architect", "admin"] },
+        "bio": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Job": {
+      "title": "Architectural Job",
+      "description": "A job posted by a client.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "requirements": { "type": "array", "items": { "type": "string" } },
+        "deadline": { "type": "string", "format": "date" },
+        "budget": { "type": "number" },
+        "category": { "type": "string", "enum": ["Residential", "Commercial", "Industrial", "Renovation", "Interior", "Landscape"] },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in-progress", "completed", "cancelled"] },
+        "selectedArchitectId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "title", "status", "category", "createdAt"]
+    },
+    "Application": {
+      "title": "Job Application",
+      "description": "An application from an architect for a job.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "architectId": { "type": "string" },
+        "architectName": { "type": "string" },
+        "proposal": { "type": "string" },
+        "portfolioUrl": { "type": "string" },
+        "documents": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "architectId", "status", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A rating and review for a completed job.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "fromId": { "type": "string" },
+        "toId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "type": { "type": "string", "enum": ["client_to_architect", "architect_to_client"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "fromId", "toId", "rating", "type", "createdAt"]
+    },
+    "Submission": {
+      "title": "Drawing Submission",
+      "description": "A drawing submitted by an architect for review.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "architectId": { "type": "string" },
+        "drawingUrl": { "type": "string" },
+        "drawingName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending_ai", "ai_reviewing", "ai_failed", "ai_passed", "admin_reviewing", "admin_rejected", "approved"] },
+        "aiFeedback": { "type": "string" },
+        "adminFeedback": { "type": "string" },
+        "traceability": { "type": "array", "items": { "$ref": "TraceLog" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "architectId", "drawingUrl", "status", "createdAt"]
+    },
+    "TraceLog": {
+      "title": "Traceability Log",
+      "description": "A log entry for tracking steps in the submission process.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "actor": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" }
+      }
+    },
+    "Agent": {
+      "title": "AI Agent",
+      "description": "Configuration for AI agents used in compliance checks.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "description": { "type": "string" },
+        "systemPrompt": { "type": "string" },
+        "temperature": { "type": "number" },
+        "status": { "type": "string", "enum": ["online", "offline", "maintenance"] },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "role", "systemPrompt"]
+    },
+    "SystemLog": {
+      "title": "System Log",
+      "description": "Audited logs for system events.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "level": { "type": "string", "enum": ["info", "warning", "error", "critical"] },
+        "source": { "type": "string" },
+        "message": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["timestamp", "level", "source", "message"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "UserProfile", "description": "User profiles" },
+    "/jobs/{jobId}": { "schema": "Job", "description": "Architectural jobs" },
+    "/jobs/{jobId}/applications/{appId}": { "schema": "Application", "description": "Applications for a specific job" },
+    "/jobs/{jobId}/submissions/{subId}": { "schema": "Submission", "description": "Submissions for a specific job" },
+    "/reviews/{reviewId}": { "schema": "Review", "description": "Ratings and reviews" },
+    "/agents/{agentId}": { "schema": "Agent", "description": "AI agent configurations" },
+    "/system_logs/{logId}": { "schema": "SystemLog", "description": "Audited system logs" }
+  }
+}

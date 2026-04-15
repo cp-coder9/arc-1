@@ -1,0 +1,271 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin') || 
+        (isAuthenticated() && 
+         (request.auth.token.email == "gm.tarb@gmail.com" || 
+          request.auth.token.email == "leor@slutzkin.co.za") && 
+         request.auth.token.email_verified == true);
+    }
+    
+    function isVerifiedArchitect() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/architect_verifications/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/architect_verifications/$(request.auth.uid)).data.status == 'verified';
+    }
+    
+    function getJob(jobId) {
+      return get(/databases/$(database)/documents/jobs/$(jobId));
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && 
+        request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+        request.resource.data.role in ['client', 'architect'];
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+            ['displayName', 'bio', 'updatedAt']
+          )
+        ) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Jobs collection
+    match /jobs/{jobId} {
+      allow read: if (resource != null && resource.data.status == 'open') || 
+                   (isAuthenticated() && (
+                     resource.data.clientId == request.auth.uid ||
+                     resource.data.selectedArchitectId == request.auth.uid ||
+                     isAdmin()
+                   ));
+      allow create: if isAuthenticated() && hasRole('client') &&
+        request.resource.data.clientId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['clientId', 'title', 'description', 'budget', 'status', 'createdAt']);
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.selectedArchitectId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+
+      // Applications subcollection
+      match /applications/{appId} {
+        allow read: if isAuthenticated() && (
+          isAdmin() ||
+          getJob(jobId).data.clientId == request.auth.uid ||
+          resource.data.architectId == request.auth.uid
+        );
+        allow create: if isAuthenticated() && 
+          hasRole('architect') &&
+          request.resource.data.architectId == request.auth.uid &&
+          isVerifiedArchitect();
+        allow update: if isAuthenticated() && (
+          (getJob(jobId).data.clientId == request.auth.uid) ||
+          isAdmin()
+        );
+        allow delete: if false;
+      }
+
+      // Submissions subcollection
+      match /submissions/{subId} {
+        allow read: if isAuthenticated() && (
+          isAdmin() ||
+          getJob(jobId).data.clientId == request.auth.uid ||
+          resource.data.architectId == request.auth.uid
+        );
+        allow create: if isAuthenticated() && 
+          hasRole('architect') &&
+          request.resource.data.architectId == request.auth.uid &&
+          getJob(jobId).data.selectedArchitectId == request.auth.uid;
+        allow update: if isAuthenticated() && (
+          isAdmin() ||
+          (resource.data.architectId == request.auth.uid && 
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+        );
+        allow delete: if false;
+      }
+
+      // Delegated tasks subcollection
+      match /tasks/{taskId} {
+        allow read: if isAuthenticated() && (
+          isAdmin() ||
+          getJob(jobId).data.clientId == request.auth.uid ||
+          resource.data.architectId == request.auth.uid
+        );
+        allow create: if isAuthenticated() && 
+          request.resource.data.architectId == request.auth.uid &&
+          getJob(jobId).data.selectedArchitectId == request.auth.uid;
+        allow update: if isAuthenticated() && 
+          resource.data.architectId == request.auth.uid;
+        allow delete: if isAuthenticated() && 
+          resource.data.architectId == request.auth.uid;
+      }
+    }
+
+    // Collection Group matches for Admin Dashboard
+    match /{path=**}/submissions/{subId} {
+      allow read: if isAuthenticated() && isAdmin();
+    }
+
+    match /{path=**}/applications/{appId} {
+      allow read: if isAuthenticated() && isAdmin();
+    }
+
+    // Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+        request.resource.data.fromId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['jobId', 'fromId', 'toId', 'rating', 'comment', 'type', 'createdAt']);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        (isAdmin() || request.resource.data.userId != request.auth.uid);
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Messages collection
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        getJob(resource.data.jobId).data.clientId == request.auth.uid ||
+        getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.senderId == request.auth.uid &&
+        (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
+         getJob(request.resource.data.jobId).data.selectedArchitectId == request.auth.uid)
+      );
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Conversations collection
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.architectId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.clientId == request.auth.uid ||
+        request.resource.data.architectId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.architectId == request.auth.uid
+      );
+      allow delete: if false;
+    }
+
+    // Architect verifications
+    match /architect_verifications/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) &&
+        request.resource.data.keys().hasAll(['userId', 'status', 'submittedAt']);
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Architect profiles
+    match /architect_profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && isOwner(userId);
+      allow delete: if isAdmin();
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.payerId == request.auth.uid ||
+        resource.data.payeeId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isAdmin();
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if false;
+    }
+
+    // Escrow collection
+    match /escrow/{jobId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        getJob(jobId).data.clientId == request.auth.uid ||
+        getJob(jobId).data.selectedArchitectId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && isAdmin();
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if false;
+    }
+
+    // System settings (admin only)
+    match /system_settings/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Agents collection
+    match /agents/{agentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // System logs (admin only read, auth create)
+    match /system_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Council submissions
+    match /council_submissions/{submissionId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        (resource != null && 
+         (getJob(resource.data.jobId).data.clientId == request.auth.uid ||
+          getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid))
+      );
+      allow create: if isAuthenticated() && isAdmin();
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if false;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
