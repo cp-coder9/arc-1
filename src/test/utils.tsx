@@ -1,13 +1,12 @@
 import React from 'react';
 import { render as rtlRender, RenderOptions } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 
 interface WrapperProps {
   children: React.ReactNode;
 }
 
 function Wrapper({ children }: WrapperProps) {
-  return <BrowserRouter>{children}</BrowserRouter>;
+  return <>{children}</>;
 }
 
 export function render(
@@ -17,5 +16,6 @@ export function render(
   return rtlRender(ui, { wrapper: Wrapper, ...options });
 }
 
+// Re-export everything except render, which we custom defined
 export * from '@testing-library/react';
-export { render };
+// We don't need export { render } because it's already exported above with 'export function render'

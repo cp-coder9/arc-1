@@ -6,8 +6,8 @@
 import { PDFDocument, PDFPage, StandardFonts, rgb, PageSizes } from 'pdf-lib';
 import { db } from '../lib/firebase';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
-import { CouncilSubmission, Job, Submission, UserProfile } from '../types';
-import { put } from '@vercel/blob';
+import { CouncilSubmission, Job, Submission, UserProfile, Invoice } from '../types';
+import { uploadAndTrackFile } from '../lib/uploadService';
 
 export interface SubmissionPackageData {
   job: Job;
@@ -26,6 +26,7 @@ export interface SubmissionPackageData {
         actionItem: string;
       }>;
     }>;
+    traceLog: string;
   };
 }
 
@@ -35,7 +36,8 @@ class PDFGenerationService {
    */
   async generateCouncilSubmissionPackage(
     councilSubmissionId: string,
-    token: string
+    token: string,
+    uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
       // Fetch all required data
@@ -65,13 +67,17 @@ class PDFGenerationService {
       
       // Upload to blob storage
       const fileName = `council-submission-${data.councilSubmission.referenceNumber}-${Date.now()}.pdf`;
-      const blob = await put(fileName, new Blob([pdfBytes], { type: 'application/pdf' }), {
-        access: 'public',
-        token,
-        addRandomSuffix: false,
+      const url = await uploadAndTrackFile(new Blob([pdfBytes as any], { type: 'application/pdf' }), {
+        fileName,
+        fileType: 'application/pdf',
+        fileSize: pdfBytes.length,
+        uploadedBy,
+        context: 'submission',
+        jobId: data.job.id,
+        token
       });
 
-      return { url: blob.url, fileName };
+      return { url, fileName };
     } catch (error) {
       console.error('PDF generation error:', error);
       throw error;
@@ -124,15 +130,17 @@ class PDFGenerationService {
       
       // Get latest AI review result
       const aiReviewResult = approvedSubmissions.length > 0 
-        ? approvedSubmissions[approvedSubmissions.length - 1].aiReview || {
-            status: 'passed',
-            feedback: 'No AI review data available',
-            categories: []
+        ? {
+            status: approvedSubmissions[approvedSubmissions.length - 1].status === 'approved' ? 'passed' : 'failed',
+            feedback: approvedSubmissions[approvedSubmissions.length - 1].aiFeedback || 'No AI feedback available',
+            categories: approvedSubmissions[approvedSubmissions.length - 1].aiStructuredFeedback || [],
+            traceLog: 'Refer to automated logs for detail.'
           }
         : {
             status: 'pending',
             feedback: 'No submissions approved yet',
-            categories: []
+            categories: [],
+            traceLog: 'No submission found.'
           };
 
       return {
@@ -614,7 +622,8 @@ class PDFGenerationService {
    */
   async generateComplianceCertificate(
     submissionId: string,
-    token: string
+    token: string,
+    uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
       const submissionDoc = await getDoc(doc(db, 'submissions', submissionId));
@@ -687,15 +696,170 @@ class PDFGenerationService {
       const pdfBytes = await pdfDoc.save();
       
       const fileName = `compliance-certificate-${submissionId}-${Date.now()}.pdf`;
-      const blob = await put(fileName, new Blob([pdfBytes], { type: 'application/pdf' }), {
-        access: 'public',
-        token,
-        addRandomSuffix: false,
+      const url = await uploadAndTrackFile(new Blob([pdfBytes as any], { type: 'application/pdf' }), {
+        fileName,
+        fileType: 'application/pdf',
+        fileSize: pdfBytes.length,
+        uploadedBy,
+        context: 'certificate',
+        submissionId,
+        token
       });
       
-      return { url: blob.url, fileName };
+      return { url, fileName };
     } catch (error) {
       console.error('Certificate generation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate an invoice PDF
+   */
+  async generateInvoicePDF(
+    invoice: Invoice,
+    token: string,
+    uploadedBy: string
+  ): Promise<{ url: string; fileName: string }> {
+    try {
+      // Fetch client and architect profiles
+      const clientDoc = await getDoc(doc(db, 'users', invoice.clientId));
+      const architectDoc = await getDoc(doc(db, 'users', invoice.architectId));
+      
+      const client = clientDoc.exists() ? clientDoc.data() as UserProfile : { displayName: 'Unknown Client', email: '' } as UserProfile;
+      const architect = architectDoc.exists() ? architectDoc.data() as UserProfile : { displayName: 'Unknown Architect', email: '' } as UserProfile;
+
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage(PageSizes.A4);
+      const { width, height } = page.getSize();
+      
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Header
+      page.drawText('INVOICE', {
+        x: 50,
+        y: height - 80,
+        size: 30,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(`# ${invoice.invoiceNumber}`, {
+        x: 50,
+        y: height - 110,
+        size: 14,
+        font: helvetica,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+
+      // Dates
+      page.drawText(`Issue Date: ${new Date(invoice.createdAt).toLocaleDateString('en-ZA')}`, {
+        x: width - 200,
+        y: height - 80,
+        size: 10,
+        font: helvetica,
+      });
+
+      page.drawText(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString('en-ZA')}`, {
+        x: width - 200,
+        y: height - 95,
+        size: 10,
+        font: helveticaBold,
+      });
+
+      // From / To
+      page.drawText('FROM:', { x: 50, y: height - 170, size: 10, font: helveticaBold });
+      page.drawText(architect.displayName, { x: 50, y: height - 185, size: 12, font: helveticaBold });
+      page.drawText(architect.email, { x: 50, y: height - 200, size: 10, font: helvetica });
+
+      page.drawText('BILL TO:', { x: width / 2, y: height - 170, size: 10, font: helveticaBold });
+      page.drawText(client.displayName, { x: width / 2, y: height - 185, size: 12, font: helveticaBold });
+      page.drawText(client.email, { x: width / 2, y: height - 200, size: 10, font: helvetica });
+
+      // Items Table Header
+      let yPos = height - 260;
+      page.drawRectangle({
+        x: 50,
+        y: yPos - 5,
+        width: width - 100,
+        height: 25,
+        color: rgb(0.95, 0.95, 0.95),
+      });
+
+      page.drawText('Description', { x: 60, y: yPos, size: 10, font: helveticaBold });
+      page.drawText('Qty', { x: 350, y: yPos, size: 10, font: helveticaBold });
+      page.drawText('Unit Price', { x: 400, y: yPos, size: 10, font: helveticaBold });
+      page.drawText('Total', { x: 500, y: yPos, size: 10, font: helveticaBold });
+
+      yPos -= 30;
+
+      // Items
+      for (const item of invoice.items) {
+        page.drawText(item.description, { x: 60, y: yPos, size: 10, font: helvetica });
+        page.drawText(item.quantity.toString(), { x: 350, y: yPos, size: 10, font: helvetica });
+        page.drawText(`${invoice.currency} ${item.unitPrice.toLocaleString()}`, { x: 400, y: yPos, size: 10, font: helvetica });
+        page.drawText(`${invoice.currency} ${item.total.toLocaleString()}`, { x: 500, y: yPos, size: 10, font: helveticaBold });
+        yPos -= 25;
+      }
+
+      // Totals
+      yPos -= 20;
+      const totalsX = width - 200;
+      page.drawText('Subtotal:', { x: totalsX, y: yPos, size: 10, font: helvetica });
+      page.drawText(`${invoice.currency} ${invoice.subtotal.toLocaleString()}`, { x: totalsX + 80, y: yPos, size: 10, font: helvetica });
+      
+      yPos -= 20;
+      page.drawText(`Tax (${invoice.taxRate}%):`, { x: totalsX, y: yPos, size: 10, font: helvetica });
+      page.drawText(`${invoice.currency} ${invoice.taxAmount.toLocaleString()}`, { x: totalsX + 80, y: yPos, size: 10, font: helvetica });
+
+      yPos -= 30;
+      page.drawRectangle({
+        x: totalsX - 10,
+        y: yPos - 10,
+        width: 160,
+        height: 35,
+        color: rgb(0.95, 0.95, 0.95),
+      });
+      page.drawText('TOTAL:', { x: totalsX, y: yPos, size: 14, font: helveticaBold });
+      page.drawText(`${invoice.currency} ${invoice.totalAmount.toLocaleString()}`, { x: totalsX + 80, y: yPos, size: 14, font: helveticaBold, color: rgb(0, 0, 0.6) });
+
+      // Notes
+      if (invoice.notes) {
+        yPos -= 60;
+        page.drawText('Notes:', { x: 50, y: yPos, size: 10, font: helveticaBold });
+        yPos -= 15;
+        const wrappedNotes = this.wrapText(invoice.notes, 80);
+        for (const line of wrappedNotes) {
+          page.drawText(line, { x: 50, y: yPos, size: 9, font: helvetica });
+          yPos -= 12;
+        }
+      }
+
+      // Footer
+      page.drawText('Thank you for using Architex!', {
+        x: width / 2 - 80,
+        y: 50,
+        size: 10,
+        font: helvetica,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      const pdfBytes = await pdfDoc.save();
+      const fileName = `invoice-${invoice.invoiceNumber}-${Date.now()}.pdf`;
+      const url = await uploadAndTrackFile(new Blob([pdfBytes as any], { type: 'application/pdf' }), {
+        fileName,
+        fileType: 'application/pdf',
+        fileSize: pdfBytes.length,
+        uploadedBy,
+        context: 'invoice',
+        jobId: invoice.jobId,
+        token
+      });
+
+      return { url, fileName };
+    } catch (error) {
+      console.error('Invoice PDF generation error:', error);
       throw error;
     }
   }

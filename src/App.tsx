@@ -44,15 +44,22 @@ import {
   Mail,
   Lock,
   User as UserIcon,
-  Settings2
+  Settings2,
+  CreditCard,
+  UserCircle,
+  HardDrive
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
+import { NotificationBell } from './components/NotificationBell';
 
 // Sub-components
 import ClientDashboard from './components/ClientDashboard';
 import ArchitectDashboard from './components/ArchitectDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import UserSettings from './components/UserSettings';
+import InvoiceManagement from './components/InvoiceManagement';
+import FileManager from './components/FileManager';
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 
 export default function App() {
@@ -568,6 +575,26 @@ const handleLogin = async () => {
             active={activeTab === 'audit'} 
             onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }} 
           />
+          <div className="pt-4 mt-4 border-t border-border">
+            <NavItem 
+              icon={<CreditCard size={18} />} 
+              label="Invoices" 
+              active={activeTab === 'invoices'} 
+              onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }} 
+            />
+            <NavItem 
+              icon={<HardDrive size={18} />} 
+              label="Files" 
+              active={activeTab === 'files'} 
+              onClick={() => { setActiveTab('files'); setIsSidebarOpen(false); }} 
+            />
+            <NavItem 
+              icon={<UserCircle size={18} />} 
+              label="My Settings" 
+              active={activeTab === 'profile-settings'} 
+              onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }} 
+            />
+          </div>
         </nav>
 
         <div className="p-8 border-t border-border bg-secondary/10 m-4 rounded-[1.5rem]">
@@ -608,6 +635,7 @@ const handleLogin = async () => {
             </div>
           </div>
           <div className="flex items-center gap-6">
+            <NotificationBell userId={user!.uid} />
             <div className="flex flex-col items-end">
               <div className="text-[10px] text-primary uppercase tracking-widest font-bold bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
                 {new Date().toLocaleDateString('en-ZA', { dateStyle: 'medium' })}
@@ -618,9 +646,17 @@ const handleLogin = async () => {
 
         <ScrollArea className="flex-1">
           <div className="p-6 lg:p-12 max-w-7xl mx-auto">
-            {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
-            {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
-            {user!.role === 'admin' && <AdminDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+            {activeTab === 'invoices' && <InvoiceManagement user={user!} />}
+            {activeTab === 'files' && <FileManager user={user!} />}
+            {activeTab === 'profile-settings' && <UserSettings user={user!} />}
+            
+            {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings') && (
+              <>
+                {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user!.role === 'admin' && <AdminDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+              </>
+            )}
           </div>
         </ScrollArea>
       </main>

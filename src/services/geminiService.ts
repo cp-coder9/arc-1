@@ -1,6 +1,6 @@
 import { db } from "../lib/firebase";
-import { collection, getDocs, query, where, addDoc, updateDoc, doc, getDoc } from "firebase/firestore";
-import { LLMConfig } from "../types";
+import { doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc } from "firebase/firestore";
+import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider } from "../types";
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -38,7 +38,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promis
 }
 
 // Server-side Gemini proxy - API key is protected on server
-async function callGeminiProxy(systemInstruction: string, prompt: string): Promise<string> {
+async function callGeminiProxy(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig): Promise<string> {
   return withRetry(async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
@@ -51,7 +51,9 @@ async function callGeminiProxy(systemInstruction: string, prompt: string): Promi
         },
         body: JSON.stringify({
           systemInstruction,
-          prompt
+          prompt,
+          drawingUrl,
+          config
         }),
         signal: controller.signal
       });
@@ -101,7 +103,6 @@ async function callOpenAICompatible(config: LLMConfig, systemInstruction: string
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          config,
           systemInstruction,
           prompt
         }),
@@ -144,22 +145,11 @@ export async function logSystemEvent(level: 'info' | 'warning' | 'error' | 'crit
   }
 }
 
-export interface AIIssue {
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-  actionItem: string;
-}
-
-export interface AICategory {
-  name: string;
-  issues: AIIssue[];
-}
-
-export interface AIReviewResult {
-  status: 'passed' | 'failed';
-  feedback: string;
-  categories: AICategory[];
-  traceLog: string;
+export interface AIProgress {
+  percentage: number;
+  agentName: string;
+  activity: string;
+  completedAgents: string[];
 }
 
 export const SPECIALIZED_AGENTS = [
@@ -169,7 +159,7 @@ export const SPECIALIZED_AGENTS = [
     description: "Main coordinator for architectural compliance checks.",
     systemPrompt: `You are the AI Orchestrator for SANS 10400 compliance checking.
 
-Your role is to coordinate specialized agents and produce a structured JSON compliance report.
+Your role is to coordinate specialized agent findings and produce a structured JSON compliance report.
 
 CRITICAL RULES:
 1. You MUST output valid JSON only
@@ -177,8 +167,9 @@ CRITICAL RULES:
 3. status must be either "passed" or "failed"
 4. If ANY compliance issue is found, status must be "failed"
 5. Only use "passed" if drawing is fully compliant
-
-Use the specialized agents' knowledge to inform your analysis but produce a unified report.
+6. For each issue, you MUST provide a "boundingBox": { "x": number, "y": number, "width": number, "height": number }
+   - Use normalized coordinates (0.0 to 1.0) relative to the image dimensions.
+   - x: left, y: top, width, height.
 
 Example output format:
 {
@@ -191,12 +182,13 @@ Example output format:
         {
           "description": "External wall thickness is less than 230mm",
           "severity": "high",
-          "actionItem": "Increase external wall thickness to minimum 230mm per SANS 10400-K"
+          "actionItem": "Increase external wall thickness to minimum 230mm per SANS 10400-K",
+          "boundingBox": { "x": 0.15, "y": 0.22, "width": 0.05, "height": 0.3 }
         }
       ]
     }
   ],
-  "traceLog": "Orchestrator initialized review. Checked wall compliance, fenestration, fire safety..."
+  "traceLog": "Orchestrator synthesized findings from specialized agents..."
 }`,
     temperature: 0.2
   },
@@ -331,7 +323,7 @@ export async function seedAgents() {
   }
 }
 
-async function getAgentPrompt(role: string, defaultPrompt: string): Promise<string> {
+async function getAgentConfig(role: string, defaultAgent: Partial<Agent>): Promise<Agent> {
   try {
     const q = query(collection(db, 'agents'), where('role', '==', role), where('status', '==', 'online'));
     const snap = await getDocs(q);
@@ -342,12 +334,12 @@ async function getAgentPrompt(role: string, defaultPrompt: string): Promise<stri
         currentActivity: 'Analyzing drawing...',
         lastActive: new Date().toISOString()
       });
-      return agentDoc.data().systemPrompt;
+      return { id: agentDoc.id, ...agentDoc.data() } as Agent;
     }
   } catch (error) {
-    console.error(`Error fetching agent prompt for ${role}:`, error);
+    console.error(`Error fetching agent config for ${role}:`, error);
   }
-  return defaultPrompt;
+  return { ...defaultAgent } as Agent;
 }
 
 export interface AIProgress {
@@ -403,229 +395,194 @@ export async function reviewDrawing(
     };
 
     const completed: string[] = [];
-    reportProgress(5, 'Orchestrator', 'Initializing review workflow...', completed);
+    reportProgress(5, 'Orchestrator', 'Initializing multi-agent workflow...', completed);
 
-    await logSystemEvent('info', 'AI Orchestrator', `Starting review for drawing: ${drawingName}`, {
+    await logSystemEvent('info', 'AI Orchestrator', `Starting multi-agent review for: ${drawingName}`, {
       drawingUrl,
       timestamp: new Date().toISOString()
     });
 
-    const agentsToFetch = [
-      { role: 'orchestrator', name: 'Orchestrator' },
-      { role: 'wall_checker', name: 'Wall Compliance Agent' },
-      { role: 'window_checker', name: 'Fenestration Agent' },
-      { role: 'door_checker', name: 'Fire Safety Agent' },
-      { role: 'area_checker', name: 'Area Sizing Agent' },
-      { role: 'compliance_checker', name: 'General Compliance Agent' },
-      { role: 'sans_compliance', name: 'SANS Specialist' }
+    const agentRoles = [
+      'wall_checker',
+      'window_checker',
+      'door_checker',
+      'area_checker',
+      'compliance_checker',
+      'sans_compliance'
     ];
 
-    const prompts: string[] = [];
-    let currentPercentage = 5;
+    const globalConfig = await getLLMConfig();
+    
+    // 1. Fetch all agent configurations
+    reportProgress(10, 'System', 'Loading specialized agent configurations...', completed);
+    const agentConfigs = await Promise.all(agentRoles.map(role => {
+      const def = SPECIALIZED_AGENTS.find(a => a.role === role) || { role, name: role, systemPrompt: '', temperature: 0.1 };
+      return getAgentConfig(role, def);
+    }));
 
-    // Fetch all agent prompts in parallel for better performance
-    const promptPromises = agentsToFetch.map(async (agent, index) => {
-      const agentFromList = SPECIALIZED_AGENTS.find(a => a.role === agent.role);
-      const defaultPrompt = agentFromList?.systemPrompt || '';
+    // 2. Execute specialized agents in parallel
+    reportProgress(20, 'System', 'Activating specialized agents...', completed);
+    
+    // Check if we need a web search based on findings (we'll collect unknown refs)
+    let needsWebSearch = false;
+    let webSearchQueries: { query: string, role: string, id: string }[] = [];
 
-      reportProgress(
-        currentPercentage + (index * 2),
-        agent.name,
-        `Fetching ${agent.name} configuration...`,
-        completed
-      );
+    const agentCalls = agentConfigs.map(async (agent) => {
+      reportProgress(25, agent.name, `Analyzing drawing (Sector: ${agent.name})...`, completed);
+      
+      const config: LLMConfig = {
+        provider: (agent.llmProvider === 'global' || !agent.llmProvider) ? globalConfig.provider : agent.llmProvider as LLMProvider,
+        model: agent.llmModel || globalConfig.model,
+        apiKey: agent.llmApiKey || globalConfig.apiKey,
+        baseUrl: agent.llmBaseUrl || globalConfig.baseUrl,
+      };
 
       try {
-        const prompt = await getAgentPrompt(agent.role, defaultPrompt);
-        return { index, prompt, agent };
-      } catch (error) {
-        console.error(`Failed to fetch prompt for ${agent.name}:`, error);
-        return { index, prompt: defaultPrompt, agent };
+        // Inject active knowledge
+        const { getAgentKnowledge } = await import('./knowledgeService');
+        const knowledgeEntries = await getAgentKnowledge(agent.role, 'active');
+        const knowledgeContext = knowledgeEntries.length > 0 
+          ? `\n\nADDITIONAL LEARNED KNOWLEDGE (Apply these rules over default instructions):\n` + 
+            knowledgeEntries.map(k => `[${k.title}]: ${k.content}`).join('\n\n')
+          : '';
+          
+        const enrichedPrompt = agent.systemPrompt + knowledgeContext;
+
+        let response = '';
+        const promptInstruction = `Identify compliance issues in this drawing: ${drawingName}. URL: ${drawingUrl}. If you encounter a regulation or standard you are unsure of, explicitly state "UNKNOWN_REGULATION: [Topic]".`;
+        
+        if (config.provider === 'gemini') {
+          response = await callGeminiProxy(enrichedPrompt, promptInstruction, drawingUrl, config);
+        } else {
+          // Non-Gemini providers might not support vision via my proxy yet, but let's try
+          response = await callOpenAICompatible(config, enrichedPrompt, promptInstruction);
+        }
+        
+        completed.push(agent.name);
+        reportProgress(20 + (completed.length * 10), agent.name, `${agent.name} completed analysis.`, completed);
+        
+        if (response.includes("UNKNOWN_REGULATION:")) {
+          const match = response.match(/UNKNOWN_REGULATION:\s*(.+)/);
+          if (match && match[1]) {
+            needsWebSearch = true;
+            webSearchQueries.push({ query: match[1], role: agent.role, id: agent.id! });
+          }
+        }
+
+        return { role: agent.role, name: agent.name, findings: response, id: agent.id };
+      } catch (err) {
+        console.error(`Agent ${agent.name} failed:`, err);
+        return { role: agent.role, name: agent.name, findings: `Error: Agent failed to respond. ${err instanceof Error ? err.message : String(err)}`, id: agent.id };
       }
     });
 
-    const promptResults = await Promise.all(promptPromises);
+    const agentFindings = await Promise.all(agentCalls);
 
-    // Sort by original index to maintain order
-    promptResults.sort((a, b) => a.index - b.index);
-
-    promptResults.forEach(({ prompt, agent }) => {
-      prompts.push(prompt);
-      completed.push(agent.name);
-      currentPercentage += 10;
-      reportProgress(currentPercentage, agent.name, `${agent.name} ready for analysis.`, completed);
-    });
-
-    const [
-      orchestratorPrompt,
-      wallPrompt,
-      windowPrompt,
-      doorPrompt,
-      areaPrompt,
-      compliancePrompt,
-      sansPrompt
-    ] = prompts;
-
-    reportProgress(75, 'Orchestrator', 'Consolidating agent knowledge and performing final compliance synthesis...', completed);
-
-    // Create a more detailed combined system instruction
-    const combinedSystemInstruction = `${orchestratorPrompt}
-
-You have access to specialized agents with the following expertise:
-
-WALL COMPLIANCE AGENT:
-${wallPrompt}
-
-FENESTRATION AGENT:
-${windowPrompt}
-
-FIRE SAFETY AGENT:
-${doorPrompt}
-
-AREA SIZING AGENT:
-${areaPrompt}
-
-GENERAL COMPLIANCE AGENT:
-${compliancePrompt}
-
-SANS SPECIALIST:
-${sansPrompt}
-
-INSTRUCTIONS:
-1. Analyze the architectural drawing comprehensively
-2. Use the specialized agents' knowledge as context
-3. Identify ALL compliance issues
-4. Return a valid JSON object with the exact structure specified in your instructions
-5. Be thorough - check every aspect mentioned by the specialized agents
-6. If you cannot see certain details in the drawing, note that as a potential issue
-
-REMEMBER: Valid JSON output only. No markdown formatting, no explanation text outside the JSON.`;
-
-    const userPrompt = `Review this architectural drawing:
-
-Drawing Name: ${drawingName}
-Image URL: ${drawingUrl}
-
-Perform a comprehensive SANS 10400 compliance review covering:
-1. Wall thickness and construction (SANS 10400-K)
-2. Windows, ventilation, and lighting (SANS 10400-N)
-3. Doors and fire safety (SANS 10400-T)
-4. Room sizes and ceiling heights (SANS 10400-C)
-5. General compliance (SANS 10400-A)
-6. Cross-reference with SANS specialist knowledge
-
-Provide your findings as a JSON object with:
-- status: "passed" or "failed"
-- feedback: A detailed markdown summary of findings
-- categories: Array of compliance categories with issues
-- traceLog: Summary of the review process
-
-If ANY issues are found, status must be "failed".
-Only use "passed" if the drawing is fully compliant.`;
-
-    const config = await getLLMConfig();
-    let responseText = '';
-
-    reportProgress(80, 'Orchestrator', 'Sending request to AI model...', completed);
-
-    try {
-      if (config.provider === 'gemini') {
-        responseText = await callGeminiProxy(combinedSystemInstruction, userPrompt);
-      } else {
-        responseText = await callOpenAICompatible(config, combinedSystemInstruction, userPrompt);
+    // Dynamic Web Search Phase
+    if (needsWebSearch && webSearchQueries.length > 0) {
+      reportProgress(75, 'Orchestrator', 'Performing web research on unknown regulations...', completed);
+      const { webSearchForAgent } = await import('./knowledgeService');
+      
+      for (const req of webSearchQueries) {
+        if (req.id) {
+           const searchResult = await webSearchForAgent(req.query, req.role, req.id);
+           // Append search result to the respective agent's findings for the current run
+           const targetFinding = agentFindings.find(f => f.role === req.role);
+           if (targetFinding) {
+             targetFinding.findings += `\n\n[WEB SEARCH RESULT for ${req.query}]: ${searchResult}`;
+           }
+        }
       }
-    } catch (apiError) {
-      console.error('API call failed:', apiError);
-      throw new Error(`AI API call failed: ${apiError.message}`);
     }
 
-    reportProgress(90, 'Orchestrator', 'Parsing AI response...', completed);
+    // 3. Orchestration phase
+    reportProgress(85, 'Orchestrator', 'Synthesizing all agent findings and generating final report...', completed);
+    
+    const orchestratorAgent = await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
+    const orchConfig: LLMConfig = {
+      provider: (orchestratorAgent.llmProvider === 'global' || !orchestratorAgent.llmProvider) ? globalConfig.provider : orchestratorAgent.llmProvider as LLMProvider,
+      model: orchestratorAgent.llmModel || globalConfig.model,
+      apiKey: orchestratorAgent.llmApiKey || globalConfig.apiKey,
+      baseUrl: orchestratorAgent.llmBaseUrl || globalConfig.baseUrl,
+    };
 
-    // Parse the response
-    let result: any;
+    const findingsContext = agentFindings.map(f => `### ${f.name} Findings:\n${f.findings}`).join('\n\n');
+    
+    const synthesisPrompt = `I have received reports from multiple specialized agents regarding the drawing: ${drawingName}.
+    
+    ${findingsContext}
+    
+    Based on these specialized reports AND your visual analysis of the drawing, produce the final compliance status and structured issue list.
+    Remember to include boundingBox coordinates for every issue identified.`;
+
+    let finalResponse = '';
+    if (orchConfig.provider === 'gemini') {
+      finalResponse = await callGeminiProxy(orchestratorAgent.systemPrompt, synthesisPrompt, drawingUrl, orchConfig);
+    } else {
+      finalResponse = await callOpenAICompatible(orchConfig, orchestratorAgent.systemPrompt, synthesisPrompt);
+    }
+
+    reportProgress(95, 'Orchestrator', 'Finalizing compliance report...', completed);
+
+    const result = parseAIResponse(finalResponse);
+    const validStatus = result.status === 'passed' ? 'passed' : 'failed';
+
+    // Self Improvement logging
     try {
-      result = parseAIResponse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      // Return a fallback result with the raw response for debugging
-      return {
-        status: 'failed',
-        feedback: `AI Review completed but response parsing failed. Raw response snippet: ${responseText.substring(0, 500)}...`,
-        categories: [{
-          name: 'Parse Error',
-          issues: [{
-            description: 'Failed to parse AI response',
-            severity: 'medium',
-            actionItem: 'Please review the drawing manually or retry'
-          }]
-        }],
-        traceLog: `Orchestrator started review. Agents activated: ${completed.join(', ')}. Parse error occurred.`
-      };
+      if (orchestratorAgent.id) {
+        const { addKnowledge } = await import('./knowledgeService');
+        await addKnowledge({
+          agentId: 'orchestrator',
+          agentRole: 'orchestrator',
+          title: `Review Summary for ${drawingName}`,
+          content: `Reviewed ${drawingName}. Status: ${validStatus}. Found ${Array.isArray(result.categories) ? result.categories.reduce((acc: number, cat: any) => acc + (cat.issues?.length || 0), 0) : 0} issues. Tracelog: ${result.traceLog}`,
+          source: 'self_improvement',
+          status: 'pending_review',
+          submittedBy: 'system',
+          submittedByRole: 'system',
+          tags: ['review_summary', validStatus],
+          createdAt: new Date().toISOString()
+        });
+      }
+    } catch (selfImprovementError) {
+      console.error("Failed to log self improvement:", selfImprovementError);
     }
-
-    // Validate required fields
-    if (!result.status || !result.feedback) {
-      console.error('Invalid result structure:', result);
-      throw new Error('AI response missing required fields');
-    }
-
-    // Ensure status is valid
-    const validStatus = result.status === 'passed' || result.status === 'failed' ? result.status : 'failed';
-
-    reportProgress(95, 'Orchestrator', 'Finalizing report and updating traceability logs...', completed);
 
     // Reset agent activities
-    try {
-      const agentsSnap = await getDocs(collection(db, 'agents'));
-      const resetPromises = agentsSnap.docs.map(agentDoc =>
-        updateDoc(doc(db, 'agents', agentDoc.id), {
-          currentActivity: 'Idle',
-          lastActive: new Date().toISOString()
-        })
-      );
-      await Promise.all(resetPromises);
-    } catch (error) {
-      console.error('Failed to reset agent activities:', error);
-    }
+    await Promise.all(agentConfigs.concat(orchestratorAgent).map(agent => {
+      if (!agent.id) return Promise.resolve();
+      return updateDoc(doc(db, 'agents', agent.id), {
+        currentActivity: 'Idle',
+        lastActive: new Date().toISOString()
+      });
+    }));
 
     const duration = Date.now() - startTime;
     reportProgress(100, 'Orchestrator', `Review Complete (${Math.round(duration / 1000)}s).`, completed);
-
-    await logSystemEvent('info', 'AI Orchestrator', `Review completed for ${drawingName}`, {
-      status: validStatus,
-      duration: `${duration}ms`,
-      categoriesCount: result.categories?.length || 0,
-      issuesCount: result.categories?.reduce((acc: number, cat: AICategory) => acc + cat.issues.length, 0) || 0
-    });
 
     return {
       status: validStatus,
       feedback: result.feedback || 'AI Review completed.',
       categories: Array.isArray(result.categories) ? result.categories : [],
-      traceLog: result.traceLog || `Orchestrator completed review with ${completed.length} agents in ${Math.round(duration / 1000)}s.`
+      traceLog: result.traceLog || `Orchestrator summarized findings from ${completed.length} specialized agents.`
     };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await logSystemEvent('error', 'AI Orchestrator', `Review failed for ${drawingName}`, {
-      error: errorMessage,
-      duration: `${Date.now() - startTime}ms`
-    });
-
-    console.error("AI Review Error:", error);
-
+    console.error("Multi-agent Review Error:", error);
+    
     return {
       status: 'failed',
-      feedback: `An error occurred during the AI review process: ${errorMessage}. Please try again or contact support.`,
+      feedback: `Orchestration error: ${errorMessage}`,
       categories: [{
         name: 'System Error',
         issues: [{
-          description: 'AI review system encountered an error',
+          description: 'The multi-agent review system encountered a failure.',
           severity: 'high',
-          actionItem: 'Please retry the submission or contact support if the issue persists'
+          actionItem: 'Retry or check system logs'
         }]
       }],
-      traceLog: `Orchestrator encountered an error: ${errorMessage}`
+      traceLog: `Failed at ${Date.now() - startTime}ms: ${errorMessage}`
     };
   }
 }

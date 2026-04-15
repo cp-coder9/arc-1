@@ -3,7 +3,7 @@ import { AlertCircle, RefreshCcw } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface Props {
-  children?: React.ReactNode;
+  children: React.ReactNode;
 }
 
 interface State {
@@ -11,10 +11,13 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundary extends React.Component<Props, State> {
+export class ErrorBoundary extends React.Component<Props, State> {
+  public props: Props;
+  public state: State = { hasError: false, error: null };
+
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.props = props;
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -26,7 +29,7 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    (this as any).setState({ hasError: false, error: null });
     window.location.reload();
   };
 

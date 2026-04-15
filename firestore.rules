@@ -95,10 +95,14 @@ service cloud.firestore {
           getJob(jobId).data.clientId == request.auth.uid ||
           resource.data.architectId == request.auth.uid
         );
-        allow create: if isAuthenticated() && 
-          hasRole('architect') &&
-          request.resource.data.architectId == request.auth.uid &&
-          getJob(jobId).data.selectedArchitectId == request.auth.uid;
+        allow create: if isAuthenticated() && (
+          (hasRole('architect') &&
+            request.resource.data.architectId == request.auth.uid &&
+            getJob(jobId).data.selectedArchitectId == request.auth.uid) ||
+          (hasRole('client') &&
+            getJob(jobId).data.clientId == request.auth.uid) ||
+          isAdmin()
+        );
         allow update: if isAuthenticated() && (
           isAdmin() ||
           (resource.data.architectId == request.auth.uid && 
@@ -261,6 +265,40 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isAdmin();
       allow update: if isAuthenticated() && isAdmin();
       allow delete: if false;
+    }
+
+    // Invoices collection
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.clientId == request.auth.uid ||
+        resource.data.architectId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        (hasRole('architect') && request.resource.data.architectId == request.auth.uid)
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.architectId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'pdfUrl', 'updatedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Uploaded files collection
+    match /uploaded_files/{fileId} {
+      allow read: if isAuthenticated() && (resource.data.uploadedBy == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.uploadedBy == request.auth.uid;
+      allow delete: if isAuthenticated() && (resource.data.uploadedBy == request.auth.uid || isAdmin());
+    }
+
+    // Agent Knowledge collection
+    match /agent_knowledge/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Default deny

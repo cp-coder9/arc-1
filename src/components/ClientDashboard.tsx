@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { UserProfile, Job, Application, Submission, JobCategory } from '../types';
+import { UserProfile, Job, Application, Submission, JobCategory, AIReviewResult } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -13,8 +13,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { toast } from 'sonner';
-import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink } from 'lucide-react';
+import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X } from 'lucide-react';
+import { ArchitectPortfolio } from './ArchitectPortfolio';
 import { Logo } from './Logo';
+import { uploadAndTrackFile } from '../lib/uploadService';
+import { reviewDrawing, AIProgress } from '../services/geminiService';
+import { notificationService } from '../services/notificationService';
+import { SubmissionItem } from './SubmissionItem';
+import { OrchestrationProgressModal } from './OrchestrationProgressModal';
+import { format } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
 // import { motion } from 'framer-motion';
 
 export default function ClientDashboard({ 
@@ -211,7 +219,7 @@ function StatCard({ title, value, icon }: { title: string, value: string | numbe
 
 import { Star, Send } from 'lucide-react';
 
-function JobItem({ job, user }: { job: Job, user: UserProfile }) {
+function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: string]: any }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isRating, setIsRating] = useState(false);
@@ -221,6 +229,17 @@ function JobItem({ job, user }: { job: Job, user: UserProfile }) {
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [selectedArchitect, setSelectedArchitect] = useState<UserProfile | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  
+  // Upload and AI review state
+  const [drawingUrl, setDrawingUrl] = useState('');
+  const [drawingName, setDrawingName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isPreChecking, setIsPreChecking] = useState(false);
+  const [preCheckResult, setPreCheckResult] = useState<AIReviewResult | null>(null);
+  const [aiProgress, setAiProgress] = useState<AIProgress | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isImage, setIsImage] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const qApps = query(collection(db, `jobs/${job.id}/applications`));
@@ -248,6 +267,10 @@ function JobItem({ job, user }: { job: Job, user: UserProfile }) {
       await updateDoc(doc(db, `jobs/${job.id}/applications`, app.id), {
         status: 'accepted'
       });
+      
+      // Notify architect
+      await notificationService.notifyApplicationAccepted(app.architectId, job.title, job.id);
+      
       toast.success(`Accepted ${app.architectName}'s proposal. Escrow payment initialized.`);
     } catch (error) {
       toast.error("Failed to accept application");
@@ -306,6 +329,198 @@ function JobItem({ job, user }: { job: Job, user: UserProfile }) {
       toast.success("Review submitted! Thank you.");
     } catch (error) {
       toast.error("Failed to submit review");
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleUpload(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleUpload(file);
+  };
+
+  const handleUpload = async (file: File) => {
+    if (!file) return;
+    
+    // Validate file type (PDF, CAD-like extensions, or images)
+    const validTypes = ['application/pdf', 'image/vnd.dwg', 'application/acad', 'application/x-acad', 'application/autocad_dwg', 'image/x-dwg', 'application/dwg'];
+    const isPdf = file.type === 'application/pdf';
+    const isDwg = file.name.toLowerCase().endsWith('.dwg');
+    const isImg = file.type.startsWith('image/');
+    
+    if (!isPdf && !isDwg && !isImg) {
+      toast.error("Please upload a PDF, DWG, or Image file.");
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("File size exceeds 20MB limit.");
+      return;
+    }
+
+    setIsImage(isImg);
+    setIsUploading(true);
+    setDrawingName(file.name.split('.')[0]);
+
+    try {
+      const url = await uploadAndTrackFile(file, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedBy: user.uid,
+        context: 'submission',
+        jobId: job.id,
+        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
+      });
+      setDrawingUrl(url);
+      setIsUploading(false);
+      toast.success("File uploaded successfully!");
+      
+      // Verification: Automatically trigger AI analysis and create submission
+      // as requested in the comment (Step 3).
+      await handleSubmitDrawingAction(url, file.name.split('.')[0]);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Upload failed.");
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmitDrawingAction = async (url: string, name: string) => {
+    try {
+      toast.info("Starting AI Compliance Review...");
+      
+      const newSub = {
+        jobId: job.id,
+        architectId: user.uid, // In this case, the client is submitting
+        drawingUrl: url,
+        drawingName: name,
+        status: 'processing' as const,
+        traceability: [{
+          timestamp: new Date().toISOString(),
+          actor: 'Client',
+          action: 'Submission Initiated',
+          details: `Drawing "${name}" uploaded by client for AI analysis.`
+        }],
+        createdAt: new Date().toISOString()
+      };
+
+      const docRef = await addDoc(collection(db, `jobs/${job.id}/submissions`), newSub);
+      
+      // Notify Client (self notification is okay, or could be architect if supported)
+      await notificationService.notifyDrawingSubmitted(job.clientId, name, job.id, docRef.id);
+      
+      // Update to AI Reviewing
+      await updateDoc(doc(db, `jobs/${job.id}/submissions`, docRef.id), {
+        status: 'ai_reviewing',
+        traceability: [
+          ...newSub.traceability,
+          {
+            timestamp: new Date().toISOString(),
+            actor: 'System',
+            action: 'Status Change',
+            details: 'Routing to AI Compliance Orchestrator.'
+          }
+        ]
+      });
+
+      // Trigger AI Review
+      const aiResult = await reviewDrawing(url, name, (progress) => {
+        setAiProgress(progress);
+      });
+      
+      const finalStatus = aiResult.status === 'passed' ? 'admin_reviewing' : 'ai_failed';
+      const statusLabel = aiResult.status === 'passed' ? 'Awaiting Admin Approval' : 'AI Review Failed';
+
+      await updateDoc(doc(db, `jobs/${job.id}/submissions`, docRef.id), {
+        status: finalStatus,
+        aiFeedback: aiResult.feedback,
+        aiStructuredFeedback: aiResult.categories,
+        traceability: [
+          ...newSub.traceability,
+          {
+            timestamp: new Date().toISOString(),
+            actor: 'System',
+            action: 'Status Change',
+            details: 'Routing to AI Compliance Orchestrator.'
+          },
+          {
+            timestamp: new Date().toISOString(),
+            actor: 'AI Orchestrator',
+            action: 'Compliance Check Completed',
+            details: aiResult.traceLog
+          },
+          {
+            timestamp: new Date().toISOString(),
+            actor: 'System',
+            action: 'Status Change',
+            details: `Submission moved to: ${statusLabel}`
+          }
+        ]
+      });
+      
+      // Notify parties of AI completion
+      await notificationService.notifyAIReviewComplete(
+        job.clientId,
+        user.uid,
+        name,
+        aiResult.status === 'passed' ? 'passed' : 'failed',
+        job.id,
+        docRef.id
+      );
+
+      if (aiResult.status === 'passed') {
+        toast.success("AI Review Passed! Sent to Admin for final approval.");
+      } else {
+        toast.error("AI Review Failed. Please check feedback.");
+      }
+      setDrawingName('');
+      setDrawingUrl('');
+      setAiProgress(null);
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast.error("Submission and review failed");
+      setAiProgress(null);
+    }
+  };
+
+  const handlePreCheck = async () => {
+    if (!drawingUrl || !drawingName) {
+      toast.error("Please upload a drawing first.");
+      return;
+    }
+    
+    setIsPreChecking(true);
+    setPreCheckResult(null);
+    setAiProgress({
+      percentage: 0,
+      agentName: 'Orchestrator',
+      activity: 'Initializing AI Orchestration Engine...',
+      completedAgents: []
+    });
+    
+    try {
+      const result = await reviewDrawing(drawingUrl, drawingName, (progress) => {
+        setAiProgress(progress);
+      });
+      
+      setPreCheckResult(result);
+      if (result.status === 'passed') {
+        toast.success("AI Pre-check Passed!");
+      } else {
+        toast.warning("AI Pre-check identified issues.");
+      }
+    } catch (error) {
+      console.error("Pre-check error:", error);
+      toast.error("AI Pre-check failed.");
+    } finally {
+      setIsPreChecking(false);
+      setTimeout(() => setAiProgress(null), 1000);
     }
   };
 
@@ -515,53 +730,106 @@ function JobItem({ job, user }: { job: Job, user: UserProfile }) {
                   )}
                 </TabsContent>
 
-<TabsContent value="applications" className="mt-0 space-y-6">
+<TabsContent value="applications" className="mt-0 space-y-4 pb-20">
                 {applications.map(app => (
                   <Card 
                     key={app.id} 
-                    className="border-border shadow-sm bg-white rounded-2xl hover:shadow-md transition-all cursor-pointer hover:border-primary/30"
-                    onClick={() => setSelectedApplication(app)}
+                    className="border-border shadow-sm bg-white rounded-3xl hover:shadow-xl transition-all border-l-4 border-l-primary overflow-hidden"
                   >
-                    <CardContent className="p-8 flex items-center justify-between gap-8">
-                      <div className="space-y-3 flex-1">
-                        <div className="flex items-center gap-4">
-                          <p className="font-heading font-bold text-2xl tracking-tight">{app.architectName}</p>
-                          <ArchitectRating architectId={app.architectId} />
+                    <CardContent className="p-0">
+                      <div className="flex flex-col md:flex-row h-full">
+                        {/* Portfolio Thumbnail */}
+                        <div className="md:w-48 bg-secondary/30 relative overflow-hidden group">
+                          {app.portfolioThumbnail ? (
+                            <img 
+                              src={app.portfolioThumbnail} 
+                              alt="Portfolio Preview" 
+                              className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                              <Briefcase size={32} />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-[10px] text-white font-bold uppercase tracking-widest">View Portfolio</span>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed max-w-xl line-clamp-2">{app.proposal}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock size={12} />
-                          <span>Applied {new Date(app.createdAt).toLocaleDateString()}</span>
+
+                        <div className="flex-1 p-8 flex flex-col md:flex-row justify-between gap-8">
+                          <div className="space-y-4 flex-1">
+                            <div className="flex flex-col space-y-1">
+                              <div className="flex items-center gap-3">
+                                <p className="font-heading font-bold text-2xl tracking-tight text-foreground">{app.architectName}</p>
+                                {app.sacapNumber && (
+                                  <Badge className="bg-green-50 text-green-700 border-green-100 gap-1 text-[9px] px-2 py-0 border">
+                                    <ShieldCheck size={10} /> Verified
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <ArchitectRating architectId={app.architectId} />
+                                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest border-l border-border pl-3">
+                                  {app.completedJobs || 0} Jobs Completed
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-sm text-muted-foreground leading-relaxed max-w-xl line-clamp-2 italic">
+                              "{app.proposal}"
+                            </p>
+
+                            <div className="flex flex-wrap gap-2">
+                              {app.specializations?.map((spec, i) => (
+                                <Badge key={i} variant="secondary" className="text-[9px] bg-primary/5 text-primary border-primary/10 px-2 py-0">
+                                  {spec}
+                                </Badge>
+                              ))}
+                              {(!app.specializations || app.specializations.length === 0) && (
+                                <Badge variant="secondary" className="text-[9px] bg-secondary text-muted-foreground px-2 py-0">
+                                  General Architect
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col justify-between items-end gap-4 min-w-[140px]">
+                            <div className="text-right">
+                              <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Applied On</p>
+                              <p className="text-xs font-bold">{new Date(app.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2 w-full">
+                              <Button 
+                                variant="outline"
+                                className="w-full h-10 rounded-xl text-[10px] uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedApplication(app);
+                                }}
+                              >
+                                View Full Profile
+                              </Button>
+                              {job.status === 'open' && app.status === 'pending' && (
+                                <Button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAcceptApplication(app);
+                                  }} 
+                                  className="w-full bg-primary text-primary-foreground h-10 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20 text-[10px] uppercase tracking-widest"
+                                >
+                                  Hire
+                                </Button>
+                              )}
+                              {app.status === 'accepted' && (
+                                <div className="bg-primary/10 text-primary rounded-xl px-4 py-2 flex items-center justify-center gap-2">
+                                  <CheckCircle2 size={14} />
+                                  <span className="text-[10px] font-bold uppercase tracking-widest">Hired</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          className="rounded-xl"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedApplication(app);
-                          }}
-                        >
-                          View Details
-                        </Button>
-                        {job.status === 'open' && app.status === 'pending' && (
-                          <Button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAcceptApplication(app);
-                            }} 
-                            className="bg-primary text-primary-foreground h-12 px-6 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20"
-                          >
-                            <CheckCircle2 size={18} /> Hire
-                          </Button>
-                        )}
-                        {job.status !== 'open' && (
-                          <Badge variant={app.status === 'accepted' ? 'default' : 'outline'} className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-[10px] ${app.status === 'accepted' ? 'bg-primary text-primary-foreground' : ''}`}>
-                            {app.status}
-                          </Badge>
-                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -573,37 +841,65 @@ function JobItem({ job, user }: { job: Job, user: UserProfile }) {
                   )}
                 </TabsContent>
 
-                <TabsContent value="submissions" className="mt-0 space-y-6">
-                  {submissions.map(sub => (
-                    <Card key={sub.id} className="border-border shadow-sm bg-white rounded-2xl">
-                      <CardContent className="p-8 flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                          <div className="p-4 bg-secondary/50 rounded-2xl text-primary">
-                            <FileText size={24} />
-                          </div>
-                          <div>
-                            <p className="font-heading font-bold text-xl">{sub.drawingName}</p>
-                            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest font-bold mt-1">
-                              Submitted {new Date(sub.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
+                <TabsContent value="submissions" className="mt-0 space-y-6 pb-20">
+                  {/* Step 1 & 2: Client upload capability */}
+                  {job.status === 'in-progress' && (
+                    <section className="space-y-4">
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
+                        <UploadCloud size={14} className="text-primary" /> Upload New Drawing for AI Review
+                      </h4>
+                      <div 
+                        className={`p-10 border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center text-center gap-4 ${
+                          isDragging ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-border bg-white hover:border-primary/30'
+                        }`}
+                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={handleDrop}
+                      >
+                        <div className="p-4 bg-primary/10 text-primary rounded-2xl">
+                          {isUploading ? <Loader2 size={32} className="animate-spin" /> : <Plus size={32} />}
                         </div>
-                        <Badge variant="outline" className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-[10px] ${
-                          sub.status === 'approved' ? 'bg-green-50 text-green-700 border-green-100' : 
-                          sub.status.includes('failed') ? 'bg-red-50 text-red-700 border-red-100' : 
-                          'bg-primary/5 text-primary border-primary/10'
-                        }`}>
-                          {sub.status.replace('_', ' ')}
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {submissions.length === 0 && (
-                    <div className="py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
-                      <p className="text-muted-foreground italic">No drawings submitted yet.</p>
-                    </div>
+                        <div>
+                          <p className="text-sm font-bold">Drag and drop your architectural plan</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">PDF, DWG, or High-Res Image (Max 20MB)</p>
+                        </div>
+                        <input 
+                          type="file" 
+                          ref={fileInputRef}
+                          className="hidden" 
+                          accept=".pdf,.dwg,image/*"
+                          onChange={handleFileSelect}
+                        />
+                        <Button 
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploading}
+                          variant="outline"
+                          className="rounded-xl border-primary/20 text-xs font-bold uppercase tracking-widest px-8"
+                        >
+                          {isUploading ? 'Uploading...' : 'Select File'}
+                        </Button>
+                      </div>
+                    </section>
                   )}
+
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
+                      <HistoryIcon size={14} className="text-primary" /> Submission History
+                    </h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {submissions.map(sub => (
+                        <SubmissionItem key={sub.id} sub={sub} userRole={user.role} />
+                      ))}
+                      {submissions.length === 0 && (
+                        <div className="py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
+                          <p className="text-muted-foreground italic">No drawings submitted yet.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </TabsContent>
+
+                <OrchestrationProgressModal progress={aiProgress} isOpen={!!aiProgress} />
 
                 <TabsContent value="payments" className="mt-0 space-y-10">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -700,69 +996,61 @@ function JobItem({ job, user }: { job: Job, user: UserProfile }) {
       
       {/* Application Details Dialog */}
       <Dialog open={!!selectedApplication} onOpenChange={() => setSelectedApplication(null)}>
-        <DialogContent className="sm:max-w-[600px] border-border bg-white rounded-3xl p-0 overflow-hidden">
-          <div className="bg-primary/5 p-8 border-b border-border">
+        <DialogContent className="sm:max-w-[900px] max-w-4xl border-border bg-white rounded-3xl p-0 overflow-hidden flex flex-col h-[90vh]">
+          <div className="bg-primary/5 p-8 border-b border-border shrink-0">
             <DialogHeader>
-              <DialogTitle className="font-heading text-3xl font-bold">Application Details</DialogTitle>
-              <DialogDescription>Review architect proposal and portfolio</DialogDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <DialogTitle className="font-heading text-3xl font-bold">Application Details</DialogTitle>
+                  <DialogDescription>Review architect proposal and portfolio gallery</DialogDescription>
+                </div>
+                <div className="flex gap-3">
+                  {selectedApplication && job.status === 'open' && selectedApplication.status === 'pending' && (
+                    <Button 
+                      onClick={() => {
+                        handleAcceptApplication(selectedApplication);
+                        setSelectedApplication(null);
+                      }}
+                      className="bg-primary text-primary-foreground h-12 px-6 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20"
+                    >
+                      <CheckCircle2 size={18} /> Hire Architect
+                    </Button>
+                  )}
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedApplication(null)}
+                    className="rounded-full"
+                  >
+                    <X size={20} />
+                  </Button>
+                </div>
+              </div>
             </DialogHeader>
           </div>
-          {selectedApplication && (
-            <div className="p-8 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <User size={32} className="text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-heading font-bold text-2xl">{selectedApplication.architectName}</h3>
-                  <p className="text-sm text-muted-foreground">Applied {new Date(selectedApplication.createdAt).toLocaleDateString()}</p>
+          
+          <ScrollArea className="flex-1">
+            {selectedApplication && (
+              <div className="p-8 space-y-10 pb-20">
+                {/* Proposal Section */}
+                <section className="space-y-4">
+                  <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
+                    <FileText size={14} className="text-primary" /> Proposal from {selectedApplication.architectName}
+                  </h4>
+                  <div className="bg-secondary/30 p-8 rounded-[2rem] border border-border">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedApplication.proposal}</p>
+                  </div>
+                </section>
+
+                <div className="border-t border-border pt-10">
+                  <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2 mb-6">
+                    <User size={14} className="text-primary" /> Full Architect Profile & Portfolio
+                  </h4>
+                  <ArchitectPortfolio architectId={selectedApplication.architectId} />
                 </div>
               </div>
-              
-              <div className="space-y-2">
-                <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Proposal</h4>
-                <div className="bg-secondary/30 p-6 rounded-2xl">
-                  <p className="text-sm leading-relaxed">{selectedApplication.proposal}</p>
-                </div>
-              </div>
-              
-              {selectedApplication.portfolioUrl && (
-                <div className="space-y-2">
-                  <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Portfolio</h4>
-                  <a 
-                    href={selectedApplication.portfolioUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-primary hover:underline"
-                  >
-                    <ExternalLink size={16} />
-                    View Portfolio
-                  </a>
-                </div>
-              )}
-              
-              <div className="flex gap-3 pt-4">
-                {job.status === 'open' && selectedApplication.status === 'pending' && (
-                  <Button 
-                    onClick={() => {
-                      handleAcceptApplication(selectedApplication);
-                      setSelectedApplication(null);
-                    }}
-                    className="flex-1 bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2"
-                  >
-                    <CheckCircle2 size={18} /> Hire Architect
-                  </Button>
-                )}
-                <Button 
-                  variant="outline"
-                  onClick={() => setSelectedApplication(null)}
-                  className="flex-1 h-14 rounded-xl font-bold"
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
       

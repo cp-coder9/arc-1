@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc } from 'firebase/firestore';
-import { put } from '@vercel/blob';
-import { UserProfile, Job, Application, Submission, DelegatedTask } from '../types';
+import { uploadAndTrackFile } from '../lib/uploadService';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -14,10 +14,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
 import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle } from 'lucide-react';
-import { reviewDrawing, AIReviewResult, AIProgress } from '../services/geminiService';
+import { reviewDrawing, AIProgress } from '../services/geminiService';
+import { SubmissionItem } from './SubmissionItem';
+import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { notificationService } from '../services/notificationService';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { SearchFilter, SearchFilters } from './SearchFilter';
+import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 // import { motion } from 'framer-motion';
 
 export default function ArchitectDashboard({ 
@@ -31,6 +36,16 @@ export default function ArchitectDashboard({
 }) {
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
+  const [filters, setFilters] = useState<SearchFilters>({
+    query: '',
+    category: '',
+    minBudget: 0,
+    maxBudget: 10000000,
+    location: '',
+    deadlineWithin: 0,
+    postedWithin: 0,
+    sortBy: 'posted',
+  });
 
   // Map sidebar tabs to internal dashboard tabs
   const internalTab = activeTab === 'marketplace' ? 'browse' : activeTab === 'projects' ? 'active' : 'browse';
@@ -58,6 +73,40 @@ export default function ArchitectDashboard({
     };
   }, [user.uid]);
 
+  const filteredJobs = availableJobs
+    .filter(job => {
+      const matchesSearch = !filters.query || 
+        job.title.toLowerCase().includes(filters.query.toLowerCase()) || 
+        job.description.toLowerCase().includes(filters.query.toLowerCase());
+      
+      const matchesCategory = !filters.category || job.category === filters.category;
+      
+      const matchesBudget = job.budget >= filters.minBudget && job.budget <= filters.maxBudget;
+      
+      // matchesLocation could be added if job has location field
+      
+      let matchesDeadline = true;
+      if (filters.deadlineWithin > 0) {
+        const daysToDeadline = differenceInDays(parseISO(job.deadline), new Date());
+        matchesDeadline = daysToDeadline >= 0 && daysToDeadline <= filters.deadlineWithin;
+      }
+
+      let matchesPosted = true;
+      if (filters.postedWithin > 0) {
+        const daysSincePosted = differenceInDays(new Date(), parseISO(job.createdAt));
+        matchesPosted = daysSincePosted <= filters.postedWithin;
+      }
+
+      return matchesSearch && matchesCategory && matchesBudget && matchesDeadline && matchesPosted;
+    })
+    .sort((a, b) => {
+      if (filters.sortBy === 'budget_desc') return b.budget - a.budget;
+      if (filters.sortBy === 'budget_asc') return a.budget - b.budget;
+      if (filters.sortBy === 'deadline') return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); // default: posted (newest)
+    });
+
+
   return (
     <div className="space-y-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 bg-white p-10 rounded-[2.5rem] border border-border shadow-sm">
@@ -76,14 +125,33 @@ export default function ArchitectDashboard({
           <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">My Active Projects</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="browse" className="mt-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {availableJobs.map(job => (
+        <TabsContent value="browse" className="mt-8 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-heading font-bold tracking-tight">Find Your Next Project</h2>
+              <p className="text-muted-foreground">{filteredJobs.length} open jobs matching your criteria</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
+                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Total Open Jobs</p>
+                <p className="text-xl font-bold text-primary">{availableJobs.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <SearchFilter 
+            filters={filters} 
+            onFiltersChange={setFilters} 
+            totalResults={filteredJobs.length} 
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+            {filteredJobs.map(job => (
               <BrowseJobItem key={job.id} job={job} user={user} />
             ))}
-            {availableJobs.length === 0 && (
+            {filteredJobs.length === 0 && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
-                <p className="text-muted-foreground italic">No new jobs available at the moment.</p>
+                <p className="text-muted-foreground italic">No jobs match your current filters. Try adjusting your search.</p>
               </div>
             )}
           </div>
@@ -106,11 +174,13 @@ export default function ArchitectDashboard({
   );
 }
 
-function BrowseJobItem({ job, user }: { job: Job, user: UserProfile }) {
+function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
   const [proposal, setProposal] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [isApplying, setIsApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
+  const [appCount, setAppCount] = useState(0);
+  const [clientProfile, setClientProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     const checkApplied = async () => {
@@ -118,12 +188,32 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile }) {
       const snap = await getDocs(q);
       setHasApplied(!snap.empty);
     };
+    
+    const fetchAppCount = async () => {
+      const q = query(collection(db, `jobs/${job.id}/applications`));
+      const snap = await getDocs(q);
+      setAppCount(snap.size);
+    };
+
+    const fetchClient = async () => {
+      const snap = await getDoc(doc(db, 'users', job.clientId));
+      if (snap.exists()) {
+        setClientProfile(snap.data() as UserProfile);
+      }
+    };
+
     checkApplied();
-  }, [job.id, user.uid]);
+    fetchAppCount();
+    fetchClient();
+  }, [job.id, user.uid, job.clientId]);
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Fetch architect profile for denormalization
+      const profileDoc = await getDoc(doc(db, 'architect_profiles', user.uid));
+      const profileData = profileDoc.exists() ? profileDoc.data() : null;
+
       await addDoc(collection(db, `jobs/${job.id}/applications`), {
         jobId: job.id,
         architectId: user.uid,
@@ -131,7 +221,13 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile }) {
         proposal,
         portfolioUrl,
         status: 'pending',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        // Denormalized fields
+        sacapNumber: profileData?.sacapNumber || '',
+        specializations: (profileData?.specializations || []).slice(0, 3),
+        completedJobs: profileData?.completedJobs || 0,
+        averageRating: profileData?.averageRating || 0,
+        portfolioThumbnail: profileData?.portfolioImages?.[0]?.url || ''
       });
       
       // Notify the client of new application
@@ -144,28 +240,86 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile }) {
       
       setHasApplied(true);
       setIsApplying(false);
+      setAppCount(prev => prev + 1);
       toast.success("Application submitted");
     } catch (error) {
       toast.error("Failed to submit application");
     }
   };
 
+  const daysLeft = differenceInDays(parseISO(job.deadline), new Date());
+  
+  const categoryColors: Record<string, string> = {
+    'Residential': 'bg-blue-500',
+    'Commercial': 'bg-purple-500',
+    'Industrial': 'bg-orange-500',
+    'Renovation': 'bg-emerald-500',
+    'Interior': 'bg-rose-500',
+    'Landscape': 'bg-green-500'
+  };
+
   return (
-    <Card className="border-border shadow-sm bg-white hover:shadow-md transition-shadow rounded-2xl overflow-hidden group">
-      <CardHeader className="p-8">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex gap-2">
-            <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest px-3 py-1">Open</Badge>
-            <Badge variant="outline" className="border-primary/20 text-primary uppercase text-[10px] tracking-widest px-3 py-1">{job.category}</Badge>
+    <Card className="border-border shadow-sm bg-white hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden group border-t-0">
+      <div className={`h-1.5 w-full ${categoryColors[job.category] || 'bg-primary'}`} />
+      <CardHeader className="p-6 pb-4">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[9px] tracking-widest px-2 py-0.5">Open</Badge>
+            <Badge variant="outline" className="border-primary/20 text-primary uppercase text-[9px] tracking-widest px-2 py-0.5">{job.category}</Badge>
+            {daysLeft >= 0 && (
+              <Badge className={`${daysLeft <= 3 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'} uppercase text-[9px] tracking-widest px-2 py-0.5`}>
+                <Clock size={10} className="mr-1" /> {daysLeft === 0 ? 'Due Today' : `${daysLeft} days left`}
+              </Badge>
+            )}
           </div>
-          <span className="text-lg font-bold text-primary font-mono">R {job.budget.toLocaleString()}</span>
+          <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {job.budget.toLocaleString()}</span>
         </div>
-        <CardTitle className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</CardTitle>
-        <CardDescription className="line-clamp-2 leading-relaxed mt-2">{job.description}</CardDescription>
+        <CardTitle className="font-heading font-bold text-xl group-hover:text-primary transition-colors tracking-tight line-clamp-1">{job.title}</CardTitle>
+        <CardDescription className="line-clamp-2 text-xs leading-relaxed mt-2 h-8">{job.description}</CardDescription>
       </CardHeader>
-      <CardFooter className="bg-secondary/20 p-6 border-t border-border">
+      
+      <CardContent className="p-6 pt-0 space-y-4">
+        {/* Requirements Tags */}
+        <div className="flex flex-wrap gap-1.5">
+          {job.requirements.slice(0, 3).map((req, i) => (
+            <Badge key={i} variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0 max-w-[120px] truncate">
+              {req}
+            </Badge>
+          ))}
+          {job.requirements.length > 3 && (
+            <Badge variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0">
+              +{job.requirements.length - 3} more
+            </Badge>
+          )}
+        </div>
+
+        {/* Client Info & Application Count */}
+        <div className="flex items-center justify-between pt-4 border-t border-border/50">
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                {clientProfile?.displayName?.[0] || 'C'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-foreground leading-none">{clientProfile?.displayName || 'Architex Client'}</span>
+              <span className="text-[9px] text-muted-foreground">Client</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Users size={12} />
+            <span className="text-[10px] font-bold">{appCount} applications</span>
+          </div>
+        </div>
+      </CardContent>
+
+      <CardFooter className="bg-secondary/10 p-4 border-t border-border mt-auto">
         <Dialog open={isApplying} onOpenChange={setIsApplying}>
-          <DialogTrigger render={<Button disabled={hasApplied} variant="outline" className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">{hasApplied ? 'Already Applied' : 'Apply for Job'}</Button>} />
+          <DialogTrigger render={
+            <Button disabled={hasApplied} variant={hasApplied ? "secondary" : "outline"} className="w-full h-10 rounded-xl text-[10px] uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">
+              {hasApplied ? 'Already Applied' : 'Apply for Job'}
+            </Button>
+          } />
           <DialogContent className="sm:max-w-[600px] border-border bg-white/95 backdrop-blur-md p-0 overflow-hidden rounded-3xl">
             <div className="bg-primary/5 p-8 border-b border-border">
               <DialogHeader>
@@ -202,7 +356,7 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile }) {
   );
 }
 
-function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile }) {
+function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [drawingUrl, setDrawingUrl] = useState('');
@@ -271,17 +425,21 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile }) {
     setDrawingName(file.name.split('.')[0]);
 
     try {
-      const blob = await put(file.name, file, {
-        access: 'public',
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
-        addRandomSuffix: true,
+      const url = await uploadAndTrackFile(file, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedBy: user.uid,
+        context: 'submission',
+        jobId: job.id,
+        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
       });
-      setDrawingUrl(blob.url);
+      setDrawingUrl(url);
       setIsUploading(false);
       toast.success("File uploaded successfully!");
       
       // Automatically run AI pre-check
-      handlePreCheck(blob.url, file.name.split('.')[0]);
+      handlePreCheck(url, file.name.split('.')[0]);
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Upload failed.");
@@ -367,6 +525,9 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile }) {
 
       const docRef = await addDoc(collection(db, `jobs/${job.id}/submissions`), newSub);
 
+      // Notify Client
+      await notificationService.notifyDrawingSubmitted(job.clientId, drawingName, job.id, docRef.id);
+
       // Update to AI Reviewing
       await updateDoc(doc(db, `jobs/${job.id}/submissions`, docRef.id), {
         status: 'ai_reviewing',
@@ -415,6 +576,16 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile }) {
           }
         ]
       });
+
+      // Notify parties of AI completion
+      await notificationService.notifyAIReviewComplete(
+        job.clientId,
+        user.uid,
+        drawingName,
+        aiResult.status === 'passed' ? 'passed' : 'failed',
+        job.id,
+        docRef.id
+      );
 
       if (aiResult.status === 'passed') {
         toast.success("AI Review Passed! Sent to Admin for final approval.");
@@ -510,7 +681,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile }) {
           </h4>
           <div className="space-y-3">
             {submissions.slice(0, 3).map(sub => (
-              <SubmissionItem key={sub.id} sub={sub} />
+              <SubmissionItem key={sub.id} sub={sub} userRole={user.role} />
             ))}
             {submissions.length === 0 && <p className="text-xs text-muted-foreground italic">No drawings submitted yet.</p>}
           </div>
@@ -588,17 +759,10 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile }) {
                 >
                   {isUploading && (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 z-10">
-                      <div className="w-full max-w-xs space-y-4">
-                        <div className="flex justify-between items-end">
-                          <p className="text-sm font-bold text-primary">Uploading Drawing...</p>
-                          <p className="text-xs font-mono font-bold">{uploadProgress}%</p>
-                        </div>
-                        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all duration-300"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
+                      <div className="w-full max-w-xs space-y-4 text-center">
+                        <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+                        <p className="text-sm font-bold text-primary">Uploading drawing to secure vault...</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">This may take a moment</p>
                       </div>
                     </div>
                   )}
@@ -893,290 +1057,5 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
         </div>
       )}
     </div>
-  );
-}
-
-function SubmissionItem({ sub }: { sub: Submission }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'approved': return { label: 'Approved', color: 'bg-green-50 text-green-700 border-green-100', icon: CheckCircle2 };
-      case 'ai_failed': return { label: 'AI Failed', color: 'bg-red-50 text-red-700 border-red-100', icon: AlertCircle };
-      case 'admin_rejected': return { label: 'Admin Rejected', color: 'bg-red-50 text-red-700 border-red-100', icon: AlertCircle };
-      case 'ai_reviewing': return { label: 'AI Reviewing', color: 'bg-blue-50 text-blue-700 border-blue-100', icon: Loader2 };
-      case 'processing': return { label: 'Processing', color: 'bg-yellow-50 text-yellow-700 border-yellow-100', icon: Clock };
-      case 'admin_reviewing': return { label: 'Awaiting Admin', color: 'bg-primary/5 text-primary border-primary/10', icon: Shield };
-      default: return { label: status.replace('_', ' '), color: 'bg-secondary text-muted-foreground', icon: Clock };
-    }
-  };
-
-  const config = getStatusConfig(sub.status);
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger render={
-        <button className="w-full p-4 border border-border rounded-xl flex items-center justify-between bg-white shadow-sm hover:border-primary/30 hover:shadow-md transition-all group text-left">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-secondary/50 text-muted-foreground group-hover:text-primary transition-colors">
-              <FileUp size={16} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold truncate max-w-[150px]">{sub.drawingName}</span>
-              <span className="text-[10px] text-muted-foreground">{format(new Date(sub.createdAt), 'MMM d, HH:mm')}</span>
-            </div>
-          </div>
-          <Badge variant="outline" className={`px-3 py-0.5 rounded-full font-bold uppercase tracking-widest text-[10px] flex items-center gap-1 ${config.color}`}>
-            {sub.status === 'ai_reviewing' || sub.status === 'processing' ? <config.icon size={10} className="animate-spin" /> : <config.icon size={10} />}
-            {config.label}
-          </Badge>
-        </button>
-      } />
-      <DialogContent className="max-w-3xl border-border bg-white p-0 overflow-hidden rounded-[2rem] shadow-2xl">
-        <div className="bg-primary/5 p-8 border-b border-border">
-          <DialogHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <DialogTitle className="font-heading font-bold text-3xl tracking-tighter">{sub.drawingName}</DialogTitle>
-                <DialogDescription className="text-muted-foreground mt-1 flex items-center gap-2">
-                  Submitted on {format(new Date(sub.createdAt), 'MMMM d, yyyy HH:mm')}
-                </DialogDescription>
-              </div>
-              <Badge className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs ${config.color}`}>
-                {config.label}
-              </Badge>
-            </div>
-          </DialogHeader>
-        </div>
-
-        <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 max-h-[70vh] overflow-y-auto">
-          <div className="md:col-span-2 space-y-8">
-              <section className="space-y-4">
-                <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-                  <Sparkles size={14} className="text-primary" /> AI Compliance Feedback
-                </h4>
-                {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 ? (
-                  <div className="space-y-6">
-                    {sub.aiStructuredFeedback.map((cat, i) => (
-                      <div key={i} className="space-y-3">
-                        <h5 className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-primary" /> {cat.name}
-                        </h5>
-                        <div className="grid gap-3">
-                          {cat.issues.map((issue, j) => (
-                            <div key={j} className={`p-4 rounded-2xl border ${
-                              issue.severity === 'high' ? 'bg-red-50/50 border-red-100' :
-                              issue.severity === 'medium' ? 'bg-yellow-50/50 border-yellow-100' :
-                              'bg-blue-50/50 border-blue-100'
-                            }`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <p className="text-sm font-bold leading-tight">{issue.description}</p>
-                                <Badge variant="outline" className={`text-[8px] font-bold uppercase px-2 py-0 h-4 ${
-                                  issue.severity === 'high' ? 'border-red-200 text-red-700 bg-red-50' :
-                                  issue.severity === 'medium' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
-                                  'border-blue-200 text-blue-700 bg-blue-50'
-                                }`}>
-                                  {issue.severity}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-black/5">
-                                <div className="p-1 rounded-full bg-white shadow-sm">
-                                  <CheckCircle2 size={10} className="text-primary" />
-                                </div>
-                                <p className="text-[10px] font-bold text-muted-foreground"><span className="text-primary">ACTION:</span> {issue.actionItem}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : sub.aiFeedback ? (
-                  <div className="p-6 bg-secondary/30 rounded-2xl border border-border markdown-body text-sm leading-relaxed">
-                    <ReactMarkdown>{sub.aiFeedback}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="p-10 text-center border-2 border-dashed border-border rounded-2xl bg-white/50">
-                    <Loader2 className="mx-auto text-primary animate-spin mb-2" size={24} />
-                    <p className="text-xs text-muted-foreground italic">AI is currently analyzing your drawing for SANS 10400 compliance...</p>
-                  </div>
-                )}
-              </section>
-
-            {sub.adminFeedback && (
-              <section className="space-y-4">
-                <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-                  <ShieldCheck size={14} className="text-primary" /> Administrative Review
-                </h4>
-                <div className="p-6 bg-primary/5 rounded-2xl border border-primary/20 text-sm leading-relaxed italic">
-                  "{sub.adminFeedback}"
-                </div>
-              </section>
-            )}
-
-            <section className="space-y-4">
-              <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-                <ExternalLink size={14} className="text-primary" /> Drawing Reference
-              </h4>
-              <a 
-                href={sub.drawingUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-4 bg-white border border-border rounded-xl hover:border-primary/30 transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <FileUp size={20} className="text-primary" />
-                  <span className="text-sm font-medium">{sub.drawingName}</span>
-                </div>
-                <ArrowRight size={18} className="text-muted-foreground group-hover:text-primary transition-all group-hover:translate-x-1" />
-              </a>
-            </section>
-          </div>
-
-          <div className="space-y-6">
-            <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-              <History size={14} className="text-primary" /> Traceability Log
-            </h4>
-            <div className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border">
-              {sub.traceability.map((log, idx) => (
-                <div key={idx} className="relative pl-8">
-                  <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center ${
-                    log.actor === 'Architect' ? 'bg-primary' : 
-                    log.actor === 'AI Orchestrator' ? 'bg-purple-500' : 
-                    log.actor === 'System' ? 'bg-blue-500' : 'bg-green-500'
-                  }`}>
-                    {log.actor === 'Architect' ? <User size={10} className="text-white" /> : 
-                     log.actor === 'AI Orchestrator' ? <Cpu size={10} className="text-white" /> : 
-                     <Shield size={10} className="text-white" />}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <p className="text-[10px] font-bold uppercase tracking-widest">{log.actor}</p>
-                      <p className="text-[9px] text-muted-foreground">{format(new Date(log.timestamp), 'HH:mm')}</p>
-                    </div>
-                    <p className="text-xs font-bold text-foreground">{log.action}</p>
-                    <p className="text-[10px] text-muted-foreground leading-tight">{log.details}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function OrchestrationProgressModal({ progress, isOpen }: { progress: AIProgress | null, isOpen: boolean }) {
-  if (!progress) return null;
-
-  const agents = [
-    { name: 'Orchestrator', icon: Cpu },
-    { name: 'Wall Compliance Agent', icon: Shield },
-    { name: 'Fenestration Agent', icon: Eye },
-    { name: 'Fire Safety Agent', icon: ShieldCheck },
-    { name: 'Area Sizing Agent', icon: Search },
-    { name: 'General Compliance Agent', icon: CheckCircle2 },
-    { name: 'SANS Specialist', icon: Sparkles }
-  ];
-
-  return (
-    <Dialog open={isOpen}>
-      <DialogContent className="max-w-xl border-border bg-white p-0 overflow-hidden rounded-[2.5rem] shadow-2xl">
-        <div className="bg-primary/5 p-10 border-b border-border relative overflow-hidden">
-          {/* Animated Background Pulse */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent animate-pulse" />
-          
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <Badge className="bg-primary/10 text-primary border-primary/20 mb-3 px-3 py-1 text-[10px] uppercase tracking-widest font-bold">
-                  AI Orchestration in Progress
-                </Badge>
-                <DialogTitle className="font-heading font-bold text-4xl tracking-tighter">
-                  {progress.percentage}% <span className="text-muted-foreground font-normal text-2xl">Analyzed</span>
-                </DialogTitle>
-              </div>
-              <div className="p-4 bg-white rounded-2xl shadow-sm border border-border">
-                <Cpu className="text-primary animate-spin" size={32} />
-              </div>
-            </div>
-
-            <div className="w-full h-3 bg-secondary/30 rounded-full overflow-hidden mb-4">
-              <div 
-                className="h-full bg-primary transition-all duration-500 ease-out"
-                style={{ width: `${progress.percentage}%` }}
-              />
-            </div>
-            
-            <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              <span>Scanning SANS 10400 Database</span>
-              <span className="text-primary animate-pulse">{progress.activity}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-10 space-y-8">
-          <div>
-            <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-6 flex items-center gap-2">
-              <Users size={14} className="text-primary" /> Active Workflow Agents
-            </h4>
-            
-            <div className="grid grid-cols-1 gap-4">
-              {agents.map((agent, idx) => {
-                const isCompleted = progress.completedAgents.includes(agent.name);
-                const isCurrent = progress.agentName === agent.name;
-                
-                return (
-                  <div 
-                    key={idx} 
-                    className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between ${
-                      isCurrent ? 'bg-primary/5 border-primary/20 shadow-sm scale-[1.02]' : 
-                      isCompleted ? 'bg-secondary/10 border-border opacity-60' : 
-                      'bg-white border-border opacity-40'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-xl ${isCurrent ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
-                        <agent.icon size={18} className={isCurrent ? 'animate-pulse' : ''} />
-                      </div>
-                      <div>
-                        <p className={`text-sm font-bold ${isCurrent ? 'text-primary' : 'text-foreground'}`}>
-                          {agent.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {isCurrent ? progress.activity : isCompleted ? 'Compliance check finalized' : 'Awaiting orchestration...'}
-                        </p>
-                      </div>
-                    </div>
-                    {isCompleted ? (
-                      <CheckCircle2 size={18} className="text-green-500" />
-                    ) : isCurrent ? (
-                      <Loader2 size={18} className="text-primary animate-spin" />
-                    ) : (
-                      <Clock size={18} className="text-muted-foreground" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="p-6 bg-secondary/10 rounded-2xl border border-border">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <Sparkles size={16} className="text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-bold mb-1">Current Task: {progress.agentName}</p>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  The {progress.agentName} is currently cross-referencing your drawing against specific SANS 10400 clauses to ensure full council readiness.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

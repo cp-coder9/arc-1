@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle, XCircle, Clock, Shield } from 'lucide-react';
-import { put } from '@vercel/blob';
+import { uploadAndTrackFile } from '@/lib/uploadService';
 import { toast } from 'sonner';
 import { ArchitectVerification, UserProfile, VerificationStatus } from '@/types';
 
@@ -72,17 +72,20 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
     setIsUploading(true);
     try {
       // Upload certificate
-      const blob = await put(certificateFile.name, certificateFile, {
-        access: 'public',
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
-        addRandomSuffix: true,
+      const url = await uploadAndTrackFile(certificateFile, {
+        fileName: certificateFile.name,
+        fileType: certificateFile.type,
+        fileSize: certificateFile.size,
+        uploadedBy: user.uid,
+        context: 'certificate',
+        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
       });
 
       // Create verification record
       const verificationData: ArchitectVerification = {
         userId: user.uid,
         status: 'pending',
-        certificateUrl: blob.url,
+        certificateUrl: url,
         sacapNumber: sacapNumber.trim(),
         submittedAt: new Date().toISOString(),
       };

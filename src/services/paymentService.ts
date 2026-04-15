@@ -21,6 +21,9 @@ import {
 import { Payment, Escrow, Job, UserProfile } from '../types';
 import { notificationService } from './notificationService';
 import { toast } from 'sonner';
+import * as jsMd5 from 'js-md5';
+// Handle both ESM and CJS import styles safely
+const md5 = (jsMd5 as any).default || jsMd5;
 
 // PayFast configuration
 const PAYFAST_CONFIG = {
@@ -40,12 +43,7 @@ class PaymentService {
    * Generate MD5 hash for PayFast signature
    */
   private async generateMD5(input: string): Promise<string> {
-    // Use browser's crypto API for MD5 (or server-side crypto in production)
-    const encoder = new TextEncoder();
-    const data = encoder.encode(input);
-    const hashBuffer = await crypto.subtle.digest('MD5', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return md5(input);
   }
 
   /**
@@ -410,8 +408,11 @@ class PaymentService {
     itemName: string,
     payer: UserProfile
   ): Promise<string> {
-    const returnUrl = `${window.location.origin}/payment/success?payment_id=${paymentId}`;
-    const cancelUrl = `${window.location.origin}/payment/cancel?payment_id=${paymentId}`;
+    // PayFast requires absolute URLs for redirects. 
+    // We point to our backend routes so the server can handle any quick pre-processing 
+    // and then 302 redirect the user back to the SPA dashboards.
+    const returnUrl = `${window.location.origin}/api/payment/success?payment_id=${paymentId}`;
+    const cancelUrl = `${window.location.origin}/api/payment/cancel?payment_id=${paymentId}`;
     const notifyUrl = `${window.location.origin}/api/payment/notify`;
 
     const data: Record<string, string> = {
@@ -523,8 +524,8 @@ class PaymentService {
 
     snapshot.docs.forEach(doc => {
       const payment = doc.data() as Payment;
-      if (payment.metadata?.platformFee) {
-        totalFees += payment.metadata.platformFee;
+      if ((payment.metadata as any)?.platformFee) {
+        totalFees += (payment.metadata as any).platformFee;
       }
     });
 

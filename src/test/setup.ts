@@ -82,8 +82,8 @@ globalThis.process = {
 };
 
 // Mock window.crypto for MD5 hashing
-globalThis.crypto = {
-  ...globalThis.crypto,
+(globalThis as any).crypto = {
+  ...(globalThis as any).crypto,
   subtle: {
     digest: jest.fn().mockResolvedValue(new ArrayBuffer(16)),
   },

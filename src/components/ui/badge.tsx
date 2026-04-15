@@ -22,10 +22,12 @@ const badgeVariants = cva(
   }
 )
 
-export interface BadgeProps {
-  children?: React.ReactNode;
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof badgeVariants> {
   className?: string;
-  variant?: VariantProps<typeof badgeVariants>["variant"];
+  children?: React.ReactNode;
+  key?: any;
 }
 
 function Badge({ className, variant, children, ...props }: BadgeProps) {

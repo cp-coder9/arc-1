@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Send, Paperclip, MessageCircle, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import { put } from '@vercel/blob';
+import { uploadAndTrackFile } from '@/lib/uploadService';
 import { toast } from 'sonner';
 
 interface ChatProps {
@@ -119,10 +119,14 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
 
     setIsUploading(true);
     try {
-      const blob = await put(file.name, file, {
-        access: 'public',
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
-        addRandomSuffix: true,
+      const url = await uploadAndTrackFile(file, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedBy: currentUser.uid,
+        context: 'chat',
+        jobId: job.id,
+        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
       });
 
       await messagingService.sendMessage({
@@ -132,7 +136,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
         content: `Attached: ${file.name}`,
         attachments: [{
           name: file.name,
-          url: blob.url,
+          url: url,
           type: file.type,
         }],
       });

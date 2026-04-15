@@ -61,6 +61,14 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Council Update',
     channels: ['in_app', 'email'],
   },
+  invoice_sent: {
+    title: 'New Invoice',
+    channels: ['in_app', 'email'],
+  },
+  invoice_paid: {
+    title: 'Invoice Paid',
+    channels: ['in_app', 'email', 'push'],
+  },
 };
 
 class NotificationService {
@@ -86,6 +94,7 @@ class NotificationService {
       isRead: false,
       channels: config.channels,
       createdAt: new Date().toISOString(),
+      deliveryStatus: 'pending' as any, // Tracked by the server.ts notification worker
     };
 
     // Save to Firestore (triggers Cloud Function for email/push)
@@ -188,6 +197,8 @@ class NotificationService {
         message: '💬',
         milestone_due: '⏰',
         council_update: '🏛️',
+        invoice_sent: '📄',
+        invoice_paid: '💰',
       };
 
       toast(`${icons[type] || '🔔'} ${title}`, {
@@ -203,6 +214,29 @@ class NotificationService {
   cleanup(): void {
     this.unsubscribeFns.forEach(unsubscribe => unsubscribe());
     this.unsubscribeFns.clear();
+  }
+
+  /**
+   * Register FCM token for push notifications
+   */
+  async registerToken(token: string): Promise<void> {
+    try {
+      const { getAuth } = await import('firebase/auth');
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      await fetch('/api/notifications/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ fcmToken: token })
+      });
+    } catch (error) {
+      console.error('Failed to register FCM token:', error);
+    }
   }
 
   // === Notification Triggers ===
@@ -379,6 +413,30 @@ class NotificationService {
       clientId,
       'payment_released',
       `Refund of R${amount.toLocaleString()} processed. Reason: ${reason}`,
+      { jobId }
+    );
+  }
+
+  /**
+   * Notify client of a new invoice
+   */
+  async notifyInvoiceSent(clientId: string, invoiceNumber: string, amount: number, jobId: string): Promise<void> {
+    await this.sendNotification(
+      clientId,
+      'invoice_sent',
+      `New invoice ${invoiceNumber} for R${amount.toLocaleString()} has been issued`,
+      { jobId }
+    );
+  }
+
+  /**
+   * Notify architect that an invoice has been paid
+   */
+  async notifyInvoicePaid(architectId: string, invoiceNumber: string, jobId: string): Promise<void> {
+    await this.sendNotification(
+      architectId,
+      'invoice_paid',
+      `Invoice ${invoiceNumber} has been marked as paid`,
       { jobId }
     );
   }

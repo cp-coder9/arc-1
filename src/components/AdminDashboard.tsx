@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, onSnapshot, doc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { put } from '@vercel/blob';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -23,7 +23,11 @@ import {
 } from "./ui/accordion";
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
-import { seedAgents, reviewDrawing, AIReviewResult } from '../services/geminiService';
+import { seedAgents, reviewDrawing } from '../services/geminiService';
+import { notificationService } from '../services/notificationService';
+import ComplianceReport from './ComplianceReport';
+import AgentKnowledgeManager from './AgentKnowledgeManager';
+import { Dialog as FullScreenDialog, DialogContent as FullScreenDialogContent } from './ui/dialog';
 
 export default function AdminDashboard({ 
   user, 
@@ -36,6 +40,7 @@ export default function AdminDashboard({
 }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [reportSubmission, setReportSubmission] = useState<Submission | null>(null);
 
   // Map sidebar tabs to internal dashboard tabs
   const internalTab = activeTab === 'compliance' ? 'agents' : activeTab === 'audit' ? 'logs' : activeTab === 'users' ? 'users' : activeTab === 'settings' ? 'settings' : 'submissions';
@@ -46,6 +51,10 @@ export default function AdminDashboard({
     activeAgents: 0,
     errorCount: 0
   });
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
 
   useEffect(() => {
     seedAgents();
@@ -72,11 +81,31 @@ export default function AdminDashboard({
 
     // Stats
     const unsubStats = onSnapshot(collection(db, 'jobs'), (snap) => {
-      const jobs = snap.docs.map(d => d.data());
+      setAllJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
       setStats(prev => ({
         ...prev,
         totalJobs: snap.size
       }));
+    });
+
+    // Users
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      setAllUsers(snap.docs.map(d => {
+        const data = d.data();
+        return {
+          uid: d.id,
+          email: data.email || '',
+          displayName: data.displayName || 'Unnamed User',
+          role: data.role || 'client',
+          createdAt: data.createdAt || new Date().toISOString(),
+          ...data
+        } as UserProfile;
+      }));
+    });
+
+    // Knowledge
+    const unsubKnowledge = onSnapshot(query(collection(db, 'agent_knowledge'), where('status', '==', 'pending_review')), (snap) => {
+      setPendingKnowledgeCount(snap.size);
     });
 
     return () => {
@@ -84,6 +113,8 @@ export default function AdminDashboard({
       unsubAgents();
       unsubLogs();
       unsubStats();
+      unsubUsers();
+      unsubKnowledge();
     };
   }, []);
 
@@ -114,6 +145,10 @@ export default function AdminDashboard({
           }
         ]
       });
+      
+      // Notify architect
+      await notificationService.notifyAdminApproval(sub.architectId, sub.drawingName, sub.jobId, sub.id);
+      
       toast.success("Submission approved");
     } catch (error) {
       toast.error("Failed to approve");
@@ -136,10 +171,44 @@ export default function AdminDashboard({
           }
         ]
       });
+      
+      // Notify architect
+      await notificationService.notifyAdminRejection(sub.architectId, sub.drawingName, sub.jobId, sub.id);
+      
       toast.success("Submission rejected and sent back");
     } catch (error) {
       toast.error("Failed to reject");
     }
+  };
+
+  const handleToggleUserStatus = async (userId: string, currentStatus?: string) => {
+    try {
+      const isSuspended = currentStatus === 'suspended';
+      await updateDoc(doc(db, 'users', userId), {
+        status: isSuspended ? 'active' : 'suspended',
+        updatedAt: new Date().toISOString()
+      });
+      toast.success(`User ${isSuspended ? 'activated' : 'suspended'}`);
+    } catch (error) {
+      toast.error("Failed to update user status");
+    }
+  };
+
+  const handleUpdateJobStatus = async (jobId: string, status: Job['status']) => {
+    try {
+      await updateDoc(doc(db, 'jobs', jobId), {
+        status,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success(`Job status updated to ${status}`);
+    } catch (error) {
+      toast.error("Failed to update job status");
+    }
+  };
+
+  const handleForceApprove = async (sub: Submission) => {
+    if (!confirm("FORCE APPROVE: This will bypass automated compliance checks. Continue?")) return;
+    await handleApprove(sub);
   };
 
   return (
@@ -175,6 +244,9 @@ export default function AdminDashboard({
           <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
             <FileText size={16} /> Recompliance Hub
           </TabsTrigger>
+          <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
+            <Briefcase size={16} /> Projects
+          </TabsTrigger>
           <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
             <Cpu size={16} /> Agent Management
           </TabsTrigger>
@@ -186,6 +258,12 @@ export default function AdminDashboard({
           </TabsTrigger>
           <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
             <Settings2 size={16} /> LLM Settings
+          </TabsTrigger>
+          <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2 relative">
+            <Sparkles size={16} /> Brain
+            {pendingKnowledgeCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -245,10 +323,20 @@ export default function AdminDashboard({
                                   </div>
                                 </div>
                                 
-                                <div className="h-64 border border-border rounded-[2rem] p-8 bg-white shadow-sm flex flex-col">
+                                <div className="border border-border rounded-[2rem] p-8 bg-white shadow-sm flex flex-col">
                                   <h4 className="text-[10px] font-bold uppercase tracking-widest mb-4 text-muted-foreground flex items-center gap-2">
                                     <Sparkles size={12} className="text-primary" /> AI Compliance Orchestrator Feedback
                                   </h4>
+                                  <div className="mb-4 flex gap-2">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="rounded-full text-[10px] font-bold uppercase tracking-widest gap-2 bg-primary/5 border-primary/20"
+                                      onClick={() => setReportSubmission(sub)}
+                                    >
+                                      <FileText size={12} /> View Full Report
+                                    </Button>
+                                  </div>
                                   <ScrollArea className="flex-1 pr-4">
                                     {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 ? (
                                       <Accordion multiple className="w-full space-y-2">
@@ -332,6 +420,9 @@ export default function AdminDashboard({
                                   <Button onClick={() => handleApprove(sub)} className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
                                     <CheckCircle2 size={18} /> Approve for Council
                                   </Button>
+                                  <Button onClick={() => handleForceApprove(sub)} variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
+                                    <Sparkles size={16} /> AI Override (Force Approve)
+                                  </Button>
                                   <RejectDialog sub={sub} onReject={handleReject} />
                                 </div>
                               </div>
@@ -353,6 +444,67 @@ export default function AdminDashboard({
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="jobs">
+          <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
+            <CardHeader className="bg-secondary/10 border-b border-border p-8 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-heading font-bold tracking-tight">Project Governance</CardTitle>
+                <CardDescription>Monitor project lifecycles and intervention status.</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Badge variant="outline" className="rounded-full px-4">{allJobs.length} Total</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                     <TableHead className="px-8 font-bold text-[10px] uppercase tracking-widest">Title</TableHead>
+                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Client</TableHead>
+                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Status</TableHead>
+                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Budget</TableHead>
+                     <TableHead className="text-right px-8 font-bold text-[10px] uppercase tracking-widest">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allJobs.map(job => (
+                    <TableRow key={job.id} className="hover:bg-secondary/10">
+                      <TableCell className="px-8 font-bold">{job.title}</TableCell>
+                      <TableCell className="text-sm">{job.clientId.slice(0, 8)}...</TableCell>
+                      <TableCell>
+                        <Badge className={`${
+                          job.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                          job.status === 'in-progress' ? 'bg-orange-100 text-orange-700' :
+                          job.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          'bg-zinc-100 text-zinc-700'
+                        } rounded-full text-[10px] font-bold uppercase`}>
+                          {job.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-bold">R {job.budget.toLocaleString()}</TableCell>
+                      <TableCell className="text-right px-8">
+                        <div className="flex justify-end gap-2">
+                          <select 
+                            className="bg-secondary/50 rounded-lg text-xs p-1 border border-border"
+                            value={job.status}
+                            onChange={(e) => handleUpdateJobStatus(job.id, e.target.value as any)}
+                          >
+                            <option value="open">Open</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         <TabsContent value="agents">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -428,18 +580,54 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="users">
-          <UserManagement />
+          <UserManagement onToggleStatus={handleToggleUserStatus} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         </TabsContent>
 
         <TabsContent value="settings">
           <LLMSettings />
         </TabsContent>
+
+        <TabsContent value="knowledge">
+          <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
+            <AgentKnowledgeManager user={user} />
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* Full Report Modal */}
+      <Dialog open={!!reportSubmission} onOpenChange={(open) => !open && setReportSubmission(null)}>
+        <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 border-none bg-transparent">
+          {reportSubmission && (
+            <div className="w-full h-full rounded-[2rem] overflow-hidden shadow-2xl">
+              <ComplianceReport 
+                result={{
+                  status: reportSubmission.status === 'ai_passed' ? 'passed' : 'failed',
+                  feedback: reportSubmission.aiFeedback || '',
+                  categories: reportSubmission.aiStructuredFeedback || [],
+                  traceLog: reportSubmission.traceability?.[0]?.details || 'Review trace not found.'
+                }}
+                drawingUrl={reportSubmission.drawingUrl}
+                drawingName={reportSubmission.drawingName}
+                onClose={() => setReportSubmission(null)}
+                userRole={user.role}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function UserManagement() {
+function UserManagement({ 
+  onToggleStatus, 
+  searchTerm, 
+  setSearchTerm 
+}: { 
+  onToggleStatus?: (uid: string, status?: string) => void,
+  searchTerm?: string,
+  setSearchTerm?: (val: string) => void
+}) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -448,7 +636,17 @@ function UserManagement() {
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      setUsers(snapshot.docs.map(d => {
+        const data = d.data();
+        return {
+          uid: d.id,
+          email: data.email || '',
+          displayName: data.displayName || 'Unnamed User',
+          role: data.role || 'client',
+          createdAt: data.createdAt || new Date().toISOString(),
+          ...data
+        } as UserProfile;
+      }));
       setLoading(false);
     });
     return () => unsub();
@@ -498,44 +696,55 @@ function UserManagement() {
         <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
           <Users size={14} /> Platform User Directory
         </CardTitle>
-        <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
-          <DialogTrigger>
-            <Button size="sm" className="rounded-full h-8 text-[10px] font-bold uppercase tracking-widest gap-2">
-              <Plus size={12} /> Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] border-border bg-white rounded-[2rem] p-0 overflow-hidden">
-            <div className="bg-primary/5 p-8 border-b border-border">
-              <DialogHeader>
-                <DialogTitle className="font-heading text-2xl font-bold">Add New User</DialogTitle>
-                <DialogDescription>Create a new user profile manually.</DialogDescription>
-              </DialogHeader>
-            </div>
-            <form onSubmit={handleAddUser} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Display Name</label>
-                <Input required value={newUser.displayName} onChange={e => setNewUser({...newUser, displayName: e.target.value})} placeholder="e.g. John Doe" className="rounded-xl" />
+        <div className="flex items-center gap-4">
+          <div className="relative w-64">
+             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+             <Input 
+                placeholder="Search users..." 
+                className="pl-9 h-10 rounded-full bg-white border-border"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm?.(e.target.value)}
+             />
+          </div>
+          <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
+            <DialogTrigger render={
+              <Button size="sm" className="rounded-full h-10 px-6 font-bold uppercase tracking-widest bg-primary shadow-lg shadow-primary/20">
+                <Plus size={16} className="mr-2" /> Add User
+              </Button>
+            } />
+            <DialogContent className="sm:max-w-[425px] border-border bg-white rounded-[2rem] p-0 overflow-hidden">
+              <div className="bg-primary/5 p-8 border-b border-border">
+                <DialogHeader>
+                  <DialogTitle className="font-heading text-2xl font-bold">Add New User</DialogTitle>
+                  <DialogDescription>Create a new user profile manually.</DialogDescription>
+                </DialogHeader>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email</label>
-                <Input required type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="john@example.com" className="rounded-xl" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
-                <select 
-                  value={newUser.role} 
-                  onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
-                >
-                  <option value="client">Client</option>
-                  <option value="architect">Architect</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <Button type="submit" className="w-full h-12 rounded-xl font-bold">Create User</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+              <form onSubmit={handleAddUser} className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Display Name</label>
+                  <Input required value={newUser.displayName} onChange={e => setNewUser({...newUser, displayName: e.target.value})} placeholder="e.g. John Doe" className="rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email</label>
+                  <Input required type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="john@example.com" className="rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+                  <select 
+                    value={newUser.role} 
+                    onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
+                    className="w-full h-10 px-3 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="client">Client</option>
+                    <option value="architect">Architect</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <Button type="submit" className="w-full h-12 rounded-xl font-bold">Create User</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
@@ -544,14 +753,23 @@ function UserManagement() {
               <TableHead className="font-bold text-[10px] uppercase tracking-widest px-8">User</TableHead>
               <TableHead className="font-bold text-[10px] uppercase tracking-widest">Email</TableHead>
               <TableHead className="font-bold text-[10px] uppercase tracking-widest">Role</TableHead>
+              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center">Status</TableHead>
               <TableHead className="font-bold text-[10px] uppercase tracking-widest">Joined</TableHead>
               <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest px-8">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map(u => (
+            {users.filter(u => 
+              u.displayName?.toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+              u.email.toLowerCase().includes((searchTerm || '').toLowerCase())
+            ).map(u => (
               <TableRow key={u.uid} className="border-border hover:bg-secondary/20 transition-colors">
-                <TableCell className="font-bold px-8">{u.displayName}</TableCell>
+                <TableCell className="font-bold px-8">
+                  <div className="flex flex-col">
+                    <span>{u.displayName}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{u.uid.slice(0, 8)}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs font-mono">{u.email}</TableCell>
                 <TableCell>
                   <select 
@@ -564,23 +782,42 @@ function UserManagement() {
                     <option value="admin">Admin</option>
                   </select>
                 </TableCell>
+                <TableCell className="text-center">
+                   {(u as any).status === 'suspended' ? (
+                      <Badge variant="destructive" className="rounded-full uppercase text-[10px]">Suspended</Badge>
+                   ) : (
+                      <Badge variant="secondary" className="bg-green-100 text-green-700 rounded-full uppercase text-[10px]">Active</Badge>
+                   )}
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{format(new Date(u.createdAt), 'MMM d, yyyy')}</TableCell>
                 <TableCell className="text-right px-8">
-                  <Button 
-                    variant="ghost" 
-                    size="icon-sm" 
-                    onClick={() => handleDeleteUser(u.uid)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className={`rounded-full h-8 text-[10px] font-bold uppercase tracking-widest ${
+                        (u as any).status === 'suspended' ? 'text-green-500 hover:bg-green-50' : 'text-red-500 hover:bg-red-50'
+                      }`}
+                      onClick={() => onToggleStatus?.(u.uid, (u as any).status)}
+                    >
+                      {(u as any).status === 'suspended' ? 'Activate' : 'Suspend'}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteUser(u.uid)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
             {users.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={5} className="h-40 text-center text-muted-foreground italic bg-secondary/10">
-                  No users found.
+                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground italic bg-secondary/10">
+                  No users found matching your criteria.
                 </TableCell>
               </TableRow>
             )}
@@ -595,7 +832,7 @@ function LLMSettings() {
   const [config, setConfig] = useState<LLMConfig>({
     provider: 'gemini',
     apiKey: '',
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-2.0-flash',
     baseUrl: ''
   });
   const [loading, setLoading] = useState(true);
@@ -604,10 +841,10 @@ function LLMSettings() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const q = query(collection(db, 'system_settings'), where('id', '==', 'llm_config'));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          setConfig(snap.docs[0].data() as LLMConfig);
+        const docRef = doc(db, 'system_settings', 'llm_config');
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setConfig(snap.data() as LLMConfig);
         }
       } catch (error) {
         console.error("Failed to fetch LLM config:", error);
@@ -671,7 +908,7 @@ function LLMSettings() {
                     ...config,
                     provider,
                     baseUrl: pInfo?.baseUrl || '',
-                    model: provider === 'gemini' ? 'gemini-3.1-pro-preview' : ''
+                    model: provider === 'gemini' ? 'gemini-2.0-flash' : ''
                   });
                 }}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
@@ -715,7 +952,7 @@ function LLMSettings() {
                 onChange={e => setConfig({...config, baseUrl: e.target.value})}
                 placeholder="https://api.example.com/v1"
                 className="rounded-xl h-12 bg-secondary/20"
-                readOnly={config.provider !== 'gemini'}
+                readOnly={config.provider === 'gemini'}
               />
               {config.provider !== 'gemini' && (
                 <p className="text-[10px] text-muted-foreground italic">Base URL is prefilled for {config.provider}.</p>
@@ -755,16 +992,26 @@ function StatCard({ label, value, icon, color = 'text-primary' }: { label: strin
   );
 }
 
-function AgentCard({ agent }: { agent: Agent }) {
+function AgentCard({ agent }: { agent: Agent, key?: any }) {
   const [isEditing, setIsEditing] = useState(false);
   const [prompt, setPrompt] = useState(agent.systemPrompt);
   const [temp, setTemp] = useState(agent.temperature);
+  
+  // LLM Config state
+  const [llmProvider, setLlmProvider] = useState<LLMProvider | 'global'>(agent.llmProvider || 'global');
+  const [llmModel, setLlmModel] = useState(agent.llmModel || '');
+  const [llmApiKey, setLlmApiKey] = useState(agent.llmApiKey || '');
+  const [llmBaseUrl, setLlmBaseUrl] = useState(agent.llmBaseUrl || '');
 
   const handleSave = async () => {
     try {
       await updateDoc(doc(db, 'agents', agent.id), {
         systemPrompt: prompt,
         temperature: temp,
+        llmProvider,
+        llmModel,
+        llmApiKey,
+        llmBaseUrl,
         lastActive: new Date().toISOString()
       });
       setIsEditing(false);
@@ -824,6 +1071,53 @@ function AgentCard({ agent }: { agent: Agent }) {
                 onChange={e => setPrompt(e.target.value)}
                 className="min-h-[200px] font-mono text-xs bg-secondary/20 border-border rounded-xl"
               />
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h6 className="text-[10px] font-bold uppercase tracking-widest text-primary">LLM Configuration</h6>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
+                    <select 
+                      value={llmProvider} 
+                      onChange={e => setLlmProvider(e.target.value as LLMProvider | 'global')}
+                      className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
+                    >
+                      <option value="global">System Default (Global)</option>
+                      <option value="gemini">Google Gemini</option>
+                      <option value="nvidia">NVIDIA NIM</option>
+                      <option value="openrouter">OpenRouter.ai</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
+                    <Input 
+                      value={llmModel} 
+                      onChange={e => setLlmModel(e.target.value)}
+                      placeholder="e.g. gpt-4o, gemini-2.0-flash"
+                      className="h-10 rounded-xl text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key (Optional)</label>
+                    <Input 
+                      type="password"
+                      value={llmApiKey} 
+                      onChange={e => setLlmApiKey(e.target.value)}
+                      placeholder="Use environment key if empty"
+                      className="h-10 rounded-xl text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
+                    <Input 
+                      value={llmBaseUrl} 
+                      onChange={e => setLlmBaseUrl(e.target.value)}
+                      placeholder="https://api.example.com/v1"
+                      className="h-10 rounded-xl text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-4">
                 <div className="flex-1 space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Temperature: {temp}</label>
@@ -858,6 +1152,12 @@ function AddAgentDialog() {
   const [role, setRole] = useState('sans_compliance');
   const [prompt, setPrompt] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  
+  // LLM Config state
+  const [llmProvider, setLlmProvider] = useState<LLMProvider | 'global'>('global');
+  const [llmModel, setLlmModel] = useState('');
+  const [llmApiKey, setLlmApiKey] = useState('');
+  const [llmBaseUrl, setLlmBaseUrl] = useState('');
 
   const handleAdd = async () => {
     if (!name || !prompt) {
@@ -872,6 +1172,10 @@ function AddAgentDialog() {
         description: `Specialized agent for ${role.replace('_', ' ')} tasks.`,
         temperature: 0.7,
         status: 'online',
+        llmProvider,
+        llmModel,
+        llmApiKey,
+        llmBaseUrl,
         lastActive: new Date().toISOString(),
         currentActivity: 'Idle'
       });
@@ -933,9 +1237,58 @@ function AddAgentDialog() {
                 className="w-full h-10 px-3 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
               >
                 <option value="orchestrator">Orchestrator</option>
+                <option value="wall_checker">Wall Checker (K)</option>
+                <option value="window_checker">Window Checker (N)</option>
+                <option value="door_checker">Door Checker (T)</option>
+                <option value="area_checker">Area Checker (C)</option>
+                <option value="compliance_checker">Compliance Checker (A)</option>
                 <option value="sans_compliance">SANS Compliance</option>
-                <option value="technical_drawing">Technical Drawing</option>
               </select>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-border pt-4">
+            <h6 className="text-[10px] font-bold uppercase tracking-widest text-primary">LLM Configuration</h6>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
+                <select 
+                  value={llmProvider} 
+                  onChange={e => setLlmProvider(e.target.value as LLMProvider | 'global')}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="global">System Default (Global)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="nvidia">NVIDIA NIM</option>
+                  <option value="openrouter">OpenRouter.ai</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
+                <Input 
+                  value={llmModel} 
+                  onChange={e => setLlmModel(e.target.value)}
+                  placeholder="e.g. gpt-4o"
+                  className="h-10 rounded-xl text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key (Optional)</label>
+                <Input 
+                  type="password"
+                  value={llmApiKey} 
+                  onChange={e => setLlmApiKey(e.target.value)}
+                  className="h-10 rounded-xl text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
+                <Input 
+                  value={llmBaseUrl} 
+                  onChange={e => setLlmBaseUrl(e.target.value)}
+                  className="h-10 rounded-xl text-xs"
+                />
+              </div>
             </div>
           </div>
           <div className="space-y-2">

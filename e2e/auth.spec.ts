@@ -54,7 +54,7 @@ test.describe('Architect Application', () => {
 
   test('should allow architect to apply for job', async ({ page }) => {
     await page.goto('/marketplace');
-    await page.click('text=Apply for Job').first();
+    await page.locator('text=Apply for Job').first().click();
     await page.fill('textarea[name="proposal"]', 'I am interested in this project');
     await page.click('button[type="submit"]');
     await expect(page.locator('.text-green-600')).toContainText('Application submitted');
@@ -74,7 +74,7 @@ test.describe('Drawing Submission', () => {
 
   test('should allow architect to submit drawing', async ({ page }) => {
     await page.click('text=My Active Projects');
-    await page.click('text=Submit New Drawing').first();
+    await page.locator('text=Submit New Drawing').first().click();
     await page.fill('input[name="drawingName"]', 'Floor Plan Rev A');
     // Simulate file upload
     await page.setInputFiles('input[type="file"]', {
@@ -100,7 +100,7 @@ test.describe('Admin Review', () => {
 
   test('should allow admin to approve submission', async ({ page }) => {
     await page.click('text=Compliance Hub');
-    await page.click('text=Review').first();
+    await page.locator('text=Review').first().click();
     await page.click('text=Approve for Council');
     await expect(page.locator('.text-green-600')).toContainText('Submission approved');
   });
@@ -118,7 +118,7 @@ test.describe('Messaging', () => {
 
   test('should allow sending message', async ({ page }) => {
     await page.click('text=My Projects');
-    await page.click('text=Chat').first();
+    await page.locator('text=Chat').first().click();
     await page.fill('input[placeholder="Type a message..."]', 'Hello architect');
     await page.click('button:has-text("Send")');
     await expect(page.locator('.text-sm')).toContainText('Hello architect');

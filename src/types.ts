@@ -37,6 +37,13 @@ export interface Application {
   documents?: string[];
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
+  
+  // Denormalized profile fields
+  sacapNumber?: string;
+  specializations?: string[];
+  completedJobs?: number;
+  averageRating?: number;
+  portfolioThumbnail?: string;
 }
 
 export interface Review {
@@ -71,11 +78,20 @@ export interface AIIssue {
   description: string;
   severity: 'low' | 'medium' | 'high';
   actionItem: string;
+  boundingBox?: { x: number; y: number; width: number; height: number };
+  annotatedImageUrl?: string;
 }
 
 export interface AICategory {
   name: string;
   issues: AIIssue[];
+}
+
+export interface AIReviewResult {
+  status: 'passed' | 'failed';
+  feedback: string;
+  categories: AICategory[];
+  traceLog: string;
 }
 
 export interface Submission {
@@ -87,6 +103,7 @@ export interface Submission {
   status: SubmissionStatus;
   aiFeedback?: string;
   aiStructuredFeedback?: AICategory[];
+  annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
   adminFeedback?: string;
   traceability: TraceLog[];
   createdAt: string;
@@ -102,6 +119,10 @@ export interface Agent {
   status: 'online' | 'offline' | 'maintenance';
   currentActivity?: string;
   lastActive: string;
+  llmProvider?: LLMProvider | 'global';
+  llmModel?: string;
+  llmApiKey?: string;
+  llmBaseUrl?: string;
 }
 
 export interface SystemLog {
@@ -145,7 +166,9 @@ export type NotificationType =
   | 'payment_released' 
   | 'message'
   | 'milestone_due'
-  | 'council_update';
+  | 'council_update'
+  | 'invoice_sent'
+  | 'invoice_paid';
 
 export interface Notification {
   id: string;
@@ -163,6 +186,7 @@ export interface Notification {
   channels: ('in_app' | 'email' | 'push')[];
   createdAt: string;
   readAt?: string;
+  deliveryStatus?: 'pending' | 'processing' | 'delivered' | 'failed';
 }
 
 // Message types
@@ -266,5 +290,77 @@ export interface CouncilSubmission {
   submittedAt?: string;
   documents: { name: string; url: string }[];
   trackingHistory: { status: string; timestamp: string; notes?: string }[];
-  queries?: { raisedAt: string; description: string; response?: string }[];
+  queries?: {
+    raisedAt: string;
+    description: string;
+    response?: string;
+    respondedAt?: string;
+    attachments?: { name: string; url: string }[];
+  }[];
+}
+
+// Invoicing types
+export interface InvoiceItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  jobId: string;
+  clientId: string;
+  architectId: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  taxAmount: number;
+  taxRate: number;
+  totalAmount: number;
+  currency: string;
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  dueDate: string;
+  createdAt: string;
+  updatedAt?: string;
+  paidAt?: string;
+  pdfUrl?: string;
+  notes?: string;
+}
+
+export type UploadedFile = {
+  id: string;
+  url: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  uploadedBy: string;
+  uploadedAt: string;
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test';
+  jobId?: string;
+  submissionId?: string;
+};
+
+export type KnowledgeSource = 'documentation' | 'human_feedback' | 'self_improvement' | 'web_search';
+export type KnowledgeStatus = 'active' | 'pending_review' | 'rejected' | 'archived';
+
+export interface AgentKnowledge {
+  id: string;
+  agentId: string;
+  agentRole: string;
+  title: string;
+  content: string; // Human-readable markdown
+  source: KnowledgeSource;
+  status: KnowledgeStatus;
+  submittedBy: string; // userId
+  submittedByRole: 'admin' | 'architect' | 'client' | 'system';
+  reviewedBy?: string; // admin userId
+  reviewedAt?: string;
+  relatedSubmissionId?: string;
+  relatedJobId?: string;
+  searchQuery?: string; // if source is web_search
+  sourceUrl?: string; // if from documentation or web
+  tags: string[]; // e.g. ['SANS 10400-K', 'wall thickness', 'DPC']
+  createdAt: string;
+  updatedAt?: string;
 }

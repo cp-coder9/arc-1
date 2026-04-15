@@ -315,12 +315,22 @@ async function generateSubmissionPackage(submission: Submission): Promise<Blob> 
 
 #### 5.2 Message Notifications
 
+**Implementation:**
+```typescript
+// Express Server Worker (server.ts)
+// Listen to 'notifications' collection where deliveryStatus === 'pending'
+// Deliver via SendGrid/FCM
+// Update deliveryStatus to 'delivered' or 'failed'
+```
+
 **Tasks:**
+- [x] Create server-side worker in `server.ts` to process notifications
+- [x] Add `/api/notifications/token` endpoint for FCM registration
 - [ ] Add real-time message listeners in dashboards
 - [ ] Show toast notifications for new messages
 - [ ] Update NotificationBell to include message notifications
-- [ ] Add "message received" email notifications
-- [ ] Add browser push notifications
+- [ ] Implement actual SendGrid integration (currently simulated)
+- [ ] Implement actual FCM integration (currently simulated)
 
 #### 5.3 Contextual Chat
 

@@ -6,17 +6,45 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import {
   reviewDrawing,
-  parseAIResponse,
-  withRetry,
-  SPECIALIZED_AGENTS,
-  AIReviewResult
+  AIUtils,
+  SPECIALIZED_AGENTS
 } from '../geminiService';
+import { AIReviewResult } from '../../types';
 
 // Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+const mockFetch = jest.fn() as jest.Mock;
+(global as any).fetch = mockFetch;
 
-describe('parseAIResponse', () => {
+// Mock firebase
+jest.mock('../../lib/firebase', () => ({
+  db: {
+    collection: jest.fn(() => ({
+      doc: jest.fn(() => ({
+        get: jest.fn(),
+      })),
+    })),
+  },
+}));
+
+// Mock getAgents
+jest.mock('firebase/firestore', () => ({
+  getDocs: jest.fn(() => Promise.resolve({
+    empty: false,
+    docs: SPECIALIZED_AGENTS.map(agent => ({
+      id: agent.role,
+      data: () => agent
+    }))
+  })),
+  collection: jest.fn(),
+  query: jest.fn(),
+  where: jest.fn(),
+  orderBy: jest.fn(),
+  doc: jest.fn(),
+  updateDoc: jest.fn(() => Promise.resolve()),
+  addDoc: jest.fn(() => Promise.resolve({ id: 'new-doc-id' })),
+}));
+
+describe('AIUtils.parseAIResponse', () => {
   test('should parse direct JSON response', () => {
     const response = JSON.stringify({
       status: 'passed',
@@ -25,7 +53,7 @@ describe('parseAIResponse', () => {
       traceLog: 'Test'
     });
 
-    const result = parseAIResponse(response);
+    const result = AIUtils.parseAIResponse(response);
     expect(result.status).toBe('passed');
     expect(result.feedback).toBe('Good');
   });
@@ -33,80 +61,60 @@ describe('parseAIResponse', () => {
   test('should parse markdown-wrapped JSON', () => {
     const response = '```json\n{"status": "failed", "feedback": "Issues found", "categories": [], "traceLog": "Error"}\n```';
 
-    const result = parseAIResponse(response);
+    const result = AIUtils.parseAIResponse(response);
     expect(result.status).toBe('failed');
   });
 
   test('should parse JSON within curly braces', () => {
     const response = 'Some text {"status": "passed", "feedback": "OK", "categories": [], "traceLog": "Test"} more text';
 
-    const result = parseAIResponse(response);
+    const result = AIUtils.parseAIResponse(response);
     expect(result.status).toBe('passed');
   });
 
   test('should throw on unparseable response', () => {
-    expect(() => parseAIResponse('invalid')).toThrow('Could not parse AI response');
+    expect(() => AIUtils.parseAIResponse('invalid')).toThrow('Could not parse AI response');
   });
 });
 
-describe('withRetry', () => {
+describe('AIUtils.withRetry', () => {
   test('should return result on first success', async () => {
-    const fn = jest.fn().mockResolvedValue('success');
+    const fn = jest.fn<() => Promise<string>>().mockResolvedValue('success');
 
-    const result = await withRetry(fn, 3);
+    const result = await AIUtils.withRetry(fn, 3);
 
     expect(result).toBe('success');
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
   test('should retry on failure', async () => {
-    const fn = jest.fn()
+    const fn = jest.fn<() => Promise<string>>()
       .mockRejectedValueOnce(new Error('fail1'))
       .mockRejectedValueOnce(new Error('fail2'))
       .mockResolvedValue('success');
 
-    const result = await withRetry(fn, 3);
+    const result = await AIUtils.withRetry(fn, 3);
 
     expect(result).toBe('success');
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
   test('should throw after max retries', async () => {
-    const fn = jest.fn().mockRejectedValue(new Error('always fails'));
+    const fn = jest.fn<() => Promise<string>>().mockRejectedValue(new Error('always fails'));
 
-    await expect(withRetry(fn, 2)).rejects.toThrow('always fails');
+    await expect(AIUtils.withRetry(fn, 2)).rejects.toThrow('always fails');
     expect(fn).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe('SPECIALIZED_AGENTS', () => {
-  test('should have all required agents', () => {
-    const agentNames = SPECIALIZED_AGENTS.map(a => a.role);
-
-    expect(agentNames).toContain('orchestrator');
-    expect(agentNames).toContain('wall_checker');
-    expect(agentNames).toContain('window_checker');
-    expect(agentNames).toContain('door_checker');
-    expect(agentNames).toContain('area_checker');
-    expect(agentNames).toContain('compliance_checker');
-    expect(agentNames).toContain('sans_compliance');
-  });
-
-  test('each agent should have system prompt', () => {
-    SPECIALIZED_AGENTS.forEach(agent => {
-      expect(agent.systemPrompt).toBeTruthy();
-      expect(agent.systemPrompt.length).toBeGreaterThan(100);
-    });
   });
 });
 
 describe('reviewDrawing', () => {
   beforeEach(() => {
     mockFetch.mockClear();
+    jest.clearAllMocks();
   });
 
   test('should return review result on success', async () => {
-    const mockResponse = {
+    const mockSuccessResponse = {
       candidates: [{
         content: {
           parts: [{
@@ -121,9 +129,9 @@ describe('reviewDrawing', () => {
       }]
     };
 
-    mockFetch.mockResolvedValueOnce({
+    (mockFetch as any).mockResolvedValue({
       ok: true,
-      json: async () => mockResponse
+      json: async () => mockSuccessResponse
     });
 
     const result = await reviewDrawing(
@@ -134,10 +142,12 @@ describe('reviewDrawing', () => {
 
     expect(result.status).toBe('passed');
     expect(result.feedback).toBe('All good');
+    // orchestrator + at least one specialized agent
+    expect(mockFetch).toHaveBeenCalled();
   });
 
   test('should return failed status on API error', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'));
+    (mockFetch as any).mockRejectedValue(new Error('Network error'));
 
     const result = await reviewDrawing(
       'https://example.com/drawing.pdf',

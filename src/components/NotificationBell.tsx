@@ -28,6 +28,8 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   message: '💬',
   milestone_due: '⏰',
   council_update: '🏛️',
+  invoice_sent: '📄',
+  invoice_paid: '💰',
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {
