@@ -5,16 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "bun run server.ts",
-    "build": "bunx vite build",
-    "preview": "bunx vite preview",
+    "build": "vite build",
+    "vercel-build": "vite build",
+    "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "bunx tsc --noEmit",
+    "lint": "tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "test:e2e": "bunx playwright test",
     "test:e2e:ui": "bunx playwright test --ui",
-    "install:deps": "bun install"
+    "install:deps": "npm install"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

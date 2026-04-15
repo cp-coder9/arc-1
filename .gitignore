@@ -37,6 +37,7 @@ build/
 
 # Vercel
 .vercel
+.vercel/output
 
 # Environment variables
 .env
