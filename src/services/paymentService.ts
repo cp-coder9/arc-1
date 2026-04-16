@@ -1,29 +1,44 @@
-/**
- * Payment Service
- * Handles PayFast integration, escrow management, and payment processing
- */
-
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import {
   collection,
-  addDoc,
-  doc,
-  updateDoc,
   query,
   where,
   onSnapshot,
   getDocs,
   getDoc,
+  doc,
   orderBy,
-  serverTimestamp,
-  writeBatch
 } from 'firebase/firestore';
+import { getIdToken } from 'firebase/auth';
 import { Payment, Escrow, Job, UserProfile } from '../types';
 import { notificationService } from './notificationService';
 import { toast } from 'sonner';
 import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
 const md5 = (jsMd5 as any).default || jsMd5;
+
+/** Fetch a fresh Firebase ID token for the current user, or throw if not signed in. */
+async function requireIdToken(): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('You must be signed in to perform this action.');
+  return getIdToken(user);
+}
+
+/** Thin wrapper for authenticated server API calls. */
+async function apiFetch(path: string, body: object): Promise<any> {
+  const idToken = await requireIdToken();
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Server error: ${res.status}`);
+  return data;
+}
 
 // PayFast configuration
 const PAYFAST_CONFIG = {
@@ -82,254 +97,62 @@ class PaymentService {
   }
 
   /**
-   * Initialize escrow for a job
+   * Initialize escrow for a job — delegates to server for privileged write.
    */
   async initializeEscrow(job: Job, client: UserProfile): Promise<{ paymentUrl: string; paymentId: string }> {
-    const platformFee = Math.round(job.budget * PLATFORM_FEE_PERCENTAGE);
-    const totalAmount = job.budget + platformFee;
-
-    // Create escrow record
-    const escrowData: Omit<Escrow, 'jobId'> = {
-      totalAmount: totalAmount,
-      heldAmount: 0, // Will be updated after payment confirmation
-      releasedAmount: 0,
-      platformFeeAmount: platformFee,
-      status: 'pending',
-      milestones: {
-        initial: { percentage: 20, status: 'pending', released: false },
-        draft: { percentage: 40, status: 'pending', released: false },
-        final: { percentage: 40, status: 'pending', released: false },
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    await updateDoc(doc(db, 'escrow', job.id), escrowData);
-
-    // Create initial payment record
-    const payment: Omit<Payment, 'id'> = {
-      jobId: job.id,
-      payerId: job.clientId,
-      payeeId: job.selectedArchitectId || '',
-      amount: totalAmount,
-      type: 'escrow_deposit',
-      status: 'pending',
-      metadata: {
-        platformFee,
-        architectAmount: job.budget,
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const paymentDoc = await addDoc(collection(db, 'payments'), payment);
-
-    // Generate PayFast payment URL
-    const paymentUrl = await this.generatePayFastUrl(paymentDoc.id, totalAmount, job.title, client);
-
-    // Update escrow with payment reference
-    await updateDoc(doc(db, 'escrow', job.id), {
-      paymentId: paymentDoc.id,
-    });
-
-    return { paymentUrl, paymentId: paymentDoc.id };
+    const data = await apiFetch('/api/payment/escrow/init', { jobId: job.id });
+    const paymentUrl = await this.generatePayFastUrl(data.paymentId, data.totalAmount, job.title, client);
+    return { paymentUrl, paymentId: data.paymentId };
   }
 
   /**
-   * Confirm payment received from PayFast
+   * Confirm payment received (manual trigger — delegates to server).
    */
   async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
-    const paymentRef = doc(db, 'payments', paymentId);
-    const paymentSnap = await getDoc(paymentRef);
-
-    if (!paymentSnap.exists()) {
-      throw new Error('Payment not found');
-    }
-
-    const payment = paymentSnap.data() as Payment;
-
-    // Verify payment data
-    const expectedAmount = (payment.amount / 100).toFixed(2);
-    if (pfData['amount_gross'] !== expectedAmount) {
-      throw new Error('Payment amount mismatch');
-    }
-
-    // Update payment status
-    await updateDoc(paymentRef, {
-      status: 'completed',
-      transactionId: pfData['pf_payment_id'],
-      processedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      metadata: {
-        ...payment.metadata,
-        payfastData: pfData,
-      },
-    });
-
-    // Update escrow
-    const escrowRef = doc(db, 'escrow', payment.jobId);
-    await updateDoc(escrowRef, {
-      status: 'funded',
-      heldAmount: payment.amount,
-      fundedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Notify parties
-    await notificationService.notifyEscrowFunded(
-      payment.payerId,
-      payment.payeeId,
-      payment.amount,
-      payment.jobId
-    );
-
+    await apiFetch('/api/payment/confirm', { paymentId, pfData });
     toast.success('Escrow funded successfully!');
   }
 
   /**
-   * Release milestone payment
+   * Release milestone payment — delegates to server for privileged write.
    */
   async releaseMilestone(
     job: Job,
     milestone: 'initial' | 'draft' | 'final',
     requestingUserId: string
   ): Promise<void> {
-    // Verify requester is the client
-    if (requestingUserId !== job.clientId) {
-      throw new Error('Only the client can release payments');
-    }
-
-    // Get escrow
-    const escrowRef = doc(db, 'escrow', job.id);
-    const escrowSnap = await getDoc(escrowRef);
-
-    if (!escrowSnap.exists()) {
-      throw new Error('Escrow not found');
-    }
-
-    const escrow = escrowSnap.data() as Escrow;
-
-    // Check if escrow is funded
-    if (escrow.status !== 'funded' && escrow.status !== 'partially_released') {
-      throw new Error('Escrow is not funded');
-    }
-
-    // Check if milestone already released
-    if (escrow.milestones[milestone].released) {
-      throw new Error('Milestone already released');
-    }
-
-    const percentages = {
-      initial: 0.20,
-      draft: 0.40,
-      final: 0.40,
-    };
-
-    const releaseAmount = Math.round(job.budget * percentages[milestone]);
-    const platformFee = Math.round(releaseAmount * PLATFORM_FEE_PERCENTAGE);
-    const architectAmount = releaseAmount - platformFee;
-
-    // Use batch for atomic update
-    const batch = writeBatch(db);
-
-    // Update escrow
-    batch.update(escrowRef, {
-      heldAmount: escrow.heldAmount - releaseAmount,
-      releasedAmount: escrow.releasedAmount + releaseAmount,
-      platformFeeAmount: escrow.platformFeeAmount + platformFee,
-      [`milestones.${milestone}.status`]: 'released',
-      [`milestones.${milestone}.released`]: true,
-      [`milestones.${milestone}.releasedAt`]: new Date().toISOString(),
-      [`milestones.${milestone}.amount`]: architectAmount,
-      status: escrow.heldAmount - releaseAmount <= 0 ? 'fully_released' : 'partially_released',
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Create payment record
-    const paymentRef = doc(collection(db, 'payments'));
-    const payment: Omit<Payment, 'id'> = {
-      jobId: job.id,
-      payerId: job.clientId,
-      payeeId: job.selectedArchitectId || '',
-      amount: architectAmount,
-      type: 'milestone_release',
-      milestone,
-      status: 'completed',
-      metadata: {
-        platformFee,
-        grossAmount: releaseAmount,
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    batch.set(paymentRef, payment);
-
-    await batch.commit();
-
-    // Notify architect
+    const data = await apiFetch('/api/payment/milestone/release', { jobId: job.id, milestone });
     if (job.selectedArchitectId) {
       await notificationService.notifyPaymentReleased(
         job.selectedArchitectId,
-        architectAmount,
+        data.architectAmount,
         milestone,
         job.id
       );
     }
-
-    toast.success(`R${architectAmount.toLocaleString()} released successfully`);
+    toast.success(`R${data.architectAmount.toLocaleString()} released successfully`);
   }
 
   /**
-   * Request milestone release (architect initiates)
+   * Request milestone release (architect initiates) — delegates to server.
    */
   async requestMilestoneRelease(
     job: Job,
     milestone: 'initial' | 'draft' | 'final',
     architectId: string
   ): Promise<void> {
-    if (architectId !== job.selectedArchitectId) {
-      throw new Error('Only the assigned architect can request payment');
-    }
-
-    // Get escrow
-    const escrowRef = doc(db, 'escrow', job.id);
-    const escrowSnap = await getDoc(escrowRef);
-
-    if (!escrowSnap.exists()) {
-      throw new Error('Escrow not found');
-    }
-
-    const escrow = escrowSnap.data() as Escrow;
-
-    if (escrow.milestones[milestone].released) {
-      throw new Error('Milestone already released');
-    }
-
-    if (escrow.milestones[milestone].status === 'requested') {
-      throw new Error('Release already requested');
-    }
-
-    // Update milestone status
-    await updateDoc(escrowRef, {
-      [`milestones.${milestone}.status`]: 'requested',
-      [`milestones.${milestone}.requestedAt`]: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Notify client
+    await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
     await notificationService.notifyMilestoneRequest(
       job.clientId,
       job.title,
       milestone,
       job.id
     );
-
     toast.success('Payment release requested');
   }
 
   /**
-   * Process refund
+   * Process refund — delegates to server for privileged write.
    */
   async processRefund(
     job: Job,
@@ -337,66 +160,14 @@ class PaymentService {
     reason: string,
     requestingUserId: string
   ): Promise<void> {
-    // Only client can request refund
-    if (requestingUserId !== job.clientId) {
-      throw new Error('Only the client can request a refund');
-    }
-
-    // Get escrow
-    const escrowRef = doc(db, 'escrow', job.id);
-    const escrowSnap = await getDoc(escrowRef);
-
-    if (!escrowSnap.exists()) {
-      throw new Error('Escrow not found');
-    }
-
-    const escrow = escrowSnap.data() as Escrow;
-
-    // Check available amount
-    if (amount > escrow.heldAmount) {
-      throw new Error('Refund amount exceeds available funds');
-    }
-
-    const platformFee = Math.round(amount * PLATFORM_FEE_PERCENTAGE);
-    const refundAmount = amount - platformFee;
-
-    const batch = writeBatch(db);
-
-    // Update escrow
-    batch.update(escrowRef, {
-      heldAmount: escrow.heldAmount - amount,
-      refundedAmount: (escrow.refundedAmount || 0) + refundAmount,
-      status: escrow.heldAmount - amount <= 0 ? 'refunded' : 'partially_refunded',
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Create refund payment record
-    const paymentRef = doc(collection(db, 'payments'));
-    const payment: Omit<Payment, 'id'> = {
-      jobId: job.id,
-      payerId: job.clientId,
-      payeeId: job.selectedArchitectId || '',
-      amount: refundAmount,
-      type: 'refund',
-      status: 'completed',
-      metadata: { reason, platformFee },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    batch.set(paymentRef, payment);
-
-    await batch.commit();
-
-    // Notify parties
+    const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
     await notificationService.notifyRefundProcessed(
       job.clientId,
-      refundAmount,
+      data.refundAmount,
       reason,
       job.id
     );
-
-    toast.success(`Refund of R${refundAmount.toLocaleString()} processed`);
+    toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
   }
 
   /**

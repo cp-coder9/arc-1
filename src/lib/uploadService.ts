@@ -1,6 +1,5 @@
-import { put } from '@vercel/blob';
-import { db } from './firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { auth } from './firebase';
+import { getIdToken } from 'firebase/auth';
 import { UploadedFile } from '../types';
 
 export interface UploadOptions {
@@ -11,47 +10,53 @@ export interface UploadOptions {
   context: UploadedFile['context'];
   jobId?: string;
   submissionId?: string;
-  token?: string;
-  access?: 'public';
 }
 
 /**
- * Uploads a file to Vercel Blob and tracks it in Firestore's uploaded_files collection.
+ * Uploads a file via the server-side /api/files/upload endpoint (auth-protected).
+ * The server validates MIME type, file size, and authorization against job/submission,
+ * then uploads to Vercel Blob and tracks the result in Firestore.
  */
 export async function uploadAndTrackFile(
-  fileData: Buffer | Blob | string,
+  fileData: Blob | File,
   options: UploadOptions
 ): Promise<string> {
-  const { 
-    fileName, 
-    fileType, 
-    fileSize, 
-    uploadedBy, 
-    context, 
-    jobId, 
-    submissionId,
-    token,
-    access = 'public'
-  } = options;
+  const user = auth.currentUser;
+  if (!user) throw new Error('You must be signed in to upload files.');
 
-  // 1. Upload to Vercel Blob
-  const blob = await put(fileName, fileData, {
-    access,
-    token: token || import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
+  const idToken = await getIdToken(user);
+
+  // Convert Blob/File to base64 for JSON transport.
+  const fileBase64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the data-URL prefix (e.g. "data:image/png;base64,")
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(fileData);
   });
 
-  // 2. Track in Firestore
-  await addDoc(collection(db, 'uploaded_files'), {
-    url: blob.url,
-    fileName,
-    fileType,
-    fileSize,
-    uploadedBy,
-    context,
-    jobId: jobId || null,
-    submissionId: submissionId || null,
-    uploadedAt: new Date().toISOString()
+  const res = await fetch('/api/files/upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({
+      fileName:     options.fileName,
+      fileType:     options.fileType,
+      fileSize:     options.fileSize,
+      context:      options.context,
+      jobId:        options.jobId || null,
+      submissionId: options.submissionId || null,
+      fileBase64,
+    }),
   });
 
-  return blob.url;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Upload failed: ${res.status}`);
+
+  return data.url as string;
 }

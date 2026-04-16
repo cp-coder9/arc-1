@@ -1,5 +1,6 @@
-import { db } from "../lib/firebase";
+import { db, auth } from "../lib/firebase";
 import { doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc } from "firebase/firestore";
+import { getIdToken } from "firebase/auth";
 import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider } from "../types";
 
 // Retry configuration
@@ -39,6 +40,18 @@ async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promis
 
 // Server-side Gemini proxy - API key is protected on server
 async function callGeminiProxy(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig): Promise<string> {
+  // Require an authenticated Firebase user before touching the endpoint.
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error(
+      'Authentication required: you must be signed in to run an AI review. ' +
+      'Please sign in and try again.'
+    );
+  }
+
+  // Obtain a fresh ID token (auto-refreshed by the Firebase SDK if needed).
+  const idToken = await getIdToken(currentUser);
+
   return withRetry(async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
@@ -48,6 +61,7 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           systemInstruction,
@@ -59,6 +73,13 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
       });
 
       clearTimeout(timeoutId);
+
+      if (response.status === 401) {
+        throw new Error(
+          'Authentication required: the review endpoint rejected your session. ' +
+          'Please sign out, sign back in, and try again.'
+        );
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

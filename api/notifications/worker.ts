@@ -18,7 +18,7 @@ if (!admin.apps.length) {
 
 const adminDb =
   firebaseConfig.firestoreDatabaseId &&
-  firebaseConfig.firestoreDatabaseId !== "(default)"
+    firebaseConfig.firestoreDatabaseId !== "(default)"
     ? getFirestore(admin.app(), firebaseConfig.firestoreDatabaseId)
     : getFirestore(admin.app());
 

@@ -134,8 +134,20 @@ async function startServer() {
     }
   });
 
-  // Gemini API Proxy - Server-side only (protects API key)
+  // Gemini API Proxy - Server-side only (protects API key) — requires Firebase auth
   app.post("/api/gemini/review", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required. Please sign in to run an AI review." });
+    }
+    try {
+      await admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+    } catch (authErr) {
+      return res.status(401).json({ error: "Invalid or expired session. Please sign out and sign back in." });
+    }
+
+    // original handler continues below
+    const _handler = async () => {
     const { systemInstruction, prompt, drawingUrl, config } = req.body;
     const dbConfig = await getAdminLLMConfig();
     
@@ -269,6 +281,8 @@ async function startServer() {
       console.error("Server Gemini Proxy Error:", error);
       res.status(500).json({ error: "Failed to fetch from Gemini API" });
     }
+    }; // end _handler
+    await _handler();
   });
   
   // Agent Web Search endpoint - Uses Gemini with Google Search grounding
@@ -344,6 +358,353 @@ async function startServer() {
     } catch (error) {
       console.error("Agent Search Error:", error);
       res.status(500).json({ error: "Internal server error during agent search" });
+    }
+  });
+
+  // ── File Upload endpoint ────────────────────────────────────────────────────
+  // Validates auth, authorization against jobId/submissionId, MIME type, and size.
+  app.post("/api/files/upload", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer "))
+      return res.status(401).json({ error: "Authentication required" });
+
+    const ALLOWED_MIME_TYPES: Record<string, string[]> = {
+      drawing:     ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
+      document:    ['application/pdf', 'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      profile:     ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+      sacap:       ['image/png', 'image/jpeg', 'application/pdf'],
+      message:     ['image/png', 'image/jpeg', 'image/webp',
+                    'application/pdf', 'video/mp4', 'audio/mpeg'],
+      invoice:     ['application/pdf'],
+      verification:['image/png', 'image/jpeg', 'application/pdf'],
+    };
+    const MAX_SIZE_BYTES: Record<string, number> = {
+      drawing:     50 * 1024 * 1024,  // 50 MB
+      document:    20 * 1024 * 1024,  // 20 MB
+      profile:      5 * 1024 * 1024,  //  5 MB
+      sacap:       20 * 1024 * 1024,
+      message:     25 * 1024 * 1024,
+      invoice:     10 * 1024 * 1024,
+      verification:20 * 1024 * 1024,
+    };
+
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+      const uid = decodedToken.uid;
+
+      const { fileName, fileType, fileSize, context, jobId, submissionId, fileBase64 } = req.body;
+
+      // --- Input validation ---
+      if (!fileName || !fileType || !fileSize || !context || !fileBase64) {
+        return res.status(400).json({ error: "Missing required fields: fileName, fileType, fileSize, context, fileBase64" });
+      }
+
+      const allowedMimes = ALLOWED_MIME_TYPES[context];
+      if (!allowedMimes) {
+        return res.status(400).json({ error: `Unknown upload context: ${context}` });
+      }
+      if (!allowedMimes.includes(fileType)) {
+        return res.status(415).json({
+          error: `File type '${fileType}' is not allowed for context '${context}'.`,
+          allowed: allowedMimes,
+        });
+      }
+
+      const maxBytes = MAX_SIZE_BYTES[context] ?? 10 * 1024 * 1024;
+      if (fileSize > maxBytes) {
+        return res.status(413).json({
+          error: `File too large. Maximum allowed for '${context}' is ${maxBytes / 1024 / 1024} MB.`,
+        });
+      }
+
+      // --- Authorization: verify the user is a party to the referenced job/submission ---
+      if (jobId) {
+        const jobSnap = await adminDb.collection('jobs').doc(jobId).get();
+        if (!jobSnap.exists) return res.status(404).json({ error: 'Referenced job not found' });
+        const job = jobSnap.data()!;
+        const userSnap = await adminDb.collection('users').doc(uid).get();
+        const isAdmin = userSnap.data()?.role === 'admin';
+        if (!isAdmin && job.clientId !== uid && job.selectedArchitectId !== uid) {
+          return res.status(403).json({ error: 'You are not authorized to upload files for this job' });
+        }
+      } else if (submissionId) {
+        // Resolve the parent job via the submission document searched across subcollections
+        const subQuery = await adminDb.collectionGroup('submissions').where(admin.firestore.FieldPath.documentId(), '==', submissionId).limit(1).get();
+        if (subQuery.empty) return res.status(404).json({ error: 'Referenced submission not found' });
+        const subData = subQuery.docs[0].data();
+        const parentJobId = subQuery.docs[0].ref.parent.parent?.id;
+        if (parentJobId) {
+          const jobSnap = await adminDb.collection('jobs').doc(parentJobId).get();
+          const job = jobSnap.data();
+          const userSnap = await adminDb.collection('users').doc(uid).get();
+          const isAdmin = userSnap.data()?.role === 'admin';
+          if (!isAdmin && job?.clientId !== uid && job?.selectedArchitectId !== uid && subData.architectId !== uid) {
+            return res.status(403).json({ error: 'You are not authorized to upload files for this submission' });
+          }
+        }
+      } else {
+        // No job/submission context — only allow profile/sacap/verification uploads for the owner
+        if (!['profile', 'sacap', 'verification'].includes(context)) {
+          return res.status(400).json({ error: `A jobId or submissionId is required for context '${context}'` });
+        }
+      }
+
+      // --- Upload to Vercel Blob ---
+      const { put } = await import('@vercel/blob');
+      const fileBuffer = Buffer.from(fileBase64, 'base64');
+      const blob = await put(fileName, fileBuffer, {
+        access: 'public',
+        token: BLOB_READ_WRITE_TOKEN,
+        contentType: fileType,
+      });
+
+      // --- Track in Firestore (server-side, trusted) ---
+      await adminDb.collection('uploaded_files').add({
+        url: blob.url,
+        fileName,
+        fileType,
+        fileSize,
+        uploadedBy: uid,           // derived from verified token — not client-supplied
+        context,
+        jobId: jobId || null,
+        submissionId: submissionId || null,
+        uploadedAt: new Date().toISOString(),
+      });
+
+      return res.json({ success: true, url: blob.url });
+    } catch (error: any) {
+      console.error('File upload error:', error);
+      if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
+        return res.status(401).json({ error: 'Invalid or expired session' });
+      }
+      return res.status(500).json({ error: 'File upload failed', details: error.message });
+    }
+  });
+
+  // ── Payment – escrow initialization ─────────────────────────────────────────
+  app.post("/api/payment/escrow/init", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer "))
+      return res.status(401).json({ error: "Authentication required" });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+      const uid = decodedToken.uid;
+      const { jobId } = req.body;
+      if (!jobId) return res.status(400).json({ error: "Missing jobId" });
+
+      const jobSnap = await adminDb.collection('jobs').doc(jobId).get();
+      if (!jobSnap.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobSnap.data()!;
+
+      if (job.clientId !== uid) {
+        return res.status(403).json({ error: "Only the client who owns this job can initialize escrow" });
+      }
+      if (!job.budget || job.budget <= 0) {
+        return res.status(400).json({ error: "Job has no valid budget" });
+      }
+
+      const PLATFORM_FEE_PERCENTAGE = 0.05;
+      const platformFee = Math.round(job.budget * PLATFORM_FEE_PERCENTAGE);
+      const totalAmount = job.budget + platformFee;
+
+      const escrowData = {
+        totalAmount,
+        heldAmount: 0,
+        releasedAmount: 0,
+        platformFeeAmount: platformFee,
+        status: 'pending',
+        milestones: {
+          initial: { percentage: 20, status: 'pending', released: false },
+          draft:   { percentage: 40, status: 'pending', released: false },
+          final:   { percentage: 40, status: 'pending', released: false },
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await adminDb.collection('escrow').doc(jobId).set(escrowData, { merge: true });
+
+      const paymentData = {
+        jobId,
+        payerId: job.clientId,
+        payeeId: job.selectedArchitectId || '',
+        amount: totalAmount,
+        type: 'escrow_deposit',
+        status: 'pending',
+        metadata: { platformFee, architectAmount: job.budget },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const paymentRef = await adminDb.collection('payments').add(paymentData);
+      await adminDb.collection('escrow').doc(jobId).update({ paymentId: paymentRef.id });
+
+      return res.json({ success: true, paymentId: paymentRef.id, totalAmount });
+    } catch (err: any) {
+      console.error('Escrow init error:', err);
+      return res.status(500).json({ error: 'Failed to initialize escrow', details: err.message });
+    }
+  });
+
+  // ── Payment – milestone release (client approves) ─────────────────────────────
+  app.post("/api/payment/milestone/release", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer "))
+      return res.status(401).json({ error: "Authentication required" });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+      const uid = decodedToken.uid;
+      const { jobId, milestone } = req.body;
+      if (!jobId || !milestone) return res.status(400).json({ error: "Missing jobId or milestone" });
+      if (!['initial','draft','final'].includes(milestone))
+        return res.status(400).json({ error: "Invalid milestone" });
+
+      const jobSnap = await adminDb.collection('jobs').doc(jobId).get();
+      if (!jobSnap.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobSnap.data()!;
+      if (job.clientId !== uid)
+        return res.status(403).json({ error: "Only the client can release milestone payments" });
+
+      const escrowSnap = await adminDb.collection('escrow').doc(jobId).get();
+      if (!escrowSnap.exists) return res.status(404).json({ error: "Escrow not found" });
+      const escrow = escrowSnap.data()!;
+      if (!['funded','partially_released'].includes(escrow.status))
+        return res.status(400).json({ error: "Escrow is not funded" });
+      if (escrow.milestones[milestone]?.released)
+        return res.status(400).json({ error: "Milestone already released" });
+
+      const PLATFORM_FEE_PERCENTAGE = 0.05;
+      const percentages: Record<string,number> = { initial:0.20, draft:0.40, final:0.40 };
+      const releaseAmount  = Math.round(job.budget * percentages[milestone]);
+      const platformFee    = Math.round(releaseAmount * PLATFORM_FEE_PERCENTAGE);
+      const architectAmount = releaseAmount - platformFee;
+      const remainingHeld  = escrow.heldAmount - releaseAmount;
+
+      const batch = adminDb.batch();
+      const escrowRef = adminDb.collection('escrow').doc(jobId);
+      batch.update(escrowRef, {
+        heldAmount:          remainingHeld,
+        releasedAmount:      escrow.releasedAmount + releaseAmount,
+        platformFeeAmount:   escrow.platformFeeAmount + platformFee,
+        [`milestones.${milestone}.status`]:     'released',
+        [`milestones.${milestone}.released`]:   true,
+        [`milestones.${milestone}.releasedAt`]: new Date().toISOString(),
+        [`milestones.${milestone}.amount`]:     architectAmount,
+        status: remainingHeld <= 0 ? 'fully_released' : 'partially_released',
+        updatedAt: new Date().toISOString(),
+      });
+      const payRef = adminDb.collection('payments').doc();
+      batch.set(payRef, {
+        jobId,
+        payerId: job.clientId,
+        payeeId: job.selectedArchitectId || '',
+        amount: architectAmount,
+        type: 'milestone_release',
+        milestone,
+        status: 'completed',
+        metadata: { platformFee, grossAmount: releaseAmount },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      await batch.commit();
+      return res.json({ success: true, architectAmount, milestone });
+    } catch (err: any) {
+      console.error('Milestone release error:', err);
+      return res.status(500).json({ error: 'Failed to release milestone', details: err.message });
+    }
+  });
+
+  // ── Payment – milestone release request (architect initiates) ────────────────
+  app.post("/api/payment/milestone/request", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer "))
+      return res.status(401).json({ error: "Authentication required" });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+      const uid = decodedToken.uid;
+      const { jobId, milestone } = req.body;
+      if (!jobId || !milestone) return res.status(400).json({ error: "Missing jobId or milestone" });
+      if (!['initial','draft','final'].includes(milestone))
+        return res.status(400).json({ error: "Invalid milestone" });
+
+      const jobSnap = await adminDb.collection('jobs').doc(jobId).get();
+      if (!jobSnap.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobSnap.data()!;
+      if (job.selectedArchitectId !== uid)
+        return res.status(403).json({ error: "Only the assigned architect can request milestone release" });
+
+      const escrowSnap = await adminDb.collection('escrow').doc(jobId).get();
+      if (!escrowSnap.exists) return res.status(404).json({ error: "Escrow not found" });
+      const escrow = escrowSnap.data()!;
+      if (escrow.milestones[milestone]?.released)
+        return res.status(400).json({ error: "Milestone already released" });
+      if (escrow.milestones[milestone]?.status === 'requested')
+        return res.status(400).json({ error: "Release already requested" });
+
+      await adminDb.collection('escrow').doc(jobId).update({
+        [`milestones.${milestone}.status`]:      'requested',
+        [`milestones.${milestone}.requestedAt`]: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Milestone request error:', err);
+      return res.status(500).json({ error: 'Failed to request milestone release', details: err.message });
+    }
+  });
+
+  // ── Payment – refund ──────────────────────────────────────────────────────────
+  app.post("/api/payment/refund", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer "))
+      return res.status(401).json({ error: "Authentication required" });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+      const uid = decodedToken.uid;
+      const { jobId, amount, reason } = req.body;
+      if (!jobId || !amount || !reason)
+        return res.status(400).json({ error: "Missing jobId, amount, or reason" });
+
+      const jobSnap = await adminDb.collection('jobs').doc(jobId).get();
+      if (!jobSnap.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobSnap.data()!;
+      if (job.clientId !== uid)
+        return res.status(403).json({ error: "Only the client can request a refund" });
+
+      const escrowSnap = await adminDb.collection('escrow').doc(jobId).get();
+      if (!escrowSnap.exists) return res.status(404).json({ error: "Escrow not found" });
+      const escrow = escrowSnap.data()!;
+      if (amount > escrow.heldAmount)
+        return res.status(400).json({ error: "Refund amount exceeds available held funds" });
+
+      const PLATFORM_FEE_PERCENTAGE = 0.05;
+      const platformFee  = Math.round(amount * PLATFORM_FEE_PERCENTAGE);
+      const refundAmount = amount - platformFee;
+      const remainingHeld = escrow.heldAmount - amount;
+
+      const batch = adminDb.batch();
+      batch.update(adminDb.collection('escrow').doc(jobId), {
+        heldAmount:     remainingHeld,
+        refundedAmount: (escrow.refundedAmount || 0) + refundAmount,
+        status: remainingHeld <= 0 ? 'refunded' : 'partially_refunded',
+        updatedAt: new Date().toISOString(),
+      });
+      const payRef = adminDb.collection('payments').doc();
+      batch.set(payRef, {
+        jobId,
+        payerId: job.clientId,
+        payeeId: job.selectedArchitectId || '',
+        amount: refundAmount,
+        type: 'refund',
+        status: 'completed',
+        metadata: { reason, platformFee },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      await batch.commit();
+      return res.json({ success: true, refundAmount, platformFee });
+    } catch (err: any) {
+      console.error('Refund error:', err);
+      return res.status(500).json({ error: 'Failed to process refund', details: err.message });
     }
   });
 
