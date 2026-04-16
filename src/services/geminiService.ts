@@ -60,7 +60,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promis
 }
 
 // Server-side Gemini proxy - API key is protected on server
-async function callGeminiProxy(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig): Promise<string> {
+async function callGeminiProxy(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig, agent?: Agent): Promise<string> {
   // Require an authenticated Firebase user before touching the endpoint.
   const currentUser = auth.currentUser;
   if (!currentUser) {
@@ -79,8 +79,8 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
 
     try {
       // Get agent configuration if available
-      const agentConfig = await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
-      const authorizationHeader = getAuthorizationHeader(agentConfig);
+      const agentToUse = agent || await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
+      const authorizationHeader = getAuthorizationHeader(agentToUse);
 
       const response = await fetch('/api/gemini/review', {
         method: 'POST',
@@ -97,6 +97,7 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
         }),
         signal: controller.signal
       });
+
 
       clearTimeout(timeoutId);
 
@@ -138,7 +139,7 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
   });
 }
 
-async function callOpenAICompatible(config: LLMConfig, systemInstruction: string, prompt: string, drawingUrl?: string): Promise<string> {
+async function callOpenAICompatible(config: LLMConfig, systemInstruction: string, prompt: string, drawingUrl?: string, agent?: Agent): Promise<string> {
   const currentUser = auth.currentUser;
   if (!currentUser) {
     throw new Error('Authentication required for AI review.');
@@ -152,8 +153,8 @@ async function callOpenAICompatible(config: LLMConfig, systemInstruction: string
 
     try {
       // Get agent configuration if available
-      const agentConfig = await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
-      const authorizationHeader = getAuthorizationHeader(agentConfig);
+      const agentToUse = agent || await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
+      const authorizationHeader = getAuthorizationHeader(agentToUse);
 
       const response = await fetch('/api/review', {
         method: 'POST',
@@ -170,6 +171,7 @@ async function callOpenAICompatible(config: LLMConfig, systemInstruction: string
         }),
         signal: controller.signal
       });
+
 
       clearTimeout(timeoutId);
 
@@ -371,13 +373,23 @@ export async function seedAgents() {
 
     for (const agent of SPECIALIZED_AGENTS) {
       if (!existingRoles.includes(agent.role)) {
+        const roleKeys: Record<string, string> = {
+          orchestrator: 'orchestrator-key',
+          wall_checker: 'wall-checker-key',
+          window_checker: 'window-checker-key',
+          door_checker: 'door-checker-key',
+          area_checker: 'area-checker-key',
+          compliance_checker: 'compliance-checker-key',
+          sans_compliance: 'sans-specialist-key'
+        };
+
         await addDoc(collection(db, 'agents'), {
           ...agent,
           status: 'online',
           lastActive: new Date().toISOString(),
           currentActivity: 'Idle',
-          authorizationType: 'bearer', // Default authorization type
-          authorizationValue: process.env.AGENT_API_KEY || 'default-agent-key' // Default API key
+          authorizationType: 'api_key',
+          authorizationValue: roleKeys[agent.role] || 'default-agent-key'
         });
       }
     }
@@ -521,10 +533,10 @@ export async function reviewDrawing(
         const promptInstruction = `Identify compliance issues in this drawing: ${drawingName}. URL: ${drawingUrl}. If you encounter a regulation or standard you are unsure of, explicitly state "UNKNOWN_REGULATION: [Topic]".`;
         
         if (config.provider === 'gemini') {
-          response = await callGeminiProxy(enrichedPrompt, promptInstruction, drawingUrl, config);
+          response = await callGeminiProxy(enrichedPrompt, promptInstruction, drawingUrl, config, agent as Agent);
         } else {
           // Support vision for OpenAI-compatible providers (like NVIDIA)
-          response = await callOpenAICompatible(config, enrichedPrompt, promptInstruction, drawingUrl);
+          response = await callOpenAICompatible(config, enrichedPrompt, promptInstruction, drawingUrl, agent as Agent);
         }
         
         completed.push(agent.name);
@@ -586,9 +598,9 @@ export async function reviewDrawing(
 
     let finalResponse = '';
     if (orchConfig.provider === 'gemini') {
-      finalResponse = await callGeminiProxy(orchestratorAgent.systemPrompt, synthesisPrompt, drawingUrl, orchConfig);
+      finalResponse = await callGeminiProxy(orchestratorAgent.systemPrompt, synthesisPrompt, drawingUrl, orchConfig, orchestratorAgent);
     } else {
-      finalResponse = await callOpenAICompatible(orchConfig, orchestratorAgent.systemPrompt, synthesisPrompt);
+      finalResponse = await callOpenAICompatible(orchConfig, orchestratorAgent.systemPrompt, synthesisPrompt, undefined, orchestratorAgent);
     }
 
     reportProgress(95, 'Orchestrator', 'Finalizing compliance report...', completed);

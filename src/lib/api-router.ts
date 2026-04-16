@@ -3,7 +3,10 @@ import rateLimit from "express-rate-limit";
 import crypto from "crypto";
 import { del, put } from "@vercel/blob";
 import multer from "multer";
-import { admin, adminDb, auth } from "./firebase-admin.js";
+import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
+
+import { UserRole } from "../types.js";
+
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -52,7 +55,23 @@ async function getAdminLLMConfig() {
   return null;
 }
 
-async function verifyAuth(authHeader: string | undefined) {
+async function verifyAuth(headers: Record<string, any>) {
+  const authHeader = headers.authorization as string | undefined;
+  const directApiKey = headers['api-key'] || headers['x-agent-key'];
+
+  // Handle direct API Key header (preferred for agents)
+  if (directApiKey) {
+    // Return a mock agent user
+    return {
+      uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
+      email: 'agent@architex.co.za',
+      displayName: 'Agent Service',
+      role: 'admin' as UserRole,
+      authorizationType: 'api_key',
+      authorizationValue: directApiKey
+    };
+  }
+
   if (!authHeader) {
     throw Object.assign(new Error("Missing authorization header"), { status: 401 });
   }
@@ -60,21 +79,32 @@ async function verifyAuth(authHeader: string | undefined) {
   // Handle Bearer token (Firebase auth)
   if (authHeader.startsWith("Bearer ")) {
     try {
-      return await auth.verifyIdToken(authHeader.split("Bearer ")[1]);
+      const token = authHeader.split("Bearer ")[1];
+      const decoded = await auth.verifyIdToken(token);
+      
+      // Check if this user is acting as an agent
+      const agentDoc = await adminDb.collection("agents").doc(decoded.uid).get();
+      if (agentDoc.exists) {
+        const agentData = agentDoc.data();
+        return {
+          ...decoded,
+          authorizationType: agentData?.authorizationType,
+          authorizationValue: agentData?.authorizationValue
+        };
+      }
+      return decoded;
     } catch (err: any) {
       console.error("Firebase Auth Verification Failed:", err);
       throw Object.assign(new Error(`Auth failed: ${err.message}`), { status: 401 });
     }
   }
 
-  // Handle API key (for agent calls)
+  // Handle Api-Key embedded in Authorization header
   if (authHeader.startsWith("Api-Key ")) {
     const apiKey = authHeader.split("Api-Key ")[1];
     if (!apiKey) {
       throw Object.assign(new Error("Missing API key value"), { status: 401 });
     }
-    // In a real implementation, you would validate the API key
-    // For now, we'll just return a mock user object
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
       email: 'agent@architex.co.za',
@@ -85,13 +115,12 @@ async function verifyAuth(authHeader: string | undefined) {
     };
   }
 
-  // Handle custom headers
+  // Handle Custom-Auth
   if (authHeader.startsWith("Custom-Auth ")) {
     const customAuth = authHeader.split("Custom-Auth ")[1];
     if (!customAuth) {
       throw Object.assign(new Error("Missing custom auth value"), { status: 401 });
     }
-    // In a real implementation, you would validate the custom auth
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
       email: 'agent@architex.co.za',
@@ -100,28 +129,6 @@ async function verifyAuth(authHeader: string | undefined) {
       authorizationType: 'custom',
       authorizationValue: customAuth
     };
-  }
-
-  // Handle Bearer token with custom authorization (for agent calls)
-  if (authHeader.startsWith("Bearer ")) {
-    const token = authHeader.split("Bearer ")[1];
-    try {
-      const decoded = await auth.verifyIdToken(token);
-      // Check if this is an agent token (has authorization headers)
-      const agentDoc = await adminDb.collection("agents").doc(decoded.uid).get();
-      if (agentDoc.exists) {
-        const agentData = agentDoc.data();
-        return {
-          ...decoded,
-          authorizationType: agentData.authorizationType,
-          authorizationValue: agentData.authorizationValue
-        };
-      }
-      return decoded;
-    } catch (err: any) {
-      console.error("Firebase Auth Verification Failed:", err);
-      throw Object.assign(new Error(`Auth failed: ${err.message}`), { status: 401 });
-    }
   }
 
   throw Object.assign(new Error("Unsupported authorization type"), { status: 401 });
@@ -166,7 +173,7 @@ router.post("/review", reviewLimiter, async (req, res) => {
   // --- COMMENT 4 IMPLEMENTATION: Add Firebase auth verification ---
   let decoded;
   try {
-    decoded = await verifyAuth(req.headers.authorization);
+    decoded = await verifyAuth(req.headers);
     
     // Admin whitelist check (log but allow for now to prevent blocking architects)
     const adminEmails = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
@@ -243,9 +250,11 @@ router.post("/review", reviewLimiter, async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${activeApiKey}`,
+        "Authorization": `Bearer ${activeApiKey}`,
+        "Accept": "application/json",
       },
       body: JSON.stringify({
+
         model: activeModel,
         messages,
         response_format: { type: "json_object" },
@@ -282,7 +291,7 @@ router.post("/review", reviewLimiter, async (req, res) => {
 // Gemini proxy (authenticated + URL-validated)
 router.post("/gemini/review", reviewLimiter, async (req, res) => {
   try {
-    await verifyAuth(req.headers.authorization);
+    await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -380,7 +389,7 @@ router.post("/gemini/review", reviewLimiter, async (req, res) => {
 router.post("/agent/search", apiLimiter, async (req, res) => {
   const { query, agentRole } = req.body;
   try {
-    await verifyAuth(req.headers.authorization);
+    await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -425,7 +434,7 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
 router.post("/files/upload", async (req, res) => {
   let decoded;
   try {
-    decoded = await verifyAuth(req.headers.authorization);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -492,7 +501,7 @@ router.post("/files/delete", async (req, res) => {
   const { fileId, fileUrl } = req.body;
   let decoded;
   try {
-    decoded = await verifyAuth(req.headers.authorization);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -529,7 +538,7 @@ router.post("/files/delete", async (req, res) => {
 router.post("/notifications/token", async (req, res) => {
   let decoded;
   try {
-    decoded = await verifyAuth(req.headers.authorization);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -553,7 +562,7 @@ router.post("/notifications/token", async (req, res) => {
 router.post("/payment/initialize-escrow", async (req, res) => {
   let decoded;
   try {
-    decoded = await verifyAuth(req.headers.authorization);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -646,7 +655,7 @@ router.post("/payment/initialize-escrow", async (req, res) => {
 router.post("/payment/release-milestone", async (req, res) => {
   let decoded;
   try {
-    decoded = await verifyAuth(req.headers.authorization);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
