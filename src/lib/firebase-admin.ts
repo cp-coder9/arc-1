@@ -49,4 +49,24 @@ export const firebaseConfig = { projectId, firestoreDatabaseId };
 import * as adminModule from "firebase-admin";
 export const admin = adminModule;
 
+// Add test endpoint for development
+export async function testFirebase() {
+  try {
+    const collections = await adminDb.listCollections();
+    const collectionNames = collections.map(col => col.id);
+    return {
+      status: "success",
+      firebaseConfig: { projectId, firestoreDatabaseId },
+      collections: collectionNames,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
 

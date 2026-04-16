@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import apiRouter from "./src/lib/api-router.js";
-import { adminDb } from "./src/lib/firebase-admin.js";
+import { adminDb, testFirebase } from "./src/lib/firebase-admin.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +90,20 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Firebase test endpoint
+  app.get("/firebase/test", async (_req, res) => {
+    try {
+      const result = await testFirebase();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ 
+        status: "error", 
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
