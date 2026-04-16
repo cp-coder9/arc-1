@@ -8,7 +8,8 @@ import crypto from "crypto";
 import * as admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
-import { del } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
+import multer from "multer";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,7 +32,40 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const PAYFAST_MERCHANT_ID = process.env.VITE_PAYFAST_MERCHANT_ID || "";
 const PAYFAST_MERCHANT_KEY = process.env.VITE_PAYFAST_MERCHANT_KEY || "";
 const PAYFAST_PASSPHRASE = process.env.VITE_PAYFAST_PASSPHRASE || "";
-const BLOB_READ_WRITE_TOKEN = process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
+const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
+const PLATFORM_FEE_PERCENTAGE = 0.05;
+
+// Allowed Blob hostnames for drawingUrl validation
+const ALLOWED_BLOB_HOSTS = ["public.blob.vercel-storage.com"];
+function isAllowedBlobUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    return ALLOWED_BLOB_HOSTS.some(host => parsed.hostname.endsWith(host));
+  } catch { return false; }
+}
+
+// Multer setup (memory storage, 20MB limit)
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf", "image/png", "image/jpeg", "image/jpg",
+  "application/octet-stream", "image/webp",
+]);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype)) cb(null, true);
+    else cb(new Error(`File type not allowed: ${file.mimetype}`));
+  },
+});
+
+// Auth helper
+async function verifyAuth(authHeader: string | undefined) {
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw Object.assign(new Error("Missing or invalid authorization header"), { status: 401 });
+  }
+  return admin.auth().verifyIdToken(authHeader.split("Bearer ")[1]);
+}
 
 
 async function getAdminLLMConfig() {
@@ -708,6 +742,33 @@ async function startServer() {
     }
   });
 
+  // File Upload endpoint - performs Blob upload server-side (token never exposed to browser)
+  app.post("/api/files/upload", upload.single("file"), async (req, res) => {
+    let decoded: any;
+    try { decoded = await verifyAuth(req.headers.authorization); }
+    catch (err: any) { return res.status(err.status || 401).json({ error: err.message }); }
+
+    if (!req.file) return res.status(400).json({ error: "No file provided" });
+    const { context, jobId, submissionId } = req.body;
+    if (!context) return res.status(400).json({ error: "context field is required" });
+
+    try {
+      const fileName = req.file.originalname || `upload-${Date.now()}`;
+      const blob = await put(fileName, req.file.buffer, {
+        access: "public", token: BLOB_READ_WRITE_TOKEN, contentType: req.file.mimetype,
+      });
+      const fileRef = await adminDb.collection("uploaded_files").add({
+        url: blob.url, fileName, fileType: req.file.mimetype, fileSize: req.file.size,
+        uploadedBy: decoded.uid, context, jobId: jobId || null,
+        submissionId: submissionId || null, uploadedAt: new Date().toISOString(),
+      });
+      res.json({ url: blob.url, fileId: fileRef.id });
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: "Upload failed", details: err.message });
+    }
+  });
+
   // File Delete endpoint - Server-side only (protects Blob token and verifies ownership)
   app.post("/api/files/delete", async (req, res) => {
     const { fileId, fileUrl } = req.body;
@@ -857,110 +918,203 @@ async function startServer() {
   // PayFast ITN (Instant Transaction Notification) Handler
   app.post("/api/payment/notify", async (req, res) => {
     try {
-      const pfData = req.body;
+      const pfData = { ...req.body };
 
-      // Validate required PayFast fields
-      const requiredFields = [
-        "m_payment_id",
-        "pf_payment_id",
-        "payment_status",
-        "amount_gross",
-        "amount_fee",
-        "amount_net",
-      ];
-
+      const requiredFields = ["m_payment_id","pf_payment_id","payment_status","amount_gross","amount_fee","amount_net"];
       for (const field of requiredFields) {
-        if (!pfData[field]) {
-          console.error(`Missing required PayFast field: ${field}`);
-          return res.status(400).send("Bad Request");
-        }
+        if (!pfData[field]) { console.error(`Missing PayFast field: ${field}`); return res.status(400).send("Bad Request"); }
       }
 
-      // Verify payment data signature
       const signature = pfData["signature"];
       delete pfData["signature"];
 
-      // Build signature string (alphabetical order)
-      const signatureData = Object.keys(pfData)
-        .sort()
-        .map((key) => `${key}=${encodeURIComponent(pfData[key]).replace(/%20/g, "+")}`)
-        .join("&");
-
-      // Calculate expected signature
+      const signatureData = Object.keys(pfData).sort()
+        .map(key => `${key}=${encodeURIComponent(pfData[key]).replace(/%20/g, "+")}`).join("&");
       let signatureString = signatureData;
-      if (PAYFAST_PASSPHRASE) {
-        signatureString += `&passphrase=${encodeURIComponent(PAYFAST_PASSPHRASE).replace(/%20/g, "+")}`;
-      }
+      if (PAYFAST_PASSPHRASE) signatureString += `&passphrase=${encodeURIComponent(PAYFAST_PASSPHRASE).replace(/%20/g, "+")}`;
+      const expectedSignature = crypto.createHash("md5").update(signatureString).digest("hex");
 
-      const expectedSignature = crypto
-        .createHash("md5")
-        .update(signatureString)
-        .digest("hex");
+      if (signature !== expectedSignature) { console.error("PayFast signature failed"); return res.status(400).send("Invalid signature"); }
 
-      if (signature !== expectedSignature) {
-        console.error("PayFast signature verification failed");
-        return res.status(400).send("Invalid signature");
-      }
+      const paymentSnap = await adminDb.collection("payments").doc(pfData["m_payment_id"]).get();
+      if (!paymentSnap.exists) return res.status(400).send("Payment not found");
+      const paymentData = paymentSnap.data()!;
+      const expectedAmount = (paymentData.amount / 100).toFixed(2);
+      if (pfData["amount_gross"] !== expectedAmount) return res.status(400).send("Amount mismatch");
 
-      // Verify amounts match (prevent tampering)
-      const expectedAmountResult = await adminDb.collection("payments").doc(pfData["m_payment_id"]).get();
-      if (!expectedAmountResult.exists) {
-        console.error("Payment record not found for webhook:", pfData["m_payment_id"]);
-        return res.status(400).send("Payment not found");
-      }
-      const paymentData = expectedAmountResult.data();
-      const expectedAmount = (paymentData?.amount / 100).toFixed(2);
-      
-      if (pfData["amount_gross"] !== expectedAmount) {
-        console.error("PayFast amount mismatch. Expected:", expectedAmount, "Got:", pfData["amount_gross"]);
-        return res.status(400).send("Amount mismatch");
-      }
-
-      const grossAmount = parseFloat(pfData["amount_gross"]);
-
-      console.log("PayFast payment notification received:", {
-        paymentId: pfData["m_payment_id"],
-        pfPaymentId: pfData["pf_payment_id"],
-        status: pfData["payment_status"],
-        amount: grossAmount,
-      });
-
-      // Process payment based on status
+      // Inline Admin SDK processing (no internal HTTP call)
       if (pfData["payment_status"] === "COMPLETE") {
-        console.log("Payment completed successfully:", pfData["m_payment_id"]);
-
-        // Call internal API to confirm payment
-        try {
-          const confirmResponse = await fetch(`http://localhost:${PORT}/api/payment/confirm`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              paymentId: pfData["m_payment_id"],
-              pfData: pfData,
-            }),
+        if (paymentData.status !== "completed") {
+          await paymentSnap.ref.update({
+            status: "completed", transactionId: pfData["pf_payment_id"],
+            processedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            metadata: { ...(paymentData.metadata || {}), payfastData: pfData },
           });
-
-          if (!confirmResponse.ok) {
-            console.error("Failed to confirm payment:", await confirmResponse.text());
+          if (paymentData.jobId) {
+            await adminDb.collection("escrow").doc(paymentData.jobId).update({
+              status: "funded", heldAmount: paymentData.amount,
+              fundedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            });
           }
-        } catch (confirmError) {
-          console.error("Error confirming payment:", confirmError);
         }
       } else if (pfData["payment_status"] === "FAILED") {
-        console.error("Payment failed:", pfData["m_payment_id"]);
-
-        // Update payment status to failed
-        // TODO: Implement via Firebase Admin SDK
-      } else if (pfData["payment_status"] === "PENDING") {
-        console.log("Payment pending:", pfData["m_payment_id"]);
+        await paymentSnap.ref.update({ status: "failed", updatedAt: new Date().toISOString() });
       }
 
-      // Return success to PayFast (must be exactly "OK")
       res.status(200).send("OK");
     } catch (error) {
       console.error("PayFast notification error:", error);
       res.status(500).send("Error");
     }
+  });
+
+  // Payment – initialize escrow
+  app.post("/api/payment/initialize-escrow", async (req, res) => {
+    let decoded: any;
+    try { decoded = await verifyAuth(req.headers.authorization); }
+    catch (err: any) { return res.status(err.status || 401).json({ error: err.message }); }
+    const { jobId } = req.body;
+    if (!jobId) return res.status(400).json({ error: "jobId is required" });
+    try {
+      const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+      if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobDoc.data()!;
+      if (job.clientId !== decoded.uid) return res.status(403).json({ error: "Only the job client can initialize escrow" });
+      const platformFee = Math.round(job.budget * PLATFORM_FEE_PERCENTAGE);
+      const totalAmount = job.budget + platformFee;
+      const paymentRef = await adminDb.collection("payments").add({
+        jobId, payerId: job.clientId, payeeId: job.selectedArchitectId || "",
+        amount: totalAmount, type: "escrow_deposit", status: "pending",
+        metadata: { platformFee, architectAmount: job.budget },
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      });
+      await adminDb.collection("escrow").doc(jobId).set({
+        totalAmount, heldAmount: 0, releasedAmount: 0, platformFeeAmount: platformFee,
+        status: "pending", paymentId: paymentRef.id,
+        milestones: { initial: { percentage: 20, status: "pending", released: false }, draft: { percentage: 40, status: "pending", released: false }, final: { percentage: 40, status: "pending", released: false } },
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      const baseUrl = `http://localhost:${PORT}`;
+      const pfUrl = process.env.VITE_PAYFAST_SANDBOX === "true" ? "https://sandbox.payfast.co.za/eng/process" : "https://www.payfast.co.za/eng/process";
+      const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+      const userData = userDoc.data() || {};
+      const displayName = userData.displayName || "";
+      const data: Record<string,string> = {
+        merchant_id: PAYFAST_MERCHANT_ID, merchant_key: PAYFAST_MERCHANT_KEY,
+        return_url: `${baseUrl}/api/payment/success?payment_id=${paymentRef.id}`,
+        cancel_url: `${baseUrl}/api/payment/cancel?payment_id=${paymentRef.id}`,
+        notify_url: `${baseUrl}/api/payment/notify`,
+        name_first: displayName.split(" ")[0] || displayName, name_last: displayName.split(" ").slice(1).join(" ") || "",
+        email_address: userData.email || "", m_payment_id: paymentRef.id,
+        amount: (totalAmount / 100).toFixed(2), item_name: `Escrow: ${(job.title||'').substring(0,100)}`,
+        item_description: "Payment for architectural services via Architex",
+        custom_str1: paymentRef.id, custom_str2: decoded.uid,
+      };
+      Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
+      const sorted = Object.keys(data).sort();
+      let paramStr = sorted.map(k => `${k}=${encodeURIComponent(data[k]).replace(/%20/g,"+")}`).join("&");
+      if (PAYFAST_PASSPHRASE) paramStr += `&passphrase=${encodeURIComponent(PAYFAST_PASSPHRASE).replace(/%20/g,"+")}`;
+      const sig = crypto.createHash("md5").update(paramStr).digest("hex");
+      const params = new URLSearchParams({...data, signature: sig}).toString();
+      res.json({ paymentUrl: `${pfUrl}?${params}`, paymentId: paymentRef.id });
+    } catch (err: any) { res.status(500).json({ error: "Internal server error", details: err.message }); }
+  });
+
+  // Payment – release milestone
+  app.post("/api/payment/release-milestone", async (req, res) => {
+    let decoded: any;
+    try { decoded = await verifyAuth(req.headers.authorization); }
+    catch (err: any) { return res.status(err.status || 401).json({ error: err.message }); }
+    const { jobId, milestone } = req.body;
+    if (!jobId || !milestone) return res.status(400).json({ error: "jobId and milestone required" });
+    try {
+      const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+      if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobDoc.data()!;
+      if (job.clientId !== decoded.uid) return res.status(403).json({ error: "Only client can release milestones" });
+      const escrowRef = adminDb.collection("escrow").doc(jobId);
+      const escrowDoc = await escrowRef.get();
+      if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+      const escrow = escrowDoc.data()!;
+      if (escrow.milestones?.[milestone]?.released) return res.status(400).json({ error: "Milestone already released" });
+      const pct: Record<string,number> = { initial: 0.20, draft: 0.40, final: 0.40 };
+      const releaseAmount = Math.round(job.budget * (pct[milestone] || 0));
+      const fee = Math.round(releaseAmount * PLATFORM_FEE_PERCENTAGE);
+      const architectAmount = releaseAmount - fee;
+      const batch = adminDb.batch();
+      batch.update(escrowRef, {
+        heldAmount: escrow.heldAmount - releaseAmount, releasedAmount: (escrow.releasedAmount||0) + releaseAmount,
+        [`milestones.${milestone}.status`]: "released", [`milestones.${milestone}.released`]: true,
+        [`milestones.${milestone}.releasedAt`]: new Date().toISOString(), [`milestones.${milestone}.amount`]: architectAmount,
+        status: escrow.heldAmount - releaseAmount <= 0 ? "fully_released" : "partially_released",
+        updatedAt: new Date().toISOString(),
+      });
+      batch.set(adminDb.collection("payments").doc(), {
+        jobId, payerId: job.clientId, payeeId: job.selectedArchitectId || "",
+        amount: architectAmount, type: "milestone_release", milestone, status: "completed",
+        metadata: { platformFee: fee, grossAmount: releaseAmount },
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      });
+      await batch.commit();
+      res.json({ success: true, releasedAmount: architectAmount });
+    } catch (err: any) { res.status(500).json({ error: "Internal server error", details: err.message }); }
+  });
+
+  // Payment – request milestone release
+  app.post("/api/payment/request-milestone", async (req, res) => {
+    let decoded: any;
+    try { decoded = await verifyAuth(req.headers.authorization); }
+    catch (err: any) { return res.status(err.status || 401).json({ error: err.message }); }
+    const { jobId, milestone } = req.body;
+    if (!jobId || !milestone) return res.status(400).json({ error: "jobId and milestone required" });
+    try {
+      const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+      if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobDoc.data()!;
+      if (job.selectedArchitectId !== decoded.uid) return res.status(403).json({ error: "Only the assigned architect can request release" });
+      const escrowRef = adminDb.collection("escrow").doc(jobId);
+      await escrowRef.update({
+        [`milestones.${milestone}.status`]: "requested",
+        [`milestones.${milestone}.requestedAt`]: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: "Internal server error", details: err.message }); }
+  });
+
+  // Payment – refund
+  app.post("/api/payment/refund", async (req, res) => {
+    let decoded: any;
+    try { decoded = await verifyAuth(req.headers.authorization); }
+    catch (err: any) { return res.status(err.status || 401).json({ error: err.message }); }
+    const { jobId, amount, reason } = req.body;
+    if (!jobId || !amount || !reason) return res.status(400).json({ error: "jobId, amount, reason required" });
+    try {
+      const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+      if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+      const job = jobDoc.data()!;
+      if (job.clientId !== decoded.uid) return res.status(403).json({ error: "Only client can request refunds" });
+      const escrowRef = adminDb.collection("escrow").doc(jobId);
+      const escrowDoc = await escrowRef.get();
+      if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+      const escrow = escrowDoc.data()!;
+      if (amount > escrow.heldAmount) return res.status(400).json({ error: "Refund amount exceeds available funds" });
+      const fee = Math.round(amount * PLATFORM_FEE_PERCENTAGE);
+      const refundAmount = amount - fee;
+      const batch = adminDb.batch();
+      batch.update(escrowRef, {
+        heldAmount: escrow.heldAmount - amount, refundedAmount: (escrow.refundedAmount||0) + refundAmount,
+        status: escrow.heldAmount - amount <= 0 ? "refunded" : "partially_refunded",
+        updatedAt: new Date().toISOString(),
+      });
+      batch.set(adminDb.collection("payments").doc(), {
+        jobId, payerId: job.clientId, payeeId: job.selectedArchitectId || "",
+        amount: refundAmount, type: "refund", status: "completed",
+        metadata: { reason, platformFee: fee }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      });
+      await batch.commit();
+      res.json({ success: true, refundAmount });
+    } catch (err: any) { res.status(500).json({ error: "Internal server error", details: err.message }); }
   });
 
   // Payment return URLs
