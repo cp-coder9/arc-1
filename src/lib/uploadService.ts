@@ -56,7 +56,9 @@ export async function uploadAndTrackFile(
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Upload failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(data.details ? `Upload failed: ${data.details}` : (data.error || `Upload failed: ${res.status}`));
+  }
 
   return data.url as string;
 }
