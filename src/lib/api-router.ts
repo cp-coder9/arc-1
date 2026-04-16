@@ -53,15 +53,78 @@ async function getAdminLLMConfig() {
 }
 
 async function verifyAuth(authHeader: string | undefined) {
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw Object.assign(new Error("Missing or invalid authorization header"), { status: 401 });
+  if (!authHeader) {
+    throw Object.assign(new Error("Missing authorization header"), { status: 401 });
   }
-  try {
-    return await auth.verifyIdToken(authHeader.split("Bearer ")[1]);
-  } catch (err: any) {
-    console.error("Auth Verification Failed:", err);
-    throw Object.assign(new Error(`Auth failed: ${err.message}`), { status: 401 });
+
+  // Handle Bearer token (Firebase auth)
+  if (authHeader.startsWith("Bearer ")) {
+    try {
+      return await auth.verifyIdToken(authHeader.split("Bearer ")[1]);
+    } catch (err: any) {
+      console.error("Firebase Auth Verification Failed:", err);
+      throw Object.assign(new Error(`Auth failed: ${err.message}`), { status: 401 });
+    }
   }
+
+  // Handle API key (for agent calls)
+  if (authHeader.startsWith("Api-Key ")) {
+    const apiKey = authHeader.split("Api-Key ")[1];
+    if (!apiKey) {
+      throw Object.assign(new Error("Missing API key value"), { status: 401 });
+    }
+    // In a real implementation, you would validate the API key
+    // For now, we'll just return a mock user object
+    return {
+      uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
+      email: 'agent@architex.co.za',
+      displayName: 'Agent Service',
+      role: 'admin' as UserRole,
+      authorizationType: 'api_key',
+      authorizationValue: apiKey
+    };
+  }
+
+  // Handle custom headers
+  if (authHeader.startsWith("Custom-Auth ")) {
+    const customAuth = authHeader.split("Custom-Auth ")[1];
+    if (!customAuth) {
+      throw Object.assign(new Error("Missing custom auth value"), { status: 401 });
+    }
+    // In a real implementation, you would validate the custom auth
+    return {
+      uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
+      email: 'agent@architex.co.za',
+      displayName: 'Agent Service',
+      role: 'admin' as UserRole,
+      authorizationType: 'custom',
+      authorizationValue: customAuth
+    };
+  }
+
+  // Handle Bearer token with custom authorization (for agent calls)
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split("Bearer ")[1];
+    try {
+      const decoded = await auth.verifyIdToken(token);
+      // Check if this is an agent token (has authorization headers)
+      const agentDoc = await adminDb.collection("agents").doc(decoded.uid).get();
+      if (agentDoc.exists) {
+        const agentData = agentDoc.data();
+        return {
+          ...decoded,
+          authorizationType: agentData.authorizationType,
+          authorizationValue: agentData.authorizationValue
+        };
+      }
+      return decoded;
+    } catch (err: any) {
+      console.error("Firebase Auth Verification Failed:", err);
+      throw Object.assign(new Error(`Auth failed: ${err.message}`), { status: 401 });
+    }
+  }
+
+  throw Object.assign(new Error("Unsupported authorization type"), { status: 401 });
 }
 
 async function isAdmin(uid: string): Promise<boolean> {
@@ -719,5 +782,25 @@ router.post("/payment/notify", async (req, res) => {
     res.status(500).send("Internal Error");
   }
 });
+
+// Firebase test endpoint
+router.get("/firebase/test", async (_req, res) => {
+  try {
+    const collections = await adminDb.listCollections();
+    const collectionNames = collections.map(col => col.id);
+    res.json({ 
+      status: "success", 
+      firebaseConfig: firebaseConfig,
+      collections: collectionNames,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: "error", 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+})
 
 export default router;

@@ -29,6 +29,263 @@ import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
 import { Dialog as FullScreenDialog, DialogContent as FullScreenDialogContent } from './ui/dialog';
 
+// Agent Card Component
+function AgentCard({ agent }: { agent: Agent }) {
+  const [editing, setEditing] = useState(false);
+  const [tempAgent, setTempAgent] = useState<Agent>(agent);
+
+  const handleSave = async () => {
+    try {
+      await updateDoc(doc(db, 'agents', agent.id), {
+        ...tempAgent,
+        updatedAt: new Date().toISOString()
+      });
+      setEditing(false);
+      toast.success("Agent configuration saved");
+    } catch (error) {
+      toast.error("Failed to save agent configuration");
+    }
+  };
+
+  const handleReset = () => {
+    setTempAgent(agent);
+    setEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this agent? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, 'agents', agent.id));
+      toast.success("Agent deleted");
+    } catch (error) {
+      toast.error("Failed to delete agent");
+    }
+  };
+
+  if (editing) {
+    return (
+      <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
+        <CardHeader className="bg-primary/5 border-b border-border p-8">
+          <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Cpu size={14} /> {agent.name} (Editing)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-8 space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Name</label>
+              <Input 
+                value={tempAgent.name} 
+                onChange={e => setTempAgent({...tempAgent, name: e.target.value})}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+              <Input 
+                value={tempAgent.role} 
+                onChange={e => setTempAgent({...tempAgent, role: e.target.value})}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
+              <Textarea 
+                value={tempAgent.description} 
+                onChange={e => setTempAgent({...tempAgent, description: e.target.value})}
+                className="rounded-xl"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">System Prompt</label>
+              <Textarea 
+                value={tempAgent.systemPrompt} 
+                onChange={e => setTempAgent({...tempAgent, systemPrompt: e.target.value})}
+                className="rounded-xl"
+                rows={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Temperature</label>
+              <Input 
+                type="number"
+                value={tempAgent.temperature} 
+                onChange={e => setTempAgent({...tempAgent, temperature: parseFloat(e.target.value)})}
+                className="rounded-xl"
+                min="0"
+                max="1"
+                step="0.1"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Provider</label>
+              <select 
+                value={tempAgent.llmProvider || 'global'} 
+                onChange={e => setTempAgent({...tempAgent, llmProvider: e.target.value as LLMProvider | 'global'})}
+                className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+              >
+                <option value="global">Global (Use System Config)</option>
+                {Object.keys(PROVIDER_CONFIGS).map((key) => (
+                  <option key={key} value={key}>{PROVIDER_CONFIGS[key as LLMProvider].label}</option>
+                ))}
+              </select>
+            </div>
+            {tempAgent.llmProvider !== 'global' && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Model</label>
+                  <select 
+                    value={tempAgent.llmModel || ''} 
+                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                  >
+                    <option value="">Select a model</option>
+                    {tempAgent.llmProvider && PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider].models.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key</label>
+                  <Input 
+                    type="password"
+                    value={tempAgent.llmApiKey || ''} 
+                    onChange={e => setTempAgent({...tempAgent, llmApiKey: e.target.value})}
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
+                  <Input 
+                    value={tempAgent.llmBaseUrl || ''} 
+                    onChange={e => setTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
+                    className="rounded-xl"
+                  />
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authorization Type</label>
+              <select 
+                value={tempAgent.authorizationType || ''} 
+                onChange={e => setTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
+                className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+              >
+                <option value="">None</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="api_key">API Key</option>
+                <option value="custom">Custom Header</option>
+              </select>
+            </div>
+            {tempAgent.authorizationType && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authorization Value</label>
+                  <Input 
+                    type={tempAgent.authorizationType === 'bearer' ? 'password' : 'text'}
+                    value={tempAgent.authorizationValue || ''} 
+                    onChange={e => setTempAgent({...tempAgent, authorizationValue: e.target.value})}
+                    className="rounded-xl"
+                  />
+                </div>
+                {tempAgent.authorizationType === 'custom' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Header Name</label>
+                    <Input 
+                      value={tempAgent.authorizationHeader || ''} 
+                      onChange={e => setTempAgent({...tempAgent, authorizationHeader: e.target.value})}
+                      className="rounded-xl"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} className="bg-primary text-primary-foreground h-12 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
+              <Save size={16} /> Save Changes
+            </Button>
+            <Button onClick={handleReset} variant="outline" className="h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
+              <RefreshCcw size={16} /> Reset
+            </Button>
+            <Button onClick={() => setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
+      <CardHeader className="bg-primary/5 border-b border-border p-8">
+        <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+          <Cpu size={14} /> {agent.name}
+        </CardTitle>
+        <CardDescription className="text-[10px] text-muted-foreground">{agent.description}</CardDescription>
+      </CardHeader>
+      <CardContent className="p-8 space-y-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+              <p className="text-sm font-mono">{agent.role}</p>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</label>
+              <Badge variant={agent.status === 'online' ? 'secondary' : 'destructive'} className="text-[10px] font-bold uppercase">
+                {agent.status}
+              </Badge>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Last Active</label>
+            <p className="text-sm text-muted-foreground">{format(new Date(agent.lastActive), 'MMM d, yyyy HH:mm')}</p>
+          </div>
+          {agent.currentActivity && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Current Activity</label>
+              <p className="text-sm text-primary">{agent.currentActivity}</p>
+            </div>
+          )}
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Provider</label>
+            <p className="text-sm">
+              {agent.llmProvider === 'global' ? 'Global (System Config)' : agent.llmProvider || 'Not configured'}
+            </p>
+          </div>
+          {agent.llmProvider !== 'global' && agent.llmModel && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model</label>
+              <p className="text-sm">{agent.llmModel}</p>
+            </div>
+          )}
+          {agent.authorizationType && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authorization</label>
+              <p className="text-sm">
+                {agent.authorizationType === 'bearer' ? 'Bearer Token' : 
+                 agent.authorizationType === 'api_key' ? 'API Key' : 
+                 `Custom Header: ${agent.authorizationHeader}`}
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setEditing(true)} variant="outline" className="h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
+            <Settings2 size={16} /> Edit
+          </Button>
+          <Button onClick={handleDelete} variant="destructive" className="h-12 rounded-xl font-bold gap-2">
+            <Trash2 size={16} /> Delete
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminDashboard({ 
   user, 
   activeTab, 
@@ -872,11 +1129,6 @@ function LLMSettings() {
     }
   };
 
-  const providers: { value: LLMProvider; label: string; baseUrl?: string }[] = [
-    { value: 'gemini', label: 'Google Gemini' },
-    { value: 'nvidia', label: 'NVIDIA NIM', baseUrl: 'https://integrate.api.nvidia.com/v1' },
-    { value: 'openrouter', label: 'OpenRouter.ai', baseUrl: 'https://openrouter.ai/api/v1' }
-  ];
 
   if (loading) {
     return (
@@ -903,18 +1155,18 @@ function LLMSettings() {
                 value={config.provider} 
                 onChange={(e) => {
                   const provider = e.target.value as LLMProvider;
-                  const pInfo = providers.find(p => p.value === provider);
+                  const pConfig = PROVIDER_CONFIGS[provider];
                   setConfig({
                     ...config,
                     provider,
-                    baseUrl: pInfo?.baseUrl || '',
-                    model: provider === 'gemini' ? 'gemini-2.0-flash' : ''
+                    baseUrl: pConfig.baseUrl,
+                    model: pConfig.models[0].value
                   });
                 }}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
-                {providers.map(p => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
+                  <option key={key} value={key}>{p.label}</option>
                 ))}
               </select>
             </div>
@@ -937,12 +1189,15 @@ function LLMSettings() {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
-              <Input 
+              <select 
                 value={config.model} 
                 onChange={e => setConfig({...config, model: e.target.value})}
-                placeholder={config.provider === 'nvidia' ? 'e.g. meta/llama-3.1-405b-instruct' : 'e.g. openai/gpt-4o'}
-                className="rounded-xl h-12"
-              />
+                className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+              >
+                {PROVIDER_CONFIGS[config.provider].models.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
@@ -1078,23 +1333,45 @@ function AgentCard({ agent }: { agent: Agent, key?: any }) {
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
                     <select 
                       value={llmProvider} 
-                      onChange={e => setLlmProvider(e.target.value as LLMProvider | 'global')}
+                      onChange={e => {
+                        const provider = e.target.value as LLMProvider | 'global';
+                        setLlmProvider(provider);
+                        if (provider !== 'global') {
+                          const pConfig = PROVIDER_CONFIGS[provider];
+                          setLlmBaseUrl(pConfig.baseUrl);
+                          setLlmModel(pConfig.models[0].value);
+                        } else {
+                          setLlmBaseUrl('');
+                          setLlmModel('');
+                        }
+                      }}
                       className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                     >
                       <option value="global">System Default (Global)</option>
-                      <option value="gemini">Google Gemini</option>
-                      <option value="nvidia">NVIDIA NIM</option>
-                      <option value="openrouter">OpenRouter.ai</option>
+                      {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
+                        <option key={key} value={key}>{p.label}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
-                    <Input 
-                      value={llmModel} 
-                      onChange={e => setLlmModel(e.target.value)}
-                      placeholder="e.g. gpt-4o, gemini-2.0-flash"
-                      className="h-10 rounded-xl text-xs"
-                    />
+                    {llmProvider === 'global' ? (
+                      <Input 
+                        value="Inherited from System Settings"
+                        disabled
+                        className="h-10 rounded-xl text-xs bg-secondary/20"
+                      />
+                    ) : (
+                      <select 
+                        value={llmModel} 
+                        onChange={e => setLlmModel(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
+                      >
+                        {PROVIDER_CONFIGS[llmProvider as LLMProvider].models.map(m => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key (Optional)</label>
@@ -1254,23 +1531,45 @@ function AddAgentDialog() {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
                 <select 
                   value={llmProvider} 
-                  onChange={e => setLlmProvider(e.target.value as LLMProvider | 'global')}
+                  onChange={e => {
+                    const provider = e.target.value as LLMProvider | 'global';
+                    setLlmProvider(provider);
+                    if (provider !== 'global') {
+                      const pConfig = PROVIDER_CONFIGS[provider];
+                      setLlmBaseUrl(pConfig.baseUrl);
+                      setLlmModel(pConfig.models[0].value);
+                    } else {
+                      setLlmBaseUrl('');
+                      setLlmModel('');
+                    }
+                  }}
                   className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                 >
                   <option value="global">System Default (Global)</option>
-                  <option value="gemini">Google Gemini</option>
-                  <option value="nvidia">NVIDIA NIM</option>
-                  <option value="openrouter">OpenRouter.ai</option>
+                  {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
+                    <option key={key} value={key}>{p.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
-                <Input 
-                  value={llmModel} 
-                  onChange={e => setLlmModel(e.target.value)}
-                  placeholder="e.g. gpt-4o"
-                  className="h-10 rounded-xl text-xs"
-                />
+                {llmProvider === 'global' ? (
+                  <Input 
+                    value="Inherited from System Settings"
+                    disabled
+                    className="h-10 rounded-xl text-xs bg-secondary/20"
+                  />
+                ) : (
+                  <select 
+                    value={llmModel} 
+                    onChange={e => setLlmModel(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
+                  >
+                    {PROVIDER_CONFIGS[llmProvider as LLMProvider].models.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key (Optional)</label>

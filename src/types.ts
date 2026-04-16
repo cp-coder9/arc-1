@@ -123,6 +123,9 @@ export interface Agent {
   llmModel?: string;
   llmApiKey?: string;
   llmBaseUrl?: string;
+  authorizationType?: 'bearer' | 'api_key' | 'custom';
+  authorizationValue?: string;
+  authorizationHeader?: string;
 }
 
 export interface SystemLog {

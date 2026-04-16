@@ -3,6 +3,27 @@ import { doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc } fro
 import { getIdToken } from "firebase/auth";
 import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider } from "../types";
 
+// Helper function to get authorization headers from agent config
+function getAuthorizationHeader(agent: Agent): Record<string, string> {
+  if (!agent.authorizationType || !agent.authorizationValue) {
+    return {};
+  }
+
+  switch (agent.authorizationType) {
+    case 'bearer':
+      return { 'Authorization': `Bearer ${agent.authorizationValue}` };
+    case 'api_key':
+      return { 'Api-Key': agent.authorizationValue };
+    case 'custom':
+      if (agent.authorizationHeader) {
+        return { [agent.authorizationHeader]: agent.authorizationValue };
+      }
+      return {};
+    default:
+      return {};
+  }
+}
+
 // Retry configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -57,11 +78,16 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
     try {
+      // Get agent configuration if available
+      const agentConfig = await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
+      const authorizationHeader = getAuthorizationHeader(agentConfig);
+
       const response = await fetch('/api/gemini/review', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
+          ...authorizationHeader
         },
         body: JSON.stringify({
           systemInstruction,
@@ -125,11 +151,16 @@ async function callOpenAICompatible(config: LLMConfig, systemInstruction: string
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
+      // Get agent configuration if available
+      const agentConfig = await getAgentConfig('orchestrator', SPECIALIZED_AGENTS[0]);
+      const authorizationHeader = getAuthorizationHeader(agentConfig);
+
       const response = await fetch('/api/review', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
+          ...authorizationHeader
         },
         body: JSON.stringify({
           systemInstruction,
@@ -344,7 +375,9 @@ export async function seedAgents() {
           ...agent,
           status: 'online',
           lastActive: new Date().toISOString(),
-          currentActivity: 'Idle'
+          currentActivity: 'Idle',
+          authorizationType: 'bearer', // Default authorization type
+          authorizationValue: process.env.AGENT_API_KEY || 'default-agent-key' // Default API key
         });
       }
     }
