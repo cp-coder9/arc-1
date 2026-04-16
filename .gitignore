@@ -39,6 +39,9 @@ build/
 .vercel
 .vercel/output
 
+# Kilo
+.kilo/
+
 # Environment variables
 .env
 .env.local
