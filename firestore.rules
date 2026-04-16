@@ -54,7 +54,7 @@ service cloud.firestore {
 
     // Jobs collection
     match /jobs/{jobId} {
-      allow read: if (resource != null && resource.data.status == 'open') || 
+      allow read: if (resource.data.status == 'open') || 
                    (isAuthenticated() && (
                      resource.data.clientId == request.auth.uid ||
                      resource.data.selectedArchitectId == request.auth.uid ||

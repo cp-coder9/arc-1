@@ -465,11 +465,12 @@ export async function reviewDrawing(
     const agentCalls = agentConfigs.map(async (agent) => {
       reportProgress(25, agent.name, `Analyzing drawing (Sector: ${agent.name})...`, completed);
       
+      const isGlobalProvider = !agent.llmProvider || agent.llmProvider === 'global';
       const config: LLMConfig = {
-        provider: (agent.llmProvider === 'global' || !agent.llmProvider) ? globalConfig.provider : agent.llmProvider as LLMProvider,
-        model: agent.llmModel || globalConfig.model,
-        apiKey: agent.llmApiKey || globalConfig.apiKey,
-        baseUrl: agent.llmBaseUrl || globalConfig.baseUrl,
+        provider: isGlobalProvider ? globalConfig.provider : agent.llmProvider as LLMProvider,
+        model: (isGlobalProvider || !agent.llmModel) ? globalConfig.model : agent.llmModel,
+        apiKey: (isGlobalProvider || !agent.llmApiKey) ? globalConfig.apiKey : agent.llmApiKey,
+        baseUrl: (isGlobalProvider || !agent.llmBaseUrl) ? globalConfig.baseUrl : agent.llmBaseUrl
       };
 
       try {
