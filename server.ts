@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import crypto from "crypto";
-import * as admin from "firebase-admin";
+import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 import { del, put } from "@vercel/blob";

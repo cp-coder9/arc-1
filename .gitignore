@@ -51,3 +51,6 @@ build/
 
 # Firebase
 .firebase/
+
+.vercel
+.env*.local
