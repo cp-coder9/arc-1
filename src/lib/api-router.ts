@@ -283,7 +283,7 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
 });
 
 // File upload (server-side Blob, auth-gated)
-router.post("/files/upload", upload.single("file"), async (req, res) => {
+router.post("/files/upload", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers.authorization);
@@ -291,23 +291,30 @@ router.post("/files/upload", upload.single("file"), async (req, res) => {
     return res.status(err.status || 401).json({ error: err.message });
   }
 
-  if (!req.file) return res.status(400).json({ error: "No file provided" });
-  const { context, jobId, submissionId } = req.body;
+  const { context, jobId, submissionId, fileBase64, fileName, fileType, fileSize } = req.body;
+  if (!fileBase64) return res.status(400).json({ error: "No file provided" });
   if (!context) return res.status(400).json({ error: "context field is required" });
 
   try {
-    const fileName = req.file.originalname || `upload-${Date.now()}`;
-    const blob = await put(fileName, req.file.buffer, {
+    const safeFileName = fileName || `upload-${Date.now()}`;
+    const fileBuffer = Buffer.from(fileBase64, 'base64');
+    
+    // Optional: check file type against ALLOWED_MIME_TYPES
+    if (!ALLOWED_MIME_TYPES.has(fileType || '')) {
+      return res.status(400).json({ error: `File type not allowed: ${fileType}` });
+    }
+
+    const blob = await put(safeFileName, fileBuffer, {
       access: "public",
       token: BLOB_READ_WRITE_TOKEN,
-      contentType: req.file.mimetype,
+      contentType: fileType || "application/octet-stream",
     });
 
     const fileRef = await adminDb.collection("uploaded_files").add({
       url: blob.url,
-      fileName,
-      fileType: req.file.mimetype,
-      fileSize: req.file.size,
+      fileName: safeFileName,
+      fileType: fileType || "application/octet-stream",
+      fileSize: fileSize || fileBuffer.byteLength,
       uploadedBy: decoded.uid,
       context,
       jobId: jobId || null,

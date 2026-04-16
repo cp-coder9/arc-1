@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
-import { put } from '@vercel/blob';
+import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -1369,16 +1369,19 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
     setTestResult(null);
 
     try {
-      const blob = await put(file.name, file, {
-        access: 'public',
-        addRandomSuffix: true,
+      const url = await uploadAndTrackFile(file, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedBy: user.uid,
+        context: 'test'
       });
       
       setIsUploading(false);
       setIsTesting(true);
       
       try {
-        const result = await reviewDrawing(blob.url, file.name);
+        const result = await reviewDrawing(url, file.name);
         setTestResult(result);
         toast.success("AI Test completed successfully.");
       } catch (error) {
