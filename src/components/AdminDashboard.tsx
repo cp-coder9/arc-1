@@ -79,7 +79,7 @@ const PROVIDER_CONFIGS = {
 } as const;
 
 // Agent Card Component
-function AgentCard({ agent }: { agent: Agent }) {
+function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
   const [editing, setEditing] = useState(false);
   const [tempAgent, setTempAgent] = useState<Agent>(agent);
 
@@ -148,7 +148,7 @@ function AgentCard({ agent }: { agent: Agent }) {
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
-              {llmProvider === 'global' ? (
+              {tempAgent.llmProvider === 'global' || !tempAgent.llmProvider ? (
                 <Input 
                   value="Inherited from System Settings"
                   disabled
@@ -157,12 +157,10 @@ function AgentCard({ agent }: { agent: Agent }) {
               ) : (
                 <div className="space-y-2">
                   <select 
-                    value={llmModel} 
+                    value={tempAgent.llmModel || ''} 
                     onChange={e => {
-                      setLlmModel(e.target.value);
-                      if (e.target.value === 'custom') {
-                        setLlmModel('');
-                      }
+                      const val = e.target.value;
+                      setTempAgent({...tempAgent, llmModel: val === 'custom' ? '' : val});
                     }}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
@@ -173,8 +171,8 @@ function AgentCard({ agent }: { agent: Agent }) {
                     <option value="custom">Enter custom model name...</option>
                   </select>
                   <Input 
-                    value={llmModel}
-                    onChange={e => setLlmModel(e.target.value)}
+                    value={tempAgent.llmModel || ''}
+                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
                     placeholder="Enter model name (e.g. nvidia/llama-3.1-70b-instruct)"
                     className="h-12 rounded-xl"
                   />
@@ -423,10 +421,12 @@ export default function AdminDashboard({
       }));
     });
 
-    // Knowledge
-    const unsubKnowledge = onSnapshot(query(collection(db, 'agent_knowledge'), where('status', '==', 'pending_review')), (snap) => {
-      setPendingKnowledgeCount(snap.size);
-    });
+    // Knowledge — may fire a transient permission-denied before auth resolves; suppress that silently.
+    const unsubKnowledge = onSnapshot(
+      query(collection(db, 'agent_knowledge'), where('status', '==', 'pending_review')),
+      (snap) => { setPendingKnowledgeCount(snap.size); },
+      (err) => { if (err.code !== 'permission-denied') console.error('[AdminDashboard] knowledge listener:', err); }
+    );
 
     return () => {
       unsubSub();

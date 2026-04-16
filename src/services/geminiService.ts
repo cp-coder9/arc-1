@@ -220,6 +220,7 @@ export interface AIProgress {
   completedAgents: string[];
 }
 
+
 export const SPECIALIZED_AGENTS = [
   {
     name: "Orchestrator",
@@ -230,16 +231,17 @@ export const SPECIALIZED_AGENTS = [
 Your role is to coordinate specialized agent findings and produce a structured JSON compliance report.
 
 CRITICAL RULES:
-1. You MUST output valid JSON only
-2. The JSON must have these exact fields: status, feedback, categories, traceLog
-3. status must be either "passed" or "failed"
-4. If ANY compliance issue is found, status must be "failed"
-5. Only use "passed" if drawing is fully compliant
-6. For each issue, you MUST provide a "boundingBox": { "x": number, "y": number, "width": number, "height": number }
+1. You MUST output ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON.
+2. Start your response with { and end with } — nothing else.
+3. The JSON must have these exact fields: status, feedback, categories, traceLog
+4. status must be either "passed" or "failed"
+5. If ANY compliance issue is found, status must be "failed"
+6. Only use "passed" if drawing is fully compliant
+7. For each issue, you MUST provide a "boundingBox": { "x": number, "y": number, "width": number, "height": number }
    - Use normalized coordinates (0.0 to 1.0) relative to the image dimensions.
    - x: left, y: top, width, height.
 
-Example output format:
+Example output (output ONLY this structure, nothing else):
 {
   "status": "failed",
   "feedback": "Drawing has compliance issues...",
@@ -403,13 +405,29 @@ export async function seedAgents() {
   }
 }
 
+// Parse LLM response to extract valid JSON
+function parseAIResponse(responseText: string): any {
+  try {
+    return JSON.parse(responseText);
+  } catch (e) {
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      try { return JSON.parse(jsonMatch[1].trim()); } catch (_) {}
+    }
+    const curlyMatch = responseText.match(/\{[\s\S]*\}/);
+    if (curlyMatch) {
+      try { return JSON.parse(curlyMatch[0]); } catch (_) {}
+    }
+    throw new Error('Could not parse AI response as JSON. Response: ' + responseText.substring(0, 500));
+  }
+}
+
 async function getAgentConfig(role: string, defaultAgent: Partial<Agent>): Promise<Agent> {
   try {
     const q = query(collection(db, 'agents'), where('role', '==', role), where('status', '==', 'online'));
     const snap = await getDocs(q);
     if (!snap.empty) {
       const agentDoc = snap.docs[0];
-      // Update activity
       await updateDoc(doc(db, 'agents', agentDoc.id), {
         currentActivity: 'Analyzing drawing...',
         lastActive: new Date().toISOString()
@@ -420,44 +438,6 @@ async function getAgentConfig(role: string, defaultAgent: Partial<Agent>): Promi
     console.error(`Error fetching agent config for ${role}:`, error);
   }
   return { ...defaultAgent } as Agent;
-}
-
-export interface AIProgress {
-  percentage: number;
-  agentName: string;
-  activity: string;
-  completedAgents: string[];
-}
-
-// Parse LLM response to extract valid JSON
-function parseAIResponse(responseText: string): any {
-  // Try parsing directly first
-  try {
-    return JSON.parse(responseText);
-  } catch (e) {
-    // Not direct JSON, try extracting from markdown code blocks
-    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[1].trim());
-      } catch (e2) {
-        // Failed to parse code block
-      }
-    }
-
-    // Try finding JSON between curly braces
-    const curlyMatch = responseText.match(/\{[\s\S]*\}/);
-    if (curlyMatch) {
-      try {
-        return JSON.parse(curlyMatch[0]);
-      } catch (e3) {
-        // Failed to parse curly braces
-      }
-    }
-
-    // If all parsing fails, return a structured error
-    throw new Error('Could not parse AI response as JSON. Response: ' + responseText.substring(0, 500));
-  }
 }
 
 export async function reviewDrawing(

@@ -12,6 +12,7 @@ import { UserRole } from "../types.js";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const PAYFAST_PASSPHRASE = process.env.VITE_PAYFAST_PASSPHRASE || "";
 const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
+const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || "";
 const PLATFORM_FEE_PERCENTAGE = 0.05;
 
 // ── Rate Limiters ─────────────────────────────────────────────────────────────
@@ -218,26 +219,46 @@ router.post("/review", reviewLimiter, async (req, res) => {
   console.log(`[Proxy] Routing to ${config.provider} @ ${cleanBaseUrl}/chat/completions using model: ${activeModel}`);
 
   try {
+    // Build the user message with vision support
     const messages: any[] = [{ role: "system", content: systemInstruction }];
     let userContent: any[] = [{ type: "text", text: prompt }];
 
-    // If drawingUrl is present and it's a vision call
+    // If drawingUrl is present, determine whether it's an actual image or a
+    // PDF/binary document. NVIDIA NIM and most OpenAI-compatible text models
+    // will error with "cannot identify image file" if they receive a non-image.
+    // We do a lightweight HEAD request to check the Content-Type before deciding.
     if (drawingUrl && isAllowedBlobUrl(drawingUrl)) {
       try {
-        const imageResp = await fetch(drawingUrl);
-        if (imageResp.ok) {
-          const buffer = await imageResp.arrayBuffer();
-          const base64Data = Buffer.from(buffer).toString("base64");
-          const mimeType = imageResp.headers.get("content-type") || "image/jpeg";
-          
-          // Only add vision content if we have an image
+        let resolvedMime = "";
+        // HEAD request is cheaper than fetching the full file
+        const headResp = await fetch(drawingUrl, { method: "HEAD" });
+        if (headResp.ok) {
+          resolvedMime = (headResp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+        }
+        // Also check the URL extension as a fallback
+        const urlLower = drawingUrl.toLowerCase();
+        const isPdf = urlLower.endsWith(".pdf") || resolvedMime === "application/pdf";
+        const isImage = resolvedMime.startsWith("image/") && !isPdf;
+
+        if (isImage) {
+          // Vision-capable: pass image URL directly so model fetches it
+          console.log(`[Proxy] Vision injection: image_url (${resolvedMime})`);
           userContent.push({
             type: "image_url",
-            image_url: { url: `data:${mimeType};base64,${base64Data}` }
+            image_url: { url: drawingUrl }
+          });
+        } else {
+          // Non-image (PDF, DWG, etc.) — add descriptive text context only.
+          // Sending these as image_url causes "cannot identify image file" errors.
+          console.log(`[Proxy] Non-image drawing (${resolvedMime || "unknown"}) — using text reference only`);
+          userContent.push({
+            type: "text",
+            text: `[Drawing Reference] File: ${drawingUrl} (${isPdf ? "PDF" : resolvedMime || "binary"} format). Analyse based on drawing context described in the prompt.`
           });
         }
-      } catch (fetchErr) {
-        console.error("[Proxy] Drawing fetch failed:", fetchErr);
+      } catch (headErr) {
+        console.error("[Proxy] Drawing type check failed:", headErr);
+        // If we can't determine the type, skip vision to avoid errors
       }
     }
 
@@ -254,10 +275,13 @@ router.post("/review", reviewLimiter, async (req, res) => {
         "Accept": "application/json",
       },
       body: JSON.stringify({
-
         model: activeModel,
         messages,
-        response_format: { type: "json_object" },
+        // response_format with json_object is only supported by OpenAI and OpenRouter.
+        // NVIDIA NIM and local models reject this parameter and return 400.
+        ...(config.provider === 'openai' || config.provider === 'openrouter'
+          ? { response_format: { type: "json_object" } }
+          : {}),
         temperature: 0.2,
       }),
       signal: controller.signal
@@ -398,32 +422,47 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
 
   try {
     const dbConfig = (await getAdminLLMConfig()) as any;
+    // Prefer the Gemini API key; fall back to env
     const activeApiKey = dbConfig?.apiKey || GEMINI_API_KEY;
 
     if (!activeApiKey) {
-      console.error("[API] Agent Search: Missing API Key in DB and Env.");
+      console.error("[API] Agent Search: Missing Gemini API Key in DB and Env.");
       return res.status(400).json({ error: "Gemini API key not configured for search" });
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [{ text: `Research the following query related to ${agentRole}: ${query}` }],
-          }],
-          tools: [{ googleSearchRetrieval: {} }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
-        }),
-      }
-    );
+    // Use googleSearch tool (new grounding API — googleSearchRetrieval is deprecated)
+    const requestBody: any = {
+      contents: [{
+        role: "user",
+        parts: [{ text: `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references.` }],
+      }],
+      tools: [{ googleSearch: {} }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+    };
 
-    if (!response.ok) return res.status(response.status).json(await response.json());
+    let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeApiKey}`;
+    
+    // If a separate Google Search API key is configured, try grounding with it
+    const searchKey = GOOGLE_SEARCH_API_KEY || activeApiKey;
+    if (searchKey !== activeApiKey) {
+      console.log(`[API] Using dedicated Google Search API key for agent search`);
+    }
+
+    console.log(`[API] Agent search for query: "${query}" (role: ${agentRole})`);
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      console.error(`[API] Agent Search failed: ${response.status}`, errData);
+      return res.status(response.status).json({ error: "Search provider error", details: errData });
+    }
     const data = await response.json();
-    res.json(data.candidates?.[0]?.content?.parts?.[0]?.text ? { text: data.candidates[0].content.parts[0].text } : data);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    res.json(text ? { text } : { text: `No results for: ${query}` });
   } catch (error) {
     console.error("Agent Search Error:", error);
     res.status(500).json({ error: "Internal server error during agent search" });

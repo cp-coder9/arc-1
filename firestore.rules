@@ -11,16 +11,18 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
     }
     
     function hasRole(role) {
-      return isAuthenticated() && getUserData().role == role;
+      return isAuthenticated() && getUserData() != null && getUserData().role == role;
     }
     
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email.matches('gm\\.tarb@gmail\\.com|leor@slutzkin\\.co\\.za') ||
+        request.auth.token.email.matches('gm\.tarb@gmail\.com|leor@slutzkin\.co\.za') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
@@ -38,14 +40,15 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      // Allow reading any user profile if authenticated (needed for job/submission context)
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin() || true);
       allow create: if isAuthenticated() && isOwner(userId) && 
         request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
         request.resource.data.role in ['client', 'architect'];
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-            ['displayName', 'bio', 'updatedAt']
+            ['displayName', 'bio', 'updatedAt', 'fcmTokens', 'role']
           )
         ) || isAdmin()
       );
@@ -297,7 +300,7 @@ service cloud.firestore {
     match /agent_knowledge/{entryId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAdmin();
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.submittedBy == request.auth.uid);
       allow delete: if isAdmin();
     }
 
