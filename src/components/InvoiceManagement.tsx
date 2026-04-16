@@ -140,8 +140,7 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
       setGeneratingPdfId(invoice.id);
       
       // 1. Generate PDF
-      const token = import.meta.env.VITE_BLOB_READ_WRITE_TOKEN || '';
-      const { url } = await pdfGenerationService.generateInvoicePDF(invoice, token, user.uid);
+      const { url } = await pdfGenerationService.generateInvoicePDF(invoice, user.uid);
       
       // 2. Update Invoice
       await updateDoc(doc(db, 'invoices', invoice.id), {

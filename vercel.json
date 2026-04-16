@@ -23,6 +23,10 @@
   ],
   "routes": [
     {
+      "src": "/api/notifications/worker",
+      "dest": "/api/notifications/worker.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     },

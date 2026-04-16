@@ -78,7 +78,6 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
         fileSize: certificateFile.size,
         uploadedBy: user.uid,
         context: 'certificate',
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
       });
 
       // Create verification record

@@ -432,7 +432,6 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
         uploadedBy: user.uid,
         context: 'submission',
         jobId: job.id,
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
       });
       setDrawingUrl(url);
       setIsUploading(false);

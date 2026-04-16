@@ -36,7 +36,6 @@ class PDFGenerationService {
    */
   async generateCouncilSubmissionPackage(
     councilSubmissionId: string,
-    token: string,
     uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
@@ -74,7 +73,6 @@ class PDFGenerationService {
         uploadedBy,
         context: 'submission',
         jobId: data.job.id,
-        token
       });
 
       return { url, fileName };
@@ -622,7 +620,6 @@ class PDFGenerationService {
    */
   async generateComplianceCertificate(
     submissionId: string,
-    token: string,
     uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
@@ -703,7 +700,6 @@ class PDFGenerationService {
         uploadedBy,
         context: 'certificate',
         submissionId,
-        token
       });
       
       return { url, fileName };
@@ -718,7 +714,6 @@ class PDFGenerationService {
    */
   async generateInvoicePDF(
     invoice: Invoice,
-    token: string,
     uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
@@ -854,7 +849,6 @@ class PDFGenerationService {
         uploadedBy,
         context: 'invoice',
         jobId: invoice.jobId,
-        token
       });
 
       return { url, fileName };

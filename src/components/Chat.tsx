@@ -126,7 +126,6 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
         uploadedBy: currentUser.uid,
         context: 'chat',
         jobId: job.id,
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN
       });
 
       await messagingService.sendMessage({

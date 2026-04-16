@@ -10,7 +10,14 @@
 import * as admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import type { Request, Response } from "express";
-import firebaseConfig from "../firebase-applet-config.json" assert { type: "json" };
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const firebaseConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../firebase-applet-config.json"), "utf8"));
+
 
 if (!admin.apps.length) {
   admin.initializeApp({ projectId: firebaseConfig.projectId });

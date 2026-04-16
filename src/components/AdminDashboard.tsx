@@ -1371,7 +1371,6 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
     try {
       const blob = await put(file.name, file, {
         access: 'public',
-        token: import.meta.env.VITE_BLOB_READ_WRITE_TOKEN,
         addRandomSuffix: true,
       });
       
