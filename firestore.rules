@@ -19,11 +19,11 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return hasRole('admin') || 
-        (isAuthenticated() && 
-         (request.auth.token.email == "gm.tarb@gmail.com" || 
-          request.auth.token.email == "leor@slutzkin.co.za") && 
-         request.auth.token.email_verified == true);
+      return isAuthenticated() && (
+        request.auth.token.email.matches('gm\\.tarb@gmail\\.com|leor@slutzkin\\.co\\.za') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
     }
     
     function isVerifiedArchitect() {

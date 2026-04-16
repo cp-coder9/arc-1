@@ -14,7 +14,7 @@ const PLATFORM_FEE_PERCENTAGE = 0.05;
 // ── Rate Limiters ─────────────────────────────────────────────────────────────
 const reviewLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100, // Increased to support multi-agent parallel execution
   message: { error: "Too many review requests, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,
@@ -56,7 +56,12 @@ async function verifyAuth(authHeader: string | undefined) {
   if (!authHeader?.startsWith("Bearer ")) {
     throw Object.assign(new Error("Missing or invalid authorization header"), { status: 401 });
   }
-  return auth.verifyIdToken(authHeader.split("Bearer ")[1]);
+  try {
+    return await auth.verifyIdToken(authHeader.split("Bearer ")[1]);
+  } catch (err: any) {
+    console.error("Auth Verification Failed:", err);
+    throw Object.assign(new Error(`Auth failed: ${err.message}`), { status: 401 });
+  }
 }
 
 async function isAdmin(uid: string): Promise<boolean> {
@@ -104,41 +109,96 @@ router.post("/review", reviewLimiter, async (req, res) => {
     return res.status(err.status || 401).json({ error: err.message });
   }
 
-  const { systemInstruction, prompt } = req.body;
-  const config = await getAdminLLMConfig();
+  const { systemInstruction, prompt, drawingUrl, config: clientConfig } = req.body;
+  const dbConfig = (await getAdminLLMConfig()) as any;
+  
+  // Merge client config (from agent settings) with global DB config
+  const config = { ...dbConfig, ...clientConfig };
 
-  if (!config)
+  if (!config || !config.provider || config.provider === 'global') {
     return res.status(400).json({
       error: "LLM configuration not found. Please configure a provider in Admin Dashboard › Settings.",
     });
+  }
 
-  if (config.provider === "gemini")
+  // If this is actually a Gemini config mistakenly routed here, handle it or return error
+  if (config.provider === "gemini") {
     return res.status(400).json({
       error: "Current provider is Gemini — use /api/gemini/review instead.",
     });
+  }
+
+  const activeApiKey = config.apiKey || "";
+  const activeModel = config.model || "";
+  const baseUrl = config.baseUrl || (config.provider === 'nvidia' ? 'https://integrate.api.nvidia.com/v1' : '');
+
+  // Log for debugging 404s
+  console.log(`[Proxy] Routing to ${config.provider} @ ${baseUrl}/chat/completions using model: ${activeModel}`);
 
   try {
-    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    const messages: any[] = [{ role: "system", content: systemInstruction }];
+    let userContent: any[] = [{ type: "text", text: prompt }];
+
+    // If drawingUrl is present and it's a vision call
+    if (drawingUrl && isAllowedBlobUrl(drawingUrl)) {
+      try {
+        const imageResp = await fetch(drawingUrl);
+        if (imageResp.ok) {
+          const buffer = await imageResp.arrayBuffer();
+          const base64Data = Buffer.from(buffer).toString("base64");
+          const mimeType = imageResp.headers.get("content-type") || "image/jpeg";
+          userContent.push({
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${base64Data}` }
+          });
+        }
+      } catch (fetchErr) {
+        console.error("[Proxy] Drawing fetch failed:", fetchErr);
+      }
+    }
+
+    messages.push({ role: "user", content: userContent });
+
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 45000); // 45s for vision calls
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
+        Authorization: `Bearer ${activeApiKey}`,
       },
       body: JSON.stringify({
-        model: config.model,
-        messages: [
-          { role: "system", content: systemInstruction },
-          { role: "user", content: prompt },
-        ],
+        model: activeModel,
+        messages,
         response_format: { type: "json_object" },
+        temperature: 0.2,
       }),
+      signal: controller.signal
     });
 
-    if (!response.ok) return res.status(response.status).json(await response.json());
-    res.json(await response.json());
-  } catch (error) {
+    clearTimeout(tid);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[API] LLM Provider Error: ${response.status} - ${errorText}`);
+      return res.status(response.status).json({ 
+        error: "LLM Provider rejected request", 
+        details: errorText.substring(0, 500),
+        targetUrl: `${baseUrl}/chat/completions`,
+        targetModel: activeModel
+      });
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error: any) {
     console.error("LLM Proxy Error:", error);
-    res.status(500).json({ error: "Failed to fetch from LLM provider" });
+    res.status(500).json({ 
+      error: "Failed to connect to LLM provider", 
+      message: error.message,
+      type: error.name
+    });
   }
 });
 
@@ -299,18 +359,32 @@ router.post("/files/upload", async (req, res) => {
     const safeFileName = fileName || `upload-${Date.now()}`;
     const fileBuffer = Buffer.from(fileBase64, 'base64');
     
+    console.log(`[API] Uploading ${safeFileName} (${fileBuffer.byteLength} bytes) for context: ${context}`);
+
+    // Check environment variables
+    if (!BLOB_READ_WRITE_TOKEN) {
+      console.error("[API] Configuration Error: BLOB_READ_WRITE_TOKEN is missing.");
+      return res.status(503).json({ error: "Service unavailable: Storage token missing." });
+    }
+
     // Optional: check file type against ALLOWED_MIME_TYPES
     if (!ALLOWED_MIME_TYPES.has(fileType || '')) {
+      console.warn(`[API] Invalid file type blocked: ${fileType}`);
       return res.status(400).json({ error: `File type not allowed: ${fileType}` });
     }
 
+    console.log(`[API] Sending file to Vercel Blob...`);
     const blob = await put(safeFileName, fileBuffer, {
       access: "public",
       token: BLOB_READ_WRITE_TOKEN,
       contentType: fileType || "application/octet-stream",
+      addRandomSuffix: true,
     });
+    console.log(`[API] Vercel Blob success: ${blob.url}`);
 
+    console.log(`[API] Adding to Firestore...`);
     const fileRef = await adminDb.collection("uploaded_files").add({
+
       url: blob.url,
       fileName: safeFileName,
       fileType: fileType || "application/octet-stream",
@@ -321,11 +395,16 @@ router.post("/files/upload", async (req, res) => {
       submissionId: submissionId || null,
       uploadedAt: new Date().toISOString(),
     });
+    console.log(`[API] Firestore success: ${fileRef.id}`);
 
     res.json({ url: blob.url, fileId: fileRef.id });
   } catch (err: any) {
-    console.error("Upload error:", err);
-    res.status(500).json({ error: "Upload failed", details: err.message });
+    console.error("[API] ❌ Upload failed catastrophically:", err);
+    res.status(500).json({ 
+      error: "Upload failed", 
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+    });
   }
 });
 

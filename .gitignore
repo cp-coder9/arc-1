@@ -51,6 +51,9 @@ build/
 
 # Firebase
 .firebase/
+*-firebase-adminsdk-*.json
+firebase-debug.log
+.firebaserc
 
 .vercel
 .env*.local

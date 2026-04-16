@@ -20,8 +20,7 @@ export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus
     const q = query(
       collection(db, KNOWLEDGE_COLLECTION),
       where("agentId", "==", agentId),
-      where("status", "==", status),
-      orderBy("createdAt", "desc")
+      where("status", "==", status)
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentKnowledge));

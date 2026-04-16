@@ -112,7 +112,14 @@ async function callGeminiProxy(systemInstruction: string, prompt: string, drawin
   });
 }
 
-async function callOpenAICompatible(config: LLMConfig, systemInstruction: string, prompt: string): Promise<string> {
+async function callOpenAICompatible(config: LLMConfig, systemInstruction: string, prompt: string, drawingUrl?: string): Promise<string> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('Authentication required for AI review.');
+  }
+
+  const idToken = await getIdToken(currentUser);
+
   return withRetry(async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -122,15 +129,22 @@ async function callOpenAICompatible(config: LLMConfig, systemInstruction: string
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           systemInstruction,
-          prompt
+          prompt,
+          drawingUrl, // Send drawingUrl to the proxy so it can fetch/encode it
+          config // Pass the config so the server knows which provider/model to use
         }),
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
+
+      if (response.status === 401) {
+        throw new Error('Authentication required: session rejected.');
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -475,8 +489,8 @@ export async function reviewDrawing(
         if (config.provider === 'gemini') {
           response = await callGeminiProxy(enrichedPrompt, promptInstruction, drawingUrl, config);
         } else {
-          // Non-Gemini providers might not support vision via my proxy yet, but let's try
-          response = await callOpenAICompatible(config, enrichedPrompt, promptInstruction);
+          // Support vision for OpenAI-compatible providers (like NVIDIA)
+          response = await callOpenAICompatible(config, enrichedPrompt, promptInstruction, drawingUrl);
         }
         
         completed.push(agent.name);

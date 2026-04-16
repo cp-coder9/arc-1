@@ -7,27 +7,9 @@
  * This replaces the long-lived onSnapshot listener from server.ts,
  * which cannot run in a serverless environment.
  */
-import * as admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
+import { admin, adminDb } from "../../src/lib/firebase-admin.js";
 import type { Request, Response } from "express";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const firebaseConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../firebase-applet-config.json"), "utf8"));
-
-
-if (!admin.apps.length) {
-  admin.initializeApp({ projectId: firebaseConfig.projectId });
-}
-
-const adminDb =
-  firebaseConfig.firestoreDatabaseId &&
-    firebaseConfig.firestoreDatabaseId !== "(default)"
-    ? getFirestore(admin.app(), firebaseConfig.firestoreDatabaseId)
-    : getFirestore(admin.app());
 
 export default async function handler(_req: Request, res: Response) {
   // Basic cron secret check to prevent unauthorized invocations

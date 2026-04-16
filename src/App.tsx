@@ -65,6 +65,7 @@ import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [roleSelection, setRoleSelection] = useState<UserRole | null>(null);
   const [showLogin, setShowLogin] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -94,14 +95,18 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
       try {
         if (firebaseUser) {
+          setProfileLoading(true);
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             setUser(userDoc.data() as UserProfile);
           } else {
             // New user, need role selection
+            setUser(null);
             setRoleSelection('client'); 
+            setShowLogin(true);
           }
         } else {
           setUser(null);
@@ -111,6 +116,7 @@ export default function App() {
         setUser(null);
       } finally {
         setLoading(false);
+        setProfileLoading(false);
       }
     });
 
@@ -118,8 +124,9 @@ export default function App() {
   }, []);
 
 const handleLogin = async () => {
-    if (isLoggingIn) return;
+    if (isLoggingIn || profileLoading) return;
     setIsLoggingIn(true);
+    setProfileLoading(true);
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
@@ -169,6 +176,7 @@ const handleLogin = async () => {
       }
     } finally {
       setIsLoggingIn(false);
+      setProfileLoading(false);
     }
   };
 
@@ -184,8 +192,9 @@ const handleLogin = async () => {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoggingIn) return;
+    if (isLoggingIn || profileLoading) return;
     setIsLoggingIn(true);
+    setProfileLoading(true);
 
     try {
       let firebaseUser;
@@ -286,15 +295,19 @@ const handleLogin = async () => {
       }
     } finally {
       setIsLoggingIn(false);
+      setProfileLoading(false);
     }
   };
 
   const handleLogout = () => signOut(auth);
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="rounded-full h-12 w-12 border-b-2 border-primary animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="rounded-full h-12 w-12 border-b-2 border-primary animate-spin"></div>
+          <p className="text-sm text-muted-foreground animate-pulse font-medium">Securing session...</p>
+        </div>
       </div>
     );
   }
