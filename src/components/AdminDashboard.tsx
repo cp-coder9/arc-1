@@ -23,7 +23,7 @@ import {
 } from "./ui/accordion";
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
-import { seedAgents, reviewDrawing } from '../services/geminiService';
+import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
@@ -1548,6 +1548,7 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
+  const [aiProgress, setAiProgress] = useState<AIProgress | null>(null);
   const [testResult, setTestResult] = useState<AIReviewResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1613,7 +1614,9 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
       setIsTesting(true);
       
       try {
-        const result = await reviewDrawing(url, file.name);
+        const result = await reviewDrawing(url, file.name, (prog) => {
+          setAiProgress(prog);
+        });
         setTestResult(result);
         toast.success("AI Test completed successfully.");
       } catch (error) {
@@ -1672,44 +1675,147 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
           )}
 
           {isTesting && (
-            <div className="py-16 relative flex flex-col items-center justify-center min-h-[400px]">
-              <div className="relative w-64 h-64 flex items-center justify-center">
-                <div className="absolute inset-0 border-2 border-primary/10 rounded-full animate-[spin_12s_linear_infinite]" />
-                <div className="absolute inset-8 border border-dashed border-primary/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
-                
-                {/* Radial lines */}
-                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2"></div>
-                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2 rotate-90"></div>
-                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2 rotate-45"></div>
-                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2 -rotate-45"></div>
+            <div className="py-20 relative flex flex-col items-center justify-center min-h-[500px] overflow-hidden">
+              {/* Background ambient effect */}
+              <div className="absolute inset-0 bg-primary/2 opacity-20 pointer-events-none" />
+              
+              <div className="relative w-80 h-80 flex items-center justify-center">
+                {/* SVG Connections Layer */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                  <defs>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+                      <feMerge>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.2" />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.8" />
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Lines to agents */}
+                  {[0, 60, 120, 180, 240, 300].map((angle, i) => {
+                    const agentNames = [
+                      "Orchestrator", // Indexing match workaround
+                      "Wall Compliance Agent",
+                      "Fenestration Agent",
+                      "Door & Fire Safety Agent",
+                      "Area Sizing Agent",
+                      "General Compliance Agent",
+                      "SANS Specialist"
+                    ];
+                    // Skip index 0 as it's orchestrator
+                    const agentName = agentNames[i + 1];
+                    const isActive = aiProgress?.agentName === agentName;
+                    const isDone = aiProgress?.completedAgents.includes(agentName);
+                    
+                    const rad = (angle - 90) * (Math.PI / 180);
+                    const x2 = 160 + Math.cos(rad) * 140;
+                    const y2 = 160 + Math.sin(rad) * 140;
+                    
+                    return (
+                      <g key={angle}>
+                         <line 
+                           x1="160" y1="160" x2={x2} y2={y2} 
+                           stroke={isDone ? "var(--primary)" : "var(--primary)"}
+                           strokeOpacity={isDone ? 0.6 : 0.15}
+                           strokeWidth={isActive ? "3" : "1.5"}
+                           className={isActive ? "animate-pulse" : ""}
+                         />
+                         {isActive && (
+                           <circle r="4" fill="var(--primary)">
+                             <animateMotion 
+                               path={`M 160 160 L ${x2} ${y2}`} 
+                               dur="1s" 
+                               repeatCount="indefinite" 
+                             />
+                           </circle>
+                         )}
+                      </g>
+                    );
+                  })}
+                </svg>
 
-                <div className="relative z-10 w-24 h-24 bg-white border-4 border-primary rounded-full flex flex-col items-center justify-center shadow-[0_0_30px_rgba(var(--primary),0.3)] animate-pulse">
-                  <Cpu className="w-10 h-10 text-primary" />
+                {/* Central Orchestrator Node */}
+                <div className="relative z-10 w-28 h-28 bg-white border-4 border-primary rounded-full flex flex-col items-center justify-center shadow-[0_0_40px_rgba(var(--primary),0.2)]">
+                  <Cpu className={`w-12 h-12 text-primary ${aiProgress?.percentage ? "animate-spin-slow" : "animate-pulse"}`} />
+                  <div className="absolute -bottom-8 bg-primary/10 px-3 py-1 rounded-full border border-primary/20 backdrop-blur-sm">
+                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase">Orchestrator</span>
+                  </div>
                 </div>
                 
-                {/* Orbiting Agents */}
-                <div className="absolute top-0 left-1/2 -ml-6 -mt-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div className="absolute bottom-0 left-1/2 -ml-6 -mb-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <div className="absolute top-1/2 left-0 -mt-6 -ml-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                  <Activity className="w-5 h-5" />
-                </div>
-                <div className="absolute top-1/2 right-0 -mt-6 -mr-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                  <Briefcase className="w-5 h-5" />
-                </div>
-                <div className="absolute top-[14%] left-[14%] -ml-6 -mt-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                  <Settings2 className="w-5 h-5" />
-                </div>
-                <div className="absolute bottom-[14%] right-[14%] -ml-6 -mt-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
-                  <Search className="w-5 h-5" />
-                </div>
+                {/* Orbiting Agents Nodes */}
+                {[0, 60, 120, 180, 240, 300].map((angle, i) => {
+                    const agents = [
+                        { name: "Wall Compliance Agent", icon: <ShieldCheck className="w-5 h-5" /> },
+                        { name: "Fenestration Agent", icon: <Eye className="w-5 h-5" /> },
+                        { name: "Door & Fire Safety Agent", icon: <Activity className="w-5 h-5" /> },
+                        { name: "Area Sizing Agent", icon: <Maximize2 className="w-5 h-5" /> },
+                        { name: "General Compliance Agent", icon: <Settings2 className="w-5 h-5" /> },
+                        { name: "SANS Specialist", icon: <Search className="w-5 h-5" /> }
+                    ];
+                    const agent = agents[i];
+                    const isActive = aiProgress?.agentName === agent.name;
+                    const isDone = aiProgress?.completedAgents.includes(agent.name);
+                    
+                    const rad = (angle - 90) * (Math.PI / 180);
+                    const x = Math.cos(rad) * 140;
+                    const y = Math.sin(rad) * 140;
+                    
+                    return (
+                      <div 
+                        key={angle} 
+                        className={`absolute w-14 h-14 bg-white border-2 rounded-full flex items-center justify-center shadow-lg transition-all duration-500 z-20 ${
+                          isActive ? "border-primary scale-125 shadow-primary/30" : 
+                          isDone ? "border-primary/60 bg-primary/5 shadow-none" : "border-primary/20"
+                        }`}
+                        style={{ transform: `translate(${x}px, ${y}px)` }}
+                      >
+                        <div className={isDone ? "text-primary" : isActive ? "text-primary" : "text-muted-foreground"}>
+                          {agent.icon}
+                        </div>
+                        
+                        {/* Thought Bubble */}
+                        {isActive && aiProgress.thought && (
+                          <div className="absolute left-16 bottom-16 w-60 bg-white border-2 border-primary/20 rounded-2xl p-4 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-300 z-30">
+                            <div className="absolute bottom-[-10px] left-2 w-4 h-4 bg-white border-b-2 border-l-2 border-primary/20 rotate-[-45deg]" />
+                            <p className="text-xs font-medium text-foreground leading-relaxed italic">
+                              "{aiProgress.thought}"
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Status Checkmark */}
+                        {isDone && (
+                           <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5 animate-in zoom-in duration-300">
+                             <CheckCircle2 className="w-3 h-3" />
+                           </div>
+                        )}
+                      </div>
+                    );
+                })}
               </div>
 
-              <h3 className="font-bold text-xl mt-12 mb-2 animate-pulse">AI Orchestrator Running...</h3>
-              <p className="text-sm text-muted-foreground">The specialized agents are actively evaluating compliance clauses.</p>
+              <div className="text-center mt-20 space-y-4 max-w-md">
+                <div className="flex items-center justify-center gap-3">
+                    <h3 className="font-bold text-2xl tracking-tight">{aiProgress?.agentName || "System"}</h3>
+                    <Badge variant="outline" className="animate-pulse bg-primary/5 text-primary border-primary/20">
+                        {aiProgress?.percentage || 20}%
+                    </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {aiProgress?.activity || "Preparing specialized analysis agents..."}
+                </p>
+                <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div 
+                        className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(var(--primary),0.4)]"
+                        style={{ width: `${aiProgress?.percentage || 20}%` }}
+                    />
+                </div>
+              </div>
             </div>
           )}
 

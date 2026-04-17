@@ -218,6 +218,7 @@ export interface AIProgress {
   percentage: number;
   agentName: string;
   activity: string;
+  thought?: string;
   completedAgents: string[];
 }
 
@@ -467,9 +468,9 @@ export async function reviewDrawing(
   const startTime = Date.now();
 
   try {
-    const reportProgress = (percentage: number, agentName: string, activity: string, completedAgents: string[]) => {
+    const reportProgress = (percentage: number, agentName: string, activity: string, completedAgents: string[], thought?: string) => {
       if (onProgress) {
-        onProgress({ percentage, agentName, activity, completedAgents });
+        onProgress({ percentage, agentName, activity, completedAgents, thought });
       }
     };
 
@@ -507,7 +508,20 @@ export async function reviewDrawing(
     let webSearchQueries: { query: string, role: string, id: string }[] = [];
 
     const agentCalls = agentConfigs.map(async (agent) => {
-      reportProgress(25, agent.name, `Analyzing drawing (Sector: ${agent.name})...`, completed);
+      const getAgentThought = (role: string) => {
+        const thoughts: Record<string, string[]> = {
+          wall_checker: ["Checking wall thicknesses against SANS 10400-K...", "Verifying DPC placement and heights...", "Analyzing foundation-to-wall load paths..."],
+          window_checker: ["Calculating 5% ventilation requirements...", "Measuring 10% natural lighting ratios (Part N)...", "Checking safety glazing compliance..."],
+          door_checker: ["Verifying fire door ratings and escape widths...", "Checking threshold levels for accessibility...", "Analyzing door swings for escape routes..."],
+          area_checker: ["Measuring minimum room sizes (min 6m²)...", "Checking vertical clearances (2.4m ceiling height)...", "Verifying occupancy density compliance..."],
+          compliance_checker: ["Searching for North Point and Scale Bar...", "Analyzing title block and site plan details...", "Checking coordination between plan and sections..."],
+          sans_compliance: ["Cross-referencing SANS 10400 National Building Regs...", "Validating Part A (General Principles) items...", "Finalizing multi-part regulation check..."]
+        };
+        const agentThoughts = thoughts[role] || ["Performing specialized analysis..."];
+        return agentThoughts[Math.floor(Math.random() * agentThoughts.length)];
+      };
+
+      reportProgress(25, agent.name, `Analyzing drawing (Sector: ${agent.name})...`, completed, getAgentThought(agent.role));
       
       const isGlobalProvider = !agent.llmProvider || agent.llmProvider === 'global';
       const config: LLMConfig = {
@@ -538,7 +552,7 @@ export async function reviewDrawing(
         }
         
         completed.push(agent.name);
-        reportProgress(20 + (completed.length * 10), agent.name, `${agent.name} completed analysis.`, completed);
+        reportProgress(20 + (completed.length * 10), agent.name, `${agent.name} completed analysis.`, completed, "Synthesis sent to Orchestrator.");
         
         if (response.includes("UNKNOWN_REGULATION:")) {
           const match = response.match(/UNKNOWN_REGULATION:\s*(.+)/);
