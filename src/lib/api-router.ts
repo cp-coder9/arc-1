@@ -83,7 +83,7 @@ async function verifyAuth(headers: Record<string, any>) {
     try {
       const token = authHeader.split("Bearer ")[1];
       const decoded = await auth.verifyIdToken(token);
-      
+
       // Check if this user is acting as an agent
       const agentDoc = await adminDb.collection("agents").doc(decoded.uid).get();
       if (agentDoc.exists) {
@@ -178,12 +178,12 @@ router.post("/review", reviewLimiter, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
-    
+
     // Admin whitelist check (log but allow for now to prevent blocking architects)
     const adminEmails = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
     const userEmail = decoded.email?.toLowerCase();
     const isAdmin = userEmail && adminEmails.includes(userEmail);
-    
+
     if (userEmail && !isAdmin) {
       console.log(`[API] AI Review requested by non-admin: ${userEmail}. Allowing as standard user.`);
     }
@@ -193,7 +193,7 @@ router.post("/review", reviewLimiter, async (req, res) => {
 
   const { systemInstruction, prompt, drawingUrl, config: clientConfig } = req.body;
   const dbConfig = (await getAdminLLMConfig()) as any;
-  
+
   // Merge client config (from agent settings) with global DB config
   const config = { ...dbConfig, ...clientConfig };
 
@@ -279,9 +279,9 @@ router.post("/review", reviewLimiter, async (req, res) => {
             if (cadResp.ok) {
               const cadBuffer = Buffer.from(await cadResp.arrayBuffer());
               const cadData = extractCadData(cadBuffer, drawingUrl);
-              
+
               console.log(`[Proxy] CAD data extracted: ${cadData.format}, labels: ${cadData.textLabels.length}`);
-              
+
               userContent.push({
                 type: "text",
                 text: `[CAD Drawing Data]
@@ -356,20 +356,20 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[API] LLM Provider Error: ${response.status} - ${errorText}`);
-      return res.status(response.status).json({ 
-        error: "LLM Provider rejected request", 
+      return res.status(response.status).json({
+        error: "LLM Provider rejected request",
         details: errorText.substring(0, 500),
         targetUrl: `${cleanBaseUrl}/chat/completions`,
         targetModel: activeModel
       });
     }
-    
+
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
     console.error("LLM Proxy Error:", error);
-    res.status(500).json({ 
-      error: "Failed to connect to LLM provider", 
+    res.status(500).json({
+      error: "Failed to connect to LLM provider",
       message: error.message,
       type: error.name
     });
@@ -455,9 +455,9 @@ router.post("/gemini/review", reviewLimiter, async (req, res) => {
             try {
               const cadBuffer = Buffer.from(buffer);
               const cadData = extractCadData(cadBuffer, drawingUrl);
-              
+
               console.log(`[Gemini Proxy] CAD data extracted: ${cadData.format}, labels: ${cadData.textLabels.length}`);
-              
+
               parts.push({
                 text: `[CAD Drawing Data]
 Format: ${cadData.format}
@@ -601,7 +601,7 @@ router.post("/files/upload", async (req, res) => {
   try {
     const safeFileName = fileName || `upload-${Date.now()}`;
     const fileBuffer = Buffer.from(fileBase64, 'base64');
-    
+
     console.log(`[API] Uploading ${safeFileName} (${fileBuffer.byteLength} bytes) for context: ${context}`);
 
     // Check environment variables
@@ -643,10 +643,10 @@ router.post("/files/upload", async (req, res) => {
     res.json({ url: blob.url, fileId: fileRef.id });
   } catch (err: any) {
     console.error("[API] ❌ Upload failed catastrophically:", err);
-    res.status(500).json({ 
-      error: "Upload failed", 
+    res.status(500).json({
+      error: "Upload failed",
       details: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 });
@@ -923,22 +923,22 @@ router.post("/payment/notify", async (req, res) => {
     if (!paymentDoc.exists) return res.status(404).send("Payment not found");
 
     if (pfData["payment_status"] === "COMPLETE") {
-       // Similar logic to /confirm
-       await paymentRef.update({
-         status: "completed",
-         transactionId: pfData["pf_payment_id"],
-         processedAt: new Date().toISOString(),
-         updatedAt: new Date().toISOString(),
-         metadata: { ...(paymentDoc.data()?.metadata || {}), payfastData: pfData, itn: true },
-       });
-       if (paymentDoc.data()?.jobId) {
-         await adminDb.collection("escrow").doc(paymentDoc.data()!.jobId).update({
-           status: "funded",
-           heldAmount: paymentDoc.data()!.amount,
-           fundedAt: new Date().toISOString(),
-           updatedAt: new Date().toISOString(),
-         });
-       }
+      // Similar logic to /confirm
+      await paymentRef.update({
+        status: "completed",
+        transactionId: pfData["pf_payment_id"],
+        processedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        metadata: { ...(paymentDoc.data()?.metadata || {}), payfastData: pfData, itn: true },
+      });
+      if (paymentDoc.data()?.jobId) {
+        await adminDb.collection("escrow").doc(paymentDoc.data()!.jobId).update({
+          status: "funded",
+          heldAmount: paymentDoc.data()!.amount,
+          fundedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
     res.status(200).send("OK");
   } catch (err) {
@@ -952,15 +952,15 @@ router.get("/firebase/test", async (_req, res) => {
   try {
     const collections = await adminDb.listCollections();
     const collectionNames = collections.map(col => col.id);
-    res.json({ 
-      status: "success", 
+    res.json({
+      status: "success",
       firebaseConfig: firebaseConfig,
       collections: collectionNames,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
-      status: "error", 
+    res.status(500).json({
+      status: "error",
       error: error.message,
       timestamp: new Date().toISOString()
     });
