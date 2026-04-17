@@ -365,7 +365,14 @@ export default function AdminDashboard({
   const [reportSubmission, setReportSubmission] = useState<Submission | null>(null);
 
   // Map sidebar tabs to internal dashboard tabs
-  const internalTab = activeTab === 'compliance' ? 'agents' : activeTab === 'audit' ? 'logs' : activeTab === 'users' ? 'users' : activeTab === 'settings' ? 'settings' : 'submissions';
+  const internalTab = 
+    activeTab === 'compliance' ? 'agents' : 
+    activeTab === 'audit' ? 'logs' : 
+    activeTab === 'users' ? 'users' : 
+    activeTab === 'settings' ? 'settings' : 
+    activeTab === 'knowledge' ? 'knowledge' :
+    activeTab === 'projects' ? 'jobs' :
+    'submissions';
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [stats, setStats] = useState({
     totalJobs: 0,
@@ -393,12 +400,17 @@ export default function AdminDashboard({
     const qAgents = query(collection(db, 'agents'));
     const unsubAgents = onSnapshot(qAgents, (snapshot) => {
       setAgents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Agent)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'agents');
     });
 
     // Logs
     const qLogs = query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50));
     const unsubLogs = onSnapshot(qLogs, (snapshot) => {
       setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SystemLog)));
+    }, (error) => {
+      // Don't crash for logs, just warn
+      console.warn('[AdminDashboard] Logs listener:', error);
     });
 
     // Stats
@@ -408,6 +420,8 @@ export default function AdminDashboard({
         ...prev,
         totalJobs: snap.size
       }));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'jobs');
     });
 
     // Users
@@ -563,7 +577,22 @@ export default function AdminDashboard({
         <StatCard label="System Alerts" value={stats.errorCount.toString()} icon={<AlertTriangle size={20} />} color={stats.errorCount > 0 ? 'text-destructive' : 'text-primary'} />
       </div>
 
-      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'agents' ? 'compliance' : val === 'logs' ? 'audit' : val === 'users' ? 'users' : 'overview')} className="w-full">
+      <Tabs 
+        value={internalTab} 
+        onValueChange={(val) => {
+          const tabMap: Record<string, string> = {
+            'agents': 'compliance',
+            'logs': 'audit',
+            'users': 'users',
+            'settings': 'settings',
+            'knowledge': 'knowledge',
+            'jobs': 'projects',
+            'submissions': 'overview'
+          };
+          onTabChange?.(tabMap[val] || 'overview');
+        }} 
+        className="w-full"
+      >
         <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
           <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
             <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
@@ -828,6 +857,13 @@ export default function AdminDashboard({
                       </TableCell>
                     </TableRow>
                   ))}
+                  {allJobs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-40 text-center text-muted-foreground italic bg-secondary/10">
+                        {stats.totalJobs === 0 ? "No projects found in the database." : "Loading project data..."}
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
               </ScrollArea>

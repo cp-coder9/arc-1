@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult } from '../types';
 import ProfileEditor from './ProfileEditor';
@@ -37,6 +37,7 @@ export default function ArchitectDashboard({
 }) {
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
     category: '',
@@ -49,7 +50,11 @@ export default function ArchitectDashboard({
   });
 
   // Map sidebar tabs to internal dashboard tabs
-  const internalTab = activeTab === 'marketplace' ? 'browse' : activeTab === 'projects' ? 'active' : 'browse';
+  const internalTab = 
+    activeTab === 'marketplace' ? 'browse' : 
+    activeTab === 'applications' ? 'applications' :
+    activeTab === 'projects' ? 'active' : 
+    'browse';
 
   useEffect(() => {
     // Available jobs
@@ -68,9 +73,18 @@ export default function ArchitectDashboard({
       handleFirestoreError(error, OperationType.LIST, 'jobs (my)');
     });
 
+    // My applications
+    const qApps = query(collectionGroup(db, 'applications'), where('architectId', '==', user.uid));
+    const unsubApps = onSnapshot(qApps, (snapshot) => {
+      setMyApplications(snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as Application)));
+    }, (error) => {
+      console.warn('[ArchitectDashboard] Applications listener:', error);
+    });
+
     return () => {
       unsubAll();
       unsubMy();
+      unsubApps();
     };
   }, [user.uid]);
 
@@ -120,11 +134,23 @@ export default function ArchitectDashboard({
         </div>
       </div>
 
-      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'browse' ? 'marketplace' : 'projects')} className="w-full">
+      <Tabs 
+        value={internalTab} 
+        onValueChange={(val) => {
+          const tabMap: Record<string, string> = {
+            'browse': 'marketplace',
+            'applications': 'applications',
+            'active': 'projects'
+          };
+          onTabChange?.(tabMap[val] || 'marketplace');
+        }} 
+        className="w-full"
+      >
         <div className="border-b border-border bg-white h-14 md:h-16 w-full flex items-center px-4 md:px-0 bg-transparent rounded-full overflow-hidden mb-8">
           <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
             <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Browse Jobs</TabsTrigger>
-            <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects</TabsTrigger>
+            <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">My Applications ({myApplications.length})</TabsTrigger>
+            <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects ({myJobs.length})</TabsTrigger>
           </TabsList>
         </div>
 
@@ -155,6 +181,46 @@ export default function ArchitectDashboard({
             {filteredJobs.length === 0 && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
                 <p className="text-muted-foreground italic">No jobs match your current filters. Try adjusting your search.</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="applications" className="mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myApplications.map(app => (
+              <Card key={app.id} className="border-border shadow-sm bg-white rounded-2xl overflow-hidden hover:shadow-md transition-all">
+                <CardHeader className="p-5 pb-2">
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge variant="outline" className={`text-[9px] uppercase tracking-widest ${
+                      app.status === 'accepted' ? 'bg-green-50 text-green-700 border-green-100' :
+                      app.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-100' :
+                      'bg-blue-50 text-blue-700 border-blue-100'
+                    }`}>
+                      {app.status}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground font-mono">{new Date(app.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <CardTitle className="text-lg font-bold tracking-tight">Project {app.jobId.slice(0, 8)}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 pt-0">
+                  <p className="text-xs text-muted-foreground line-clamp-3 italic mb-4">"{app.proposal}"</p>
+                  <div className="flex items-center gap-2 pt-4 border-t border-border/50">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                      <Briefcase size={14} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-foreground leading-none">Job Application</span>
+                      <span className="text-[9px] text-muted-foreground">Status: {app.status}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {myApplications.length === 0 && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                <p className="text-muted-foreground italic">You haven't applied for any jobs yet.</p>
+                <Button variant="link" onClick={() => onTabChange?.('marketplace')} className="mt-2 text-primary">Browse Marketplace</Button>
               </div>
             )}
           </div>

@@ -47,7 +47,9 @@ import {
   Settings2,
   CreditCard,
   UserCircle,
-  HardDrive
+  HardDrive,
+  Sparkles,
+  Send
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -558,6 +560,14 @@ const handleLogin = async () => {
               onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }} 
             />
           )}
+          {user!.role === 'architect' && (
+            <NavItem 
+              icon={<Send size={18} />} 
+              label="My Applications" 
+              active={activeTab === 'applications'} 
+              onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }} 
+            />
+          )}
           <NavItem 
             icon={<FileText size={18} />} 
             label="Active Projects" 
@@ -583,6 +593,12 @@ const handleLogin = async () => {
                 label="LLM Settings" 
                 active={activeTab === 'settings'} 
                 onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} 
+              />
+              <NavItem 
+                icon={<Sparkles size={18} />} 
+                label="Knowledge Base" 
+                active={activeTab === 'knowledge'} 
+                onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }} 
               />
             </>
           )}
