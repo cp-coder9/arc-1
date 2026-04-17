@@ -623,8 +623,8 @@ export async function reviewDrawing(
     try {
       if (orchestratorAgent.id) {
         await addKnowledge({
-          agentId: 'orchestrator',
-          agentRole: 'orchestrator',
+          agentId: orchestratorAgent.id, // Use actual UUID if available
+          agentRole: orchestratorAgent.role,
           title: `Review Summary for ${drawingName}`,
           content: `Reviewed ${drawingName}. Status: ${validStatus}. Found ${Array.isArray(result.categories) ? result.categories.reduce((acc: number, cat: any) => acc + (cat.issues?.length || 0), 0) : 0} issues. Tracelog: ${result.traceLog}`,
           source: 'self_improvement',

@@ -547,38 +547,73 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
       return res.status(400).json({ error: "LLM configuration not found for search" });
     }
 
-    const activeApiKey = dbConfig.apiKey || "";
-    const activeModel = dbConfig.model || "";
-    let cleanBaseUrl = (dbConfig.baseUrl || (dbConfig.provider === 'nvidia' ? 'https://integrate.api.nvidia.com/v1' : '')).replace(/\/$/, "");
-    if (cleanBaseUrl.endsWith("/chat/completions")) {
-      cleanBaseUrl = cleanBaseUrl.replace(/\/chat\/completions$/, "");
+    const provider = dbConfig.provider;
+    const activeApiKey = dbConfig.apiKey || GEMINI_API_KEY;
+    const activeModel = dbConfig.model || (provider === 'gemini' ? "gemini-1.5-flash" : "");
+    const searchPrompt = `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references based on your training data.`;
+
+    console.log(`[API] Agent virtual search for "${query}" using ${provider}`);
+
+    if (provider === 'gemini') {
+      const requestBody = {
+        contents: [{ role: "user", parts: [{ text: searchPrompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+        },
+      };
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${activeApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`[API] Gemini Search failed: ${response.status}`, errorData);
+        return res.status(response.status).json({ error: "Gemini search error", details: errorData });
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      return res.json(text ? { text } : { text: `No results for: ${query}` });
+    } else {
+      // OpenAI-compatible providers
+      let cleanBaseUrl = (dbConfig.baseUrl || (provider === 'nvidia' ? 'https://integrate.api.nvidia.com/v1' : '')).replace(/\/$/, "");
+      if (cleanBaseUrl.endsWith("/chat/completions")) {
+        cleanBaseUrl = cleanBaseUrl.replace(/\/chat\/completions$/, "");
+      }
+
+      const requestBody = {
+        model: activeModel,
+        messages: [{ role: "user", content: searchPrompt }],
+        temperature: 0.1,
+        max_tokens: 1024
+      };
+
+      const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${activeApiKey}`
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error(`[API] AI Search failed: ${response.status}`, errData);
+        return res.status(response.status).json({ error: "Search provider error", details: errData });
+      }
+      
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content;
+      return res.json(text ? { text } : { text: `No results for: ${query}` });
     }
-
-    const requestBody = {
-      model: activeModel,
-      messages: [{ role: "user", content: `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references based on your training data.` }],
-      temperature: 0.1,
-      max_tokens: 1024
-    };
-
-    console.log(`[API] Agent virtual search for "${query}" using ${dbConfig.provider}`);
-    const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${activeApiKey}`
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      console.error(`[API] Agent Search failed: ${response.status}`, errData);
-      return res.status(response.status).json({ error: "Search provider error", details: errData });
-    }
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content;
-    res.json(text ? { text } : { text: `No results for: ${query}` });
   } catch (error) {
     console.error("Agent Search Error:", error);
     res.status(500).json({ error: "Internal server error during agent search" });

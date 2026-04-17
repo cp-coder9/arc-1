@@ -19,7 +19,7 @@ export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus
   try {
     const q = query(
       collection(db, KNOWLEDGE_COLLECTION),
-      where("agentId", "==", agentId),
+      where("agentRole", "==", agentId),
       where("status", "==", status)
     );
     const snap = await getDocs(q);
