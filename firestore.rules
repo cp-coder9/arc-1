@@ -22,9 +22,8 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email.matches('gm\.tarb@gmail\.com|leor@slutzkin\.co\.za') ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        request.auth.token.email.matches('gm\\.tarb@gmail\\.com|leor@slutzkin\\.co\\.za') ||
+        request.auth.token.admin == true
       );
     }
     
@@ -40,11 +39,13 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      // Allow reading any user profile if authenticated (needed for job/submission context)
-      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin() || true);
+      // Allow reading user profiles if authenticated
+      allow read: if isAuthenticated();
+      
       allow create: if isAuthenticated() && isOwner(userId) && 
         request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
-        request.resource.data.role in ['client', 'architect'];
+        request.resource.data.role in ['client', 'architect', 'admin'];
+
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(

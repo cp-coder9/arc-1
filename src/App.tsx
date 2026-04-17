@@ -118,6 +118,10 @@ export default function App() {
         setLoading(false);
         setProfileLoading(false);
       }
+    }, (error) => {
+      console.error("Auth state listener error:", error);
+      setLoading(false);
+      setProfileLoading(false);
     });
 
     return () => unsubscribe();
@@ -613,11 +617,11 @@ const handleLogin = async () => {
         <div className="p-8 border-t border-border bg-secondary/10 m-4 rounded-[1.5rem]">
           <div className="flex items-center gap-4 mb-8 px-2">
             <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl shadow-lg shadow-primary/20">
-              {user!.displayName[0]}
+              {user?.displayName?.[0] || '?'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate text-foreground">{user!.displayName}</p>
-              <p className="text-[10px] text-muted-foreground truncate font-mono">{user!.email}</p>
+              <p className="text-sm font-bold truncate text-foreground">{user?.displayName || 'Unknown User'}</p>
+              <p className="text-[10px] text-muted-foreground truncate font-mono">{user?.email || 'no-email'}</p>
             </div>
           </div>
           <Button 

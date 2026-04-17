@@ -57,7 +57,7 @@ export default function ClientDashboard({
     try {
       await addDoc(collection(db, 'jobs'), {
         ...newJob,
-        requirements: newJob.requirements.split('\n').filter(r => r.trim()),
+        requirements: (newJob.requirements || '').split('\n').filter(r => r.trim()),
         clientId: user.uid,
         budget: Number(newJob.budget),
         status: 'open',
@@ -364,7 +364,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
 
     setIsImage(isImg);
     setIsUploading(true);
-    setDrawingName(file.name.split('.')[0]);
+    setDrawingName(file.name?.split('.')[0] || 'Drawing');
 
     try {
       const url = await uploadAndTrackFile(file, {
@@ -381,7 +381,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
       
       // Verification: Automatically trigger AI analysis and create submission
       // as requested in the comment (Step 3).
-      await handleSubmitDrawingAction(url, file.name.split('.')[0]);
+      await handleSubmitDrawingAction(url, file.name?.split('.')[0] || 'Drawing');
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Upload failed.");

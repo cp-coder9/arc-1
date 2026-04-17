@@ -422,7 +422,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
     setIsImage(isImg);
     setIsUploading(true);
     setUploadProgress(0);
-    setDrawingName(file.name.split('.')[0]);
+    setDrawingName(file.name?.split('.')[0] || 'Drawing');
 
     try {
       const url = await uploadAndTrackFile(file, {
@@ -438,7 +438,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
       toast.success("File uploaded successfully!");
       
       // Automatically run AI pre-check
-      handlePreCheck(url, file.name.split('.')[0]);
+      handlePreCheck(url, file.name?.split('.')[0] || 'Drawing');
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Upload failed.");
