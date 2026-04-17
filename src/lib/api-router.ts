@@ -230,15 +230,27 @@ router.post("/review", reviewLimiter, async (req, res) => {
     if (drawingUrl && isAllowedBlobUrl(drawingUrl)) {
       try {
         let resolvedMime = "";
-        // HEAD request is cheaper than fetching the full file
-        const headResp = await fetch(drawingUrl, { method: "HEAD" });
-        if (headResp.ok) {
-          resolvedMime = (headResp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+        let urlLower = drawingUrl.toLowerCase();
+        let isPdf = urlLower.endsWith(".pdf");
+        let isImage = false;
+
+        // HEAD request to check Content-Type
+        try {
+          const headResp = await fetch(drawingUrl, { method: "HEAD" });
+          if (headResp.ok) {
+            resolvedMime = (headResp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+            isPdf = isPdf || resolvedMime === "application/pdf";
+            isImage = resolvedMime.startsWith("image/") && !isPdf;
+          }
+        } catch (headErr) {
+          console.warn("[Proxy] HEAD request failed, falling back to URL extension check:", headErr.message);
         }
-        // Also check the URL extension as a fallback
-        const urlLower = drawingUrl.toLowerCase();
-        const isPdf = urlLower.endsWith(".pdf") || resolvedMime === "application/pdf";
-        const isImage = resolvedMime.startsWith("image/") && !isPdf;
+
+        // Additional extension checks
+        const isDwg = urlLower.endsWith(".dwg");
+        const isOtherBinary = !isPdf && !isDwg && !resolvedMime.startsWith("image/");
+
+        console.log(`[Proxy] Drawing analysis: ${drawingUrl} -> mime: ${resolvedMime}, isImage: ${isImage}, isPdf: ${isPdf}, isDwg: ${isDwg}`);
 
         if (isImage) {
           // Vision-capable: pass image URL directly so model fetches it
@@ -250,15 +262,20 @@ router.post("/review", reviewLimiter, async (req, res) => {
         } else {
           // Non-image (PDF, DWG, etc.) — add descriptive text context only.
           // Sending these as image_url causes "cannot identify image file" errors.
-          console.log(`[Proxy] Non-image drawing (${resolvedMime || "unknown"}) — using text reference only`);
+          const fileType = isPdf ? "PDF" : isDwg ? "DWG" : resolvedMime || "binary";
+          console.log(`[Proxy] Non-image drawing (${fileType}) — using text reference only`);
           userContent.push({
             type: "text",
-            text: `[Drawing Reference] File: ${drawingUrl} (${isPdf ? "PDF" : resolvedMime || "binary"} format). Analyse based on drawing context described in the prompt.`
+            text: `[Drawing Reference] File: ${drawingUrl} (${fileType} format). This is a technical drawing. Analyze based on architectural standards and the prompt requirements.`
           });
         }
       } catch (headErr) {
         console.error("[Proxy] Drawing type check failed:", headErr);
-        // If we can't determine the type, skip vision to avoid errors
+        // If we can't determine the type, add text reference as fallback
+        userContent.push({
+          type: "text",
+          text: `[Drawing Reference] File: ${drawingUrl} (format unknown). This is a technical drawing. Analyze based on architectural standards and the prompt requirements.`
+        });
       }
     }
 
@@ -365,13 +382,34 @@ router.post("/gemini/review", reviewLimiter, async (req, res) => {
           if (buffer.byteLength > 10 * 1024 * 1024) {
             return res.status(400).json({ error: "Drawing file exceeds 10 MB limit" });
           }
-          const base64Data = Buffer.from(buffer).toString("base64");
+
           let mimeType = imageResp.headers.get("content-type") || "image/jpeg";
-          if (drawingUrl.toLowerCase().endsWith(".pdf")) mimeType = "application/pdf";
-          parts.push({ inlineData: { mimeType, data: base64Data } });
+          const urlLower = drawingUrl.toLowerCase();
+          const isPdf = urlLower.endsWith(".pdf") || mimeType === "application/pdf";
+          const isImage = mimeType.startsWith("image/") && !isPdf;
+
+          console.log(`[Gemini Proxy] Drawing analysis: ${drawingUrl} -> mime: ${mimeType}, isImage: ${isImage}, isPdf: ${isPdf}`);
+
+          // Only include vision data for actual images, not PDFs (to avoid issues)
+          if (isImage) {
+            const base64Data = Buffer.from(buffer).toString("base64");
+            parts.push({ inlineData: { mimeType, data: base64Data } });
+            console.log(`[Gemini Proxy] Vision injection: inlineData (${mimeType})`);
+          } else {
+            // For PDFs and other files, add text reference
+            const fileType = isPdf ? "PDF" : mimeType || "binary";
+            console.log(`[Gemini Proxy] Non-image drawing (${fileType}) — using text reference only`);
+            parts.push({
+              text: `[Drawing Reference] File: ${drawingUrl} (${fileType} format). This is a technical drawing. Analyze based on architectural standards and the prompt requirements.`
+            });
+          }
         }
       } catch (fetchError) {
         console.error("Error fetching drawing:", fetchError);
+        // Add text reference as fallback
+        parts.push({
+          text: `[Drawing Reference] File: ${drawingUrl} (format unknown). This is a technical drawing. Analyze based on architectural standards and the prompt requirements.`
+        });
       }
     }
 

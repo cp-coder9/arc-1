@@ -73,13 +73,13 @@ export default function ClientDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 bg-white p-10 rounded-[2.5rem] border border-border shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-5xl font-heading font-bold tracking-tighter text-foreground">Welcome, {user.displayName}</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Welcome, {user.displayName}</h1>
             <ProfileEditor user={user} />
           </div>
-          <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">Manage your architectural projects and find the right experts on Architex.</p>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Manage your architectural projects and find the right experts on Architex.</p>
         </div>
         <Dialog open={isPosting} onOpenChange={setIsPosting}>
           <DialogTrigger render={<Button className="bg-primary text-primary-foreground gap-2 h-12 px-6 rounded-full font-bold shadow-lg shadow-primary/20"><Plus size={18} />Post New Job</Button>} />
@@ -203,15 +203,15 @@ export default function ClientDashboard({
 
 function StatCard({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) {
   return (
-    <Card className="border-border shadow-sm bg-white hover:shadow-xl transition-all duration-300 rounded-[2rem] group overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between pb-4 p-8">
+    <Card className="border-border shadow-sm bg-white hover:shadow-xl transition-all duration-300 rounded-[1.5rem] md:rounded-[2rem] group overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between pb-4 p-6 md:p-8">
         <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
         <div className="p-3 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
           {icon}
         </div>
       </CardHeader>
-      <CardContent className="px-8 pb-8">
-        <div className="text-4xl font-heading font-bold tracking-tighter">{value}</div>
+      <CardContent className="px-6 md:px-8 pb-6 md:pb-8">
+        <div className="text-3xl md:text-4xl font-heading font-bold tracking-tighter">{value}</div>
       </CardContent>
     </Card>
   );
@@ -669,12 +669,14 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
             </div>
 
             <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-              <TabsList className="px-10 bg-white border-b border-border rounded-none h-16 gap-10">
-                <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-xs uppercase tracking-widest font-bold">Overview</TabsTrigger>
-                <TabsTrigger value="applications" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-xs uppercase tracking-widest font-bold">Applications ({applications.length})</TabsTrigger>
-                <TabsTrigger value="submissions" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-xs uppercase tracking-widest font-bold">Submissions ({submissions.length})</TabsTrigger>
-                <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-xs uppercase tracking-widest font-bold">Escrow & Payments</TabsTrigger>
-              </TabsList>
+              <ScrollArea orientation="horizontal" className="border-b border-border bg-white h-16 w-full">
+                <TabsList className="px-6 md:px-10 bg-transparent rounded-none h-16 gap-6 md:gap-10 w-max min-w-full">
+                  <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] md:text-xs uppercase tracking-widest font-bold">Overview</TabsTrigger>
+                  <TabsTrigger value="applications" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] md:text-xs uppercase tracking-widest font-bold">Applications ({applications.length})</TabsTrigger>
+                  <TabsTrigger value="submissions" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] md:text-xs uppercase tracking-widest font-bold">Submissions ({submissions.length})</TabsTrigger>
+                  <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-4 data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] md:text-xs uppercase tracking-widest font-bold">Escrow & Payments</TabsTrigger>
+                </TabsList>
+              </ScrollArea>
 
               <ScrollArea className="flex-1 p-10 bg-secondary/10">
                 <TabsContent value="overview" className="mt-0 space-y-10">

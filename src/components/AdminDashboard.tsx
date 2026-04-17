@@ -532,21 +532,21 @@ export default function AdminDashboard({
   };
 
   return (
-    <div className="space-y-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 bg-white p-10 rounded-[2.5rem] border border-border shadow-sm">
+    <div className="space-y-8 md:space-y-12">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-5xl font-heading font-bold tracking-tighter text-foreground">Admin Control</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Admin Control</h1>
             <ProfileEditor user={user} />
           </div>
-          <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">Enterprise compliance orchestration and agent management hub.</p>
+          <p className="text-muted-foreground text-sm md:text-lg max-w-2xl leading-relaxed">Enterprise compliance orchestration and agent management hub.</p>
         </div>
         <div className="flex gap-4">
-          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10">
+          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 w-full lg:w-auto">
             <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">System Status</p>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-bold">ALL SYSTEMS OPERATIONAL</span>
+              <span className="text-xs md:text-sm font-bold">ALL SYSTEMS OPERATIONAL</span>
             </div>
           </div>
         </div>
@@ -560,32 +560,34 @@ export default function AdminDashboard({
       </div>
 
       <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'agents' ? 'compliance' : val === 'logs' ? 'audit' : val === 'users' ? 'users' : 'overview')} className="w-full">
-        <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit mb-8">
-          <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
-            <FileText size={16} /> Recompliance Hub
-          </TabsTrigger>
-          <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
-            <Briefcase size={16} /> Projects
-          </TabsTrigger>
-          <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
-            <Cpu size={16} /> Agent Management
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
-            <History size={16} /> Audited Logs
-          </TabsTrigger>
-          <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
-            <Users size={16} /> User Management
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2">
-            <Settings2 size={16} /> LLM Settings
-          </TabsTrigger>
-          <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8 gap-2 relative">
-            <Sparkles size={16} /> Brain
-            {pendingKnowledgeCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
+          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
+            <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <FileText size={16} /> Recompliance Hub
+            </TabsTrigger>
+            <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <Briefcase size={16} /> Projects
+            </TabsTrigger>
+            <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <Cpu size={16} /> Agent Management
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <History size={16} /> Audited Logs
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <Users size={16} /> User Management
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <Settings2 size={16} /> LLM Settings
+            </TabsTrigger>
+            <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 relative">
+              <Sparkles size={16} /> Brain
+              {pendingKnowledgeCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </ScrollArea>
 
         <TabsContent value="submissions">
           <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
@@ -595,17 +597,18 @@ export default function AdminDashboard({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border">
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest px-8">Drawing</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">Architect</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">AI Status</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">Date</TableHead>
-                    <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest px-8">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <ScrollArea orientation="horizontal" className="w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-border">
+                      <TableHead className="font-bold text-[10px] uppercase tracking-widest px-8 min-w-[200px]">Drawing</TableHead>
+                      <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Architect</TableHead>
+                      <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">AI Status</TableHead>
+                      <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Date</TableHead>
+                      <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest px-8 min-w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {submissions.filter(s => s.status === 'admin_reviewing').map(sub => (
                     <TableRow key={sub.id} className="border-border hover:bg-secondary/20 transition-colors">
                       <TableCell className="font-heading font-bold px-8">{sub.drawingName}</TableCell>
@@ -617,113 +620,113 @@ export default function AdminDashboard({
                       <TableCell className="text-right px-8">
                         <Dialog>
                           <DialogTrigger render={<Button variant="ghost" size="sm" className="gap-2 hover:bg-primary hover:text-primary-foreground rounded-full px-4"><Eye size={14} />Review</Button>} />
-                          <DialogContent className="max-w-6xl border-border bg-white/95 backdrop-blur-md h-[90vh] flex flex-col p-0 overflow-hidden rounded-[2rem] shadow-2xl">
-                            <div className="p-10 border-b border-border bg-primary/5">
+                          <DialogContent className="max-w-6xl border-border bg-white/95 backdrop-blur-md h-[100vh] md:h-[90vh] flex flex-col p-0 overflow-hidden md:rounded-[2rem] shadow-2xl">
+                            <div className="p-6 md:p-10 border-b border-border bg-primary/5">
                               <DialogHeader>
-                                <DialogTitle className="font-heading font-bold text-3xl tracking-tighter">Review Submission: {sub.drawingName}</DialogTitle>
-                                <DialogDescription className="text-muted-foreground mt-2">Verify AI findings and provide final council-ready approval.</DialogDescription>
+                                <DialogTitle className="font-heading font-bold text-2xl md:text-3xl tracking-tighter">Review: {sub.drawingName}</DialogTitle>
+                                <DialogDescription className="text-muted-foreground text-xs md:text-sm mt-1">Verify AI findings and provide final approval.</DialogDescription>
                               </DialogHeader>
                             </div>
                             
-                            <div className="flex-1 overflow-hidden flex gap-8 p-10 bg-secondary/10">
-                              <div className="flex-1 flex flex-col gap-6">
-                                <div className="flex-1 border border-border rounded-[2rem] bg-white shadow-sm flex flex-col overflow-hidden">
-                                  <div className="bg-secondary/20 p-4 border-b border-border flex justify-between items-center">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Technical Drawing View</span>
-                                    <Button variant="outline" size="sm" className="rounded-full h-8 text-[10px] font-bold uppercase tracking-widest">
-                                      <a href={sub.drawingUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">Open Original <ExternalLink size={10} className="ml-1" /></a>
-                                    </Button>
+                            <ScrollArea className="flex-1">
+                              <div className="flex flex-col lg:flex-row gap-6 md:gap-8 p-6 md:p-10 bg-secondary/10">
+                                <div className="flex-1 flex flex-col gap-6">
+                                  <div className="flex-1 border border-border rounded-[1.5rem] md:rounded-[2rem] bg-white shadow-sm flex flex-col overflow-hidden min-h-[300px] md:min-h-[500px]">
+                                    <div className="bg-secondary/20 p-4 border-b border-border flex justify-between items-center">
+                                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Technical Drawing View</span>
+                                      <Button variant="outline" size="sm" className="rounded-full h-8 text-[10px] font-bold uppercase tracking-widest">
+                                        <a href={sub.drawingUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">Open Original <ExternalLink size={10} className="ml-1" /></a>
+                                      </Button>
+                                    </div>
+                                    <div className="flex-1 flex items-center justify-center p-4 md:p-8 bg-slate-900 relative">
+                                      {sub.drawingUrl.endsWith('.pdf') ? (
+                                        <iframe src={sub.drawingUrl} title="Submission PDF" className="w-full h-full rounded-lg" />
+                                      ) : (
+                                        <img src={sub.drawingUrl} alt="Submission" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" referrerPolicy="no-referrer" />
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex-1 flex items-center justify-center p-8 bg-slate-900 relative">
-                                    {sub.drawingUrl.endsWith('.pdf') ? (
-                                      <iframe src={sub.drawingUrl} className="w-full h-full rounded-lg" />
-                                    ) : (
-                                      <img src={sub.drawingUrl} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" referrerPolicy="no-referrer" />
-                                    )}
+                                  
+                                  <div className="border border-border rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 bg-white shadow-sm flex flex-col">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest mb-4 text-muted-foreground flex items-center gap-2">
+                                      <Sparkles size={12} className="text-primary" /> AI Compliance Orchestrator Feedback
+                                    </h4>
+                                    <div className="mb-4 flex flex-wrap gap-2">
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="rounded-full text-[10px] font-bold uppercase tracking-widest gap-2 bg-primary/5 border-primary/20"
+                                        onClick={() => setReportSubmission(sub)}
+                                      >
+                                        <FileText size={12} /> View Full Report
+                                      </Button>
+                                    </div>
+                                    <div className="max-h-[400px] overflow-y-auto pr-2">
+                                      {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 ? (
+                                        <Accordion multiple={true} type="multiple" className="w-full space-y-2">
+                                          {sub.aiStructuredFeedback.map((cat, i) => (
+                                            <AccordionItem key={i} value={`cat-${i}`} className="border border-border rounded-xl overflow-hidden bg-secondary/5 px-4">
+                                              <AccordionTrigger className="hover:no-underline py-4">
+                                                <div className="flex items-center gap-3">
+                                                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                                                    <Shield size={14} />
+                                                  </div>
+                                                  <div className="text-left">
+                                                    <p className="text-sm font-bold tracking-tight">{cat.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                                                      {cat.issues.length} {cat.issues.length === 1 ? 'Issue' : 'Issues'} Identified
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                              </AccordionTrigger>
+                                              <AccordionContent className="pb-4">
+                                                <div className="space-y-3 pt-2">
+                                                  {cat.issues.map((issue, j) => (
+                                                    <div key={j} className={`p-4 rounded-xl border ${
+                                                      issue.severity === 'high' ? 'bg-red-50/50 border-red-100' :
+                                                      issue.severity === 'medium' ? 'bg-yellow-50/50 border-yellow-100' :
+                                                      'bg-blue-50/50 border-blue-100'
+                                                    }`}>
+                                                      <div className="flex justify-between items-start mb-2">
+                                                        <p className="text-sm font-bold leading-tight">{issue.description}</p>
+                                                        <Badge variant="outline" className={`text-[8px] font-bold uppercase px-2 py-0 h-4 ${
+                                                          issue.severity === 'high' ? 'border-red-200 text-red-700 bg-red-50' :
+                                                          issue.severity === 'medium' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
+                                                          'border-blue-200 text-blue-700 bg-blue-50'
+                                                        }`}>
+                                                          {issue.severity}
+                                                        </Badge>
+                                                      </div>
+                                                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-black/5">
+                                                        <div className="p-1 rounded-full bg-white shadow-sm">
+                                                          <CheckCircle2 size={10} className="text-primary" />
+                                                        </div>
+                                                        <p className="text-[10px] font-bold text-muted-foreground">
+                                                          <span className="text-primary">ACTION:</span> {issue.actionItem}
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </AccordionContent>
+                                            </AccordionItem>
+                                          ))}
+                                        </Accordion>
+                                      ) : (
+                                        <div className="text-sm prose prose-sm max-w-none leading-relaxed markdown-body">
+                                          <ReactMarkdown>{sub.aiFeedback || 'No AI feedback available.'}</ReactMarkdown>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 
-                                <div className="border border-border rounded-[2rem] p-8 bg-white shadow-sm flex flex-col">
-                                  <h4 className="text-[10px] font-bold uppercase tracking-widest mb-4 text-muted-foreground flex items-center gap-2">
-                                    <Sparkles size={12} className="text-primary" /> AI Compliance Orchestrator Feedback
-                                  </h4>
-                                  <div className="mb-4 flex gap-2">
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      className="rounded-full text-[10px] font-bold uppercase tracking-widest gap-2 bg-primary/5 border-primary/20"
-                                      onClick={() => setReportSubmission(sub)}
-                                    >
-                                      <FileText size={12} /> View Full Report
-                                    </Button>
-                                  </div>
-                                  <ScrollArea className="flex-1 pr-4">
-                                    {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 ? (
-                                      <Accordion multiple className="w-full space-y-2">
-                                        {sub.aiStructuredFeedback.map((cat, i) => (
-                                          <AccordionItem key={i} value={`cat-${i}`} className="border border-border rounded-xl overflow-hidden bg-secondary/5 px-4">
-                                            <AccordionTrigger className="hover:no-underline py-4">
-                                              <div className="flex items-center gap-3">
-                                                <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                                                  <Shield size={14} />
-                                                </div>
-                                                <div className="text-left">
-                                                  <p className="text-sm font-bold tracking-tight">{cat.name}</p>
-                                                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                                                    {cat.issues.length} {cat.issues.length === 1 ? 'Issue' : 'Issues'} Identified
-                                                  </p>
-                                                </div>
-                                              </div>
-                                            </AccordionTrigger>
-                                            <AccordionContent className="pb-4">
-                                              <div className="space-y-3 pt-2">
-                                                {cat.issues.map((issue, j) => (
-                                                  <div key={j} className={`p-4 rounded-xl border ${
-                                                    issue.severity === 'high' ? 'bg-red-50/50 border-red-100' :
-                                                    issue.severity === 'medium' ? 'bg-yellow-50/50 border-yellow-100' :
-                                                    'bg-blue-50/50 border-blue-100'
-                                                  }`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                      <p className="text-sm font-bold leading-tight">{issue.description}</p>
-                                                      <Badge variant="outline" className={`text-[8px] font-bold uppercase px-2 py-0 h-4 ${
-                                                        issue.severity === 'high' ? 'border-red-200 text-red-700 bg-red-50' :
-                                                        issue.severity === 'medium' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
-                                                        'border-blue-200 text-blue-700 bg-blue-50'
-                                                      }`}>
-                                                        {issue.severity}
-                                                      </Badge>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-black/5">
-                                                      <div className="p-1 rounded-full bg-white shadow-sm">
-                                                        <CheckCircle2 size={10} className="text-primary" />
-                                                      </div>
-                                                      <p className="text-[10px] font-bold text-muted-foreground">
-                                                        <span className="text-primary">RECOMMENDED ACTION:</span> {issue.actionItem}
-                                                      </p>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </AccordionContent>
-                                          </AccordionItem>
-                                        ))}
-                                      </Accordion>
-                                    ) : (
-                                      <div className="text-sm prose prose-sm max-w-none leading-relaxed markdown-body">
-                                        <ReactMarkdown>{sub.aiFeedback || 'No AI feedback available.'}</ReactMarkdown>
-                                      </div>
-                                    )}
-                                  </ScrollArea>
-                                </div>
-                              </div>
-
-                              <div className="w-96 flex flex-col gap-6">
-                                <div className="flex-1 border border-border rounded-[2rem] p-8 bg-white shadow-sm flex flex-col">
-                                  <h4 className="text-[10px] font-bold uppercase tracking-widest mb-6 text-muted-foreground flex items-center gap-2">
-                                    <History size={12} className="text-primary" /> Audited Traceability
-                                  </h4>
-                                  <ScrollArea className="flex-1">
-                                    <div className="space-y-6">
+                                <div className="lg:w-96 flex flex-col gap-6">
+                                  <div className="border border-border rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 bg-white shadow-sm flex flex-col">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-widest mb-6 text-muted-foreground flex items-center gap-2">
+                                      <History size={12} className="text-primary" /> Audited Traceability
+                                    </h4>
+                                    <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2">
                                       {sub.traceability.map((log, i) => (
                                         <div key={i} className="relative pl-6 border-l-2 border-primary/10 pb-6 last:pb-0">
                                           <div className="absolute left-[-7px] top-0 w-3 h-3 rounded-full bg-primary shadow-sm" />
@@ -733,20 +736,20 @@ export default function AdminDashboard({
                                         </div>
                                       ))}
                                     </div>
-                                  </ScrollArea>
-                                </div>
-
-                                <div className="space-y-3">
-                                  <Button onClick={() => handleApprove(sub)} className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
-                                    <CheckCircle2 size={18} /> Approve for Council
-                                  </Button>
-                                  <Button onClick={() => handleForceApprove(sub)} variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
-                                    <Sparkles size={16} /> AI Override (Force Approve)
-                                  </Button>
-                                  <RejectDialog sub={sub} onReject={handleReject} />
+                                  </div>
+                                  
+                                  <div className="space-y-3">
+                                    <Button onClick={() => handleApprove(sub)} className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
+                                      <CheckCircle2 size={18} /> Approve for Council
+                                    </Button>
+                                    <Button onClick={() => handleForceApprove(sub)} variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
+                                      <Sparkles size={16} /> AI Override
+                                    </Button>
+                                    <RejectDialog sub={sub} onReject={handleReject} />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </ScrollArea>
                           </DialogContent>
                         </Dialog>
                       </TableCell>
@@ -761,6 +764,7 @@ export default function AdminDashboard({
                   )}
                 </TableBody>
               </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
@@ -777,17 +781,18 @@ export default function AdminDashboard({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                     <TableHead className="px-8 font-bold text-[10px] uppercase tracking-widest">Title</TableHead>
-                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Client</TableHead>
-                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Status</TableHead>
-                     <TableHead className="font-bold text-[10px] uppercase tracking-widest">Budget</TableHead>
-                     <TableHead className="text-right px-8 font-bold text-[10px] uppercase tracking-widest">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <ScrollArea orientation="horizontal" className="w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                       <TableHead className="px-8 font-bold text-[10px] uppercase tracking-widest min-w-[200px]">Title</TableHead>
+                       <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Client</TableHead>
+                       <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Status</TableHead>
+                       <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Budget</TableHead>
+                       <TableHead className="text-right px-8 font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {allJobs.map(job => (
                     <TableRow key={job.id} className="hover:bg-secondary/10">
                       <TableCell className="px-8 font-bold">{job.title}</TableCell>
@@ -821,6 +826,7 @@ export default function AdminDashboard({
                   ))}
                 </TableBody>
               </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1141,8 +1147,9 @@ function UserManagement({
                 </TableCell>
               </TableRow>
             )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </ScrollArea>
       </CardContent>
     </Card>
   );

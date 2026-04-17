@@ -519,10 +519,10 @@ const handleLogin = async () => {
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         m-4 rounded-[2rem] lg:m-0 lg:rounded-none
       `}>
-        <div className="p-10 flex items-center justify-between">
-          <Logo showText />
+        <div className="p-8 lg:p-10 flex items-center justify-between">
+          <Logo showText iconClassName="w-12 h-12 text-primary" />
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(false)}>
-            <X size={20} />
+            <X size={24} />
           </Button>
         </div>
         
@@ -702,8 +702,8 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       <AnimatedFloorPlan />
       
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-border h-20 flex items-center justify-between px-6 lg:px-20">
-        <Logo showText />
+      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-border h-24 flex items-center justify-between px-6 lg:px-20">
+        <Logo showText iconClassName="w-12 h-12 text-primary" />
         
         {/* Desktop Nav */}
         <div className="hidden lg:flex items-center gap-6">
@@ -747,7 +747,7 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             <Badge className="bg-primary/10 text-primary border-primary/20 mb-6 px-4 py-1 text-xs uppercase tracking-widest">
               The Future of Architecture
             </Badge>
-            <h1 className="text-5xl lg:text-8xl font-heading font-bold leading-[0.9] tracking-tighter mb-8">
+            <h1 className="text-5xl md:text-7xl lg:text-9xl font-heading font-bold leading-[0.85] tracking-tighter mb-8">
               Design. <br />
               Verify. <br />
               <span className="text-primary">Build.</span>
@@ -882,7 +882,7 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       {/* Footer */}
       <footer className="bg-secondary/50 py-20 px-8 lg:px-20 border-t border-border relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <Logo showText iconClassName="w-6 h-6 text-primary" textClassName="font-heading font-bold text-xl tracking-tighter" />
+          <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl lg:text-3xl tracking-tighter" />
           <p className="text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
           <div className="flex gap-6">
             <button className="text-xs uppercase tracking-widest hover:text-primary transition-colors">Terms</button>

@@ -140,30 +140,32 @@ export function SearchFilter({
   return (
     <div className="bg-white rounded-2xl border border-border shadow-sm p-4 space-y-4">
       {/* Search Bar */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search jobs by title or description..."
+            placeholder="Search jobs..."
             value={localFilters.query}
             onChange={(e) => setLocalFilters({ ...localFilters, query: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             className="pl-10"
           />
         </div>
-        <Button onClick={handleSearch}>
-          <Search className="h-4 w-4 mr-2" />
-          Search
-        </Button>
-        <Button variant="outline" onClick={() => setIsExpanded(!isExpanded)}>
-          <Filter className="h-4 w-4 mr-2" />
-          Filters
-          {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {activeFilterCount}
-            </Badge>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSearch} className="flex-1 sm:flex-none">
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
+          <Button variant="outline" onClick={() => setIsExpanded(!isExpanded)} className="flex-1 sm:flex-none">
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Active Filters */}

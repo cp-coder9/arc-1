@@ -22,6 +22,7 @@ import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
 import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
+import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 // import { motion } from 'framer-motion';
 
@@ -109,21 +110,23 @@ export default function ArchitectDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 bg-white p-10 rounded-[2.5rem] border border-border shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-5xl font-heading font-bold tracking-tighter text-foreground">Architect Studio</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Architect Studio</h1>
             <ProfileEditor user={user} />
           </div>
-          <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">Find new opportunities and submit your SANS compliant drawings on Architex.</p>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Find new opportunities and submit your SANS compliant drawings on Architex.</p>
         </div>
       </div>
 
       <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'browse' ? 'marketplace' : 'projects')} className="w-full">
-        <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
-          <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Browse Jobs</TabsTrigger>
-          <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">My Active Projects</TabsTrigger>
-        </TabsList>
+        <div className="border-b border-border bg-white h-14 md:h-16 w-full flex items-center px-4 md:px-0 bg-transparent rounded-full overflow-hidden mb-8">
+          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
+            <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Browse Jobs</TabsTrigger>
+            <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="browse" className="mt-8 space-y-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -686,234 +689,229 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
         </div>
       </div>
 
-      <CardFooter className="bg-secondary/20 p-6 border-t border-border gap-3">
-        {job.status === 'completed' ? (
-          <Dialog open={isRating} onOpenChange={setIsRating}>
-            <DialogTrigger render={<Button variant="outline" className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">Rate Client</Button>} />
-            <DialogContent className="sm:max-w-[500px] border-border bg-white rounded-3xl p-0 overflow-hidden">
-              <div className="bg-primary/5 p-8 border-b border-border">
-                <DialogHeader>
-                  <DialogTitle className="font-heading text-3xl font-bold">Rate Client</DialogTitle>
-                  <DialogDescription>Share your experience working with this client.</DialogDescription>
-                </DialogHeader>
-              </div>
-              <form onSubmit={handleSubmitReview} className="p-8 space-y-6">
-                <div className="space-y-4">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Rating</label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        className={`p-2 rounded-xl transition-all ${rating >= star ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-secondary/50'}`}
-                      >
-                        <Star size={24} fill={rating >= star ? 'currentColor' : 'none'} />
-                      </button>
-                    ))}
-                  </div>
+      <CardFooter className="bg-secondary/20 p-6 border-t border-border flex flex-col gap-3">
+        <div className="flex gap-3 w-full">
+          {job.status === 'completed' ? (
+            <Dialog open={isRating} onOpenChange={setIsRating}>
+              <DialogTrigger render={<Button variant="outline" className="flex-1 h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">Rate Client</Button>} />
+              <DialogContent className="sm:max-w-[500px] border-border bg-white rounded-3xl p-0 overflow-hidden">
+                <div className="bg-primary/5 p-8 border-b border-border">
+                  <DialogHeader>
+                    <DialogTitle className="font-heading text-3xl font-bold">Rate Client</DialogTitle>
+                    <DialogDescription>Share your experience working with this client.</DialogDescription>
+                  </DialogHeader>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Your Feedback</label>
-                  <Textarea 
-                    placeholder="How was the communication, clarity of brief, and payment timeliness?" 
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    required
-                    className="min-h-[120px] border-border rounded-xl"
-                  />
-                </div>
-                <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2">
-                  <Send size={18} /> Submit Review
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        ) : (
-          <Dialog open={isSubmitting} onOpenChange={setIsSubmitting}>
-            <DialogTrigger render={<Button variant="outline" className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">Submit New Drawing</Button>} />
-            <DialogContent className="max-w-2xl border-border bg-white/95 backdrop-blur-md p-0 overflow-hidden rounded-[2rem] shadow-2xl">
-              <div className="bg-primary/5 p-10 border-b border-border">
-                <DialogHeader>
-                  <DialogTitle className="font-heading font-bold text-4xl tracking-tighter">Submit Drawing</DialogTitle>
-                  <DialogDescription className="text-muted-foreground text-base mt-2">Upload technical drawings for AI SANS 10400 compliance check.</DialogDescription>
-                </DialogHeader>
-              </div>
-              <form onSubmit={handleSubmitDrawing} className="p-10 space-y-8">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  onChange={handleFileSelect}
-                  accept=".pdf,.dwg,image/*"
-                />
-                <div 
-                  className={`border-2 border-dashed rounded-[2rem] p-16 text-center transition-all relative overflow-hidden ${
-                    isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 bg-secondary/20'
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                >
-                  {isUploading && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 z-10">
-                      <div className="w-full max-w-xs space-y-4 text-center">
-                        <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
-                        <p className="text-sm font-bold text-primary">Uploading drawing to secure vault...</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">This may take a moment</p>
-                      </div>
+                <form onSubmit={handleSubmitReview} className="p-8 space-y-6">
+                  <div className="space-y-4">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Rating</label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className={`p-2 rounded-xl transition-all ${rating >= star ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-secondary/50'}`}
+                        >
+                          <Star size={24} fill={rating >= star ? 'currentColor' : 'none'} />
+                        </button>
+                      ))}
                     </div>
-                  )}
-
-                  <div className="flex flex-col items-center gap-4">
-                    {drawingUrl && isImage ? (
-                      <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden border border-border shadow-sm mb-2">
-                        <img src={drawingUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </div>
-                    ) : (
-                      <div className="p-6 bg-white rounded-full text-primary shadow-xl shadow-primary/10">
-                        <UploadCloud size={48} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Your Feedback</label>
+                    <Textarea 
+                      placeholder="How was the communication, clarity of brief, and payment timeliness?" 
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      required
+                      className="min-h-[120px] border-border rounded-xl"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2">
+                    <Send size={18} /> Submit Review
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <Dialog open={isSubmitting} onOpenChange={setIsSubmitting}>
+              <DialogTrigger render={<Button variant="outline" className="flex-1 h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">Submit New Drawing</Button>} />
+              <DialogContent className="max-w-2xl border-border bg-white/95 backdrop-blur-md p-0 overflow-hidden rounded-[2rem] shadow-2xl">
+                <div className="bg-primary/5 p-8 md:p-10 border-b border-border">
+                  <DialogHeader>
+                    <DialogTitle className="font-heading font-bold text-3xl md:text-4xl tracking-tighter">Submit Drawing</DialogTitle>
+                    <DialogDescription className="text-muted-foreground text-sm md:text-base mt-2">Upload technical drawings for AI SANS 10400 compliance check.</DialogDescription>
+                  </DialogHeader>
+                </div>
+                <form onSubmit={handleSubmitDrawing} className="p-6 md:p-10 space-y-6 md:space-y-8">
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    onChange={handleFileSelect}
+                    accept=".pdf,.dwg,image/*"
+                  />
+                  <div 
+                    className={`border-2 border-dashed rounded-[1.5rem] md:rounded-[2rem] p-8 md:p-16 text-center transition-all relative overflow-hidden ${
+                      isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 bg-secondary/20'
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleDrop}
+                  >
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 z-10">
+                        <div className="w-full max-w-xs space-y-4 text-center">
+                          <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+                          <p className="text-sm font-bold text-primary">Uploading drawing...</p>
+                        </div>
                       </div>
                     )}
-                    <div>
-                      <p className="text-lg font-bold tracking-tight">
-                        {drawingUrl ? 'File Ready' : 'Drag and drop your PDF/CAD/Image file'}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {drawingUrl ? drawingName : 'Maximum file size: 20MB'}
-                      </p>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="mt-4 rounded-full px-8 border-primary/20 font-bold"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {drawingUrl ? 'Change File' : 'Browse Files'}
-                    </Button>
-                  </div>
-                </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Drawing Name</label>
-                    <Input 
-                      placeholder="e.g. Ground Floor Plan - Rev A" 
-                      value={drawingName}
-                      onChange={e => setDrawingName(e.target.value)}
-                      required
-                      className="border-border focus-visible:ring-primary h-12 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Drawing URL</label>
-                    <Input 
-                      placeholder="Upload a file to get URL" 
-                      value={drawingUrl}
-                      readOnly
-                      required
-                      className="border-border focus-visible:ring-primary h-12 rounded-xl bg-secondary/20 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-6 bg-primary/5 border border-primary/20 rounded-2xl flex flex-col gap-4">
-                  <div className="flex gap-4">
-                    <Sparkles className="text-primary shrink-0" size={24} />
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold text-foreground">AI Compliance Pre-check</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Run an autonomous scan for **SANS 10400** compliance before final submission.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {preCheckResult ? (
-                    <div className={`p-6 rounded-2xl border ${preCheckResult.status === 'passed' ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
-                      <div className="flex items-center gap-2 mb-4">
-                        {preCheckResult.status === 'passed' ? (
-                          <CheckCircle2 className="text-green-600" size={20} />
-                        ) : (
-                          <AlertCircle className="text-red-600" size={20} />
-                        )}
-                        <span className={`text-sm font-bold uppercase tracking-widest ${preCheckResult.status === 'passed' ? 'text-green-700' : 'text-red-700'}`}>
-                          AI Pre-check: {preCheckResult.status}
-                        </span>
-                      </div>
-                      
-                      {preCheckResult.categories && preCheckResult.categories.length > 0 ? (
-                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
-                          {preCheckResult.categories.map((cat, i) => (
-                            <div key={i} className="space-y-2">
-                              <p className="text-[10px] font-bold text-muted-foreground uppercase">{cat.name}</p>
-                              <div className="space-y-2">
-                                {cat.issues.map((issue, j) => (
-                                  <div key={j} className="text-xs bg-white/50 p-3 rounded-xl border border-black/5">
-                                    <p className="font-bold">{issue.description}</p>
-                                    <p className="text-[10px] text-muted-foreground mt-1">Action: {issue.actionItem}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                    <div className="flex flex-col items-center gap-4">
+                      {drawingUrl && isImage ? (
+                        <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden border border-border shadow-sm mb-2">
+                          <img src={drawingUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
                       ) : (
-                        <div className="text-xs text-foreground/80 markdown-body">
-                          <ReactMarkdown>{preCheckResult.feedback}</ReactMarkdown>
+                        <div className="p-4 md:p-6 bg-white rounded-full text-primary shadow-xl shadow-primary/10">
+                          <UploadCloud size={32} />
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {isPreChecking && (
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center px-1">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-primary animate-pulse">
-                              AI Orchestration in Progress...
-                            </p>
-                            <p className="text-[10px] font-mono font-bold text-muted-foreground">{aiProgress?.percentage || 0}%</p>
-                          </div>
-                          <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${aiProgress?.percentage || 0}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                      <div>
+                        <p className="text-base md:text-lg font-bold tracking-tight">
+                          {drawingUrl ? 'File Ready' : 'Drop your PDF/CAD/Image'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {drawingUrl ? drawingName : 'Max 20MB'}
+                        </p>
+                      </div>
                       <Button 
                         type="button" 
-                        onClick={() => handlePreCheck()} 
-                        disabled={isPreChecking || !drawingUrl}
-                        className="w-full bg-white text-primary border border-primary/20 hover:bg-primary/5 h-12 rounded-xl font-bold gap-2"
+                        variant="outline" 
+                        className="mt-2 rounded-full px-6 border-primary/20 font-bold text-xs h-9"
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        {isPreChecking ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                        {isPreChecking ? 'Analyzing SANS Compliance...' : 'Run AI Pre-compliance Check'}
+                        {drawingUrl ? 'Change' : 'Browse'}
                       </Button>
                     </div>
-                  )}
-                </div>
-                <Button 
-                  type="submit" 
-                  disabled={isPreChecking}
-                  className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold text-xl shadow-xl shadow-primary/20"
-                >
-                  Submit for AI Review
-                </Button>
-              </form>
-            </DialogContent>
-</Dialog>
-      )}
-      {clientProfile && (
-        <>
-          <Button
-            variant="outline"
-            className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all"
-            onClick={() => setIsChatOpen(true)}
-          >
-            <MessageCircle size={16} className="mr-2" />
-            Message Client
-          </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Drawing Name</label>
+                      <Input 
+                        placeholder="e.g. Ground Floor Plan"
+                        value={drawingName}
+                        onChange={e => setDrawingName(e.target.value)}
+                        required
+                        className="h-12 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Project Category</label>
+                      <Badge variant="outline" className="h-12 w-full justify-center rounded-xl text-xs">{job.category}</Badge>
+                    </div>
+                  </div>
+
+                  <div className="p-4 md:p-6 bg-primary/5 border border-primary/20 rounded-2xl flex flex-col gap-4">
+                    <div className="flex gap-4">
+                      <Sparkles className="text-primary shrink-0" size={24} />
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-foreground">AI Compliance Pre-check</p>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                          Autonomous scan for **SANS 10400** compliance.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {preCheckResult ? (
+                      <div className={`p-4 rounded-2xl border ${preCheckResult.status === 'passed' ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
+                        <div className="flex items-center gap-2 mb-4">
+                          {preCheckResult.status === 'passed' ? (
+                            <CheckCircle2 className="text-green-600" size={16} />
+                          ) : (
+                            <AlertCircle className="text-red-600" size={16} />
+                          )}
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${preCheckResult.status === 'passed' ? 'text-green-700' : 'text-red-700'}`}>
+                            AI Pre-check: {preCheckResult.status}
+                          </span>
+                        </div>
+                        
+                        <ScrollArea className="h-[200px] overflow-y-auto pr-2">
+                          {preCheckResult.categories && preCheckResult.categories.length > 0 ? (
+                            <div className="space-y-4">
+                              {preCheckResult.categories.map((cat, i) => (
+                                <div key={i} className="space-y-2">
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase">{cat.name}</p>
+                                  <div className="space-y-2">
+                                    {cat.issues.map((issue, j) => (
+                                      <div key={j} className="text-xs bg-white/50 p-3 rounded-xl border border-black/5">
+                                        <p className="font-bold">{issue.description}</p>
+                                        <p className="text-[10px] text-muted-foreground mt-1">Action: {issue.actionItem}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-foreground/80 markdown-body">
+                              <ReactMarkdown>{preCheckResult.feedback}</ReactMarkdown>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {isPreChecking && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center px-1">
+                              <p className="text-[9px] font-bold uppercase tracking-widest text-primary animate-pulse">Analyzing...</p>
+                              <p className="text-[9px] font-mono font-bold text-muted-foreground">{aiProgress?.percentage || 0}%</p>
+                            </div>
+                            <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+                              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${aiProgress?.percentage || 0}%` }} />
+                            </div>
+                          </div>
+                        )}
+                        <Button 
+                          type="button" 
+                          onClick={() => handlePreCheck()} 
+                          disabled={isPreChecking || !drawingUrl}
+                          className="w-full bg-white text-primary border border-primary/20 hover:bg-primary/5 h-10 rounded-xl font-bold gap-2 text-[10px] uppercase tracking-widest"
+                        >
+                          {isPreChecking ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          Run AI Pre-check
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <Button 
+                    type="submit" 
+                    disabled={isPreChecking || !drawingUrl}
+                    className="w-full bg-primary text-primary-foreground h-14 rounded-2xl font-bold text-base shadow-xl shadow-primary/20"
+                  >
+                    Submit for AI Review
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {clientProfile && (
+            <Button
+              variant="outline"
+              className="flex-1 h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all"
+              onClick={() => setIsChatOpen(true)}
+            >
+              <MessageCircle size={16} className="mr-2" />
+              Chat
+            </Button>
+          )}
+        </div>
+
+        {clientProfile && (
           <Chat
             job={job}
             currentUser={user}
@@ -921,12 +919,11 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
           />
-        </>
-      )}
-    </CardFooter>
-    <OrchestrationProgressModal progress={aiProgress} isOpen={!!aiProgress} />
-  </Card>
-);
+        )}
+      </CardFooter>
+      <OrchestrationProgressModal progress={aiProgress} isOpen={!!aiProgress} />
+    </Card>
+  );
 }
 
 function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {

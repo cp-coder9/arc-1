@@ -30,6 +30,20 @@ export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus
   }
 };
 
+export const getAllAgentKnowledge = async (status: KnowledgeStatus = "active"): Promise<AgentKnowledge[]> => {
+  try {
+    const q = query(
+      collection(db, KNOWLEDGE_COLLECTION),
+      where("status", "==", status)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentKnowledge));
+  } catch (error) {
+    console.error("Error fetching all agent knowledge:", error);
+    return [];
+  }
+};
+
 export const addKnowledge = async (entry: Omit<AgentKnowledge, "id">): Promise<string> => {
   try {
     const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), {

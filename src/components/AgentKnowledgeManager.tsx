@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AgentKnowledge, KnowledgeStatus, KnowledgeSource, UserProfile } from '../types';
-import { getAgentKnowledge, approveKnowledge, rejectKnowledge, deleteKnowledge, updateKnowledge } from '../services/knowledgeService';
+import { getAllAgentKnowledge, approveKnowledge, rejectKnowledge, deleteKnowledge, updateKnowledge } from '../services/knowledgeService';
 import { SPECIALIZED_AGENTS } from '../services/geminiService';
 import { Loader2, CheckCircle2, XCircle, Search, Trash2, Edit } from 'lucide-react';
 
@@ -26,25 +26,19 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
   const fetchKnowledge = async () => {
     setLoading(true);
     try {
-      // In a real implementation we would fetch by status for all agents, but since getAgentKnowledge 
-      // requires agentId, we'll fetch all agents' knowledge and filter.
-      // Firestore query would ideally be adjusted to support this.
-      const allEntries: AgentKnowledge[] = [];
-      const agents = SPECIALIZED_AGENTS; // Using default roles
+      const allEntries = await getAllAgentKnowledge(activeTab);
 
-      for (const agent of agents) {
-         // Assuming agent role serves as a fallback ID if 'id' isn't set
-         const agentId = agent.role; 
-         const knowledge = await getAgentKnowledge(agentId, activeTab);
-         allEntries.push(...knowledge);
-      }
-      
       // Sort by newest first
       allEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
+
       setEntries(allEntries);
     } catch (error) {
       console.error("Failed to fetch knowledge:", error);
+      // If permission denied, show empty list gracefully
+      if (error.message?.includes('permission-denied')) {
+        console.warn("Permission denied for agent knowledge, showing empty list");
+        setEntries([]);
+      }
     } finally {
       setLoading(false);
     }

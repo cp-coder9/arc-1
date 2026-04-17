@@ -10,9 +10,9 @@ interface LogoProps {
 
 export function Logo({ 
   className = "flex items-center gap-2", 
-  iconClassName = "w-8 h-8 text-primary", 
+  iconClassName = "w-10 h-10 text-primary", 
   showText = false,
-  textClassName = "font-heading font-bold text-2xl tracking-tighter"
+  textClassName = "font-heading font-bold text-2xl lg:text-3xl tracking-tighter"
 }: LogoProps) {
   return (
     <div className={className}>
