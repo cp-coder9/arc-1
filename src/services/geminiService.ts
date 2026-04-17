@@ -407,6 +407,8 @@ export async function seedAgents() {
 
 // Parse LLM response to extract valid JSON
 function parseAIResponse(responseText: string): any {
+  if (!responseText) return { status: 'failed', feedback: 'Empty response from model.', categories: [], traceLog: '' };
+  
   try {
     return JSON.parse(responseText);
   } catch (e) {
@@ -418,7 +420,23 @@ function parseAIResponse(responseText: string): any {
     if (curlyMatch) {
       try { return JSON.parse(curlyMatch[0]); } catch (_) {}
     }
-    throw new Error('Could not parse AI response as JSON. Response: ' + responseText.substring(0, 500));
+    
+    // NVIDIA fallback: if it output pure markdown instead of JSON, we wrap it in our expected structure
+    console.warn("AI responded with non-JSON text. Wrapping raw response.", responseText.substring(0, 100));
+    return {
+      status: "failed", // Assume failed if it didn't follow strict JSON rules
+      feedback: "The AI agent provided a non-standard response. Raw output:\n\n" + responseText,
+      categories: [{
+        name: "General Compliance",
+        issues: [{
+          description: "Model failed to output structured JSON.",
+          severity: "Medium",
+          regulationRef: "System",
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 }
+        }]
+      }],
+      traceLog: "Failsafe triggered: parsed unstructured markdown into JSON wrapper."
+    };
   }
 }
 

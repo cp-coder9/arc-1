@@ -409,7 +409,7 @@ router.post("/gemini/review", reviewLimiter, async (req, res) => {
   }
 });
 
-// Agent web search
+// Agent web search (Now using standard LLM instead of Google Search)
 router.post("/agent/search", apiLimiter, async (req, res) => {
   const { query, agentRole } = req.body;
   try {
@@ -422,36 +422,31 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
 
   try {
     const dbConfig = (await getAdminLLMConfig()) as any;
-    // Prefer the Gemini API key; fall back to env
-    const activeApiKey = dbConfig?.apiKey || GEMINI_API_KEY;
-
-    if (!activeApiKey) {
-      console.error("[API] Agent Search: Missing Gemini API Key in DB and Env.");
-      return res.status(400).json({ error: "Gemini API key not configured for search" });
+    if (!dbConfig || !dbConfig.provider) {
+      return res.status(400).json({ error: "LLM configuration not found for search" });
     }
 
-    // Use googleSearch tool (new grounding API — googleSearchRetrieval is deprecated)
-    const requestBody: any = {
-      contents: [{
-        role: "user",
-        parts: [{ text: `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references.` }],
-      }],
-      tools: [{ googleSearch: {} }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+    const activeApiKey = dbConfig.apiKey || "";
+    const activeModel = dbConfig.model || "";
+    let cleanBaseUrl = (dbConfig.baseUrl || (dbConfig.provider === 'nvidia' ? 'https://integrate.api.nvidia.com/v1' : '')).replace(/\/$/, "");
+    if (cleanBaseUrl.endsWith("/chat/completions")) {
+      cleanBaseUrl = cleanBaseUrl.replace(/\/chat\/completions$/, "");
+    }
+
+    const requestBody = {
+      model: activeModel,
+      messages: [{ role: "user", content: `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references based on your training data.` }],
+      temperature: 0.1,
+      max_tokens: 1024
     };
 
-    let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeApiKey}`;
-    
-    // If a separate Google Search API key is configured, try grounding with it
-    const searchKey = GOOGLE_SEARCH_API_KEY || activeApiKey;
-    if (searchKey !== activeApiKey) {
-      console.log(`[API] Using dedicated Google Search API key for agent search`);
-    }
-
-    console.log(`[API] Agent search for query: "${query}" (role: ${agentRole})`);
-    const response = await fetch(apiUrl, {
+    console.log(`[API] Agent virtual search for "${query}" using ${dbConfig.provider}`);
+    const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${activeApiKey}`
+      },
       body: JSON.stringify(requestBody),
     });
 
@@ -461,7 +456,7 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
       return res.status(response.status).json({ error: "Search provider error", details: errData });
     }
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = data.choices?.[0]?.message?.content;
     res.json(text ? { text } : { text: `No results for: ${query}` });
   } catch (error) {
     console.error("Agent Search Error:", error);
