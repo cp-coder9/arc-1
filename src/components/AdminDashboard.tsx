@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -1549,7 +1549,28 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<AIReviewResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveReport = async () => {
+    if (!testResult) return;
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'system_reports'), {
+        title: `AI Agent Test Report - ${new Date().toLocaleString()}`,
+        status: testResult.status,
+        result: testResult,
+        createdAt: new Date().toISOString(),
+        createdBy: user.uid
+      });
+      toast.success("Report saved to system");
+    } catch (error) {
+      console.error("Save report error:", error);
+      toast.error("Failed to save report");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1568,6 +1589,13 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
     setUploadProgress(0);
     setTestResult(null);
 
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + 5;
+      });
+    }, 200);
+
     try {
       const url = await uploadAndTrackFile(file, {
         fileName: file.name,
@@ -1576,6 +1604,10 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
         uploadedBy: user.uid,
         context: 'test'
       });
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       setIsUploading(false);
       setIsTesting(true);
@@ -1591,6 +1623,7 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
         setIsTesting(false);
       }
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("Upload error:", error);
       toast.error("Failed to upload drawing.");
       setIsUploading(false);
@@ -1639,29 +1672,129 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
           )}
 
           {isTesting && (
-            <div className="text-center py-12">
-              <Cpu className="w-12 h-12 text-primary animate-pulse mx-auto mb-4" />
-              <h3 className="font-bold text-lg mb-2">AI Orchestrator Running...</h3>
-              <p className="text-sm text-muted-foreground">The specialized agents are analyzing the plan.</p>
+            <div className="py-16 relative flex flex-col items-center justify-center min-h-[400px]">
+              <div className="relative w-64 h-64 flex items-center justify-center">
+                <div className="absolute inset-0 border-2 border-primary/10 rounded-full animate-[spin_12s_linear_infinite]" />
+                <div className="absolute inset-8 border border-dashed border-primary/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
+                
+                {/* Radial lines */}
+                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2 rotate-90"></div>
+                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2 rotate-45"></div>
+                <div className="absolute top-1/2 left-1/2 w-full h-[1px] bg-primary/10 -translate-x-1/2 -translate-y-1/2 -rotate-45"></div>
+
+                <div className="relative z-10 w-24 h-24 bg-white border-4 border-primary rounded-full flex flex-col items-center justify-center shadow-[0_0_30px_rgba(var(--primary),0.3)] animate-pulse">
+                  <Cpu className="w-10 h-10 text-primary" />
+                </div>
+                
+                {/* Orbiting Agents */}
+                <div className="absolute top-0 left-1/2 -ml-6 -mt-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="absolute bottom-0 left-1/2 -ml-6 -mb-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div className="absolute top-1/2 left-0 -mt-6 -ml-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div className="absolute top-1/2 right-0 -mt-6 -mr-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div className="absolute top-[14%] left-[14%] -ml-6 -mt-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                  <Settings2 className="w-5 h-5" />
+                </div>
+                <div className="absolute bottom-[14%] right-[14%] -ml-6 -mt-6 w-12 h-12 bg-white border-2 border-primary/50 text-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                  <Search className="w-5 h-5" />
+                </div>
+              </div>
+
+              <h3 className="font-bold text-xl mt-12 mb-2 animate-pulse">AI Orchestrator Running...</h3>
+              <p className="text-sm text-muted-foreground">The specialized agents are actively evaluating compliance clauses.</p>
             </div>
           )}
 
           {testResult && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-lg">Test Results</h3>
-                <Badge className={testResult.status === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                  {testResult.status === 'passed' ? 'PASSED' : 'FAILED'}
-                </Badge>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-xl">System Testing Report</h3>
+                <div className="flex gap-2">
+                  <Badge className={testResult.status === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                    {testResult.status === 'passed' ? 'PASSED' : 'FAILED'}
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={handleSaveReport} disabled={isSaving} className="gap-2">
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save Report
+                  </Button>
+                </div>
               </div>
-              <div className="border border-border rounded-[2rem] p-6 bg-secondary/10">
-                <ScrollArea className="h-[300px] pr-4">
-                  <div className="prose prose-sm max-w-none markdown-body">
-                    <ReactMarkdown>{testResult.feedback}</ReactMarkdown>
+              
+              <ScrollArea className="h-[500px] pr-4">
+                <div className="space-y-6">
+                  {/* Summary Box */}
+                  <div className="p-6 bg-primary/5 border border-primary/20 rounded-2xl">
+                    <h4 className="font-bold text-lg mb-2 flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary"/> AI Orchestrator Summary</h4>
+                    <div className="prose prose-sm max-w-none text-foreground">
+                      <ReactMarkdown>{testResult.feedback}</ReactMarkdown>
+                    </div>
                   </div>
-                </ScrollArea>
-              </div>
-              <Button onClick={() => setTestResult(null)} className="w-full h-12 rounded-xl font-bold">Test Another Plan</Button>
+
+                  {/* Agent Categories */}
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-lg border-b pb-2">Agent Findings</h4>
+                    {testResult.categories && testResult.categories.length > 0 ? testResult.categories.map((cat, idx) => (
+                      <div key={idx} className="border border-border bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                         <div className="flex items-center justify-between mb-4">
+                           <div className="flex items-center gap-2">
+                             <Cpu className="text-primary w-5 h-5" />
+                             <h5 className="font-bold text-md tracking-tight">{cat.name}</h5>
+                           </div>
+                           <Badge variant="outline" className="bg-secondary/50 font-mono">
+                             {cat.issues.length} {cat.issues.length === 1 ? 'finding' : 'findings'}
+                           </Badge>
+                         </div>
+                         
+                         {cat.issues.length > 0 ? (
+                           <div className="grid gap-3">
+                             {cat.issues.map((issue, i) => (
+                               <div key={i} className="flex gap-3 p-3 rounded-xl bg-secondary/20 border border-secondary/50">
+                                 <div className="shrink-0 pt-0.5">
+                                   {issue.severity === 'high' ? <AlertCircle className="w-4 h-4 text-red-500" /> : 
+                                    issue.severity === 'medium' ? <AlertCircle className="w-4 h-4 text-orange-500" /> : 
+                                    <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+                                 </div>
+                                 <div className="space-y-1">
+                                   <p className="text-sm font-medium">{issue.description}</p>
+                                   {issue.actionItem && (
+                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                       <ArrowRight className="w-3 h-3" /> {issue.actionItem}
+                                     </p>
+                                   )}
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
+                         ) : (
+                           <div className="p-4 bg-green-50 text-green-700 rounded-xl flex items-center gap-2 text-sm font-medium border border-green-100">
+                             <CheckCircle2 className="w-5 h-5" /> No compliance issues found by this agent.
+                           </div>
+                         )}
+                      </div>
+                    )) : (
+                      <div className="p-6 text-center border-2 border-dashed rounded-2xl text-muted-foreground">
+                        No categorized agent findings available.
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Trace Log */}
+                  <div className="p-5 bg-secondary/30 border border-border rounded-2xl">
+                    <h4 className="font-bold text-sm text-muted-foreground mb-2 flex items-center gap-2 uppercase tracking-widest"><History className="w-4 h-4" /> Trace Log</h4>
+                    <p className="text-xs font-mono text-muted-foreground leading-relaxed whitespace-pre-wrap flex-1 min-w-0 break-words">{testResult.traceLog}</p>
+                  </div>
+                </div>
+              </ScrollArea>
+              
+              <Button onClick={() => setTestResult(null)} className="w-full h-14 rounded-xl font-bold bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors">Test Another Plan</Button>
             </div>
           )}
         </div>
