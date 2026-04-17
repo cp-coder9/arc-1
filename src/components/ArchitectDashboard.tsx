@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
 import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle } from 'lucide-react';
-import { reviewDrawing, AIProgress } from '../services/geminiService';
+import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { notificationService } from '../services/notificationService';
@@ -478,7 +478,6 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
     
     try {
       // Log start of pre-check
-      const { logSystemEvent } = await import('../services/geminiService');
       await logSystemEvent('info', 'Architect Studio', `Architect ${user.displayName} initiated AI Pre-check for ${targetName}`);
 
       const result = await reviewDrawing(targetUrl, targetName, (progress) => {

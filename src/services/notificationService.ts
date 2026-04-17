@@ -4,6 +4,7 @@
  */
 
 import { db } from '../lib/firebase';
+import { toast } from 'sonner';
 import {
   collection,
   addDoc,
@@ -184,27 +185,24 @@ class NotificationService {
    * Show toast notification
    */
   private showToast(title: string, body: string, type: NotificationType): void {
-    // Import toast dynamically to avoid circular dependency
-    import('sonner').then(({ toast }) => {
-      const icons: Record<NotificationType, string> = {
-        job_application: '👤',
-        application_accepted: '✅',
-        drawing_submitted: '📄',
-        ai_review_complete: '🤖',
-        admin_approval: '✅',
-        admin_rejection: '❌',
-        payment_released: '💰',
-        message: '💬',
-        milestone_due: '⏰',
-        council_update: '🏛️',
-        invoice_sent: '📄',
-        invoice_paid: '💰',
-      };
+    const icons: Record<NotificationType, string> = {
+      job_application: '👤',
+      application_accepted: '✅',
+      drawing_submitted: '📄',
+      ai_review_complete: '🤖',
+      admin_approval: '✅',
+      admin_rejection: '❌',
+      payment_released: '💰',
+      message: '💬',
+      milestone_due: '⏰',
+      council_update: '🏛️',
+      invoice_sent: '📄',
+      invoice_paid: '💰',
+    };
 
-      toast(`${icons[type] || '🔔'} ${title}`, {
-        description: body,
-        duration: 5000,
-      });
+    toast(`${icons[type] || '🔔'} ${title}`, {
+      description: body,
+      duration: 5000,
     });
   }
 

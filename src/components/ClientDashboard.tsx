@@ -17,7 +17,7 @@ import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, La
 import { ArchitectPortfolio } from './ArchitectPortfolio';
 import { Logo } from './Logo';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { reviewDrawing, AIProgress } from '../services/geminiService';
+import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -288,7 +288,6 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
       });
 
       // Log system event for audit trail
-      const { logSystemEvent } = await import('../services/geminiService');
       await logSystemEvent('info', 'Council Integration', `Job ${job.id} submitted to municipality portal.`, {
         clientId: user.uid,
         jobTitle: job.title

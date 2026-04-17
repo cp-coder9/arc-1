@@ -1,4 +1,5 @@
 import { db, auth } from "../lib/firebase";
+import { getAgentKnowledge, webSearchForAgent, addKnowledge } from "./knowledgeService";
 import { doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc } from "firebase/firestore";
 import { getIdToken } from "firebase/auth";
 import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider } from "../types";
@@ -518,7 +519,6 @@ export async function reviewDrawing(
 
       try {
         // Inject active knowledge
-        const { getAgentKnowledge } = await import('./knowledgeService');
         const knowledgeEntries = await getAgentKnowledge(agent.role, 'active');
         const knowledgeContext = knowledgeEntries.length > 0 
           ? `\n\nADDITIONAL LEARNED KNOWLEDGE (Apply these rules over default instructions):\n` + 
@@ -560,7 +560,6 @@ export async function reviewDrawing(
     // Dynamic Web Search Phase
     if (needsWebSearch && webSearchQueries.length > 0) {
       reportProgress(75, 'Orchestrator', 'Performing web research on unknown regulations...', completed);
-      const { webSearchForAgent } = await import('./knowledgeService');
       
       for (const req of webSearchQueries) {
         if (req.id) {
@@ -609,7 +608,6 @@ export async function reviewDrawing(
     // Self Improvement logging
     try {
       if (orchestratorAgent.id) {
-        const { addKnowledge } = await import('./knowledgeService');
         await addKnowledge({
           agentId: 'orchestrator',
           agentRole: 'orchestrator',
