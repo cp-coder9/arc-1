@@ -1149,9 +1149,8 @@ function UserManagement({
             )}
             </TableBody>
           </Table>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
   );
 }
 
