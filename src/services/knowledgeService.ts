@@ -24,7 +24,14 @@ export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentKnowledge));
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'permission-denied') {
+      console.warn(`[KnowledgeService] Permission denied for ${agentId} (${status}).`, {
+        uid: auth.currentUser?.uid,
+        isAuth: !!auth.currentUser
+      });
+      return [];
+    }
     console.error("Error fetching agent knowledge:", error);
     return [];
   }
@@ -38,7 +45,14 @@ export const getAllAgentKnowledge = async (status: KnowledgeStatus = "active"): 
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentKnowledge));
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'permission-denied') {
+      console.warn(`[KnowledgeService] Permission denied for all knowledge (${status}).`, {
+        uid: auth.currentUser?.uid,
+        isAuth: !!auth.currentUser
+      });
+      return [];
+    }
     console.error("Error fetching all agent knowledge:", error);
     return [];
   }
@@ -146,8 +160,14 @@ export const webSearchForAgent = async (query: string, agentRole: string, agentI
     });
 
     return searchContent;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Web search failed:", error);
+    if (error.code === 'permission-denied') {
+      console.warn("[KnowledgeService] Web search failed at persistence layer.", {
+        uid: auth.currentUser?.uid,
+        isAuth: !!auth.currentUser
+      });
+    }
     return `Search failed: ${error instanceof Error ? error.message : String(error)}`;
   }
 };

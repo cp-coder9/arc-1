@@ -165,7 +165,9 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
                     <option value="">Select a model</option>
-                    {tempAgent.llmProvider && PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider].models.map(m => (
+                    {tempAgent.llmProvider && 
+                     tempAgent.llmProvider !== 'global' && 
+                     PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                     <option value="custom">Enter custom model name...</option>
@@ -202,7 +204,9 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
                     <option value="">Select a model</option>
-                    {tempAgent.llmProvider && PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider].models.map(m => (
+                    {tempAgent.llmProvider && 
+                     tempAgent.llmProvider !== 'global' && 
+                     PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>

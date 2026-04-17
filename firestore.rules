@@ -22,7 +22,7 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email.matches('gm\\.tarb@gmail\\.com|leor@slutzkin\\.co\\.za') ||
+        (request.auth.token.email != null && request.auth.token.email.matches('gm\\.tarb@gmail\\.com|leor@slutzkin\\.co\\.za')) ||
         request.auth.token.admin == true ||
         (getUserData() != null && getUserData().role == 'admin')
       );
@@ -253,10 +253,10 @@ service cloud.firestore {
 
     // System logs (admin only read, auth create)
     match /system_logs/{logId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated() && isAdmin();
       allow create: if isAuthenticated();
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if isAuthenticated() && isAdmin();
     }
 
     // Council submissions
@@ -302,11 +302,11 @@ service cloud.firestore {
     match /agent_knowledge/{entryId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isAdmin() || resource.data.submittedBy == request.auth.uid);
-      allow delete: if isAdmin();
+      allow update: if isAuthenticated() && (isAdmin() || (resource != null && resource.data.submittedBy == request.auth.uid));
+      allow delete: if isAuthenticated() && isAdmin();
     }
 
-    // Default deny
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }
