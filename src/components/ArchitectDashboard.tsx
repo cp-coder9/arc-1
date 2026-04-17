@@ -406,14 +406,16 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
   const handleUpload = async (file: File) => {
     if (!file) return;
     
-    // Validate file type (PDF, CAD-like extensions, or images)
-    const validTypes = ['application/pdf', 'image/vnd.dwg', 'application/acad', 'application/x-acad', 'application/autocad_dwg', 'image/x-dwg', 'application/dwg'];
-    const isPdf = file.type === 'application/pdf';
-    const isDwg = file.name.toLowerCase().endsWith('.dwg');
+    // Validate file type (PDF, CAD, or images)
+    const fileName = file.name.toLowerCase();
+    const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
+    const isDwg = fileName.endsWith('.dwg');
+    const isDxf = fileName.endsWith('.dxf');
+    const isCad = isDwg || isDxf;
     const isImg = file.type.startsWith('image/');
     
-    if (!isPdf && !isDwg && !isImg) {
-      toast.error("Please upload a PDF, DWG, or Image file.");
+    if (!isPdf && !isCad && !isImg) {
+      toast.error("Please upload a PDF, DXF, DWG, or Image file.");
       return;
     }
 
@@ -425,7 +427,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
     setIsImage(isImg);
     setIsUploading(true);
     setUploadProgress(0);
-    setDrawingName(file.name?.split('.')[0] || 'Drawing');
+    setDrawingName(file.name.replace(/\.[^/.]+$/, ""));
 
     try {
       const url = await uploadAndTrackFile(file, {
@@ -749,7 +751,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
                     ref={fileInputRef} 
                     className="hidden" 
                     onChange={handleFileSelect}
-                    accept=".pdf,.dwg,image/*"
+                    accept=".pdf,.dwg,.dxf,image/*"
                   />
                   <div 
                     className={`border-2 border-dashed rounded-[1.5rem] md:rounded-[2rem] p-8 md:p-16 text-center transition-all relative overflow-hidden ${
@@ -770,22 +772,26 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
 
                     <div className="flex flex-col items-center gap-4">
                       {drawingUrl && isImage ? (
-                        <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden border border-border shadow-sm mb-2">
-                          <img src={drawingUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        </div>
-                      ) : (
-                        <div className="p-4 md:p-6 bg-white rounded-full text-primary shadow-xl shadow-primary/10">
-                          <UploadCloud size={32} />
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-base md:text-lg font-bold tracking-tight">
-                          {drawingUrl ? 'File Ready' : 'Drop your PDF/CAD/Image'}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {drawingUrl ? drawingName : 'Max 20MB'}
-                        </p>
-                      </div>
+                         <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden border border-border shadow-sm mb-2">
+                           <img src={drawingUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                         </div>
+                       ) : drawingUrl ? (
+                         <div className="p-4 md:p-6 bg-primary/10 rounded-full text-primary shadow-xl shadow-primary/10">
+                           <Sparkles size={32} />
+                         </div>
+                       ) : (
+                         <div className="p-4 md:p-6 bg-white rounded-full text-primary shadow-xl shadow-primary/10">
+                           <UploadCloud size={32} />
+                         </div>
+                       )}
+                       <div>
+                         <p className="text-base md:text-lg font-bold tracking-tight">
+                           {drawingUrl ? 'File Ready' : 'Drop your DXF, DWG or PDF'}
+                         </p>
+                         <p className="text-xs text-muted-foreground mt-1">
+                           {drawingUrl ? drawingName : 'Technical plans (Max 20MB)'}
+                         </p>
+                       </div>
                       <Button 
                         type="button" 
                         variant="outline" 

@@ -97,6 +97,7 @@ export default function FileManager({ user }: FileManagerProps) {
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return <ImageIcon className="w-6 h-6 text-blue-500" />;
     if (type === 'application/pdf') return <FileText className="w-6 h-6 text-red-500" />;
+    if (type === 'application/dwg' || type === 'application/dxf') return <FileCode className="w-6 h-6 text-green-500" />;
     if (type.includes('zip') || type.includes('rar')) return <FileArchive className="w-6 h-6 text-orange-500" />;
     if (type.includes('json') || type.includes('javascript') || type.includes('typescript')) return <FileCode className="w-6 h-6 text-purple-500" />;
     return <File className="w-6 h-6 text-slate-500" />;

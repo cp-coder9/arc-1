@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { del, put } from "@vercel/blob";
 import multer from "multer";
 import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
+import { extractCadData } from "./cadProcessor.js";
 
 import { UserRole } from "../types.js";
 
@@ -146,8 +147,10 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/jpg",
-  "application/octet-stream", // DWG
+  "application/octet-stream", // DWG, DXF
   "image/webp",
+  "application/dwg", // AutoCAD DWG
+  "application/dxf", // AutoCAD DXF
 ]);
 
 const upload = multer({
@@ -247,10 +250,12 @@ router.post("/review", reviewLimiter, async (req, res) => {
         }
 
         // Additional extension checks
-        const isDwg = urlLower.endsWith(".dwg");
-        const isOtherBinary = !isPdf && !isDwg && !resolvedMime.startsWith("image/");
+        const isDwg = urlLower.endsWith(".dwg") || resolvedMime === "application/dwg";
+        const isDxf = urlLower.endsWith(".dxf") || resolvedMime === "application/dxf";
+        const isCadFile = isDwg || isDxf;
+        const isOtherBinary = !isPdf && !isCadFile && !resolvedMime.startsWith("image/");
 
-        console.log(`[Proxy] Drawing analysis: ${drawingUrl} -> mime: ${resolvedMime}, isImage: ${isImage}, isPdf: ${isPdf}, isDwg: ${isDwg}`);
+        console.log(`[Proxy] Drawing analysis: ${drawingUrl} -> mime: ${resolvedMime}, isImage: ${isImage}, isPdf: ${isPdf}, isDwg: ${isDwg}, isDxf: ${isDxf}`);
 
         if (isImage) {
           // Vision-capable: pass image URL directly so model fetches it
@@ -259,11 +264,53 @@ router.post("/review", reviewLimiter, async (req, res) => {
             type: "image_url",
             image_url: { url: drawingUrl }
           });
+        } else if (isPdf) {
+          // PDF files - some vision models support PDFs, but to be safe, use text reference for now
+          console.log(`[Proxy] PDF drawing — using text reference`);
+          userContent.push({
+            type: "text",
+            text: `[Drawing Reference] File: ${drawingUrl} (PDF format). This is a technical architectural drawing in PDF format. Analyze based on SANS 10400 compliance requirements and architectural standards mentioned in the prompt.`
+          });
+        } else if (isCadFile) {
+          // CAD files (DXF/DWG) - use specialized extractor
+          try {
+            console.log(`[Proxy] CAD file detected — attempting to extract structured data`);
+            const cadResp = await fetch(drawingUrl);
+            if (cadResp.ok) {
+              const cadBuffer = Buffer.from(await cadResp.arrayBuffer());
+              const cadData = extractCadData(cadBuffer, drawingUrl);
+              
+              console.log(`[Proxy] CAD data extracted: ${cadData.format}, labels: ${cadData.textLabels.length}`);
+              
+              userContent.push({
+                type: "text",
+                text: `[CAD Drawing Data]
+Format: ${cadData.format}
+Summary: ${cadData.summary}
+Layers: ${cadData.metadata.layers?.join(', ') || 'N/A'}
+
+EXTRACTED TEXT LABELS & NOTES:
+${cadData.textLabels.slice(0, 300).join(' | ')}
+
+DIMENSIONS FOUND:
+${cadData.dimensions.slice(0, 50).join(', ') || 'None detected'}
+
+Analyze these labels and dimensions against SANS 10400 requirements (e.g. room sizes, window ventilation codes, ceiling heights).`
+              });
+            } else {
+              throw new Error(`Failed to fetch CAD file: ${cadResp.status}`);
+            }
+          } catch (cadError) {
+            console.error(`[Proxy] Failed to process CAD data:`, cadError);
+            userContent.push({
+              type: "text",
+              text: `[CAD Drawing Reference] File: ${drawingUrl} (${isDwg ? 'DWG' : 'DXF'} format). Extraction failed.`
+            });
+          }
         } else {
-          // Non-image (PDF, DWG, etc.) — add descriptive text context only.
-          // Sending these as image_url causes "cannot identify image file" errors.
-          const fileType = isPdf ? "PDF" : isDwg ? "DWG" : resolvedMime || "binary";
-          console.log(`[Proxy] Non-image drawing (${fileType}) — using text reference only`);
+          // Other binary files — add descriptive text context only.
+          const fileType = resolvedMime || "binary";
+          console.log(`[Proxy] Other binary drawing (${fileType}) — using text reference only`);
           userContent.push({
             type: "text",
             text: `[Drawing Reference] File: ${drawingUrl} (${fileType} format). This is a technical drawing. Analyze based on architectural standards and the prompt requirements.`
@@ -386,19 +433,55 @@ router.post("/gemini/review", reviewLimiter, async (req, res) => {
           let mimeType = imageResp.headers.get("content-type") || "image/jpeg";
           const urlLower = drawingUrl.toLowerCase();
           const isPdf = urlLower.endsWith(".pdf") || mimeType === "application/pdf";
-          const isImage = mimeType.startsWith("image/") && !isPdf;
+          const isDwg = urlLower.endsWith(".dwg") || mimeType === "application/dwg";
+          const isDxf = urlLower.endsWith(".dxf") || mimeType === "application/dxf";
+          const isCadFile = isDwg || isDxf;
+          const isImage = mimeType.startsWith("image/") && !isPdf && !isCadFile;
 
-          console.log(`[Gemini Proxy] Drawing analysis: ${drawingUrl} -> mime: ${mimeType}, isImage: ${isImage}, isPdf: ${isPdf}`);
+          console.log(`[Gemini Proxy] Drawing analysis: ${drawingUrl} -> mime: ${mimeType}, isImage: ${isImage}, isPdf: ${isPdf}, isDwg: ${isDwg}, isDxf: ${isDxf}`);
 
-          // Only include vision data for actual images, not PDFs (to avoid issues)
           if (isImage) {
+            // Images - send as inlineData for vision
             const base64Data = Buffer.from(buffer).toString("base64");
             parts.push({ inlineData: { mimeType, data: base64Data } });
             console.log(`[Gemini Proxy] Vision injection: inlineData (${mimeType})`);
+          } else if (isPdf) {
+            // PDFs - Gemini supports PDF inlineData
+            const base64Data = Buffer.from(buffer).toString("base64");
+            parts.push({ inlineData: { mimeType: "application/pdf", data: base64Data } });
+            console.log(`[Gemini Proxy] PDF injection: inlineData (application/pdf)`);
+          } else if (isCadFile) {
+            // CAD files (DXF/DWG) - use specialized extractor
+            try {
+              const cadBuffer = Buffer.from(buffer);
+              const cadData = extractCadData(cadBuffer, drawingUrl);
+              
+              console.log(`[Gemini Proxy] CAD data extracted: ${cadData.format}, labels: ${cadData.textLabels.length}`);
+              
+              parts.push({
+                text: `[CAD Drawing Data]
+Format: ${cadData.format}
+Summary: ${cadData.summary}
+Layers: ${cadData.metadata.layers?.join(', ') || 'N/A'}
+
+EXTRACTED TEXT LABELS & NOTES:
+${cadData.textLabels.slice(0, 300).join(' | ')}
+
+DIMENSIONS FOUND:
+${cadData.dimensions.slice(0, 50).join(', ') || 'None detected'}
+
+Analyze these labels and dimensions against SANS 10400 requirements (e.g. room sizes, window ventilation codes, ceiling heights).`
+              });
+            } catch (cadError) {
+              console.error(`[Gemini Proxy] Failed to process CAD data:`, cadError);
+              parts.push({
+                text: `[CAD Drawing Reference] File: ${drawingUrl} (${isDwg ? 'DWG' : 'DXF'} format). Extraction failed.`
+              });
+            }
           } else {
-            // For PDFs and other files, add text reference
-            const fileType = isPdf ? "PDF" : mimeType || "binary";
-            console.log(`[Gemini Proxy] Non-image drawing (${fileType}) — using text reference only`);
+            // Other binary files - add text reference
+            const fileType = mimeType || "binary";
+            console.log(`[Gemini Proxy] Other binary drawing (${fileType}) — using text reference only`);
             parts.push({
               text: `[Drawing Reference] File: ${drawingUrl} (${fileType} format). This is a technical drawing. Analyze based on architectural standards and the prompt requirements.`
             });
