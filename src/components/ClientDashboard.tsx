@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { toast } from 'sonner';
-import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X } from 'lucide-react';
+import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X, Building2 } from 'lucide-react';
+import MunicipalTracker from './MunicipalTracker';
 import { ArchitectPortfolio } from './ArchitectPortfolio';
 import { Logo } from './Logo';
 import { uploadAndTrackFile } from '../lib/uploadService';
@@ -38,7 +39,7 @@ export default function ClientDashboard({
   const [isPosting, setIsPosting] = useState(false);
 
   // Map sidebar tabs to internal dashboard tabs
-  const internalTab = activeTab === 'projects' ? 'active' : 'active';
+  const internalTab = activeTab === 'projects' ? 'active' : activeTab === 'municipal' ? 'municipal' : 'active';
   const [newJob, setNewJob] = useState({ title: '', description: '', budget: '', deadline: '', requirements: '', category: 'Residential' as JobCategory });
 
   useEffect(() => {
@@ -172,11 +173,16 @@ export default function ClientDashboard({
         <StatCard title="Pending Reviews" value={0} icon={<AlertCircle className="text-primary" />} />
       </div>
 
-      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'active' ? 'projects' : 'overview')} className="w-full">
+      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'active' ? 'projects' : val === 'municipal' ? 'municipal' : 'overview')} className="w-full">
         <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
           <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Active Jobs</TabsTrigger>
           <TabsTrigger value="completed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Completed</TabsTrigger>
+          <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Municipal Tracker</TabsTrigger>
         </TabsList>
+        <TabsContent value="municipal" className="mt-8">
+          <MunicipalTracker user={user} />
+        </TabsContent>
+
         <TabsContent value="active" className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {jobs.filter(j => j.status !== 'completed').map(job => (
