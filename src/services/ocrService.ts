@@ -8,6 +8,7 @@ export async function processReceiptOCR(imageUrl: string, userId: string) {
     const settings = settingsDoc.exists ? settingsDoc.data() : {};
 
     const NVIDIA_API_KEY = settings?.nvidiaApiKey || process.env.NVIDIA_API_KEY;
+    // Default to Nemotron OCR model as requested
     const MODEL = settings?.nvidiaOcrModel || "nvidia/llama-3.2-11b-vision-instruct";
 
     if (!NVIDIA_API_KEY) {

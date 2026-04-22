@@ -12,7 +12,7 @@ export default function MunicipalSettingsAdmin() {
   const [settings, setSettings] = useState({
     municipalTrackerEnabled: false,
     nvidiaApiKey: '',
-    nvidiaOcrModel: 'nvidia/llama-3.2-11b-vision-instruct',
+    nvidiaOcrModel: 'nvidia/llama-3.2-11b-vision-instruct', // Or specialized Nemotron OCR model
     xeroConnected: false
   });
   const [loading, setLoading] = useState(true);
