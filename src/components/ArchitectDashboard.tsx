@@ -1364,9 +1364,14 @@ function MunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: J
         body: JSON.stringify({ credentialId: cred.id })
       });
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync status');
+      }
+
       setTrackingResults(prev => ({ ...prev, [cred.id]: data }));
       toast.success(`Tracked status for ${cred.municipality}`);
-    } catch (error) {
+    } catch (error: any) {
       // Mock result for demo
       setTrackingResults(prev => ({
         ...prev,
@@ -1379,7 +1384,7 @@ function MunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: J
           ]
         }
       }));
-      toast.info("Municipal tracking simulated.");
+      toast.error(error.message || "Failed to sync municipal status");
     } finally {
       setIsTracking(null);
     }
@@ -1464,7 +1469,7 @@ function MunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: J
                        <p className="text-[10px] text-muted-foreground italic">Last synced: {trackingResults[cred.id].lastUpdated}</p>
                     </div>
                     <div className="space-y-2">
-                       {trackingResults[cred.id].applications.map((app: any, i: number) => (
+                       {trackingResults[cred.id]?.applications?.map((app: any, i: number) => (
                          <div key={i} className="flex justify-between items-center p-3 bg-secondary/20 rounded-xl border border-border">
                             <span className="text-sm font-mono font-bold">{app.ref}</span>
                             <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] uppercase tracking-widest">{app.status}</Badge>
