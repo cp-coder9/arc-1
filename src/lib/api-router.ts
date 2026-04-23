@@ -9,7 +9,7 @@ import { encrypt, decrypt } from "./encryption.js";
 import { runMunicipalScraper } from "../services/scraperService.js";
 import { processReceiptOCR } from "../services/ocrService.js";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
-import { verifySACAPRegistration } from "../services/sacapVerificationService.js";
+import { verifySACAPByName } from "../services/sacapVerificationService.js";
 
 import { UserRole, MunicipalityType } from "../types.js";
 
@@ -1157,14 +1157,14 @@ router.post("/architect/verify-sacap", async (req, res) => {
 
     console.log(`[SACAP Agent] Verifying architect: ${name} (SACAP: ${sacapNumber || 'N/A'})`);
 
-    const result = await verifySACAPRegistration(name);
+    const result = await verifySACAPByName(name);
     const status = result.verified ? 'verified' : 'failed';
 
     // Update the architect profile in Firestore
     await adminDb.collection("architect_profiles").doc(architectId).set({
       sacapStatus: status,
       sacapLastVerifiedAt: new Date().toISOString(),
-      sacapCategory: result.registrationDetails?.category || null,
+      sacapRegistrationType: result.registrationDetails?.category || null,
       updatedAt: new Date().toISOString()
     }, { merge: true });
 

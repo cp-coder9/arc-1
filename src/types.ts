@@ -276,6 +276,7 @@ export interface ArchitectProfile {
   sacapNumber: string;
   sacapStatus?: SACAPStatus;
   sacapLastVerifiedAt?: string;
+  sacapRegistrationType?: string;
   yearsExperience?: number;
   specializations: string[];
   portfolioImages: { url: string; title: string; description?: string }[];
