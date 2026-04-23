@@ -1,15 +1,16 @@
 import { db, auth } from "../lib/firebase";
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  serverTimestamp, 
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
   orderBy,
-  deleteDoc
+  deleteDoc,
+  Timestamp
 } from "firebase/firestore";
 import { AgentKnowledge, KnowledgeStatus } from "../types";
 
@@ -58,12 +59,28 @@ export const getAllAgentKnowledge = async (status: KnowledgeStatus = "active"): 
   }
 };
 
+export const getKnowledgeForAgents = async (agentRoles: string[], status: KnowledgeStatus = "active"): Promise<AgentKnowledge[]> => {
+  try {
+    const q = query(
+      collection(db, KNOWLEDGE_COLLECTION),
+      where("agentRole", "in", agentRoles),
+      where("status", "==", status)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentKnowledge));
+  } catch (error: any) {
+    console.error("Error fetching knowledge for agents:", error);
+    return [];
+  }
+};
+
 export const addKnowledge = async (entry: Omit<AgentKnowledge, "id">): Promise<string> => {
   try {
     const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), {
       ...entry,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      usageCount: 0
     });
     return docRef.id;
   } catch (error) {
@@ -119,6 +136,40 @@ export const deleteKnowledge = async (entryId: string) => {
   } catch (error) {
     console.error("Error deleting knowledge:", error);
     throw error;
+  }
+};
+
+export const incrementKnowledgeUsage = async (entryId: string) => {
+  try {
+    const entryRef = doc(db, KNOWLEDGE_COLLECTION, entryId);
+    await updateDoc(entryRef, {
+      usageCount: Timestamp.now(),
+      lastUsedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error incrementing knowledge usage:", error);
+  }
+};
+
+export const searchKnowledge = async (searchTerm: string, agentRole?: string): Promise<AgentKnowledge[]> => {
+  try {
+    const allKnowledge = await getAllAgentKnowledge('active');
+    const lowerSearch = searchTerm.toLowerCase();
+    
+    const filtered = allKnowledge.filter(entry => {
+      const matchesSearch = entry.title.toLowerCase().includes(lowerSearch) ||
+        entry.content.toLowerCase().includes(lowerSearch) ||
+        entry.tags?.some(tag => tag.toLowerCase().includes(lowerSearch));
+      
+      const matchesAgent = !agentRole || entry.agentRole === agentRole;
+      
+      return matchesSearch && matchesAgent;
+    });
+    
+    return filtered;
+  } catch (error) {
+    console.error("Error searching knowledge:", error);
+    return [];
   }
 };
 

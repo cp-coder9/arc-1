@@ -29,6 +29,7 @@ import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
+import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import { Dialog as FullScreenDialog, DialogContent as FullScreenDialogContent } from './ui/dialog';
 
 const PROVIDER_CONFIGS = {
@@ -965,11 +966,12 @@ export default function AdminDashboard({
           </div>
         </TabsContent>
 
-        <TabsContent value="knowledge">
-          <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
-            <AgentKnowledgeManager user={user} />
-          </div>
-        </TabsContent>
+<TabsContent value="knowledge">
+  <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm space-y-8">
+    <AdminKnowledgeUploader user={user} />
+    <AgentKnowledgeManager user={user} />
+  </div>
+</TabsContent>
       </Tabs>
 
       {/* Full Report Modal */}
