@@ -7,9 +7,11 @@ import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
 
+import { UserRole } from '../types';
+
 interface SubmissionItemProps {
   sub: Submission;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: UserRole;
   [key: string]: any;
 }
 

@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer';
 
 export interface UserProfile {
   uid: string;
@@ -6,6 +6,7 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   bio?: string;
+  professionalLabels?: string[]; // e.g. ['Engineer', 'Builder', 'Construction Worker']
   createdAt: string;
   updatedAt?: string;
 }
@@ -141,12 +142,35 @@ export interface DelegatedTask {
   id: string;
   jobId: string;
   architectId: string;
+  assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
   assigneeRole: string;
   deadline: string;
   notes: string;
   status: 'pending' | 'in-progress' | 'completed';
   createdAt: string;
+}
+
+export interface JobCard extends DelegatedTask {
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  attachments?: { name: string; url: string }[];
+  comments?: {
+    userId: string;
+    userName: string;
+    text: string;
+    createdAt: string;
+  }[];
+  requirements?: string[];
+  completedAt?: string;
+}
+
+export interface MunicipalCredential {
+  id: string;
+  userId: string;
+  municipality: string;
+  username: string;
+  password?: string; // Should be encrypted in a real app, but for this demo...
+  updatedAt: string;
 }
 
 export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
@@ -288,65 +312,36 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
-export type MunicipalityType = 'COJ' | 'COCT' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'eThekwini' | 'Other';
+export type MunicipalityType = 'COJ' | 'COCT' | 'ETH' | 'NMB' | 'Other';
+
+export interface TrackingEvent {
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  timestamp: string;
+  notes?: string;
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow' | string;
+}
 
 export interface CouncilSubmission {
   id: string;
-  jobId?: string;
+  jobId: string;
+  municipality: MunicipalityType | string;
+  municipalityName?: string;
   userId: string;
-  municipality: MunicipalityType;
-  municipalityName?: string; // For 'Other'
   referenceNumber?: string;
-  status: string; // Unified status
-  rawStatus?: string; // Status as reported by the municipality
-  submittedAt?: string;
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  rawStatus?: string;
   lastCheckedAt?: string;
+  submittedAt?: string;
   documents: { name: string; url: string }[];
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow';
   trackingHistory: TrackingEvent[];
-  queries?: CouncilQuery[];
-  erfNumber?: string;
-  projectDescription?: string;
-  source: 'manual' | 'ocr' | 'scraper' | 'shadow_tracker';
-}
-
-export interface TrackingEvent {
-  status: string;
-  timestamp: string;
-  notes?: string;
-  source: 'scraper' | 'ocr' | 'crowdsource' | 'shadow_tracker' | 'manual';
-  actorId?: string;
-}
-
-export interface CouncilQuery {
-  raisedAt: string;
-  description: string;
-  response?: string;
-  respondedAt?: string;
-  attachments?: { name: string; url: string }[];
-}
-
-export interface MunicipalCredential {
-  id: string;
-  userId: string;
-  municipality: MunicipalityType;
-  username: string;
-  encryptedPassword: string;
-  iv: string;
-  authTag?: string; // For GCM
-  lastUsed?: string;
-  status: 'valid' | 'invalid' | 'unchecked';
-  createdAt: string;
-}
-
-export interface CrowdsourceUpdate {
-  id: string;
-  municipality: MunicipalityType;
-  officeLocation?: string;
-  department?: string;
-  statusUpdate: string;
-  backlogLevel: 'low' | 'medium' | 'high';
-  reportedBy: string; // userId
-  timestamp: string;
+  queries?: {
+    raisedAt: string;
+    description: string;
+    response?: string;
+    respondedAt?: string;
+    attachments?: { name: string; url: string }[];
+  }[];
 }
 
 // Invoicing types
@@ -394,14 +389,6 @@ export type UploadedFile = {
 export type KnowledgeSource = 'documentation' | 'human_feedback' | 'self_improvement' | 'web_search';
 export type KnowledgeStatus = 'active' | 'pending_review' | 'rejected' | 'archived';
 
-export interface SystemSettings {
-  municipalTrackerEnabled: boolean;
-  nvidiaApiKey?: string;
-  nvidiaOcrModel?: string;
-  xeroConnected?: boolean;
-  lastScraperRun?: string;
-}
-
 export interface AgentKnowledge {
   id: string;
   agentId: string;
@@ -411,7 +398,7 @@ export interface AgentKnowledge {
   source: KnowledgeSource;
   status: KnowledgeStatus;
   submittedBy: string; // userId
-  submittedByRole: 'admin' | 'architect' | 'client' | 'system';
+  submittedByRole: UserRole | 'system';
   reviewedBy?: string; // admin userId
   reviewedAt?: string;
   relatedSubmissionId?: string;

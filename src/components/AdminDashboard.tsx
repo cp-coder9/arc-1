@@ -14,8 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Building2 } from 'lucide-react';
-import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -24,6 +23,7 @@ import {
 } from "./ui/accordion";
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { JobCard, MunicipalCredential } from '@/types';
 import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
@@ -373,7 +373,6 @@ export default function AdminDashboard({
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
-    activeTab === 'municipal' ? 'municipal' :
     'submissions';
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [stats, setStats] = useState({
@@ -621,9 +620,6 @@ export default function AdminDashboard({
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <Building2 size={16} /> Municipal Settings
-            </TabsTrigger>
           </TabsList>
         </ScrollArea>
 
@@ -848,6 +844,7 @@ export default function AdminDashboard({
                       <TableCell className="font-mono text-sm font-bold">R {job.budget.toLocaleString()}</TableCell>
                       <TableCell className="text-right px-8">
                         <div className="flex justify-end gap-2">
+                          <ProjectDetailDialog job={job} />
                           <select 
                             className="bg-secondary/50 rounded-lg text-xs p-1 border border-border"
                             value={job.status}
@@ -956,12 +953,6 @@ export default function AdminDashboard({
 
         <TabsContent value="settings">
           <LLMSettings />
-        </TabsContent>
-
-        <TabsContent value="municipal">
-          <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
-            <MunicipalSettingsAdmin />
-          </div>
         </TabsContent>
 
         <TabsContent value="knowledge">
@@ -1115,6 +1106,7 @@ function UserManagement({
                     <option value="client">Client</option>
                     <option value="architect">Architect</option>
                     <option value="admin">Admin</option>
+                    <option value="freelancer">Freelancer</option>
                   </select>
                 </div>
                 <Button type="submit" className="w-full h-12 rounded-xl font-bold">Create User</Button>
@@ -1157,6 +1149,7 @@ function UserManagement({
                     <option value="client">Client</option>
                     <option value="architect">Architect</option>
                     <option value="admin">Admin</option>
+                    <option value="freelancer">Freelancer</option>
                   </select>
                 </TableCell>
                 <TableCell className="text-center">
@@ -1596,6 +1589,123 @@ function RejectDialog({ sub, onReject }: { sub: Submission, onReject: (sub: Subm
             Confirm Rejection
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProjectDetailDialog({ job }: { job: Job }) {
+  const [tasks, setTasks] = useState<JobCard[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+
+  useEffect(() => {
+    // Fetch submissions for this job
+    const unsubSubs = onSnapshot(query(collection(db, `jobs/${job.id}/submissions`)), (snap) => {
+      setSubmissions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission)));
+    });
+
+    // Fetch tasks/job cards for this job
+    const unsubTasks = onSnapshot(query(collection(db, `jobs/${job.id}/tasks`)), (snap) => {
+      setTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JobCard)));
+    });
+
+    return () => {
+      unsubSubs();
+      unsubTasks();
+    };
+  }, [job.id]);
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this job card?")) return;
+    try {
+      await deleteDoc(doc(db, `jobs/${job.id}/tasks`, taskId));
+      toast.success("Job card deleted");
+    } catch (error) {
+      toast.error("Failed to delete job card");
+    }
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger render={<Button variant="ghost" size="sm" className="rounded-full h-8 px-4 gap-2"><Eye size={14} /> Full View</Button>} />
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 rounded-[2rem] border-border bg-white overflow-hidden">
+        <div className="bg-primary/5 p-8 border-b border-border shrink-0">
+          <DialogHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <DialogTitle className="font-heading font-bold text-3xl tracking-tighter">{job.title}</DialogTitle>
+                <DialogDescription>Full oversight of project scope, team, and deliverables.</DialogDescription>
+              </div>
+              <Badge className="bg-primary text-primary-foreground uppercase text-[10px] font-bold px-4 py-1.5 rounded-full">
+                {job.status}
+              </Badge>
+            </div>
+          </DialogHeader>
+        </div>
+
+        <ScrollArea className="flex-1 p-8 bg-secondary/10">
+          <div className="space-y-8">
+             <section>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                   <Users size={14} className="text-primary" /> Assigned Team & Job Cards
+                </h4>
+                <div className="space-y-3">
+                   {tasks.map(task => (
+                     <div key={task.id} className="p-4 bg-white border border-border rounded-2xl flex justify-between items-center shadow-sm">
+                        <div className="flex gap-4">
+                           <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-muted-foreground">
+                              {task.assigneeName ? task.assigneeName[0] : "?"}
+                           </div>
+                           <div>
+                              <p className="font-bold text-sm">{task.assigneeName} <span className="text-muted-foreground font-normal">({task.assigneeRole})</span></p>
+                              <div className="flex items-center gap-2 mt-1">
+                                 <Badge variant="outline" className="text-[8px] uppercase">{task.priority}</Badge>
+                                 <Badge variant="secondary" className="text-[8px] uppercase">{task.status}</Badge>
+                                 <p className="text-[10px] text-muted-foreground">Due: {new Date(task.deadline).toLocaleDateString()}</p>
+                              </div>
+                           </div>
+                        </div>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteTask(task.id)}>
+                           <Trash2 size={14} />
+                        </Button>
+                     </div>
+                   ))}
+                   {tasks.length === 0 && (
+                     <div className="p-10 text-center border-2 border-dashed border-border rounded-2xl bg-white/50 italic text-muted-foreground text-sm">
+                        No team members or job cards assigned to this project.
+                     </div>
+                   )}
+                </div>
+             </section>
+
+             <section>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                   <FileText size={14} className="text-primary" /> Technical Submissions
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {submissions.map(sub => (
+                     <div key={sub.id} className="p-4 bg-white border border-border rounded-2xl shadow-sm space-y-3">
+                        <div className="flex justify-between items-start">
+                           <p className="font-bold text-sm truncate max-w-[200px]">{sub.drawingName}</p>
+                           <Badge className="text-[8px] uppercase">{sub.status}</Badge>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-border">
+                           <span className="text-[10px] text-muted-foreground">{new Date(sub.createdAt).toLocaleDateString()}</span>
+                           <a href={sub.drawingUrl} target="_blank" className="text-[10px] text-primary font-bold flex items-center gap-1">
+                              View Drawing <ExternalLink size={10} />
+                           </a>
+                        </div>
+                     </div>
+                   ))}
+                   {submissions.length === 0 && (
+                     <div className="col-span-full p-10 text-center border-2 border-dashed border-border rounded-2xl bg-white/50 italic text-muted-foreground text-sm">
+                        No technical drawings submitted for this project.
+                     </div>
+                   )}
+                </div>
+             </section>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
