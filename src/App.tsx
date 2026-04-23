@@ -54,7 +54,6 @@ import {
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
-import { Building2 } from 'lucide-react';
 
 // Sub-components
 import ClientDashboard from './components/ClientDashboard';
@@ -278,7 +277,7 @@ const handleLogin = async () => {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')?.[0] || 'Anonymous',
+          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
           role: roleSelection || 'client',
           createdAt: new Date().toISOString(),
         };
@@ -379,6 +378,17 @@ const handleLogin = async () => {
                       <div className="text-center">
                         <p className="font-bold">Admin</p>
                         <p className="text-[10px] opacity-70">Platform Management</p>
+                      </div>
+                    </Button>
+                    <Button
+                      variant={roleSelection === 'freelancer' ? 'default' : 'outline'}
+                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'freelancer' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
+                      onClick={() => setRoleSelection('freelancer')}
+                    >
+                      <Sparkles className="w-8 h-8" />
+                      <div className="text-center">
+                        <p className="font-bold">Freelancer</p>
+                        <p className="text-[10px] opacity-70">Engineer/Specialist</p>
                       </div>
                     </Button>
                   </div>
@@ -575,12 +585,6 @@ const handleLogin = async () => {
             active={activeTab === 'projects'} 
             onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }} 
           />
-          <NavItem
-            icon={<Building2 size={18} />}
-            label="Municipal Tracker"
-            active={activeTab === 'municipal'}
-            onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
-          />
           {user!.role === 'admin' && (
             <>
               <NavItem 
@@ -606,12 +610,6 @@ const handleLogin = async () => {
                 label="Knowledge Base" 
                 active={activeTab === 'knowledge'} 
                 onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }} 
-              />
-              <NavItem
-                icon={<Building2 size={18} />}
-                label="Municipal Settings"
-                active={activeTab === 'municipal'}
-                onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
               />
             </>
           )}

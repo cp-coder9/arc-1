@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AIReviewResult, AICategory, AIIssue } from '@/types';
+import { AIReviewResult, AICategory, AIIssue, UserRole } from '@/types';
 import { 
   ShieldCheck, 
   AlertTriangle, 
@@ -26,7 +26,7 @@ interface ComplianceReportProps {
   drawingName?: string;
   projectName?: string;
   onClose?: () => void;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: UserRole;
 }
 
 const getAgentRoleForCategory = (categoryName: string) => {

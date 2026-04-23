@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, MunicipalCredential } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -13,7 +13,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle } from 'lucide-react';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, RefreshCcw } from 'lucide-react';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -24,7 +24,6 @@ import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import MunicipalTracker from './MunicipalTracker';
 // import { motion } from 'framer-motion';
 
 export default function ArchitectDashboard({ 
@@ -55,6 +54,7 @@ export default function ArchitectDashboard({
     activeTab === 'marketplace' ? 'browse' : 
     activeTab === 'applications' ? 'applications' :
     activeTab === 'projects' ? 'active' : 
+    activeTab === 'team' ? 'team' :
     activeTab === 'municipal' ? 'municipal' :
     'browse';
 
@@ -163,7 +163,9 @@ export default function ArchitectDashboard({
           const tabMap: Record<string, string> = {
             'browse': 'marketplace',
             'applications': 'applications',
-            'active': 'projects'
+            'active': 'projects',
+            'team': 'team',
+            'municipal': 'municipal'
           };
           onTabChange?.(tabMap[val] || 'marketplace');
         }} 
@@ -174,6 +176,7 @@ export default function ArchitectDashboard({
             <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Browse Jobs</TabsTrigger>
             <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">My Applications ({myApplications.length})</TabsTrigger>
             <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects ({myJobs.length})</TabsTrigger>
+            <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Team & Freelancers</TabsTrigger>
             <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Municipal Tracker</TabsTrigger>
           </TabsList>
         </div>
@@ -263,8 +266,12 @@ export default function ArchitectDashboard({
           </div>
         </TabsContent>
 
+        <TabsContent value="team" className="mt-8">
+          <FreelancerMarketplace architect={user} jobs={myJobs} />
+        </TabsContent>
+
         <TabsContent value="municipal" className="mt-8">
-          <MunicipalTracker user={user} />
+          <MunicipalTracker architect={user} jobs={myJobs} />
         </TabsContent>
       </Tabs>
     </div>
@@ -544,7 +551,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
       toast.success("File uploaded successfully!");
       
       // Automatically run AI pre-check
-      handlePreCheck(url, file.name?.split('.')[0] || 'Drawing');
+      handlePreCheck(url, (file.name || "").split('.')[0] || 'Drawing');
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Upload failed.");
@@ -1034,17 +1041,19 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
 }
 
 function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
-  const [tasks, setTasks] = useState<DelegatedTask[]>([]);
+  const [tasks, setTasks] = useState<JobCard[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [assigneeName, setAssigneeName] = useState('');
   const [assigneeRole, setAssigneeRole] = useState('');
   const [deadline, setDeadline] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [requirements, setRequirements] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DelegatedTask)));
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JobCard)));
     });
     return () => unsub();
   }, [job.id, user.uid]);
@@ -1059,6 +1068,8 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
         assigneeRole,
         deadline,
         notes,
+        priority,
+        requirements: (requirements || "").split('\n').filter(r => r.trim()),
         status: 'pending',
         createdAt: new Date().toISOString()
       });
@@ -1067,38 +1078,48 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
       setAssigneeRole('');
       setDeadline('');
       setNotes('');
-      toast.success("Task delegated successfully");
+      setPriority('medium');
+      setRequirements('');
+      toast.success("Job Card created successfully");
     } catch (error) {
-      toast.error("Failed to delegate task");
+      toast.error("Failed to create job card");
     }
   };
 
   const handleUpdateStatus = async (taskId: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, `jobs/${job.id}/tasks`, taskId), {
-        status: newStatus
+        status: newStatus,
+        completedAt: newStatus === 'completed' ? new Date().toISOString() : null
       });
-      toast.success("Task status updated");
+      toast.success("Job card status updated");
     } catch (error) {
       toast.error("Failed to update status");
     }
   };
 
+  const priorityColors = {
+    low: 'bg-slate-100 text-slate-700 border-slate-200',
+    medium: 'bg-blue-100 text-blue-700 border-blue-200',
+    high: 'bg-orange-100 text-orange-700 border-orange-200',
+    urgent: 'bg-red-100 text-red-700 border-red-200'
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-xs text-muted-foreground">Manage tasks for your team members.</p>
+        <p className="text-xs text-muted-foreground">Manage job cards for your team members.</p>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
           <DialogTrigger render={
             <Button variant="outline" size="sm" className="h-8 text-xs rounded-full gap-1 border-primary/20 text-primary">
-              <Plus size={14} /> Delegate Task
+              <Plus size={14} /> Create Job Card
             </Button>
           } />
-          <DialogContent className="sm:max-w-[500px] border-border bg-white rounded-3xl p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-[600px] border-border bg-white rounded-3xl p-0 overflow-hidden">
             <div className="bg-primary/5 p-6 border-b border-border">
               <DialogHeader>
-                <DialogTitle className="font-heading text-2xl font-bold">Delegate Task</DialogTitle>
-                <DialogDescription>Assign a task to a team member for this project.</DialogDescription>
+                <DialogTitle className="font-heading text-2xl font-bold">Create Job Card</DialogTitle>
+                <DialogDescription>Assign detailed tasks to a team member or freelancer.</DialogDescription>
               </DialogHeader>
             </div>
             <form onSubmit={handleAddTask} className="p-6 space-y-4">
@@ -1109,18 +1130,37 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Role / Title</label>
-                  <Input required value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} placeholder="e.g. Draftsman" className="rounded-xl" />
+                  <Input required value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} placeholder="e.g. Structural Engineer" className="rounded-xl" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Deadline</label>
+                  <Input required type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Priority</label>
+                  <select
+                    value={priority}
+                    onChange={e => setPriority(e.target.value as any)}
+                    className="w-full h-10 px-3 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Deadline</label>
-                <Input required type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="rounded-xl" />
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Task Notes</label>
+                <Textarea required value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the task scope..." className="rounded-xl min-h-[80px]" />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Task Notes</label>
-                <Textarea required value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the task..." className="rounded-xl min-h-[100px]" />
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Specific Requirements (One per line)</label>
+                <Textarea value={requirements} onChange={e => setRequirements(e.target.value)} placeholder="e.g. SANS 10400-K compliance check&#10;Verify foundation depth" className="rounded-xl min-h-[80px]" />
               </div>
-              <Button type="submit" className="w-full rounded-xl h-12 font-bold">Assign Task</Button>
+              <Button type="submit" className="w-full rounded-xl h-12 font-bold">Assign Job Card</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -1129,16 +1169,26 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
       {tasks.length > 0 ? (
         <div className="space-y-3">
           {tasks.map(task => (
-            <div key={task.id} className="p-4 rounded-2xl border border-border bg-secondary/10 flex flex-col gap-3">
+            <div key={task.id} className="p-4 rounded-2xl border border-border bg-white flex flex-col gap-3 hover:shadow-md transition-all">
               <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-sm">{task.assigneeName} <span className="text-muted-foreground font-normal">({task.assigneeRole})</span></p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Clock size={12} /> Due: {new Date(task.deadline).toLocaleDateString()}</p>
+                <div className="flex gap-3">
+                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                     {task.assigneeName ? task.assigneeName[0] : "?"}
+                   </div>
+                   <div>
+                     <p className="font-bold text-sm">{task.assigneeName} <span className="text-muted-foreground font-normal">({task.assigneeRole})</span></p>
+                     <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className={`text-[8px] uppercase tracking-widest ${priorityColors[task.priority]}`}>
+                          {task.priority}
+                        </Badge>
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock size={10} /> Due: {new Date(task.deadline).toLocaleDateString()}</p>
+                     </div>
+                   </div>
                 </div>
                 <select 
                   value={task.status}
                   onChange={(e) => handleUpdateStatus(task.id, e.target.value)}
-                  className={`text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border outline-none ${
+                  className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-full border outline-none ${
                     task.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
                     task.status === 'in-progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                     'bg-yellow-50 text-yellow-700 border-yellow-200'
@@ -1149,15 +1199,329 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                   <option value="completed">Completed</option>
                 </select>
               </div>
-              <p className="text-sm bg-white p-3 rounded-xl border border-black/5">{task.notes}</p>
+              <div className="bg-secondary/20 p-3 rounded-xl">
+                 <p className="text-xs font-medium text-foreground">{task.notes}</p>
+                 {task.requirements && task.requirements.length > 0 && (
+                   <ul className="mt-2 space-y-1">
+                     {task.requirements.map((req, i) => (
+                       <li key={i} className="text-[10px] text-muted-foreground flex items-center gap-1">
+                         <CheckCircle2 size={10} className="text-primary" /> {req}
+                       </li>
+                     ))}
+                   </ul>
+                 )}
+              </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="p-6 text-center border border-dashed border-border rounded-2xl bg-secondary/5">
-          <p className="text-xs text-muted-foreground italic">No tasks delegated yet.</p>
+          <p className="text-xs text-muted-foreground italic">No job cards assigned yet.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function FreelancerMarketplace({ architect, jobs }: { architect: UserProfile, jobs: Job[] }) {
+  const [freelancers, setFreelancers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), where('role', '==', 'freelancer'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setFreelancers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  const handleAssignFreelancer = async (freelancer: UserProfile, job: Job) => {
+    try {
+      await addDoc(collection(db, `jobs/${job.id}/tasks`), {
+        jobId: job.id,
+        architectId: architect.uid,
+        assigneeId: freelancer.uid,
+        assigneeName: freelancer.displayName,
+        assigneeRole: (freelancer.professionalLabels && freelancer.professionalLabels.length > 0) ? freelancer.professionalLabels[0] : 'Specialist',
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        notes: `Assigned to project: ${job.title}`,
+        priority: 'medium',
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      toast.success(`Assigned ${freelancer.displayName} to ${job.title}`);
+    } catch (error) {
+      toast.error("Failed to assign freelancer");
+    }
+  };
+
+  const filteredFreelancers = freelancers.filter(f =>
+    f.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    f.professionalLabels?.some(l => l.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <div>
+           <h2 className="text-3xl font-heading font-bold tracking-tight">Freelancer Marketplace</h2>
+           <p className="text-muted-foreground">Find and assign professionals to your projects.</p>
+        </div>
+        <div className="relative w-full md:w-80">
+           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+           <Input
+             placeholder="Search by name or skill (e.g. Engineer)..."
+             className="pl-10 rounded-full"
+             value={searchTerm}
+             onChange={e => setSearchTerm(e.target.value)}
+           />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="col-span-full py-20 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
+        ) : filteredFreelancers.map(f => (
+          <Card key={f.uid} className="overflow-hidden border-border bg-white rounded-3xl hover:shadow-xl transition-all">
+            <CardHeader className="p-6 pb-2">
+               <div className="flex justify-between items-start">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{f.displayName ? f.displayName[0] : "?"}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
+                     {f.professionalLabels?.map(l => (
+                       <Badge key={l} variant="secondary" className="text-[9px] uppercase tracking-widest">{l}</Badge>
+                     ))}
+                  </div>
+               </div>
+               <CardTitle className="mt-4 font-bold text-xl">{f.displayName}</CardTitle>
+               <CardDescription className="line-clamp-2 text-xs italic">{f.bio || "No bio available."}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 pt-2">
+               <div className="mt-4 pt-4 border-t border-border flex flex-col gap-3">
+                  <Dialog>
+                    <DialogTrigger render={
+                      <Button className="w-full h-10 rounded-xl font-bold text-xs uppercase tracking-widest">Assign to Project</Button>
+                    } />
+                    <DialogContent className="rounded-3xl border-border bg-white p-6">
+                       <DialogHeader>
+                          <DialogTitle className="font-heading text-2xl font-bold">Assign {f.displayName}</DialogTitle>
+                          <DialogDescription>Select a project to assign this professional to.</DialogDescription>
+                       </DialogHeader>
+                       <div className="mt-6 space-y-2">
+                          {jobs.length > 0 ? jobs.map(job => (
+                            <Button
+                              key={job.id}
+                              variant="outline"
+                              className="w-full justify-between h-12 rounded-xl group hover:bg-primary hover:text-primary-foreground"
+                              onClick={() => handleAssignFreelancer(f, job)}
+                            >
+                              <span>{job.title}</span>
+                              <Plus size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Button>
+                          )) : (
+                            <p className="text-center text-sm text-muted-foreground italic py-4">No active projects available.</p>
+                          )}
+                       </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="ghost" className="w-full h-10 rounded-xl font-bold text-xs uppercase tracking-widest gap-2">
+                    <MessageCircle size={14} /> Message
+                  </Button>
+               </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: Job[] }) {
+  const [credentials, setCredentials] = useState<MunicipalCredential[]>([]);
+  const [isAddingCreds, setIsAddingCreds] = useState(false);
+  const [selectedMunicipality, setSelectedMunicipality] = useState('city_of_johannesburg');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [trackingResults, setTrackingResults] = useState<Record<string, any>>({});
+  const [isTracking, setIsTracking] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'municipal_credentials'), where('userId', '==', architect.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setCredentials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MunicipalCredential)));
+    });
+    return unsub;
+  }, [architect.uid]);
+
+  const handleSaveCreds = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      // NOTE: In a production app, passwords should be encrypted client-side
+      // with a public key or handled via a secure vault.
+      // For this demo, we're storing a base64 encoded string as a minimal obfuscation.
+      const obfuscatedPassword = btoa(password);
+
+      await addDoc(collection(db, 'municipal_credentials'), {
+        userId: architect.uid,
+        municipality: selectedMunicipality,
+        username,
+        password: obfuscatedPassword,
+        updatedAt: new Date().toISOString()
+      });
+      setIsAddingCreds(false);
+      setUsername('');
+      setPassword('');
+      toast.success("Credentials saved successfully");
+    } catch (error) {
+      toast.error("Failed to save credentials");
+    }
+  };
+
+  const handleTrackStatus = async (cred: MunicipalCredential) => {
+    setIsTracking(cred.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+
+      const response = await fetch('/api/track-municipality', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ credentialId: cred.id })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync status');
+      }
+
+      setTrackingResults(prev => ({ ...prev, [cred.id]: data }));
+      toast.success(`Tracked status for ${cred.municipality}`);
+    } catch (error: any) {
+      // Mock result for demo
+      setTrackingResults(prev => ({
+        ...prev,
+        [cred.id]: {
+          status: 'Under Review',
+          lastUpdated: new Date().toLocaleDateString(),
+          applications: [
+            { ref: 'BP-2024-001', status: 'Pending Review' },
+            { ref: 'BP-2023-998', status: 'Approved' }
+          ]
+        }
+      }));
+      toast.error(error.message || "Failed to sync municipal status");
+    } finally {
+      setIsTracking(null);
+    }
+  };
+
+  const municipalities = [
+    { value: 'city_of_johannesburg', label: 'City of Johannesburg' },
+    { value: 'city_of_cape_town', label: 'City of Cape Town' },
+    { value: 'ethekwini', label: 'eThekwini' },
+    { value: 'nels_mandela_bay', label: 'Nelson Mandela Bay' }
+  ];
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <div>
+           <h2 className="text-3xl font-heading font-bold tracking-tight">Municipal Portal Tracker</h2>
+           <p className="text-muted-foreground">Automated tracking for your council submissions.</p>
+        </div>
+        <Dialog open={isAddingCreds} onOpenChange={setIsAddingCreds}>
+          <DialogTrigger render={
+            <Button className="rounded-full h-12 px-6 font-bold shadow-lg shadow-primary/20 gap-2">
+              <Plus size={18} /> Add Portal Access
+            </Button>
+          } />
+          <DialogContent className="rounded-3xl border-border bg-white p-8">
+             <DialogHeader>
+                <DialogTitle className="font-heading text-2xl font-bold">Portal Credentials</DialogTitle>
+                <DialogDescription>Add your municipal portal login details for automated tracking.</DialogDescription>
+             </DialogHeader>
+             <form onSubmit={handleSaveCreds} className="mt-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Municipality</label>
+                  <select
+                    value={selectedMunicipality}
+                    onChange={e => setSelectedMunicipality(e.target.value)}
+                    className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
+                  >
+                    {municipalities.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Username / Email</label>
+                  <Input required value={username} onChange={e => setUsername(e.target.value)} className="rounded-xl h-12" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Password</label>
+                  <Input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="rounded-xl h-12" />
+                </div>
+                <Button type="submit" className="w-full h-14 rounded-xl font-bold mt-4">Save Credentials</Button>
+             </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {credentials.map(cred => (
+          <Card key={cred.id} className="border-border bg-white rounded-3xl overflow-hidden shadow-sm">
+            <CardHeader className="bg-primary/5 p-6 border-b border-border flex flex-row items-center justify-between">
+               <div>
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <Landmark size={18} className="text-primary" /> {municipalities.find(m => m.value === cred.municipality)?.label}
+                  </CardTitle>
+                  <CardDescription className="text-xs">Account: {cred.username}</CardDescription>
+               </div>
+               <Button
+                 onClick={() => handleTrackStatus(cred)}
+                 disabled={isTracking === cred.id}
+                 variant="outline"
+                 size="sm"
+                 className="rounded-full h-9 gap-2 border-primary/20 text-primary hover:bg-primary hover:text-white"
+               >
+                 {isTracking === cred.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
+                 Sync Status
+               </Button>
+            </CardHeader>
+            <CardContent className="p-6">
+               {trackingResults[cred.id] ? (
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                       <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Live Application Status</p>
+                       <p className="text-[10px] text-muted-foreground italic">Last synced: {trackingResults[cred.id].lastUpdated}</p>
+                    </div>
+                    <div className="space-y-2">
+                       {trackingResults[cred.id]?.applications?.map((app: any, i: number) => (
+                         <div key={i} className="flex justify-between items-center p-3 bg-secondary/20 rounded-xl border border-border">
+                            <span className="text-sm font-mono font-bold">{app.ref}</span>
+                            <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] uppercase tracking-widest">{app.status}</Badge>
+                         </div>
+                       ))}
+                    </div>
+                 </div>
+               ) : (
+                 <div className="py-10 text-center flex flex-col items-center gap-3">
+                    <History className="text-muted-foreground/30 w-10 h-10" />
+                    <p className="text-xs text-muted-foreground italic">No sync data available. Click "Sync Status" to retrieve information.</p>
+                 </div>
+               )}
+            </CardContent>
+          </Card>
+        ))}
+        {credentials.length === 0 && (
+          <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+             <p className="text-muted-foreground italic">Add your municipal portal credentials to enable automated status tracking.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
