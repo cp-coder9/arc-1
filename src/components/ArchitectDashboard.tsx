@@ -272,6 +272,7 @@ export default function ArchitectDashboard({
 }
 
 function BrowseJobItem({ job, user, isRecommended }: { job: Job, user: UserProfile, isRecommended?: boolean, key?: any }) {
+function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: React.Key }) {
   const [proposal, setProposal] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [isApplying, setIsApplying] = useState(false);
@@ -460,7 +461,7 @@ function BrowseJobItem({ job, user, isRecommended }: { job: Job, user: UserProfi
   );
 }
 
-function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
+function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: React.Key }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [drawingUrl, setDrawingUrl] = useState('');
