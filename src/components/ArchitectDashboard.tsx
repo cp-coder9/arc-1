@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -103,13 +103,13 @@ export default function ArchitectDashboard({
       // matchesLocation could be added if job has location field
       
       let matchesDeadline = true;
-      if (filters.deadlineWithin > 0) {
+      if (filters.deadlineWithin > 0 && job.deadline) {
         const daysToDeadline = differenceInDays(parseISO(job.deadline), new Date());
         matchesDeadline = daysToDeadline >= 0 && daysToDeadline <= filters.deadlineWithin;
       }
 
       let matchesPosted = true;
-      if (filters.postedWithin > 0) {
+      if (filters.postedWithin > 0 && job.createdAt) {
         const daysSincePosted = differenceInDays(new Date(), parseISO(job.createdAt));
         matchesPosted = daysSincePosted <= filters.postedWithin;
       }
@@ -123,6 +123,27 @@ export default function ArchitectDashboard({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); // default: posted (newest)
     });
 
+  const [architectProfile, setArchitectProfile] = useState<ArchitectProfile | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const snap = await getDoc(doc(db, 'architect_profiles', user.uid));
+      if (snap.exists()) {
+        setArchitectProfile(snap.data() as ArchitectProfile);
+      }
+    };
+    fetchProfile();
+  }, [user.uid]);
+
+  const isRecommended = (job: Job) => {
+    if (!architectProfile) return false;
+    const specs = (architectProfile.specializations || []).map(s => s.toLowerCase());
+    const category = (job.category || '').toLowerCase();
+    const requirements = (job.requirements || []).filter(Boolean).map(r => r.toLowerCase());
+
+    return specs.includes(category) ||
+           requirements.some(req => specs.some(spec => req.includes(spec) || spec.includes(req)));
+  };
 
   return (
     <div className="space-y-12">
@@ -179,7 +200,7 @@ export default function ArchitectDashboard({
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredJobs.map(job => (
-              <BrowseJobItem key={job.id} job={job} user={user} />
+              <BrowseJobItem key={job.id} job={job} user={user} isRecommended={isRecommended(job)} />
             ))}
             {filteredJobs.length === 0 && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
@@ -250,7 +271,7 @@ export default function ArchitectDashboard({
   );
 }
 
-function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
+function BrowseJobItem({ job, user, isRecommended }: { job: Job, user: UserProfile, isRecommended?: boolean, key?: any }) {
   const [proposal, setProposal] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [isApplying, setIsApplying] = useState(false);
@@ -323,7 +344,7 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
     }
   };
 
-  const daysLeft = differenceInDays(parseISO(job.deadline), new Date());
+  const daysLeft = job.deadline ? differenceInDays(parseISO(job.deadline), new Date()) : -1;
   
   const categoryColors: Record<string, string> = {
     'Residential': 'bg-blue-500',
@@ -350,6 +371,13 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
           </div>
           <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {job.budget.toLocaleString()}</span>
         </div>
+        <div className="flex items-center gap-2 mb-1">
+          {isRecommended && (
+            <Badge className="bg-amber-50 text-amber-700 border-amber-100 gap-1 text-[8px] h-4 px-1.5 uppercase font-bold">
+              <Sparkles size={10} /> Recommended for you
+            </Badge>
+          )}
+        </div>
         <CardTitle className="font-heading font-bold text-xl group-hover:text-primary transition-colors tracking-tight line-clamp-1">{job.title}</CardTitle>
         <CardDescription className="line-clamp-2 text-xs leading-relaxed mt-2 h-8">{job.description}</CardDescription>
       </CardHeader>
@@ -357,14 +385,14 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
       <CardContent className="p-6 pt-0 space-y-4">
         {/* Requirements Tags */}
         <div className="flex flex-wrap gap-1.5">
-          {job.requirements.slice(0, 3).map((req, i) => (
+          {(job.requirements || []).slice(0, 3).map((req, i) => (
             <Badge key={i} variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0 max-w-[120px] truncate">
               {req}
             </Badge>
           ))}
-          {job.requirements.length > 3 && (
+          {(job.requirements || []).length > 3 && (
             <Badge variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0">
-              +{job.requirements.length - 3} more
+              +{(job.requirements || []).length - 3} more
             </Badge>
           )}
         </div>
