@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, Award, Briefcase, Calendar, Link as LinkIcon, MapPin, ShieldCheck, ShieldX } from 'lucide-react';
 import { ArchitectProfile, Review, UserProfile } from '@/types';
-import { format } from 'date-fns';
+import { safeFormat } from '@/lib/utils';
 
 interface ArchitectPortfolioProps {
   architectId: string;
@@ -283,7 +283,7 @@ export function ArchitectPortfolio({ architectId }: ArchitectPortfolioProps) {
                             ))}
                           </div>
                           <span className="text-sm text-muted-foreground">
-                            {format(new Date(review.createdAt), 'MMM d, yyyy')}
+                            {safeFormat(review.createdAt, 'MMM d, yyyy')}
                           </span>
                         </div>
                         <p className="text-sm">{review.comment}</p>

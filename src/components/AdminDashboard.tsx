@@ -3,6 +3,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
+import { safeFormat, safeLocale } from '@/lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -308,7 +309,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Last Active</label>
-            <p className="text-sm text-muted-foreground">{format(new Date(agent.lastActive), 'MMM d, yyyy HH:mm')}</p>
+            <p className="text-sm text-muted-foreground">{safeFormat(agent.lastActive, 'MMM d, yyyy HH:mm')}</p>
           </div>
           {agent.currentActivity && (
             <div>
@@ -650,11 +651,11 @@ export default function AdminDashboard({
                   {submissions.filter(s => s.status === 'admin_reviewing').map(sub => (
                     <TableRow key={sub.id} className="border-border hover:bg-secondary/20 transition-colors">
                       <TableCell className="font-heading font-bold px-8">{sub.drawingName}</TableCell>
-                      <TableCell className="text-xs font-mono">{sub.architectId.substring(0, 8)}...</TableCell>
+                      <TableCell className="text-xs font-mono">{(sub.architectId || '').substring(0, 8)}...</TableCell>
                       <TableCell>
                         <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold uppercase tracking-widest">AI PASSED</Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{format(new Date(sub.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{safeFormat(sub.createdAt, 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right px-8">
                         <Dialog>
                           <DialogTrigger render={<Button variant="ghost" size="sm" className="gap-2 hover:bg-primary hover:text-primary-foreground rounded-full px-4"><Eye size={14} />Review</Button>} />
@@ -768,7 +769,7 @@ export default function AdminDashboard({
                                       {sub.traceability.map((log, i) => (
                                         <div key={i} className="relative pl-6 border-l-2 border-primary/10 pb-6 last:pb-0">
                                           <div className="absolute left-[-7px] top-0 w-3 h-3 rounded-full bg-primary shadow-sm" />
-                                          <p className="text-[10px] font-mono text-muted-foreground font-bold">{format(new Date(log.timestamp), 'HH:mm:ss')}</p>
+                                          <p className="text-[10px] font-mono text-muted-foreground font-bold">{safeFormat(log.timestamp, 'HH:mm:ss')}</p>
                                           <p className="text-sm font-bold mt-1">{log.actor}: {log.action}</p>
                                           <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{log.details}</p>
                                         </div>
@@ -834,7 +835,7 @@ export default function AdminDashboard({
                   {allJobs.map(job => (
                     <TableRow key={job.id} className="hover:bg-secondary/10">
                       <TableCell className="px-8 font-bold">{job.title}</TableCell>
-                      <TableCell className="text-sm">{job.clientId.slice(0, 8)}...</TableCell>
+                      <TableCell className="text-sm">{(job.clientId || '').slice(0, 8)}...</TableCell>
                       <TableCell>
                         <Badge className={`${
                           job.status === 'open' ? 'bg-blue-100 text-blue-700' :
@@ -845,7 +846,7 @@ export default function AdminDashboard({
                           {job.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-sm font-bold">R {job.budget.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-sm font-bold">R {safeLocale(job.budget)}</TableCell>
                       <TableCell className="text-right px-8">
                         <div className="flex justify-end gap-2">
                           <select 
@@ -930,7 +931,7 @@ export default function AdminDashboard({
                 <TableBody>
                   {logs.map(log => (
                     <TableRow key={log.id} className="border-border hover:bg-secondary/20 transition-colors">
-                      <TableCell className="text-xs font-mono px-8">{format(new Date(log.timestamp), 'HH:mm:ss.SSS')}</TableCell>
+                      <TableCell className="text-xs font-mono px-8">{safeFormat(log.timestamp, 'HH:mm:ss.SSS')}</TableCell>
                       <TableCell>
                         <Badge className={`text-[10px] font-bold uppercase tracking-widest ${
                           log.level === 'error' || log.level === 'critical' ? 'bg-destructive/10 text-destructive border-destructive/20' :
@@ -1166,7 +1167,7 @@ function UserManagement({
                       <Badge variant="secondary" className="bg-green-100 text-green-700 rounded-full uppercase text-[10px]">Active</Badge>
                    )}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{format(new Date(u.createdAt), 'MMM d, yyyy')}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
                 <TableCell className="text-right px-8">
                   <div className="flex justify-end gap-2">
                     <Button 

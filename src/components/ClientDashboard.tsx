@@ -23,7 +23,7 @@ import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiSer
 import { notificationService } from '../services/notificationService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
-import { format } from 'date-fns';
+import { safeLocale } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 // import { motion } from 'framer-motion';
 
@@ -170,7 +170,7 @@ export default function ClientDashboard({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <StatCard title="Active Jobs" value={jobs.filter(j => j.status === 'open' || j.status === 'in-progress').length} icon={<Clock className="text-primary" />} />
-        <StatCard title="Total Spent" value={`R ${jobs.reduce((acc, j) => acc + (j.status === 'completed' ? j.budget : 0), 0).toLocaleString()}`} icon={<CheckCircle2 className="text-primary" />} />
+        <StatCard title="Total Spent" value={`R ${safeLocale(jobs.reduce((acc, j) => acc + (j.status === 'completed' ? (j.budget || 0) : 0), 0))}`} icon={<CheckCircle2 className="text-primary" />} />
         <StatCard title="Pending Reviews" value={0} icon={<AlertCircle className="text-primary" />} />
       </div>
 
@@ -568,7 +568,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
             <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-primary font-mono">R {job.budget.toLocaleString()}</p>
+            <p className="text-xl font-bold text-primary font-mono">R {safeLocale(job.budget)}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Budget</p>
           </div>
         </div>
@@ -924,7 +924,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
                         <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Escrow Balance</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-4xl font-heading font-bold tracking-tighter">R {job.status === 'open' ? '0' : job.budget.toLocaleString()}</div>
+                        <div className="text-4xl font-heading font-bold tracking-tighter">R {job.status === 'open' ? '0' : safeLocale(job.budget)}</div>
                         <p className="text-[10px] text-primary font-bold uppercase tracking-widest mt-2 flex items-center gap-1">
                           <ShieldCheck size={12} /> {job.status === 'open' ? 'Awaiting Hire' : 'Funds Secured in Escrow'}
                         </p>

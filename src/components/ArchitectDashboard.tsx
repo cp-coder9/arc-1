@@ -19,7 +19,7 @@ import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { notificationService } from '../services/notificationService';
 import ReactMarkdown from 'react-markdown';
-import { format } from 'date-fns';
+import { safeLocale } from '@/lib/utils';
 import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
@@ -225,7 +225,7 @@ export default function ArchitectDashboard({
                     </Badge>
                     <span className="text-[10px] text-muted-foreground font-mono">{new Date(app.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <CardTitle className="text-lg font-bold tracking-tight">Project {app.jobId.slice(0, 8)}</CardTitle>
+                  <CardTitle className="text-lg font-bold tracking-tight">Project {(app.jobId || '').slice(0, 8)}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-5 pt-0">
                   <p className="text-xs text-muted-foreground line-clamp-3 italic mb-4">"{app.proposal}"</p>
@@ -369,7 +369,7 @@ function BrowseJobItem({ job, user, isRecommended }: { job: Job, user: UserProfi
               </Badge>
             )}
           </div>
-          <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {job.budget.toLocaleString()}</span>
+          <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {safeLocale(job.budget)}</span>
         </div>
         <div className="flex items-center gap-2 mb-1">
           {isRecommended && (
@@ -733,7 +733,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
             <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-primary font-mono">R {job.budget.toLocaleString()}</p>
+            <p className="text-xl font-bold text-primary font-mono">R {safeLocale(job.budget)}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Budget</p>
           </div>
         </div>
