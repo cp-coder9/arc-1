@@ -380,6 +380,17 @@ const handleLogin = async () => {
                         <p className="text-[10px] opacity-70">Platform Management</p>
                       </div>
                     </Button>
+                    <Button
+                      variant={roleSelection === 'freelancer' ? 'default' : 'outline'}
+                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'freelancer' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
+                      onClick={() => setRoleSelection('freelancer')}
+                    >
+                      <Sparkles className="w-8 h-8" />
+                      <div className="text-center">
+                        <p className="font-bold">Freelancer</p>
+                        <p className="text-[10px] opacity-70">Engineer/Specialist</p>
+                      </div>
+                    </Button>
                   </div>
                   <div className="space-y-3">
                     <Button 

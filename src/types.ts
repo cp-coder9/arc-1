@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer';
 
 export interface UserProfile {
   uid: string;
@@ -6,6 +6,7 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   bio?: string;
+  professionalLabels?: string[]; // e.g. ['Engineer', 'Builder', 'Construction Worker']
   createdAt: string;
   updatedAt?: string;
 }
@@ -141,12 +142,35 @@ export interface DelegatedTask {
   id: string;
   jobId: string;
   architectId: string;
+  assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
   assigneeRole: string;
   deadline: string;
   notes: string;
   status: 'pending' | 'in-progress' | 'completed';
   createdAt: string;
+}
+
+export interface JobCard extends DelegatedTask {
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  attachments?: { name: string; url: string }[];
+  comments?: {
+    userId: string;
+    userName: string;
+    text: string;
+    createdAt: string;
+  }[];
+  requirements?: string[];
+  completedAt?: string;
+}
+
+export interface MunicipalCredential {
+  id: string;
+  userId: string;
+  municipality: string;
+  username: string;
+  password?: string; // Should be encrypted in a real app, but for this demo...
+  updatedAt: string;
 }
 
 export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
@@ -356,7 +380,7 @@ export interface AgentKnowledge {
   source: KnowledgeSource;
   status: KnowledgeStatus;
   submittedBy: string; // userId
-  submittedByRole: 'admin' | 'architect' | 'client' | 'system';
+  submittedByRole: UserRole | 'system';
   reviewedBy?: string; // admin userId
   reviewedAt?: string;
   relatedSubmissionId?: string;

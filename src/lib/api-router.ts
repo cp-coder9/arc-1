@@ -5,6 +5,7 @@ import { del, put } from "@vercel/blob";
 import multer from "multer";
 import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
 import { extractCadData } from "./cadProcessor.js";
+import { trackMunicipalityStatus } from "./municipalAutomation.js";
 
 import { UserRole } from "../types.js";
 
@@ -979,6 +980,38 @@ router.post("/payment/notify", async (req, res) => {
   } catch (err) {
     console.error("ITN error:", err);
     res.status(500).send("Internal Error");
+  }
+});
+
+// Municipal tracking endpoint
+router.post("/track-municipality", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { credentialId } = req.body;
+  if (!credentialId) return res.status(400).json({ error: "credentialId is required" });
+
+  try {
+    // Ownership verification
+    const credDoc = await adminDb.collection("municipal_credentials").doc(credentialId).get();
+    if (!credDoc.exists) {
+      return res.status(404).json({ error: "Credentials not found" });
+    }
+
+    const credData = credDoc.data();
+    if (credData?.userId !== decoded.uid && !(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Unauthorized access to credentials" });
+    }
+
+    const result = await trackMunicipalityStatus(credentialId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Municipal tracking error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 

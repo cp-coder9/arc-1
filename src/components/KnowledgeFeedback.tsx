@@ -5,14 +5,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { MessageSquarePlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { addKnowledge } from '../services/knowledgeService';
-import { AIIssue } from '../types';
+import { AIIssue, UserRole } from '../types';
 import { auth } from '../lib/firebase';
 
 interface KnowledgeFeedbackProps {
   agentRole: string;
   categoryName: string;
   issue: AIIssue;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: UserRole;
 }
 
 export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: KnowledgeFeedbackProps) {
