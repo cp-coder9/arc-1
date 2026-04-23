@@ -9,6 +9,7 @@ import { encrypt, decrypt } from "./encryption.js";
 import { runMunicipalScraper } from "../services/scraperService.js";
 import { processReceiptOCR } from "../services/ocrService.js";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
+import { verifySACAPRegistration } from "../services/sacapVerificationService.js";
 
 import { UserRole, MunicipalityType } from "../types.js";
 
@@ -1144,41 +1145,36 @@ router.get("/municipal/submissions", async (req, res) => {
   }
 });
 
-// SACAP Verification Agent (Simulation)
+// SACAP Verification Agent (Real Automation)
 router.post("/architect/verify-sacap", async (req, res) => {
   try {
-    const decoded = await verifyAuth(req.headers);
+    await verifyAuth(req.headers);
     const { architectId, name, sacapNumber } = req.body;
 
-    if (!architectId || !name || !sacapNumber) {
-      return res.status(400).json({ error: "Missing architectId, name or sacapNumber" });
+    if (!architectId || !name) {
+      return res.status(400).json({ error: "Missing architectId or name" });
     }
 
-    console.log(`[SACAP Agent] Verifying architect: ${name} (SACAP: ${sacapNumber})`);
+    console.log(`[SACAP Agent] Verifying architect: ${name} (SACAP: ${sacapNumber || 'N/A'})`);
 
-    // In a real implementation, we would use a headless browser (Puppeteer/Playwright)
-    // to navigate to https://www.sacapsa.com/search/custom.asp?id=5129
-    // or a similar search portal, enter the details, and scrape the result.
-
-    // For this environment, we simulate the agent's autonomous behavior
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // Simulation logic: names starting with 'Unverified' or 'Fake' fail.
-    // In a real app, this would be the result of the scraping.
-    const isFake = name.toLowerCase().includes('fake') || name.toLowerCase().includes('unverified');
-    const status = isFake ? 'failed' : 'verified';
+    const result = await verifySACAPRegistration(name);
+    const status = result.verified ? 'verified' : 'failed';
 
     // Update the architect profile in Firestore
     await adminDb.collection("architect_profiles").doc(architectId).set({
       sacapStatus: status,
       sacapLastVerifiedAt: new Date().toISOString(),
+      sacapCategory: result.registrationDetails?.category || null,
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
     res.json({
       success: true,
       status,
-      message: status === 'verified' ? 'Architect SACAP status verified.' : 'Architect not found in SACAP registry.'
+      details: result.registrationDetails,
+      message: status === 'verified'
+        ? `Architect SACAP status verified as ${result.registrationDetails?.category}.`
+        : 'Architect not found in SACAP registry.'
     });
   } catch (err: any) {
     console.error("SACAP Verification Error:", err);

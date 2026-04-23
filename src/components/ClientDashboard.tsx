@@ -779,7 +779,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
                                 {app.sacapNumber && (
                                   <div className="flex gap-2">
                                     <Badge variant="outline" className="text-[9px] px-2 py-0">SACAP: {app.sacapNumber}</Badge>
-                                    <SACAPStatusBadge architectId={app.architectId} />
+                                    <SACAPStatusBadge architectId={app.architectId} initialStatus={(app as any).sacapStatus} />
                                   </div>
                                 )}
                               </div>
@@ -1100,22 +1100,24 @@ function MilestoneItem({ title, percentage, status }: { title: string, percentag
   );
 }
 
-function SACAPStatusBadge({ architectId }: { architectId: string }) {
-  const [profile, setProfile] = useState<ArchitectProfile | null>(null);
+function SACAPStatusBadge({ architectId, initialStatus }: { architectId: string, initialStatus?: string }) {
+  const [status, setStatus] = useState<string | undefined>(initialStatus);
 
   useEffect(() => {
+    if (status) return; // Use initial status if provided
+
     const fetchProfile = async () => {
       const snap = await getDoc(doc(db, 'architect_profiles', architectId));
       if (snap.exists()) {
-        setProfile(snap.data() as ArchitectProfile);
+        setStatus((snap.data() as ArchitectProfile).sacapStatus);
       }
     };
     fetchProfile();
-  }, [architectId]);
+  }, [architectId, status]);
 
-  if (!profile || !profile.sacapStatus) return null;
+  if (!status) return null;
 
-  if (profile.sacapStatus === 'verified') {
+  if (status === 'verified') {
     return (
       <Badge className="bg-green-50 text-green-700 border-green-100 gap-1 text-[9px] px-2 py-0 border">
         <ShieldCheck size={10} /> SACAP Verified
@@ -1123,7 +1125,7 @@ function SACAPStatusBadge({ architectId }: { architectId: string }) {
     );
   }
 
-  if (profile.sacapStatus === 'failed') {
+  if (status === 'failed') {
     return (
       <Badge variant="destructive" className="gap-1 text-[9px] px-2 py-0 border">
         <ShieldX size={10} /> Unverified

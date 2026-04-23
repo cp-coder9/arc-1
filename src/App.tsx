@@ -306,19 +306,7 @@ const handleLogin = async () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setActiveTab('overview');
-      setIsSidebarOpen(false);
-      setShowLogin(false);
-      toast.success("Logged out successfully");
-    } catch (error) {
-      console.error("Logout error:", error);
-      toast.error("Failed to logout");
-    }
-  };
+  const handleLogout = () => signOut(auth);
 
   if (loading || profileLoading) {
     return (
