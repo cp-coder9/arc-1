@@ -17,12 +17,12 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { Message, Conversation } from '../types';
-import DOMPurify from 'dompurify';
+import DOMPurify from 'isomorphic-dompurify';
 
 export interface SendMessageParams {
   jobId: string;
   senderId: string;
-  senderRole: 'client' | 'architect' | 'admin';
+  senderRole: 'client' | 'architect' | 'admin' | 'freelancer';
   content: string;
   attachments?: { name: string; url: string; type: string }[];
 }

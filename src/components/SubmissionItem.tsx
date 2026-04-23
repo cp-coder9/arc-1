@@ -9,7 +9,7 @@ import { KnowledgeFeedback } from './KnowledgeFeedback';
 
 interface SubmissionItemProps {
   sub: Submission;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
   [key: string]: any;
 }
 

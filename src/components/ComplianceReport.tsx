@@ -26,7 +26,7 @@ interface ComplianceReportProps {
   drawingName?: string;
   projectName?: string;
   onClose?: () => void;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
 }
 
 const getAgentRoleForCategory = (categoryName: string) => {
