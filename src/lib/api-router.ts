@@ -7,7 +7,7 @@ import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
 import { extractCadData } from "./cadProcessor.js";
 import { trackMunicipalityStatus } from "./municipalAutomation.js";
 
-import { UserRole, MunicipalityType } from "../types.js";
+import { UserRole } from "../types.js";
 
 
 // ── Environment variables ─────────────────────────────────────────────────────
