@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from './ui/switch';
 import { toast } from 'sonner';
 import { Building2, Save, Loader2, Key } from 'lucide-react';
 
