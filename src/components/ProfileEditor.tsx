@@ -121,19 +121,19 @@ export default function ProfileEditor({ user, trigger, isAdminEditing = false }:
         updatedAt: new Date().toISOString(),
       });
 
-      // Update Architect profile if applicable
-      if (isArchitect) {
-        const archProfileRef = doc(db, 'architect_profiles', user.uid);
-        const archData: Partial<ArchitectProfile> = {
-          userId: user.uid,
-          sacapNumber,
-          yearsExperience: yearsExperience === '' ? undefined : Number(yearsExperience),
-          specializations,
-          portfolioImages,
-          website,
-          linkedIn,
-          updatedAt: new Date().toISOString(),
-        };
+// Update Architect profile if applicable
+if (isArchitect) {
+  const archProfileRef = doc(db, 'architect_profiles', user.uid);
+  const archData: Partial<ArchitectProfile> = {
+    userId: user.uid,
+    sacapNumber,
+    ...(yearsExperience !== '' && { yearsExperience: Number(yearsExperience) }),
+    specializations,
+    portfolioImages,
+    website,
+    linkedIn,
+    updatedAt: new Date().toISOString(),
+  };
 
         const profileDoc = await getDoc(archProfileRef);
         if (profileDoc.exists()) {
