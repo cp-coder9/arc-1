@@ -92,6 +92,8 @@ export interface AIReviewResult {
   feedback: string;
   categories: AICategory[];
   traceLog: string;
+  citations?: KnowledgeCitation[];
+  knowledgeSources?: string[];
 }
 
 export interface Submission {
@@ -387,7 +389,7 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base';
   jobId?: string;
   submissionId?: string;
 };
@@ -419,7 +421,22 @@ export interface AgentKnowledge {
   relatedJobId?: string;
   searchQuery?: string; // if source is web_search
   sourceUrl?: string; // if from documentation or web
+  pdfUrl?: string; // if uploaded from PDF
+  pdfPageNumber?: number; // page number in PDF
   tags: string[]; // e.g. ['SANS 10400-K', 'wall thickness', 'DPC']
   createdAt: string;
   updatedAt?: string;
+  usageCount?: number; // Track how often this knowledge is used
+  lastUsedAt?: string;
+}
+
+export interface KnowledgeCitation {
+  knowledgeId: string;
+  title: string;
+  content: string;
+  source: KnowledgeSource;
+  sourceUrl?: string;
+  pdfUrl?: string;
+  pdfPageNumber?: number;
+  tags: string[];
 }

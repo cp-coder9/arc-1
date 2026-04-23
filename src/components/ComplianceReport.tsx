@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { AIReviewResult, AICategory, AIIssue } from '@/types';
-import { 
-  ShieldCheck, 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle, 
-  Printer, 
-  FileText, 
-  Search, 
+import {
+  ShieldCheck,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Printer,
+  FileText,
+  Search,
   Maximize2,
   Download,
   Cpu,
-  Activity
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -19,9 +20,10 @@ import { ScrollArea } from './ui/scroll-area';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
+import { KnowledgeSources } from './KnowledgeSources';
 
 interface ComplianceReportProps {
-  result: AIReviewResult;
+  result: AIReviewResult & { citations?: any[]; knowledgeSources?: string[] };
   drawingUrl?: string;
   drawingName?: string;
   projectName?: string;
@@ -251,32 +253,39 @@ export default function ComplianceReport({
             ))}
           </div>
 
-          {/* Traceability Footer */}
-          <div className="bg-slate-900 text-slate-100 rounded-[2rem] p-10 shadow-xl overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-10 opacity-10">
-              <Cpu size={120} />
-            </div>
-            <div className="relative z-10 space-y-6">
-              <h3 className="text-xl font-bold flex items-center gap-3">
-                <Activity size={20} className="text-primary" /> Orchestration Traceability
-              </h3>
-              <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
-                <ScrollArea className="h-40 pr-4">
-                  <p className="text-xs font-mono text-slate-400 leading-relaxed">
-                    {result.traceLog}
-                  </p>
-                </ScrollArea>
-              </div>
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest">
-                  Compliance Certification ID: ARC-{Math.random().toString(36).substring(7).toUpperCase()}
-                </p>
-                <p className="text-[10px] text-slate-500">
-                  {new Date().toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
+{/* Knowledge Sources */}
+{result.citations && result.citations.length > 0 && (
+  <div className="print:break-inside-avoid">
+    <KnowledgeSources citations={result.citations} />
+  </div>
+)}
+
+{/* Traceability Footer */}
+<div className="bg-slate-900 text-slate-100 rounded-[2rem] p-10 shadow-xl overflow-hidden relative">
+  <div className="absolute top-0 right-0 p-10 opacity-10">
+    <Cpu size={120} />
+  </div>
+  <div className="relative z-10 space-y-6">
+    <h3 className="text-xl font-bold flex items-center gap-3">
+      <Activity size={20} className="text-primary" /> Orchestration Traceability
+    </h3>
+    <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+      <ScrollArea className="h-40 pr-4">
+        <p className="text-xs font-mono text-slate-400 leading-relaxed">
+          {result.traceLog}
+        </p>
+      </ScrollArea>
+    </div>
+    <div className="flex items-center justify-between pt-4 border-t border-white/10">
+      <p className="text-[10px] text-slate-500 uppercase tracking-widest">
+        Compliance Certification ID: ARC-{Math.random().toString(36).substring(7).toUpperCase()}
+      </p>
+      <p className="text-[10px] text-slate-500">
+        {new Date().toLocaleString()}
+      </p>
+    </div>
+  </div>
+</div>
         </div>
       </div>
     </div>
