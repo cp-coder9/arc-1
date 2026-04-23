@@ -24,6 +24,7 @@ import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import MunicipalTracker from './MunicipalTracker';
 // import { motion } from 'framer-motion';
 
 export default function ArchitectDashboard({ 
@@ -149,7 +150,7 @@ export default function ArchitectDashboard({
         className="w-full"
       >
         <div className="border-b border-border bg-white h-14 md:h-16 w-full flex items-center px-4 md:px-0 bg-transparent rounded-full overflow-hidden mb-8">
-          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
+          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit overflow-x-auto">
             <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Browse Jobs</TabsTrigger>
             <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">My Applications ({myApplications.length})</TabsTrigger>
             <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects ({myJobs.length})</TabsTrigger>
@@ -255,7 +256,7 @@ export default function ArchitectDashboard({
   );
 }
 
-function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
+function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: React.Key }) {
   const [proposal, setProposal] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [isApplying, setIsApplying] = useState(false);
@@ -437,7 +438,7 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
   );
 }
 
-function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
+function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: React.Key }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [drawingUrl, setDrawingUrl] = useState('');

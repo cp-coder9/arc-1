@@ -21,6 +21,8 @@ import { notificationService } from './notificationService';
 import { pdfGenerationService } from './pdfGenerationService';
 import { toast } from 'sonner';
 
+import { MunicipalityType } from '../types';
+
 export type Municipality = 
   | 'city_of_johannesburg'
   | 'city_of_cape_town'
@@ -33,6 +35,7 @@ export type Municipality =
 
 interface MunicipalityConfig {
   name: string;
+  type: MunicipalityType;
   hasApi: boolean;
   apiUrl?: string;
   manualSubmissionUrl: string;
@@ -42,6 +45,7 @@ interface MunicipalityConfig {
 const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   city_of_johannesburg: {
     name: 'City of Johannesburg',
+    type: 'COJ',
     hasApi: false,
     manualSubmissionUrl: 'https://www.joburg.org.za/departments_/Pages/Development%20Planning%20and%20Facilitation/DPD-Application-Forms.aspx',
     requirements: [
@@ -56,6 +60,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   city_of_cape_town: {
     name: 'City of Cape Town',
+    type: 'COCT',
     hasApi: false,
     manualSubmissionUrl: 'https://www.capetown.gov.za/Departments/Planning%20and%20Building%20Development%20Management',
     requirements: [
@@ -70,6 +75,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   ethekwini: {
     name: 'eThekwini Municipality',
+    type: 'eThekwini',
     hasApi: false,
     manualSubmissionUrl: 'https://www.durban.gov.za/departments/planning/',
     requirements: [
@@ -82,6 +88,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   nels_mandela_bay: {
     name: 'Nelson Mandela Bay',
+    type: 'Other',
     hasApi: false,
     manualSubmissionUrl: 'https://www.nelsonmandelabay.gov.za/',
     requirements: [
@@ -93,6 +100,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   mbombela: {
     name: 'Mbombela Local Municipality',
+    type: 'Other',
     hasApi: false,
     manualSubmissionUrl: 'https://www.mbombela.gov.za/',
     requirements: [
@@ -104,6 +112,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   polokwane: {
     name: 'Polokwane Municipality',
+    type: 'Other',
     hasApi: false,
     manualSubmissionUrl: 'https://www.polokwane.gov.za/',
     requirements: [
@@ -114,6 +123,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   buffalo_city: {
     name: 'Buffalo City Metropolitan',
+    type: 'Other',
     hasApi: false,
     manualSubmissionUrl: 'https://www.buffalocity.gov.za/',
     requirements: [
@@ -125,6 +135,7 @@ const MUNICIPALITIES: Record<Municipality, MunicipalityConfig> = {
   },
   mangaung: {
     name: 'Mangaung Metropolitan',
+    type: 'Mangaung',
     hasApi: false,
     manualSubmissionUrl: 'https://www.mangaung.gov.za/',
     requirements: [
@@ -169,7 +180,9 @@ class CouncilSubmissionService {
 
     const submission: Omit<CouncilSubmission, 'id'> = {
       jobId: job.id,
-      municipality: config.name,
+      userId: client.uid,
+      municipality: config.type,
+      municipalityName: config.name,
       referenceNumber,
       status: 'preparing',
       documents,
@@ -178,8 +191,10 @@ class CouncilSubmissionService {
           status: 'Document Package Created',
           timestamp: new Date().toISOString(),
           notes: 'All required documents compiled and ready for submission',
+          source: 'manual',
         },
       ],
+      source: 'manual',
     };
 
     const docRef = await addDoc(collection(db, 'council_submissions'), submission);
@@ -230,6 +245,7 @@ class CouncilSubmissionService {
         status: status.replace(/_/g, ' '),
         timestamp: new Date().toISOString(),
         notes,
+        source: submission.source || 'manual',
       },
     ];
 

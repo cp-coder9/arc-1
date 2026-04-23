@@ -202,7 +202,7 @@ export default function FileManager({ user }: FileManagerProps) {
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   <span className="font-medium">{formatSize(file.fileSize)}</span>
                   <span>•</span>
-                  <span>{file.fileType?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                  <span>{file.fileType?.split('/')?.[1]?.toUpperCase() || 'FILE'}</span>
                 </div>
               </div>
               
