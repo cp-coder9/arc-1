@@ -9,6 +9,7 @@ import { encrypt, decrypt } from "./encryption.js";
 import { runMunicipalScraper } from "../services/scraperService.js";
 import { processReceiptOCR } from "../services/ocrService.js";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
+import { verifySACAPRegistration } from "../services/sacapVerificationService.js";
 
 import { UserRole, MunicipalityType } from "../types.js";
 
@@ -1141,6 +1142,43 @@ router.get("/municipal/submissions", async (req, res) => {
     res.json(submissions);
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// SACAP Verification Agent (Real Automation)
+router.post("/architect/verify-sacap", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { architectId, name, sacapNumber } = req.body;
+
+    if (!architectId || !name) {
+      return res.status(400).json({ error: "Missing architectId or name" });
+    }
+
+    console.log(`[SACAP Agent] Verifying architect: ${name} (SACAP: ${sacapNumber || 'N/A'})`);
+
+    const result = await verifySACAPRegistration(name);
+    const status = result.verified ? 'verified' : 'failed';
+
+    // Update the architect profile in Firestore
+    await adminDb.collection("architect_profiles").doc(architectId).set({
+      sacapStatus: status,
+      sacapLastVerifiedAt: new Date().toISOString(),
+      sacapCategory: result.registrationDetails?.category || null,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    res.json({
+      success: true,
+      status,
+      details: result.registrationDetails,
+      message: status === 'verified'
+        ? `Architect SACAP status verified as ${result.registrationDetails?.category}.`
+        : 'Architect not found in SACAP registry.'
+    });
+  } catch (err: any) {
+    console.error("SACAP Verification Error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 

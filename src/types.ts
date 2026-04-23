@@ -269,9 +269,13 @@ export interface ArchitectVerification {
 }
 
 // Architect profile
+export type SACAPStatus = 'unverified' | 'verified' | 'pending' | 'failed';
+
 export interface ArchitectProfile {
   userId: string;
   sacapNumber: string;
+  sacapStatus?: SACAPStatus;
+  sacapLastVerifiedAt?: string;
   yearsExperience?: number;
   specializations: string[];
   portfolioImages: { url: string; title: string; description?: string }[];

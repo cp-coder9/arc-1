@@ -80,7 +80,7 @@ const PROVIDER_CONFIGS = {
 } as const;
 
 // Agent Card Component
-function AgentCard({ agent }: { agent: Agent, key?: React.Key }) {
+function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
   const [editing, setEditing] = useState(false);
   const [tempAgent, setTempAgent] = useState<Agent>(agent);
 
@@ -168,7 +168,7 @@ function AgentCard({ agent }: { agent: Agent, key?: React.Key }) {
                     <option value="">Select a model</option>
                     {tempAgent.llmProvider && 
                      tempAgent.llmProvider !== 'global' && 
-                     PROVIDER_CONFIGS[tempAgent.llmProvider as keyof typeof PROVIDER_CONFIGS]?.models?.map(m => (
+                     PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                     <option value="custom">Enter custom model name...</option>
@@ -207,7 +207,7 @@ function AgentCard({ agent }: { agent: Agent, key?: React.Key }) {
                     <option value="">Select a model</option>
                     {tempAgent.llmProvider && 
                      tempAgent.llmProvider !== 'global' && 
-                     PROVIDER_CONFIGS[tempAgent.llmProvider as keyof typeof PROVIDER_CONFIGS]?.models?.map(m => (
+                     PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
@@ -1179,6 +1179,7 @@ function UserManagement({
                     >
                       {(u as any).status === 'suspended' ? 'Activate' : 'Suspend'}
                     </Button>
+                    <ProfileEditor user={u} isAdminEditing={true} />
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -1314,7 +1315,7 @@ function LLMSettings() {
                 onChange={e => setConfig({...config, model: e.target.value})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
-                {PROVIDER_CONFIGS[config.provider as keyof typeof PROVIDER_CONFIGS].models.map(m => (
+                {PROVIDER_CONFIGS[config.provider].models.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
@@ -1515,7 +1516,7 @@ function AddAgentDialog() {
                       }}
                       className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                     >
-                      {PROVIDER_CONFIGS[llmProvider as keyof typeof PROVIDER_CONFIGS].models.map(m => (
+                      {PROVIDER_CONFIGS[llmProvider as LLMProvider].models.map(m => (
                         <option key={m.value} value={m.value}>{m.label}</option>
                       ))}
                       <option value="custom">Enter custom model name...</option>
