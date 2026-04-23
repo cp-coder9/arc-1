@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Star, Award, Briefcase, Calendar, Link as LinkIcon, MapPin } from 'lucide-react';
+import { Star, Award, Briefcase, Calendar, Link as LinkIcon, MapPin, ShieldCheck, ShieldX } from 'lucide-react';
 import { ArchitectProfile, Review, UserProfile } from '@/types';
 import { format } from 'date-fns';
 
@@ -100,10 +100,21 @@ export function ArchitectPortfolio({ architectId }: ArchitectPortfolioProps) {
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold">{user.displayName}</h1>
                 {profile?.sacapNumber && (
-                  <Badge variant="secondary" className="gap-1">
-                    <Award className="h-3 w-3" />
-                    SACAP: {profile.sacapNumber}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="gap-1">
+                      <Award className="h-3 w-3" />
+                      SACAP: {profile.sacapNumber}
+                    </Badge>
+                    {profile.sacapStatus === 'verified' ? (
+                      <Badge className="bg-green-50 text-green-700 border-green-100 gap-1 text-[10px] px-2 py-0.5">
+                        <ShieldCheck size={12} /> SACAP Verified
+                      </Badge>
+                    ) : profile.sacapStatus === 'failed' ? (
+                      <Badge variant="destructive" className="gap-1 text-[10px] px-2 py-0.5">
+                        <ShieldX size={12} /> SACAP Unverified
+                      </Badge>
+                    ) : null}
+                  </div>
                 )}
               </div>
               <p className="text-muted-foreground mb-4">{user.bio || 'No bio available'}</p>

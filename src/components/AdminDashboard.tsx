@@ -1179,6 +1179,7 @@ function UserManagement({
                     >
                       {(u as any).status === 'suspended' ? 'Activate' : 'Suspend'}
                     </Button>
+                    <ProfileEditor user={u} isAdminEditing={true} />
                     <Button 
                       variant="ghost" 
                       size="icon" 
