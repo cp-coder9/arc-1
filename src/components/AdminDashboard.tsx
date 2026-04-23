@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Building2 } from 'lucide-react';
+import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 import {
   Accordion,
   AccordionContent,
@@ -80,7 +81,7 @@ const PROVIDER_CONFIGS = {
 } as const;
 
 // Agent Card Component
-function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
+function AgentCard({ agent }: { agent: Agent, key?: React.Key }) {
   const [editing, setEditing] = useState(false);
   const [tempAgent, setTempAgent] = useState<Agent>(agent);
 
@@ -168,7 +169,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     <option value="">Select a model</option>
                     {tempAgent.llmProvider && 
                      tempAgent.llmProvider !== 'global' && 
-                     PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
+                     PROVIDER_CONFIGS[tempAgent.llmProvider as keyof typeof PROVIDER_CONFIGS]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                     <option value="custom">Enter custom model name...</option>
@@ -207,7 +208,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     <option value="">Select a model</option>
                     {tempAgent.llmProvider && 
                      tempAgent.llmProvider !== 'global' && 
-                     PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
+                     PROVIDER_CONFIGS[tempAgent.llmProvider as keyof typeof PROVIDER_CONFIGS]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
@@ -373,6 +374,7 @@ export default function AdminDashboard({
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
+    activeTab === 'municipal' ? 'municipal' :
     'submissions';
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [stats, setStats] = useState({
@@ -619,6 +621,9 @@ export default function AdminDashboard({
               {pendingKnowledgeCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <Building2 size={16} /> Municipal Settings
             </TabsTrigger>
           </TabsList>
         </ScrollArea>
@@ -953,6 +958,12 @@ export default function AdminDashboard({
 
         <TabsContent value="settings">
           <LLMSettings />
+        </TabsContent>
+
+        <TabsContent value="municipal">
+          <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
+            <MunicipalSettingsAdmin />
+          </div>
         </TabsContent>
 
         <TabsContent value="knowledge">
@@ -1307,7 +1318,7 @@ function LLMSettings() {
                 onChange={e => setConfig({...config, model: e.target.value})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
-                {PROVIDER_CONFIGS[config.provider].models.map(m => (
+                {PROVIDER_CONFIGS[config.provider as keyof typeof PROVIDER_CONFIGS].models.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
@@ -1508,7 +1519,7 @@ function AddAgentDialog() {
                       }}
                       className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                     >
-                      {PROVIDER_CONFIGS[llmProvider as LLMProvider].models.map(m => (
+                      {PROVIDER_CONFIGS[llmProvider as keyof typeof PROVIDER_CONFIGS].models.map(m => (
                         <option key={m.value} value={m.value}>{m.label}</option>
                       ))}
                       <option value="custom">Enter custom model name...</option>

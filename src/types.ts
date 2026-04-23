@@ -308,22 +308,65 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
+export type MunicipalityType = 'COJ' | 'COCT' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'eThekwini' | 'Other';
+
 export interface CouncilSubmission {
   id: string;
-  jobId: string;
-  municipality: string;
+  jobId?: string;
+  userId: string;
+  municipality: MunicipalityType;
+  municipalityName?: string; // For 'Other'
   referenceNumber?: string;
-  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised';
+  status: string; // Unified status
+  rawStatus?: string; // Status as reported by the municipality
   submittedAt?: string;
+  lastCheckedAt?: string;
   documents: { name: string; url: string }[];
-  trackingHistory: { status: string; timestamp: string; notes?: string }[];
-  queries?: {
-    raisedAt: string;
-    description: string;
-    response?: string;
-    respondedAt?: string;
-    attachments?: { name: string; url: string }[];
-  }[];
+  trackingHistory: TrackingEvent[];
+  queries?: CouncilQuery[];
+  erfNumber?: string;
+  projectDescription?: string;
+  source: 'manual' | 'ocr' | 'scraper' | 'shadow_tracker';
+}
+
+export interface TrackingEvent {
+  status: string;
+  timestamp: string;
+  notes?: string;
+  source: 'scraper' | 'ocr' | 'crowdsource' | 'shadow_tracker' | 'manual';
+  actorId?: string;
+}
+
+export interface CouncilQuery {
+  raisedAt: string;
+  description: string;
+  response?: string;
+  respondedAt?: string;
+  attachments?: { name: string; url: string }[];
+}
+
+export interface MunicipalCredential {
+  id: string;
+  userId: string;
+  municipality: MunicipalityType;
+  username: string;
+  encryptedPassword: string;
+  iv: string;
+  authTag?: string; // For GCM
+  lastUsed?: string;
+  status: 'valid' | 'invalid' | 'unchecked';
+  createdAt: string;
+}
+
+export interface CrowdsourceUpdate {
+  id: string;
+  municipality: MunicipalityType;
+  officeLocation?: string;
+  department?: string;
+  statusUpdate: string;
+  backlogLevel: 'low' | 'medium' | 'high';
+  reportedBy: string; // userId
+  timestamp: string;
 }
 
 // Invoicing types
@@ -370,6 +413,14 @@ export type UploadedFile = {
 
 export type KnowledgeSource = 'documentation' | 'human_feedback' | 'self_improvement' | 'web_search';
 export type KnowledgeStatus = 'active' | 'pending_review' | 'rejected' | 'archived';
+
+export interface SystemSettings {
+  municipalTrackerEnabled: boolean;
+  nvidiaApiKey?: string;
+  nvidiaOcrModel?: string;
+  xeroConnected?: boolean;
+  lastScraperRun?: string;
+}
 
 export interface AgentKnowledge {
   id: string;
