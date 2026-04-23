@@ -16,7 +16,7 @@ function Dialog({ children, open, onOpenChange }: { children: React.ReactNode, o
   );
 }
 
-function DialogTrigger({ children, render, onClick }: { children?: React.ReactNode, render?: React.ReactNode, onClick?: () => void }) {
+function DialogTrigger({ children, render, onClick, asChild }: { children?: React.ReactNode, render?: React.ReactNode, onClick?: () => void, asChild?: boolean }) {
   const { onOpenChange } = React.useContext(DialogContext);
   const content = render || children;
 
@@ -42,7 +42,7 @@ function DialogPortal({ children }: { children: React.ReactNode }) {
   return <div data-slot="dialog-portal">{children}</div>;
 }
 
-function DialogClose({ children, render, onClick }: { children?: React.ReactNode, render?: React.ReactNode, onClick?: () => void }) {
+function DialogClose({ children, render, onClick, asChild }: { children?: React.ReactNode, render?: React.ReactNode, onClick?: () => void, asChild?: boolean }) {
   const { onOpenChange } = React.useContext(DialogContext);
   const content = render || children;
 
