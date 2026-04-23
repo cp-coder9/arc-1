@@ -1275,16 +1275,16 @@ function LLMSettings() {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
               <select 
                 value={config.provider} 
-                onChange={(e) => {
-                  const provider = e.target.value as LLMProvider;
-                  const pConfig = PROVIDER_CONFIGS[provider];
-                  setConfig({
-                    ...config,
-                    provider,
-                    baseUrl: pConfig.baseUrl,
-                    model: pConfig.models[0].value
-                  });
-                }}
+onChange={(e) => {
+  const provider = e.target.value as LLMProvider;
+  const pConfig = PROVIDER_CONFIGS[provider];
+  setConfig({
+    ...config,
+    provider,
+    baseUrl: pConfig?.baseUrl || '',
+    model: pConfig?.models?.[0]?.value || ''
+  });
+}}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
@@ -1316,9 +1316,9 @@ function LLMSettings() {
                 onChange={e => setConfig({...config, model: e.target.value})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
-                {PROVIDER_CONFIGS[config.provider].models.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
+{PROVIDER_CONFIGS[config.provider]?.models?.map(m => (
+  <option key={m.value} value={m.value}>{m.label}</option>
+))}
               </select>
             </div>
 
@@ -1480,14 +1480,14 @@ function AddAgentDialog() {
                   onChange={e => {
                     const provider = e.target.value as LLMProvider | 'global';
                     setLlmProvider(provider);
-                    if (provider !== 'global') {
-                      const pConfig = PROVIDER_CONFIGS[provider];
-                      setLlmBaseUrl(pConfig.baseUrl);
-                      setLlmModel(pConfig.models[0].value);
-                    } else {
-                      setLlmBaseUrl('');
-                      setLlmModel('');
-                    }
+if (provider !== 'global') {
+  const pConfig = PROVIDER_CONFIGS[provider];
+  setLlmBaseUrl(pConfig?.baseUrl || '');
+  setLlmModel(pConfig?.models?.[0]?.value || '');
+} else {
+  setLlmBaseUrl('');
+  setLlmModel('');
+}
                   }}
                   className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                 >
@@ -1517,9 +1517,9 @@ function AddAgentDialog() {
                       }}
                       className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                     >
-                      {PROVIDER_CONFIGS[llmProvider as LLMProvider].models.map(m => (
-                        <option key={m.value} value={m.value}>{m.label}</option>
-                      ))}
+{PROVIDER_CONFIGS[llmProvider as LLMProvider]?.models?.map(m => (
+  <option key={m.value} value={m.value}>{m.label}</option>
+))}
                       <option value="custom">Enter custom model name...</option>
                     </select>
                     <Input 
