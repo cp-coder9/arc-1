@@ -24,8 +24,10 @@ async function startServer() {
     credentials: true
   }));
 
-  // Console logging for requests
+  // Console logging for requests and COOP headers for Firebase Auth
   app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    
     if (req.path.startsWith('/api')) {
       console.log(`[API] ${req.method} ${req.path}`);
     }
