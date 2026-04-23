@@ -6,6 +6,7 @@ export interface SACAPVerificationResult {
     firstName: string;
     lastName: string;
     category: string;
+    registrationNumber?: string;
   };
   error?: string;
 }
@@ -13,9 +14,11 @@ export interface SACAPVerificationResult {
 /**
  * Service to verify SACAP registration by scraping the official registry.
  */
-export async function verifySACAPRegistration(name: string): Promise<SACAPVerificationResult> {
-  if (!name || name.length < 3) {
-    return { verified: false, error: 'Name must be at least 3 characters long' };
+export async function verifySACAPRegistration(firstName: string, lastName: string): Promise<SACAPVerificationResult> {
+  const fullName = `${firstName} ${lastName}`.trim();
+  
+  if (!firstName || firstName.length < 2 || !lastName || lastName.length < 2) {
+    return { verified: false, error: 'First name and last name are required' };
   }
 
   const browser: Browser = await chromium.launch({
@@ -29,13 +32,13 @@ export async function verifySACAPRegistration(name: string): Promise<SACAPVerifi
     // Set a reasonable timeout
     page.setDefaultTimeout(30000);
 
-    console.log(`[SACAP Service] Verifying: ${name}`);
+    console.log(`[SACAP Service] Verifying: ${fullName}`);
     await page.goto('https://search.mymembership.co.za/Search/?Id=4f3f0fde-d5dc-4af0-97cd-0a192a56830e', {
       waitUntil: 'networkidle'
     });
 
-    // Fill search box
-    await page.fill('#WildCardSearch', name);
+    // Fill search box with full name
+    await page.fill('#WildCardSearch', fullName);
 
     // Click Search
     await page.click('#butSubmit');
@@ -44,7 +47,7 @@ export async function verifySACAPRegistration(name: string): Promise<SACAPVerifi
     try {
       await page.waitForSelector('.table tr td', { timeout: 15000 });
     } catch (e) {
-      console.log(`[SACAP Service] No results found for: ${name}`);
+      console.log(`[SACAP Service] No results found for: ${fullName}`);
       return { verified: false };
     }
 
@@ -58,27 +61,30 @@ export async function verifySACAPRegistration(name: string): Promise<SACAPVerifi
 
     console.log(`[SACAP Service] Found ${results.length} potential matches`);
 
-    // Basic fuzzy match: check if the name parts are present in the results
-    const nameParts = name.toLowerCase().split(' ').filter(p => p.length > 1);
+    // Normalize search names
+    const searchFirstName = firstName.toLowerCase().trim();
+    const searchLastName = lastName.toLowerCase().trim();
 
+    // Look for exact or close match
     for (const row of results) {
-      const firstName = row[0];
-      const lastName = row[1];
+      const resultFirstName = row[0]?.toLowerCase().trim() || '';
+      const resultLastName = row[1]?.toLowerCase().trim() || '';
       const category = row[2];
+      const registrationNumber = row[3] || '';
 
-      const fullName = `${firstName} ${lastName}`.toLowerCase();
+      // Check for exact match of first and last name
+      const firstNameMatch = resultFirstName === searchFirstName || resultFirstName.includes(searchFirstName);
+      const lastNameMatch = resultLastName === searchLastName || resultLastName.includes(searchLastName);
 
-      // If all parts of the search name are in the full name found
-      const isMatch = nameParts.every(part => fullName.includes(part));
-
-      if (isMatch) {
-        console.log(`[SACAP Service] Verified match: ${firstName} ${lastName} (${category})`);
+      if (firstNameMatch && lastNameMatch) {
+        console.log(`[SACAP Service] Verified match: ${row[0]} ${row[1]} (${category})`);
         return {
           verified: true,
           registrationDetails: {
-            firstName,
-            lastName,
-            category
+            firstName: row[0],
+            lastName: row[1],
+            category: category,
+            registrationNumber
           }
         };
       }
@@ -91,4 +97,20 @@ export async function verifySACAPRegistration(name: string): Promise<SACAPVerifi
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * Verify SACAP registration using display name (splits into first/last name)
+ */
+export async function verifySACAPByName(displayName: string): Promise<SACAPVerificationResult> {
+  const nameParts = displayName.trim().split(/\s+/);
+  
+  if (nameParts.length < 2) {
+    return { verified: false, error: 'Full name (first and last) is required' };
+  }
+
+  const firstName = nameParts[0];
+  const lastName = nameParts.slice(1).join(' ');
+  
+  return verifySACAPRegistration(firstName, lastName);
 }

@@ -97,26 +97,38 @@ export function ArchitectPortfolio({ architectId }: ArchitectPortfolioProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold">{user.displayName}</h1>
-                {profile?.sacapNumber && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="gap-1">
-                      <Award className="h-3 w-3" />
-                      SACAP: {profile.sacapNumber}
-                    </Badge>
-                    {profile.sacapStatus === 'verified' ? (
-                      <Badge className="bg-green-50 text-green-700 border-green-100 gap-1 text-[10px] px-2 py-0.5">
-                        <ShieldCheck size={12} /> SACAP Verified
-                      </Badge>
-                    ) : profile.sacapStatus === 'failed' ? (
-                      <Badge variant="destructive" className="gap-1 text-[10px] px-2 py-0.5">
-                        <ShieldX size={12} /> SACAP Unverified
-                      </Badge>
-                    ) : null}
-                  </div>
-                )}
-              </div>
+<div className="flex items-center gap-3 mb-2">
+  <h1 className="text-2xl font-bold">{user.displayName}</h1>
+  {profile?.sacapNumber && (
+    <>
+      <Badge variant="secondary" className="gap-1">
+        <Award className="h-3 w-3" />
+        SACAP: {profile.sacapNumber}
+      </Badge>
+      {profile.sacapStatus === 'verified' ? (
+        <>
+          <div className="flex items-center gap-1 bg-green-100 text-green-700 border border-green-200 rounded-full px-2 py-0.5 text-xs font-medium">
+            <div className="flex items-center justify-center w-4 h-4 bg-green-500 rounded-full text-white">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.5 7.5a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L8.5 12.086l6.793-6.793a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span>SACAP Verified</span>
+          </div>
+          {profile.sacapRegistrationType && (
+            <Badge className="bg-blue-50 text-blue-700 border-blue-100 gap-1 text-[10px] px-2 py-0.5">
+              {profile.sacapRegistrationType}
+            </Badge>
+          )}
+        </>
+      ) : profile.sacapStatus === 'failed' ? (
+        <Badge variant="destructive" className="gap-1 text-[10px] px-2 py-0.5">
+          <ShieldX size={12} /> SACAP Unverified
+        </Badge>
+      ) : null}
+    </>
+  )}
+</div>
               <p className="text-muted-foreground mb-4">{user.bio || 'No bio available'}</p>
               
               <div className="flex flex-wrap gap-4 text-sm">

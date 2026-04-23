@@ -124,14 +124,25 @@ export function ArchitectRecommendations({ job }: ArchitectRecommendationsProps)
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <h5 className="font-bold text-sm truncate group-hover:text-primary transition-colors">{user.displayName}</h5>
-                      {profile.sacapStatus === 'verified' ? (
-                        <ShieldCheck size={14} className="text-green-600 shrink-0" title="SACAP Verified" />
-                      ) : profile.sacapStatus === 'failed' ? (
-                        <ShieldX size={14} className="text-destructive shrink-0" title="SACAP Unverified" />
-                      ) : null}
-                    </div>
+<div className="flex items-center gap-1.5 min-w-0">
+  <h5 className="font-bold text-sm truncate group-hover:text-primary transition-colors">{user.displayName}</h5>
+  {profile.sacapStatus === 'verified' ? (
+    <>
+      <div className="flex items-center justify-center w-4 h-4 bg-green-500 rounded-full text-white shrink-0" title="SACAP Verified">
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.5 7.5a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L8.5 12.086l6.793-6.793a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      </div>
+      {profile.sacapRegistrationType && (
+        <span className="text-[9px] text-green-700 font-medium bg-green-50 px-1.5 py-0.5 rounded-full border border-green-200 truncate max-w-[120px]">
+          {profile.sacapRegistrationType}
+        </span>
+      )}
+    </>
+  ) : profile.sacapStatus === 'failed' ? (
+    <ShieldX size={14} className="text-destructive shrink-0" title="SACAP Unverified" />
+  ) : null}
+</div>
                     <div className="flex items-center gap-1 text-yellow-500">
                       <Star size={12} fill="currentColor" />
                       <span className="text-xs font-bold text-foreground">{profile.averageRating || 'N/A'}</span>

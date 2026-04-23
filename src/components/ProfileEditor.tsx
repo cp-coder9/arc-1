@@ -7,10 +7,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { User, Settings, Save, Loader2, Plus, Trash2, Image as ImageIcon, ShieldCheck, ShieldAlert, Search } from 'lucide-react';
+import { User, Settings, Save, Loader2, Plus, Trash2, Image as ImageIcon, ShieldCheck, ShieldAlert, Search, CheckCircle } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { uploadAndTrackFile } from '../lib/uploadService';
+import { verifySACAPByName } from '../services/sacapVerificationService';
 
 interface ProfileEditorProps {
   user: UserProfile;
@@ -108,56 +109,76 @@ export default function ProfileEditor({ user, trigger, isAdminEditing = false }:
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
+const handleSave = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsSaving(true);
 
-    try {
-      // Update User profile
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        displayName,
-        bio,
+  try {
+    // Update User profile
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, {
+      displayName,
+      bio,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Update Architect profile if applicable
+    if (isArchitect) {
+      const archProfileRef = doc(db, 'architect_profiles', user.uid);
+      const archData: Partial<ArchitectProfile> = {
+        userId: user.uid,
+        sacapNumber,
+        ...(yearsExperience !== '' && { yearsExperience: Number(yearsExperience) }),
+        specializations,
+        portfolioImages,
+        website,
+        linkedIn,
         updatedAt: new Date().toISOString(),
-      });
+      };
 
-// Update Architect profile if applicable
-if (isArchitect) {
-  const archProfileRef = doc(db, 'architect_profiles', user.uid);
-  const archData: Partial<ArchitectProfile> = {
-    userId: user.uid,
-    sacapNumber,
-    ...(yearsExperience !== '' && { yearsExperience: Number(yearsExperience) }),
-    specializations,
-    portfolioImages,
-    website,
-    linkedIn,
-    updatedAt: new Date().toISOString(),
-  };
-
-        const profileDoc = await getDoc(archProfileRef);
-        if (profileDoc.exists()) {
-          await updateDoc(archProfileRef, archData);
-        } else {
-          // Initialize missing fields for new profiles
-          await setDoc(archProfileRef, {
-            ...archData,
-            completedJobs: 0,
-            averageRating: 0,
-            totalReviews: 0,
-          });
+      // Auto-verify SACAP if number is provided and not already verified
+      if (sacapNumber && architectProfile?.sacapStatus !== 'verified') {
+        toast.info('Verifying SACAP registration...');
+        try {
+          const result = await verifySACAPByName(displayName);
+          if (result.verified && result.registrationDetails) {
+            archData.sacapStatus = 'verified';
+            archData.sacapLastVerifiedAt = new Date().toISOString();
+            archData.sacapRegistrationType = result.registrationDetails.category;
+            toast.success(`SACAP verified: ${result.registrationDetails.category}`);
+          } else {
+            archData.sacapStatus = 'failed';
+            toast.info('SACAP verification: Not found in registry');
+          }
+        } catch (error) {
+          console.error('SACAP verification error:', error);
+          archData.sacapStatus = 'failed';
         }
       }
 
-      toast.success('Profile updated successfully');
-      setIsOpen(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
-      toast.error('Failed to update profile');
-    } finally {
-      setIsSaving(false);
+      const profileDoc = await getDoc(archProfileRef);
+      if (profileDoc.exists()) {
+        await updateDoc(archProfileRef, archData);
+      } else {
+        // Initialize missing fields for new profiles
+        await setDoc(archProfileRef, {
+          ...archData,
+          completedJobs: 0,
+          averageRating: 0,
+          totalReviews: 0,
+        });
+      }
     }
-  };
+
+    toast.success('Profile updated successfully');
+    setIsOpen(false);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    toast.error('Failed to update profile');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const addSpecialization = () => {
     if (newSpecialization.trim() && !specializations.includes(newSpecialization.trim())) {
@@ -289,16 +310,28 @@ if (isArchitect) {
                           {isVerifying ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                           Verify
                         </Button>
-                      </div>
-                      {architectProfile?.sacapStatus === 'verified' ? (
-                        <p className="text-[10px] text-green-600 font-bold flex items-center gap-1 mt-1">
-                          <ShieldCheck size={12} /> Verified SACAP Member
-                        </p>
-                      ) : architectProfile?.sacapStatus === 'failed' ? (
-                        <p className="text-[10px] text-destructive font-bold flex items-center gap-1 mt-1">
-                          <ShieldAlert size={12} /> Unverified / Not Found
-                        </p>
-                      ) : null}
+</div>
+{architectProfile?.sacapStatus === 'verified' ? (
+  <div className="flex items-center gap-2 mt-2">
+    <div className="flex items-center gap-1 bg-green-100 text-green-700 border border-green-200 rounded-full px-2 py-1 text-xs font-medium">
+      <div className="flex items-center justify-center w-4 h-4 bg-green-500 rounded-full text-white">
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.5 7.5a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L8.5 12.086l6.793-6.793a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      </div>
+      <span>SACAP Verified</span>
+    </div>
+    {architectProfile.sacapRegistrationType && (
+      <Badge className="bg-blue-50 text-blue-700 border-blue-100 gap-1 text-[10px] px-2 py-0.5">
+        {architectProfile.sacapRegistrationType}
+      </Badge>
+    )}
+  </div>
+) : architectProfile?.sacapStatus === 'failed' ? (
+  <p className="text-[10px] text-destructive font-bold flex items-center gap-1 mt-1">
+    <ShieldAlert size={12} /> Unverified / Not Found
+  </p>
+) : null}
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Years of Experience</label>
