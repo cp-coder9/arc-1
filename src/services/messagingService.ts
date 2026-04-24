@@ -22,7 +22,7 @@ import DOMPurify from 'dompurify';
 export interface SendMessageParams {
   jobId: string;
   senderId: string;
-  senderRole: UserRole;
+  senderRole: 'client' | 'architect' | 'admin' | 'freelancer';
   content: string;
   attachments?: { name: string; url: string; type: string }[];
 }

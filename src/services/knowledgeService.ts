@@ -155,17 +155,17 @@ export const searchKnowledge = async (searchTerm: string, agentRole?: string): P
   try {
     const allKnowledge = await getAllAgentKnowledge('active');
     const lowerSearch = searchTerm.toLowerCase();
-
+    
     const filtered = allKnowledge.filter(entry => {
       const matchesSearch = entry.title.toLowerCase().includes(lowerSearch) ||
         entry.content.toLowerCase().includes(lowerSearch) ||
         entry.tags?.some(tag => tag.toLowerCase().includes(lowerSearch));
-
+      
       const matchesAgent = !agentRole || entry.agentRole === agentRole;
-
+      
       return matchesSearch && matchesAgent;
     });
-
+    
     return filtered;
   } catch (error) {
     console.error("Error searching knowledge:", error);

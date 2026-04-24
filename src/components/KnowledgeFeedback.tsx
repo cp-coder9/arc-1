@@ -12,7 +12,7 @@ interface KnowledgeFeedbackProps {
   agentRole: string;
   categoryName: string;
   issue: AIIssue;
-  userRole?: UserRole;
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
 }
 
 export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: KnowledgeFeedbackProps) {
@@ -42,7 +42,7 @@ export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: 
         source: 'human_feedback',
         status: 'pending_review',
         submittedBy: user.uid,
-        submittedByRole: userRole || 'architect',
+        submittedByRole: (userRole || 'architect') as any,
         tags: [categoryName, 'correction'],
         createdAt: new Date().toISOString()
       });

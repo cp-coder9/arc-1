@@ -10,7 +10,6 @@ import { runMunicipalScraper } from "../services/scraperService.js";
 import { processReceiptOCR } from "../services/ocrService.js";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
 import { verifySACAPByName } from "../services/sacapVerificationService.js";
-import { trackMunicipalityStatus } from "./municipalAutomation.js";
 
 import { UserRole, MunicipalityType } from "../types.js";
 

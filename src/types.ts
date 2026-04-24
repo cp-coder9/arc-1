@@ -154,16 +154,10 @@ export interface DelegatedTask {
 }
 
 export interface JobCard extends DelegatedTask {
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assigneeId?: string;
+  priority: 'low' | 'medium' | 'high';
+  estimatedHours?: number;
   attachments?: { name: string; url: string }[];
-  comments?: {
-    userId: string;
-    userName: string;
-    text: string;
-    createdAt: string;
-  }[];
-  requirements?: string[];
-  completedAt?: string;
 }
 
 export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';

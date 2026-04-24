@@ -16,7 +16,7 @@ export interface SACAPVerificationResult {
  */
 export async function verifySACAPRegistration(firstName: string, lastName: string): Promise<SACAPVerificationResult> {
   const fullName = `${firstName} ${lastName}`.trim();
-
+  
   if (!firstName || firstName.length < 2 || !lastName || lastName.length < 2) {
     return { verified: false, error: 'First name and last name are required' };
   }
@@ -104,13 +104,13 @@ export async function verifySACAPRegistration(firstName: string, lastName: strin
  */
 export async function verifySACAPByName(displayName: string): Promise<SACAPVerificationResult> {
   const nameParts = displayName.trim().split(/\s+/);
-
+  
   if (nameParts.length < 2) {
     return { verified: false, error: 'Full name (first and last) is required' };
   }
 
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(' ');
-
+  
   return verifySACAPRegistration(firstName, lastName);
 }
