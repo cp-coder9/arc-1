@@ -6,6 +6,7 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   bio?: string;
+  professionalLabels?: string[]; // e.g. ['Engineer', 'Builder', 'Construction Worker']
   createdAt: string;
   updatedAt?: string;
 }
@@ -143,6 +144,7 @@ export interface DelegatedTask {
   id: string;
   jobId: string;
   architectId: string;
+  assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
   assigneeRole: string;
   deadline: string;
@@ -338,14 +340,16 @@ export interface CouncilQuery {
 export interface MunicipalCredential {
   id: string;
   userId: string;
-  municipality: MunicipalityType;
+  municipality: MunicipalityType | string;
   username: string;
-  encryptedPassword: string;
-  iv: string;
+  encryptedPassword?: string;
+  password?: string; // Obfuscated base64 for demo
+  iv?: string;
   authTag?: string; // For GCM
   lastUsed?: string;
   status: 'valid' | 'invalid' | 'unchecked';
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface CrowdsourceUpdate {
@@ -421,7 +425,7 @@ export interface AgentKnowledge {
   source: KnowledgeSource;
   status: KnowledgeStatus;
   submittedBy: string; // userId
-  submittedByRole: 'admin' | 'architect' | 'client' | 'system';
+  submittedByRole: UserRole | 'system';
   reviewedBy?: string; // admin userId
   reviewedAt?: string;
   relatedSubmissionId?: string;

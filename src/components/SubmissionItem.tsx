@@ -7,6 +7,8 @@ import { safeFormat } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
 
+import { UserRole } from '../types';
+
 interface SubmissionItemProps {
   sub: Submission;
   userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
