@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer';
 
 export interface UserProfile {
   uid: string;
@@ -149,6 +149,13 @@ export interface DelegatedTask {
   notes: string;
   status: 'pending' | 'in-progress' | 'completed';
   createdAt: string;
+}
+
+export interface JobCard extends DelegatedTask {
+  assigneeId?: string;
+  priority: 'low' | 'medium' | 'high';
+  estimatedHours?: number;
+  attachments?: { name: string; url: string }[];
 }
 
 export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';

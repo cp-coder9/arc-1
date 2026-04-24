@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
 export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected']);
@@ -226,6 +226,26 @@ export const MessageCreateSchema = MessageSchema.omit({
   isRead: true,
   readAt: true,
   createdAt: true,
+});
+
+// JobCard schemas
+export const JobCardSchema = z.object({
+  id: z.string().optional(),
+  jobId: z.string().min(1),
+  architectId: z.string().min(1),
+  assigneeId: z.string().optional(),
+  assigneeName: z.string().min(1),
+  assigneeRole: z.string().min(1),
+  deadline: z.string().datetime(),
+  notes: z.string().max(2000),
+  priority: z.enum(['low', 'medium', 'high']).default('medium'),
+  estimatedHours: z.number().min(0).optional(),
+  attachments: z.array(z.object({
+    name: z.string(),
+    url: z.string().url(),
+  })).optional(),
+  status: z.enum(['pending', 'in-progress', 'completed']).default('pending'),
+  createdAt: z.string().datetime().optional(),
 });
 
 // Payment schemas
