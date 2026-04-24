@@ -11,7 +11,7 @@ import { UserRole } from '../types';
 
 interface SubmissionItemProps {
   sub: Submission;
-  userRole?: UserRole;
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
   [key: string]: any;
 }
 

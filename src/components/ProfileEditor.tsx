@@ -11,7 +11,6 @@ import { User, Settings, Save, Loader2, Plus, Trash2, Image as ImageIcon, Shield
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { verifySACAPByName } from '../services/sacapVerificationService';
 
 interface ProfileEditorProps {
   user: UserProfile;
@@ -140,12 +139,27 @@ const handleSave = async (e: React.FormEvent) => {
       if (sacapNumber && architectProfile?.sacapStatus !== 'verified') {
         toast.info('Verifying SACAP registration...');
         try {
-          const result = await verifySACAPByName(displayName);
-          if (result.verified && result.registrationDetails) {
+          // Call server-side API for SACAP verification
+          const idToken = await auth.currentUser?.getIdToken();
+          const response = await fetch('/api/architect/verify-sacap', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              architectId: user.uid,
+              name: displayName,
+              sacapNumber: sacapNumber,
+            }),
+          });
+          
+          const data = await response.json();
+          if (data.success && data.status === 'verified') {
             archData.sacapStatus = 'verified';
             archData.sacapLastVerifiedAt = new Date().toISOString();
-            archData.sacapRegistrationType = result.registrationDetails.category;
-            toast.success(`SACAP verified: ${result.registrationDetails.category}`);
+            archData.sacapRegistrationType = data.details?.category;
+            toast.success(`SACAP verified: ${data.details?.category}`);
           } else {
             archData.sacapStatus = 'failed';
             toast.info('SACAP verification: Not found in registry');

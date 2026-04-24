@@ -545,7 +545,7 @@ try {
       : '';
 
     const enrichedPrompt = agent.systemPrompt + knowledgeContext;
-
+    
     // Track which knowledge entries were used
     const usedKnowledgeIds: string[] = [];
 
@@ -664,7 +664,7 @@ const duration = Date.now() - startTime;
 reportProgress(100, 'Orchestrator', `Review Complete (${Math.round(duration / 1000)}s).`, completed);
 
 // Build knowledge sources list
-const knowledgeSources = allKnowledge.map(k =>
+const knowledgeSources = allKnowledge.map(k => 
   `[${k.title}](${k.pdfUrl || k.sourceUrl || 'Knowledge Base'}) - ${k.content.substring(0, 100)}...`
 );
 

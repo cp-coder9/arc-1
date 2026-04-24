@@ -60,6 +60,7 @@ import { Building2 } from 'lucide-react';
 import ClientDashboard from './components/ClientDashboard';
 import ArchitectDashboard from './components/ArchitectDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import FreelancerDashboard from './components/FreelancerDashboard';
 import UserSettings from './components/UserSettings';
 import InvoiceManagement from './components/InvoiceManagement';
 import FileManager from './components/FileManager';
@@ -604,6 +605,14 @@ const handleLogin = async () => {
               onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }} 
             />
           )}
+          {user!.role === 'architect' && (
+            <NavItem
+              icon={<Users size={18} />}
+              label="Team & Freelancers"
+              active={activeTab === 'team'}
+              onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
+            />
+          )}
           <NavItem 
             icon={<FileText size={18} />} 
             label="Active Projects" 
@@ -736,6 +745,7 @@ const handleLogin = async () => {
                 {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'admin' && <AdminDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user!.role === 'freelancer' && <FreelancerDashboard user={user!} />}
               </>
             )}
           </div>

@@ -46,11 +46,11 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
         uploadedBy: user.uid,
         context: 'knowledge_base',
       });
-
+      
       // Here you would typically trigger PDF text extraction
       // For now, we'll just store the PDF URL
       toast.success('PDF uploaded. Extracting content...');
-
+      
       // Create knowledge entry for PDF
       await addKnowledge({
         agentId: selectedAgent === 'all' ? 'general' : selectedAgent,
@@ -167,7 +167,7 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
                 </label>
               </div>
             </div>
-
+            
             {pdfFile && (
               <div className="flex items-center justify-between p-3 bg-muted rounded-md">
                 <div className="flex items-center gap-2">
