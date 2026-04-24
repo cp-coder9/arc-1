@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -13,7 +13,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle } from 'lucide-react';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal } from 'lucide-react';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -56,6 +56,7 @@ export default function ArchitectDashboard({
     activeTab === 'applications' ? 'applications' :
     activeTab === 'projects' ? 'active' : 
     activeTab === 'municipal' ? 'municipal' :
+    activeTab === 'team' ? 'team' :
     'browse';
 
   useEffect(() => {
@@ -163,7 +164,8 @@ export default function ArchitectDashboard({
           const tabMap: Record<string, string> = {
             'browse': 'marketplace',
             'applications': 'applications',
-            'active': 'projects'
+            'active': 'projects',
+            'team': 'team'
           };
           onTabChange?.(tabMap[val] || 'marketplace');
         }} 
@@ -174,6 +176,7 @@ export default function ArchitectDashboard({
             <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Browse Jobs</TabsTrigger>
             <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">My Applications ({myApplications.length})</TabsTrigger>
             <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects ({myJobs.length})</TabsTrigger>
+            <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Team & Freelancers</TabsTrigger>
             <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Municipal Tracker</TabsTrigger>
           </TabsList>
         </div>
@@ -261,6 +264,10 @@ export default function ArchitectDashboard({
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="team" className="mt-8">
+          <TeamManager user={user} myJobs={myJobs} />
         </TabsContent>
 
         <TabsContent value="municipal" className="mt-8">
@@ -1034,12 +1041,14 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
 }
 
 function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
-  const [tasks, setTasks] = useState<DelegatedTask[]>([]);
+  const [tasks, setTasks] = useState<(DelegatedTask | JobCard)[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [assigneeName, setAssigneeName] = useState('');
   const [assigneeRole, setAssigneeRole] = useState('');
   const [deadline, setDeadline] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [estimatedHours, setEstimatedHours] = useState<string>('');
 
   useEffect(() => {
     const q = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
@@ -1059,6 +1068,8 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
         assigneeRole,
         deadline,
         notes,
+        priority,
+        estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
         status: 'pending',
         createdAt: new Date().toISOString()
       });
@@ -1112,15 +1123,33 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                   <Input required value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} placeholder="e.g. Draftsman" className="rounded-xl" />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Deadline</label>
+                  <Input required type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Est. Hours</label>
+                  <Input type="number" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} placeholder="8" className="rounded-xl" />
+                </div>
+              </div>
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Deadline</label>
-                <Input required type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="rounded-xl" />
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Priority</label>
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value as any)}
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Task Notes</label>
                 <Textarea required value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the task..." className="rounded-xl min-h-[100px]" />
               </div>
-              <Button type="submit" className="w-full rounded-xl h-12 font-bold">Assign Task</Button>
+              <Button type="submit" className="w-full rounded-xl h-12 font-bold">Create Job Card</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -1131,9 +1160,23 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
           {tasks.map(task => (
             <div key={task.id} className="p-4 rounded-2xl border border-border bg-secondary/10 flex flex-col gap-3">
               <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-sm">{task.assigneeName} <span className="text-muted-foreground font-normal">({task.assigneeRole})</span></p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Clock size={12} /> Due: {new Date(task.deadline).toLocaleDateString()}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm">{task.assigneeName} <span className="text-muted-foreground font-normal">({task.assigneeRole})</span></p>
+                    {'priority' in task && (
+                      <Badge className={`text-[8px] uppercase tracking-widest ${
+                        task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                        task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {task.priority}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock size={12} /> Due: {new Date(task.deadline).toLocaleDateString()}</p>
+                  {'estimatedHours' in task && task.estimatedHours && (
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Est: {task.estimatedHours} hrs</p>
+                  )}
                 </div>
                 <select 
                   value={task.status}
@@ -1159,5 +1202,254 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
         </div>
       )}
     </div>
+  );
+}
+
+function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
+  const [freelancers, setFreelancers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const qFreelancers = query(collection(db, 'users'), where('role', '==', 'freelancer'));
+    const unsubscribeFreelancers = onSnapshot(qFreelancers, (snapshot) => {
+      setFreelancers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeFreelancers();
+    };
+  }, [user.uid]);
+
+  return (
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-heading font-bold">Project Team & Job Cards</h3>
+              <p className="text-muted-foreground text-sm">Assign freelancers and track deliverables for your active projects.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {myJobs.map(job => (
+              <ProjectTeamCard key={job.id} job={job} user={user} freelancers={freelancers} />
+            ))}
+            {myJobs.length === 0 && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                <p className="text-muted-foreground italic">You don't have any active projects to assign team members to.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
+            <CardHeader className="bg-primary/5 p-6 border-b border-border">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                <UserCircle size={16} className="text-primary" /> Available Freelancers
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[500px]">
+                <div className="p-4 space-y-3">
+                  {freelancers.map(freelancer => (
+                    <div key={freelancer.uid} className="flex items-center justify-between p-3 rounded-xl border border-border bg-secondary/10">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+                            {freelancer.displayName[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-xs font-bold">{freelancer.displayName}</p>
+                          <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{freelancer.email}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[8px] uppercase tracking-widest px-2 py-0">Online</Badge>
+                    </div>
+                  ))}
+                  {freelancers.length === 0 && !loading && (
+                    <p className="text-xs text-center text-muted-foreground py-10 italic">No freelancers available at the moment.</p>
+                  )}
+                  {loading && (
+                    <div className="flex justify-center py-10">
+                      <Loader2 className="animate-spin text-primary" size={24} />
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectTeamCard({ job, user, freelancers }: { job: Job, user: UserProfile, freelancers: UserProfile[], key?: string }) {
+  const [team, setTeam] = useState<any[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [selectedFreelancerId, setSelectedFreelancerId] = useState('');
+  const [role, setRole] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [jobCards, setJobCards] = useState<any[]>([]);
+
+  useEffect(() => {
+    const qTasks = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
+    const unsubscribe = onSnapshot(qTasks, (snapshot) => {
+      const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setJobCards(tasks);
+
+      setTeam(tasks.map((t: any) => ({
+        id: t.assigneeId,
+        name: t.assigneeName,
+        role: t.assigneeRole
+      })).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i));
+    });
+
+    return () => unsubscribe();
+  }, [job.id, user.uid]);
+
+  const handleAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const freelancer = freelancers.find(f => f.uid === selectedFreelancerId);
+    if (!freelancer) return;
+
+    try {
+      await addDoc(collection(db, `jobs/${job.id}/tasks`), {
+        jobId: job.id,
+        architectId: user.uid,
+        assigneeId: freelancer.uid,
+        assigneeName: freelancer.displayName,
+        assigneeRole: role,
+        priority,
+        estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        notes: `Welcome to the team for ${job.title}! Please review the project brief.`,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+
+      setIsAssigning(false);
+      setSelectedFreelancerId('');
+      setRole('');
+      toast.success(`${freelancer.displayName} assigned to project.`);
+    } catch (error) {
+      toast.error("Failed to assign freelancer.");
+    }
+  };
+
+  return (
+    <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden group hover:border-primary/30 transition-all flex flex-col">
+      <CardHeader className="p-6 pb-2">
+        <CardTitle className="text-lg font-bold truncate">{job.title}</CardTitle>
+        <CardDescription className="text-[10px] uppercase tracking-widest font-bold text-primary">Team Management</CardDescription>
+      </CardHeader>
+      <CardContent className="p-6 space-y-4 flex-1">
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
+            <Users size={12} /> Assigned Team
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {team.map((member, idx) => (
+              <Badge key={idx} variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-3 py-1 rounded-full text-[10px] font-bold">
+                {member.name} ({member.role})
+              </Badge>
+            ))}
+            {team.length === 0 && <p className="text-xs text-muted-foreground italic">No team members assigned yet.</p>}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+           <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
+            <LayoutList size={12} /> Active Job Cards ({jobCards.length})
+          </p>
+          <div className="space-y-2">
+            {jobCards.slice(0, 2).map((card, idx) => (
+              <div key={idx} className="p-2 rounded-xl border border-border bg-secondary/5 flex items-center justify-between">
+                <p className="text-[10px] font-bold truncate max-w-[120px]">{card.notes}</p>
+                <Badge className={`text-[8px] ${card.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {card.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="bg-secondary/10 p-4 border-t border-border mt-auto flex gap-2">
+        <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
+          <DialogTrigger render={
+            <Button variant="outline" className="flex-1 h-10 rounded-xl text-[10px] uppercase tracking-widest font-bold border-primary/20">
+              <Plus size={14} className="mr-1" /> Assign Freelancer
+            </Button>
+          } />
+          <DialogContent className="sm:max-w-[400px] border-border bg-white rounded-3xl p-0 overflow-hidden">
+            <div className="bg-primary/5 p-6 border-b border-border">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-xl font-bold">Assign Freelancer</DialogTitle>
+                <DialogDescription>Add a freelancer to your project team.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <form onSubmit={handleAssign} className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Select Freelancer</label>
+                <select
+                  required
+                  value={selectedFreelancerId}
+                  onChange={e => setSelectedFreelancerId(e.target.value)}
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="">Choose a freelancer...</option>
+                  {freelancers.map(f => (
+                    <option key={f.uid} value={f.uid}>{f.displayName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Assigned Role</label>
+                  <Input
+                    required
+                    value={role}
+                    onChange={e => setRole(e.target.value)}
+                    placeholder="e.g. 3D Modeler, Draftsman"
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Est. Hours</label>
+                  <Input
+                    type="number"
+                    value={estimatedHours}
+                    onChange={e => setEstimatedHours(e.target.value)}
+                    placeholder="8"
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Priority</label>
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value as any)}
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <Button type="submit" className="w-full rounded-xl h-12 font-bold shadow-lg shadow-primary/20">Assign to Project</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+        <Button variant="ghost" className="h-10 w-10 rounded-xl border border-border">
+          <MoreHorizontal size={18} />
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

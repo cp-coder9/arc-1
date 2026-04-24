@@ -60,6 +60,7 @@ import { Building2 } from 'lucide-react';
 import ClientDashboard from './components/ClientDashboard';
 import ArchitectDashboard from './components/ArchitectDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import FreelancerDashboard from './components/FreelancerDashboard';
 import UserSettings from './components/UserSettings';
 import InvoiceManagement from './components/InvoiceManagement';
 import FileManager from './components/FileManager';
@@ -381,6 +382,17 @@ const handleLogin = async () => {
                         <p className="text-[10px] opacity-70">Platform Management</p>
                       </div>
                     </Button>
+                    <Button
+                      variant={roleSelection === 'freelancer' ? 'default' : 'outline'}
+                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'freelancer' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
+                      onClick={() => setRoleSelection('freelancer')}
+                    >
+                      <UserCircle className="w-8 h-8" />
+                      <div className="text-center">
+                        <p className="font-bold">Freelancer</p>
+                        <p className="text-[10px] opacity-70">I want to help architects</p>
+                      </div>
+                    </Button>
                   </div>
                   <div className="space-y-3">
                     <Button 
@@ -569,6 +581,14 @@ const handleLogin = async () => {
               onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }} 
             />
           )}
+          {user!.role === 'architect' && (
+            <NavItem
+              icon={<Users size={18} />}
+              label="Team & Freelancers"
+              active={activeTab === 'team'}
+              onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
+            />
+          )}
           <NavItem 
             icon={<FileText size={18} />} 
             label="Active Projects" 
@@ -701,6 +721,7 @@ const handleLogin = async () => {
                 {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'admin' && <AdminDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user!.role === 'freelancer' && <FreelancerDashboard user={user!} />}
               </>
             )}
           </div>
