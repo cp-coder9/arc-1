@@ -7,11 +7,12 @@ import {
   XCircle, 
   Printer, 
   FileText, 
-  Search, 
+  Search,
   Maximize2,
   Download,
   Cpu,
-  Activity
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -19,9 +20,10 @@ import { ScrollArea } from './ui/scroll-area';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
+import { KnowledgeSources } from './KnowledgeSources';
 
 interface ComplianceReportProps {
-  result: AIReviewResult;
+  result: AIReviewResult & { citations?: any[]; knowledgeSources?: string[] };
   drawingUrl?: string;
   drawingName?: string;
   projectName?: string;
@@ -250,6 +252,13 @@ export default function ComplianceReport({
               </div>
             ))}
           </div>
+
+          {/* Knowledge Sources */}
+          {result.citations && result.citations.length > 0 && (
+            <div className="print:break-inside-avoid">
+              <KnowledgeSources citations={result.citations} />
+            </div>
+          )}
 
           {/* Traceability Footer */}
           <div className="bg-slate-900 text-slate-100 rounded-[2rem] p-10 shadow-xl overflow-hidden relative">

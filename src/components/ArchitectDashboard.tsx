@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, JobCard, MunicipalCredential } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, JobCard, MunicipalCredential, ArchitectProfile } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -19,7 +19,7 @@ import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { notificationService } from '../services/notificationService';
 import ReactMarkdown from 'react-markdown';
-import { format } from 'date-fns';
+import { safeLocale } from '@/lib/utils';
 import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
@@ -103,13 +103,13 @@ export default function ArchitectDashboard({
       // matchesLocation could be added if job has location field
       
       let matchesDeadline = true;
-      if (filters.deadlineWithin > 0) {
+      if (filters.deadlineWithin > 0 && job.deadline) {
         const daysToDeadline = differenceInDays(parseISO(job.deadline), new Date());
         matchesDeadline = daysToDeadline >= 0 && daysToDeadline <= filters.deadlineWithin;
       }
 
       let matchesPosted = true;
-      if (filters.postedWithin > 0) {
+      if (filters.postedWithin > 0 && job.createdAt) {
         const daysSincePosted = differenceInDays(new Date(), parseISO(job.createdAt));
         matchesPosted = daysSincePosted <= filters.postedWithin;
       }
@@ -123,6 +123,27 @@ export default function ArchitectDashboard({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); // default: posted (newest)
     });
 
+  const [architectProfile, setArchitectProfile] = useState<ArchitectProfile | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const snap = await getDoc(doc(db, 'architect_profiles', user.uid));
+      if (snap.exists()) {
+        setArchitectProfile(snap.data() as ArchitectProfile);
+      }
+    };
+    fetchProfile();
+  }, [user.uid]);
+
+  const isRecommended = (job: Job) => {
+    if (!architectProfile) return false;
+    const specs = (architectProfile.specializations || []).map(s => s.toLowerCase());
+    const category = (job.category || '').toLowerCase();
+    const requirements = (job.requirements || []).filter(Boolean).map(r => r.toLowerCase());
+
+    return specs.includes(category) ||
+           requirements.some(req => specs.some(spec => req.includes(spec) || spec.includes(req)));
+  };
 
   return (
     <div className="space-y-12">
@@ -142,14 +163,16 @@ export default function ArchitectDashboard({
           const tabMap: Record<string, string> = {
             'browse': 'marketplace',
             'applications': 'applications',
-            'active': 'projects'
+            'active': 'projects',
+            'team': 'team',
+            'municipal': 'municipal'
           };
           onTabChange?.(tabMap[val] || 'marketplace');
         }} 
         className="w-full"
       >
         <div className="border-b border-border bg-white h-14 md:h-16 w-full flex items-center px-4 md:px-0 bg-transparent rounded-full overflow-hidden mb-8">
-          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
+          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit overflow-x-auto">
             <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Browse Jobs</TabsTrigger>
             <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">My Applications ({myApplications.length})</TabsTrigger>
             <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 text-xs font-bold">Active Projects ({myJobs.length})</TabsTrigger>
@@ -180,7 +203,7 @@ export default function ArchitectDashboard({
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredJobs.map(job => (
-              <BrowseJobItem key={job.id} job={job} user={user} />
+              <BrowseJobItem key={job.id} job={job} user={user} isRecommended={isRecommended(job)} />
             ))}
             {filteredJobs.length === 0 && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
@@ -205,7 +228,7 @@ export default function ArchitectDashboard({
                     </Badge>
                     <span className="text-[10px] text-muted-foreground font-mono">{new Date(app.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <CardTitle className="text-lg font-bold tracking-tight">Project {app.jobId.slice(0, 8)}</CardTitle>
+                  <CardTitle className="text-lg font-bold tracking-tight">Project {(app.jobId || '').slice(0, 8)}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-5 pt-0">
                   <p className="text-xs text-muted-foreground line-clamp-3 italic mb-4">"{app.proposal}"</p>
@@ -248,14 +271,14 @@ export default function ArchitectDashboard({
         </TabsContent>
 
         <TabsContent value="municipal" className="mt-8">
-          <MunicipalTracker architect={user} jobs={myJobs} />
+          <LocalMunicipalTracker architect={user} jobs={myJobs} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
+function BrowseJobItem({ job, user, isRecommended }: { job: Job, user: UserProfile, isRecommended?: boolean, key?: any }) {
   const [proposal, setProposal] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [isApplying, setIsApplying] = useState(false);
@@ -328,7 +351,7 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
     }
   };
 
-  const daysLeft = differenceInDays(parseISO(job.deadline), new Date());
+  const daysLeft = job.deadline ? differenceInDays(parseISO(job.deadline), new Date()) : -1;
   
   const categoryColors: Record<string, string> = {
     'Residential': 'bg-blue-500',
@@ -353,7 +376,14 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
               </Badge>
             )}
           </div>
-          <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {job.budget.toLocaleString()}</span>
+          <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {safeLocale(job.budget)}</span>
+        </div>
+        <div className="flex items-center gap-2 mb-1">
+          {isRecommended && (
+            <Badge className="bg-amber-50 text-amber-700 border-amber-100 gap-1 text-[8px] h-4 px-1.5 uppercase font-bold">
+              <Sparkles size={10} /> Recommended for you
+            </Badge>
+          )}
         </div>
         <CardTitle className="font-heading font-bold text-xl group-hover:text-primary transition-colors tracking-tight line-clamp-1">{job.title}</CardTitle>
         <CardDescription className="line-clamp-2 text-xs leading-relaxed mt-2 h-8">{job.description}</CardDescription>
@@ -362,14 +392,14 @@ function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }
       <CardContent className="p-6 pt-0 space-y-4">
         {/* Requirements Tags */}
         <div className="flex flex-wrap gap-1.5">
-          {job.requirements.slice(0, 3).map((req, i) => (
+          {(job.requirements || []).slice(0, 3).map((req, i) => (
             <Badge key={i} variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0 max-w-[120px] truncate">
               {req}
             </Badge>
           ))}
-          {job.requirements.length > 3 && (
+          {(job.requirements || []).length > 3 && (
             <Badge variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0">
-              +{job.requirements.length - 3} more
+              +{(job.requirements || []).length - 3} more
             </Badge>
           )}
         </div>
@@ -710,7 +740,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
             <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-primary font-mono">R {job.budget.toLocaleString()}</p>
+            <p className="text-xl font-bold text-primary font-mono">R {safeLocale(job.budget)}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Budget</p>
           </div>
         </div>
@@ -1309,7 +1339,7 @@ function FreelancerMarketplace({ architect, jobs }: { architect: UserProfile, jo
   );
 }
 
-function MunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: Job[] }) {
+function LocalMunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: Job[] }) {
   const [credentials, setCredentials] = useState<MunicipalCredential[]>([]);
   const [isAddingCreds, setIsAddingCreds] = useState(false);
   const [selectedMunicipality, setSelectedMunicipality] = useState('city_of_johannesburg');
@@ -1329,24 +1359,31 @@ function MunicipalTracker({ architect, jobs }: { architect: UserProfile, jobs: J
   const handleSaveCreds = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // NOTE: In a production app, passwords should be encrypted client-side
-      // with a public key or handled via a secure vault.
-      // For this demo, we're storing a base64 encoded string as a minimal obfuscation.
-      const obfuscatedPassword = btoa(password);
-
-      await addDoc(collection(db, 'municipal_credentials'), {
-        userId: architect.uid,
-        municipality: selectedMunicipality,
-        username,
-        password: obfuscatedPassword,
-        updatedAt: new Date().toISOString()
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/municipal/credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          municipality: selectedMunicipality,
+          username,
+          password
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save credentials');
+      }
+
       setIsAddingCreds(false);
       setUsername('');
       setPassword('');
-      toast.success("Credentials saved successfully");
-    } catch (error) {
-      toast.error("Failed to save credentials");
+      toast.success("Credentials saved successfully with enterprise encryption");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save credentials");
     }
   };
 

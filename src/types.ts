@@ -93,6 +93,8 @@ export interface AIReviewResult {
   feedback: string;
   categories: AICategory[];
   traceLog: string;
+  citations?: KnowledgeCitation[];
+  knowledgeSources?: string[];
 }
 
 export interface Submission {
@@ -162,15 +164,6 @@ export interface JobCard extends DelegatedTask {
   }[];
   requirements?: string[];
   completedAt?: string;
-}
-
-export interface MunicipalCredential {
-  id: string;
-  userId: string;
-  municipality: string;
-  username: string;
-  password?: string; // Should be encrypted in a real app, but for this demo...
-  updatedAt: string;
 }
 
 export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
@@ -293,9 +286,14 @@ export interface ArchitectVerification {
 }
 
 // Architect profile
+export type SACAPStatus = 'unverified' | 'verified' | 'pending' | 'failed';
+
 export interface ArchitectProfile {
   userId: string;
   sacapNumber: string;
+  sacapStatus?: SACAPStatus;
+  sacapLastVerifiedAt?: string;
+  sacapRegistrationType?: string;
   yearsExperience?: number;
   specializations: string[];
   portfolioImages: { url: string; title: string; description?: string }[];
@@ -308,22 +306,67 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
+export type MunicipalityType = 'COJ' | 'COCT' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'eThekwini' | 'Other';
+
 export interface CouncilSubmission {
   id: string;
-  jobId: string;
-  municipality: string;
+  jobId?: string;
+  userId: string;
+  municipality: MunicipalityType;
+  municipalityName?: string; // For 'Other'
   referenceNumber?: string;
-  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised';
+  status: string; // Unified status
+  rawStatus?: string; // Status as reported by the municipality
   submittedAt?: string;
+  lastCheckedAt?: string;
   documents: { name: string; url: string }[];
-  trackingHistory: { status: string; timestamp: string; notes?: string }[];
-  queries?: {
-    raisedAt: string;
-    description: string;
-    response?: string;
-    respondedAt?: string;
-    attachments?: { name: string; url: string }[];
-  }[];
+  trackingHistory: TrackingEvent[];
+  queries?: CouncilQuery[];
+  erfNumber?: string;
+  projectDescription?: string;
+  source: 'manual' | 'ocr' | 'scraper' | 'shadow_tracker';
+}
+
+export interface TrackingEvent {
+  status: string;
+  timestamp: string;
+  notes?: string;
+  source: 'scraper' | 'ocr' | 'crowdsource' | 'shadow_tracker' | 'manual';
+  actorId?: string;
+}
+
+export interface CouncilQuery {
+  raisedAt: string;
+  description: string;
+  response?: string;
+  respondedAt?: string;
+  attachments?: { name: string; url: string }[];
+}
+
+export interface MunicipalCredential {
+  id: string;
+  userId: string;
+  municipality: MunicipalityType | string;
+  username: string;
+  encryptedPassword?: string;
+  password?: string; // Obfuscated base64 for demo
+  iv?: string;
+  authTag?: string; // For GCM
+  lastUsed?: string;
+  status: 'valid' | 'invalid' | 'unchecked';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrowdsourceUpdate {
+  id: string;
+  municipality: MunicipalityType;
+  officeLocation?: string;
+  department?: string;
+  statusUpdate: string;
+  backlogLevel: 'low' | 'medium' | 'high';
+  reportedBy: string; // userId
+  timestamp: string;
 }
 
 // Invoicing types
@@ -363,13 +406,21 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base';
   jobId?: string;
   submissionId?: string;
 };
 
 export type KnowledgeSource = 'documentation' | 'human_feedback' | 'self_improvement' | 'web_search';
 export type KnowledgeStatus = 'active' | 'pending_review' | 'rejected' | 'archived';
+
+export interface SystemSettings {
+  municipalTrackerEnabled: boolean;
+  nvidiaApiKey?: string;
+  nvidiaOcrModel?: string;
+  xeroConnected?: boolean;
+  lastScraperRun?: string;
+}
 
 export interface AgentKnowledge {
   id: string;
@@ -387,7 +438,22 @@ export interface AgentKnowledge {
   relatedJobId?: string;
   searchQuery?: string; // if source is web_search
   sourceUrl?: string; // if from documentation or web
+  pdfUrl?: string; // if uploaded from PDF
+  pdfPageNumber?: number; // page number in PDF
   tags: string[]; // e.g. ['SANS 10400-K', 'wall thickness', 'DPC']
   createdAt: string;
   updatedAt?: string;
+  usageCount?: number; // Track how often this knowledge is used
+  lastUsedAt?: string;
+}
+
+export interface KnowledgeCitation {
+  knowledgeId: string;
+  title: string;
+  content: string;
+  source: KnowledgeSource;
+  sourceUrl?: string;
+  pdfUrl?: string;
+  pdfPageNumber?: number;
+  tags: string[];
 }

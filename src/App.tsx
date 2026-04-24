@@ -54,6 +54,7 @@ import {
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
+import { Building2 } from 'lucide-react';
 
 // Sub-components
 import ClientDashboard from './components/ClientDashboard';
@@ -78,6 +79,7 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [professionalLabel, setProfessionalLabel] = useState('');
 
   useEffect(() => {
     // Seed admin user if requested
@@ -277,8 +279,9 @@ const handleLogin = async () => {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
+          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')?.[0] || 'Anonymous',
           role: roleSelection || 'client',
+          professionalLabels: (roleSelection === 'freelancer' && professionalLabel) ? [professionalLabel] : [],
           createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
@@ -438,19 +441,41 @@ const handleLogin = async () => {
               ) : (
                 <form onSubmit={handleEmailAuth} className="space-y-4">
                   {authMode === 'email-signup' && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                      <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          placeholder="John Doe" 
-                          className="pl-10 h-12 rounded-xl"
-                          value={displayName}
-                          onChange={e => setDisplayName(e.target.value)}
-                          required
-                        />
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                        <div className="relative">
+                          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            placeholder="John Doe"
+                            className="pl-10 h-12 rounded-xl"
+                            value={displayName}
+                            onChange={e => setDisplayName(e.target.value)}
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
+                      {roleSelection === 'freelancer' && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Profession</label>
+                          <select
+                            value={professionalLabel}
+                            onChange={e => setProfessionalLabel(e.target.value)}
+                            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                            required
+                          >
+                            <option value="">Select your profession...</option>
+                            <option value="Engineer">Engineer</option>
+                            <option value="Construction Worker">Construction Worker</option>
+                            <option value="Builder">Builder</option>
+                            <option value="Electrician">Electrician</option>
+                            <option value="Plumber">Plumber</option>
+                            <option value="Landscaper">Landscaper</option>
+                            <option value="Interior Designer">Interior Designer</option>
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
@@ -585,6 +610,12 @@ const handleLogin = async () => {
             active={activeTab === 'projects'} 
             onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }} 
           />
+          <NavItem
+            icon={<Building2 size={18} />}
+            label="Municipal Tracker"
+            active={activeTab === 'municipal'}
+            onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
+          />
           {user!.role === 'admin' && (
             <>
               <NavItem 
@@ -610,6 +641,12 @@ const handleLogin = async () => {
                 label="Knowledge Base" 
                 active={activeTab === 'knowledge'} 
                 onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }} 
+              />
+              <NavItem
+                icon={<Building2 size={18} />}
+                label="Municipal Settings"
+                active={activeTab === 'municipal'}
+                onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
               />
             </>
           )}

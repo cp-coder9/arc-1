@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Send, Paperclip, MessageCircle, X, FileText, Image as ImageIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { safeFormat } from '@/lib/utils';
 import { uploadAndTrackFile } from '@/lib/uploadService';
 import { toast } from 'sonner';
 
@@ -162,7 +162,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
     let currentGroup: MessageGroup | null = null;
 
     messages.forEach((message) => {
-      const messageDate = format(new Date(message.createdAt), 'MMMM d, yyyy');
+      const messageDate = safeFormat(message.createdAt, 'MMMM d, yyyy');
       
       if (!currentGroup || currentGroup.date !== messageDate) {
         currentGroup = { date: messageDate, messages: [] };
@@ -277,7 +277,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
                               isOwn ? 'justify-end' : 'justify-start'
                             }`}>
                               <span className="text-[10px] opacity-70">
-                                {format(new Date(message.createdAt), 'HH:mm')}
+                                {safeFormat(message.createdAt, 'HH:mm')}
                               </span>
                               {isOwn && message.isRead && (
                                 <span className="text-[10px] opacity-70">✓✓</span>
