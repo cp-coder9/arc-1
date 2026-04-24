@@ -1208,7 +1208,6 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
 function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
   const [freelancers, setFreelancers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [jobCards, setJobCards] = useState<any[]>([]);
 
   useEffect(() => {
     const qFreelancers = query(collection(db, 'users'), where('role', '==', 'freelancer'));
@@ -1217,14 +1216,8 @@ function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
       setLoading(false);
     });
 
-    const qJobCards = query(collectionGroup(db, 'tasks'), where('architectId', '==', user.uid));
-    const unsubscribeJobCards = onSnapshot(qJobCards, (snapshot) => {
-      setJobCards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
     return () => {
       unsubscribeFreelancers();
-      unsubscribeJobCards();
     };
   }, [user.uid]);
 
@@ -1310,7 +1303,6 @@ function ProjectTeamCard({ job, user, freelancers }: { job: Job, user: UserProfi
       const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setJobCards(tasks);
 
-      const uniqueAssignees = Array.from(new Set(tasks.map((t: any) => t.assigneeId).filter(Boolean)));
       setTeam(tasks.map((t: any) => ({
         id: t.assigneeId,
         name: t.assigneeName,
