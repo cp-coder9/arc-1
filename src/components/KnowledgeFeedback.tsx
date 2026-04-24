@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { MessageSquarePlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { addKnowledge } from '../services/knowledgeService';
-import { AIIssue } from '../types';
+import { AIIssue, UserRole } from '../types';
 import { auth } from '../lib/firebase';
 
 interface KnowledgeFeedbackProps {

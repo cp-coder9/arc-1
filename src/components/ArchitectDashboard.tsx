@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard } from '../types';
@@ -24,7 +24,6 @@ import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import MunicipalTracker from './MunicipalTracker';
 // import { motion } from 'framer-motion';
 
 export default function ArchitectDashboard({ 
@@ -55,6 +54,7 @@ export default function ArchitectDashboard({
     activeTab === 'marketplace' ? 'browse' : 
     activeTab === 'applications' ? 'applications' :
     activeTab === 'projects' ? 'active' : 
+    activeTab === 'team' ? 'team' :
     activeTab === 'municipal' ? 'municipal' :
     activeTab === 'team' ? 'team' :
     'browse';
@@ -271,7 +271,7 @@ export default function ArchitectDashboard({
         </TabsContent>
 
         <TabsContent value="municipal" className="mt-8">
-          <MunicipalTracker user={user} />
+          <LocalMunicipalTracker architect={user} jobs={myJobs} />
         </TabsContent>
       </Tabs>
     </div>
@@ -551,7 +551,7 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
       toast.success("File uploaded successfully!");
       
       // Automatically run AI pre-check
-      handlePreCheck(url, file.name?.split('.')[0] || 'Drawing');
+      handlePreCheck(url, (file.name || "").split('.')[0] || 'Drawing');
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Upload failed.");
@@ -1053,7 +1053,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
   useEffect(() => {
     const q = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DelegatedTask)));
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JobCard)));
     });
     return () => unsub();
   }, [job.id, user.uid]);
@@ -1078,38 +1078,48 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
       setAssigneeRole('');
       setDeadline('');
       setNotes('');
-      toast.success("Task delegated successfully");
+      setPriority('medium');
+      setRequirements('');
+      toast.success("Job Card created successfully");
     } catch (error) {
-      toast.error("Failed to delegate task");
+      toast.error("Failed to create job card");
     }
   };
 
   const handleUpdateStatus = async (taskId: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, `jobs/${job.id}/tasks`, taskId), {
-        status: newStatus
+        status: newStatus,
+        completedAt: newStatus === 'completed' ? new Date().toISOString() : null
       });
-      toast.success("Task status updated");
+      toast.success("Job card status updated");
     } catch (error) {
       toast.error("Failed to update status");
     }
   };
 
+  const priorityColors = {
+    low: 'bg-slate-100 text-slate-700 border-slate-200',
+    medium: 'bg-blue-100 text-blue-700 border-blue-200',
+    high: 'bg-orange-100 text-orange-700 border-orange-200',
+    urgent: 'bg-red-100 text-red-700 border-red-200'
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-xs text-muted-foreground">Manage tasks for your team members.</p>
+        <p className="text-xs text-muted-foreground">Manage job cards for your team members.</p>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
           <DialogTrigger render={
             <Button variant="outline" size="sm" className="h-8 text-xs rounded-full gap-1 border-primary/20 text-primary">
-              <Plus size={14} /> Delegate Task
+              <Plus size={14} /> Create Job Card
             </Button>
           } />
-          <DialogContent className="sm:max-w-[500px] border-border bg-white rounded-3xl p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-[600px] border-border bg-white rounded-3xl p-0 overflow-hidden">
             <div className="bg-primary/5 p-6 border-b border-border">
               <DialogHeader>
-                <DialogTitle className="font-heading text-2xl font-bold">Delegate Task</DialogTitle>
-                <DialogDescription>Assign a task to a team member for this project.</DialogDescription>
+                <DialogTitle className="font-heading text-2xl font-bold">Create Job Card</DialogTitle>
+                <DialogDescription>Assign detailed tasks to a team member or freelancer.</DialogDescription>
               </DialogHeader>
             </div>
             <form onSubmit={handleAddTask} className="p-6 space-y-4">
@@ -1120,7 +1130,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Role / Title</label>
-                  <Input required value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} placeholder="e.g. Draftsman" className="rounded-xl" />
+                  <Input required value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} placeholder="e.g. Structural Engineer" className="rounded-xl" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1147,7 +1157,11 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Task Notes</label>
-                <Textarea required value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the task..." className="rounded-xl min-h-[100px]" />
+                <Textarea required value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the task scope..." className="rounded-xl min-h-[80px]" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Specific Requirements (One per line)</label>
+                <Textarea value={requirements} onChange={e => setRequirements(e.target.value)} placeholder="e.g. SANS 10400-K compliance check&#10;Verify foundation depth" className="rounded-xl min-h-[80px]" />
               </div>
               <Button type="submit" className="w-full rounded-xl h-12 font-bold">Create Job Card</Button>
             </form>
@@ -1158,7 +1172,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
       {tasks.length > 0 ? (
         <div className="space-y-3">
           {tasks.map(task => (
-            <div key={task.id} className="p-4 rounded-2xl border border-border bg-secondary/10 flex flex-col gap-3">
+            <div key={task.id} className="p-4 rounded-2xl border border-border bg-white flex flex-col gap-3 hover:shadow-md transition-all">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -1181,7 +1195,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                 <select 
                   value={task.status}
                   onChange={(e) => handleUpdateStatus(task.id, e.target.value)}
-                  className={`text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border outline-none ${
+                  className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-full border outline-none ${
                     task.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
                     task.status === 'in-progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                     'bg-yellow-50 text-yellow-700 border-yellow-200'
@@ -1192,13 +1206,24 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                   <option value="completed">Completed</option>
                 </select>
               </div>
-              <p className="text-sm bg-white p-3 rounded-xl border border-black/5">{task.notes}</p>
+              <div className="bg-secondary/20 p-3 rounded-xl">
+                 <p className="text-xs font-medium text-foreground">{task.notes}</p>
+                 {task.requirements && task.requirements.length > 0 && (
+                   <ul className="mt-2 space-y-1">
+                     {task.requirements.map((req, i) => (
+                       <li key={i} className="text-[10px] text-muted-foreground flex items-center gap-1">
+                         <CheckCircle2 size={10} className="text-primary" /> {req}
+                       </li>
+                     ))}
+                   </ul>
+                 )}
+              </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="p-6 text-center border border-dashed border-border rounded-2xl bg-secondary/5">
-          <p className="text-xs text-muted-foreground italic">No tasks delegated yet.</p>
+          <p className="text-xs text-muted-foreground italic">No job cards assigned yet.</p>
         </div>
       )}
     </div>
