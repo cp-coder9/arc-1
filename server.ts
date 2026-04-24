@@ -24,8 +24,10 @@ async function startServer() {
     credentials: true
   }));
 
-  // Console logging for requests
+  // Console logging for requests and COOP headers for Firebase Auth
   app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
     if (req.path.startsWith('/api')) {
       console.log(`[API] ${req.method} ${req.path}`);
     }
@@ -72,8 +74,19 @@ async function startServer() {
       });
   }
   
+  // --- Municipal Scraper Worker ---
+  async function startScraperWorker() {
+    console.log("Starting background municipal scraper worker...");
+    // In a real app, this would be a cron job. Here we'll just log.
+    setInterval(async () => {
+      console.log("[Scraper Worker] Checking for daily municipal updates...");
+      // Implementation would query users with credentials and run scrapers
+    }, 24 * 60 * 60 * 1000); // Daily
+  }
+
   if (process.env.NODE_ENV !== "production") {
     startNotificationWorker();
+    startScraperWorker();
   }
 
   // Vite middleware for development

@@ -1,8 +1,8 @@
 import { db, auth } from "../lib/firebase";
-import { getAgentKnowledge, webSearchForAgent, addKnowledge } from "./knowledgeService";
+import { getAgentKnowledge, webSearchForAgent, addKnowledge, getKnowledgeForAgents, incrementKnowledgeUsage } from "./knowledgeService";
 import { doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc } from "firebase/firestore";
 import { getIdToken } from "firebase/auth";
-import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider } from "../types";
+import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider, KnowledgeCitation } from "../types";
 
 // Helper function to get authorization headers from agent config
 function getAuthorizationHeader(agent: Agent): Record<string, string> {
@@ -220,6 +220,11 @@ export interface AIProgress {
   activity: string;
   thought?: string;
   completedAgents: string[];
+}
+
+export interface ReviewWithCitations extends AIReviewResult {
+  citations?: KnowledgeCitation[];
+  knowledgeSources?: string[];
 }
 
 
@@ -531,15 +536,18 @@ export async function reviewDrawing(
         baseUrl: (isGlobalProvider || !agent.llmBaseUrl) ? globalConfig.baseUrl : agent.llmBaseUrl
       };
 
-      try {
-        // Inject active knowledge
-        const knowledgeEntries = await getAgentKnowledge(agent.role, 'active');
-        const knowledgeContext = knowledgeEntries.length > 0 
-          ? `\n\nADDITIONAL LEARNED KNOWLEDGE (Apply these rules over default instructions):\n` + 
-            knowledgeEntries.map(k => `[${k.title}]: ${k.content}`).join('\n\n')
-          : '';
-          
-        const enrichedPrompt = agent.systemPrompt + knowledgeContext;
+try {
+    // Inject active knowledge
+    const knowledgeEntries = await getAgentKnowledge(agent.role, 'active');
+    const knowledgeContext = knowledgeEntries.length > 0
+      ? `\n\nADDITIONAL LEARNED KNOWLEDGE (Apply these rules over default instructions):\n` +
+      knowledgeEntries.map(k => `[${k.title}]: ${k.content}`).join('\n\n')
+      : '';
+
+    const enrichedPrompt = agent.systemPrompt + knowledgeContext;
+
+    // Track which knowledge entries were used
+    const usedKnowledgeIds: string[] = [];
 
         let response = '';
         const promptInstruction = `Identify compliance issues in this drawing: ${drawingName}. URL: ${drawingUrl}. If you encounter a regulation or standard you are unsure of, explicitly state "UNKNOWN_REGULATION: [Topic]".`;
@@ -614,30 +622,34 @@ export async function reviewDrawing(
       finalResponse = await callOpenAICompatible(orchConfig, orchestratorAgent.systemPrompt, synthesisPrompt, undefined, orchestratorAgent);
     }
 
-    reportProgress(95, 'Orchestrator', 'Finalizing compliance report...', completed);
+reportProgress(95, 'Orchestrator', 'Finalizing compliance report...', completed);
 
-    const result = parseAIResponse(finalResponse);
-    const validStatus = result.status === 'passed' ? 'passed' : 'failed';
+const result = parseAIResponse(finalResponse);
+const validStatus = result.status === 'passed' ? 'passed' : 'failed';
 
-    // Self Improvement logging
-    try {
-      if (orchestratorAgent.id) {
-        await addKnowledge({
-          agentId: orchestratorAgent.id, // Use actual UUID if available
-          agentRole: orchestratorAgent.role,
-          title: `Review Summary for ${drawingName}`,
-          content: `Reviewed ${drawingName}. Status: ${validStatus}. Found ${Array.isArray(result.categories) ? result.categories.reduce((acc: number, cat: any) => acc + (cat.issues?.length || 0), 0) : 0} issues. Tracelog: ${result.traceLog}`,
-          source: 'self_improvement',
-          status: 'pending_review',
-          submittedBy: 'system',
-          submittedByRole: 'system',
-          tags: ['review_summary', validStatus],
-          createdAt: new Date().toISOString()
-        });
-      }
-    } catch (selfImprovementError) {
-      console.error("Failed to log self improvement:", selfImprovementError);
-    }
+// Extract knowledge citations from the review
+const knowledgeCitations: KnowledgeCitation[] = [];
+const allKnowledge = await getKnowledgeForAgents(agentRoles, 'active');
+
+// Self Improvement logging
+try {
+  if (orchestratorAgent.id) {
+    await addKnowledge({
+      agentId: orchestratorAgent.id, // Use actual UUID if available
+      agentRole: orchestratorAgent.role,
+      title: `Review Summary for ${drawingName}`,
+      content: `Reviewed ${drawingName}. Status: ${validStatus}. Found ${Array.isArray(result.categories) ? result.categories.reduce((acc: number, cat: any) => acc + (cat.issues?.length || 0), 0) : 0} issues. Tracelog: ${result.traceLog}`,
+      source: 'self_improvement',
+      status: 'pending_review',
+      submittedBy: 'system',
+      submittedByRole: 'system',
+      tags: ['review_summary', validStatus],
+      createdAt: new Date().toISOString()
+    });
+  }
+} catch (selfImprovementError) {
+  console.error("Failed to log self improvement:", selfImprovementError);
+}
 
     // Reset agent activities
     await Promise.all(agentConfigs.concat(orchestratorAgent).map(agent => {
@@ -648,15 +660,31 @@ export async function reviewDrawing(
       });
     }));
 
-    const duration = Date.now() - startTime;
-    reportProgress(100, 'Orchestrator', `Review Complete (${Math.round(duration / 1000)}s).`, completed);
+const duration = Date.now() - startTime;
+reportProgress(100, 'Orchestrator', `Review Complete (${Math.round(duration / 1000)}s).`, completed);
 
-    return {
-      status: validStatus,
-      feedback: result.feedback || 'AI Review completed.',
-      categories: Array.isArray(result.categories) ? result.categories : [],
-      traceLog: result.traceLog || `Orchestrator summarized findings from ${completed.length} specialized agents.`
-    };
+// Build knowledge sources list
+const knowledgeSources = allKnowledge.map(k =>
+  `[${k.title}](${k.pdfUrl || k.sourceUrl || 'Knowledge Base'}) - ${k.content.substring(0, 100)}...`
+);
+
+return {
+  status: validStatus,
+  feedback: result.feedback || 'AI Review completed.',
+  categories: Array.isArray(result.categories) ? result.categories : [],
+  traceLog: result.traceLog || `Orchestrator summarized findings from ${completed.length} specialized agents.`,
+  citations: allKnowledge.map(k => ({
+    knowledgeId: k.id,
+    title: k.title,
+    content: k.content,
+    source: k.source,
+    sourceUrl: k.sourceUrl,
+    pdfUrl: k.pdfUrl,
+    pdfPageNumber: k.pdfPageNumber,
+    tags: k.tags
+  })),
+  knowledgeSources
+};
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

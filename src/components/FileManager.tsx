@@ -24,8 +24,7 @@ import {
   FileArchive,
   HardDrive
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { safeFormat, cn } from '@/lib/utils';
 
 interface FileManagerProps {
   user: UserProfile;
@@ -202,19 +201,19 @@ export default function FileManager({ user }: FileManagerProps) {
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   <span className="font-medium">{formatSize(file.fileSize)}</span>
                   <span>•</span>
-                  <span>{file.fileType?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                  <span>{file.fileType?.split('/')?.[1]?.toUpperCase() || 'FILE'}</span>
                 </div>
               </div>
               
               <div className="pt-3 border-t border-border flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
                   <Clock className="w-3 h-3" />
-                  {format(new Date(file.uploadedAt), 'MMM d, yyyy')}
+                  {safeFormat(file.uploadedAt, 'MMM d, yyyy')}
                 </div>
                 {user.role === 'admin' && (
                   <div className="flex items-center gap-1 text-[8px] font-bold text-primary uppercase tracking-tighter">
                     <User className="w-2.5 h-2.5" />
-                    {file.uploadedBy.substring(0, 6)}
+                    {(file.uploadedBy || '').substring(0, 6)}
                   </div>
                 )}
               </div>

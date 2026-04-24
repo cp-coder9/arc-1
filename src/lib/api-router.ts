@@ -5,9 +5,14 @@ import { del, put } from "@vercel/blob";
 import multer from "multer";
 import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
 import { extractCadData } from "./cadProcessor.js";
+import { encrypt, decrypt } from "./encryption.js";
+import { runMunicipalScraper } from "../services/scraperService.js";
+import { processReceiptOCR } from "../services/ocrService.js";
+import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
+import { verifySACAPByName } from "../services/sacapVerificationService.js";
 import { trackMunicipalityStatus } from "./municipalAutomation.js";
 
-import { UserRole } from "../types.js";
+import { UserRole, MunicipalityType } from "../types.js";
 
 
 // ── Environment variables ─────────────────────────────────────────────────────
@@ -983,7 +988,9 @@ router.post("/payment/notify", async (req, res) => {
   }
 });
 
-// Municipal tracking endpoint
+// ── Municipal Tracker Routes ───────────────────────────────────────────────
+
+// Municipal tracking endpoint (scaffolded)
 router.post("/track-municipality", async (req, res) => {
   let decoded;
   try {
@@ -1012,6 +1019,217 @@ router.post("/track-municipality", async (req, res) => {
   } catch (error: any) {
     console.error("Municipal tracking error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Get Municipal Settings
+router.get("/municipal/settings", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const doc = await adminDb.collection("system_settings").doc("municipal_tracker").get();
+    res.json(doc.exists ? doc.data() : { municipalTrackerEnabled: false });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Update Municipal Settings (Admin Only)
+router.post("/municipal/settings", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    if (!(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const settings = req.body;
+    await adminDb.collection("system_settings").doc("municipal_tracker").set({
+      ...settings,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Save Municipal Credentials
+router.post("/municipal/credentials", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { municipality, username, password } = req.body;
+
+    if (!municipality || !username || !password) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const { encrypted, iv, authTag } = encrypt(password);
+
+    const credRef = adminDb.collection("municipal_credentials").doc(`${decoded.uid}_${municipality}`);
+    await credRef.set({
+      userId: decoded.uid,
+      municipality,
+      username,
+      encryptedPassword: encrypted,
+      iv,
+      authTag,
+      status: 'unchecked',
+      createdAt: new Date().toISOString()
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Trigger Scraper
+router.post("/municipal/scrape", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { municipality } = req.body;
+
+    if (!municipality) return res.status(400).json({ error: "Municipality is required" });
+
+    const result = await runMunicipalScraper(decoded.uid, municipality as MunicipalityType);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// OCR Receipt Processing
+router.post("/municipal/ocr", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { imageUrl } = req.body;
+
+    if (!imageUrl) return res.status(400).json({ error: "imageUrl is required" });
+
+    const result = await processReceiptOCR(imageUrl, decoded.uid);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Get Heatmap
+router.get("/municipal/heatmap/:municipality", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { municipality } = req.params;
+    const stats = await getMunicipalityHeatMap(municipality as MunicipalityType);
+    res.json(stats);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Shadow Tracker Ingestion
+router.post("/municipal/shadow-track", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { content } = req.body;
+    const result = await detectMunicipalInvoices(content, decoded.uid);
+    res.json(result);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Submit Manual Tracking
+router.post("/municipal/submissions", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const submission = req.body;
+
+    const docRef = await adminDb.collection("council_submissions").add({
+      ...submission,
+      userId: decoded.uid,
+      createdAt: new Date().toISOString(),
+      trackingHistory: [
+        {
+          status: submission.status,
+          timestamp: new Date().toISOString(),
+          notes: "Initial submission",
+          source: submission.source || 'manual'
+        }
+      ]
+    });
+
+    res.json({ id: docRef.id });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Get User's Submissions
+router.get("/municipal/submissions", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const snapshot = await adminDb.collection("council_submissions")
+      .where("userId", "==", decoded.uid)
+      .get();
+
+    const submissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(submissions);
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// SACAP Verification Agent (Real Automation)
+router.post("/architect/verify-sacap", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { architectId, name, sacapNumber } = req.body;
+
+    if (!architectId || !name) {
+      return res.status(400).json({ error: "Missing architectId or name" });
+    }
+
+    console.log(`[SACAP Agent] Verifying architect: ${name} (SACAP: ${sacapNumber || 'N/A'})`);
+
+    const result = await verifySACAPByName(name);
+    const status = result.verified ? 'verified' : 'failed';
+
+    // Update the architect profile in Firestore
+    await adminDb.collection("architect_profiles").doc(architectId).set({
+      sacapStatus: status,
+      sacapLastVerifiedAt: new Date().toISOString(),
+      sacapRegistrationType: result.registrationDetails?.category || null,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    res.json({
+      success: true,
+      status,
+      details: result.registrationDetails,
+      message: status === 'verified'
+        ? `Architect SACAP status verified as ${result.registrationDetails?.category}.`
+        : 'Architect not found in SACAP registry.'
+    });
+  } catch (err: any) {
+    console.error("SACAP Verification Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Crowdsource Update
+router.post("/municipal/crowdsource", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const update = req.body;
+
+    const docRef = await adminDb.collection("crowdsource_updates").add({
+      ...update,
+      reportedBy: decoded.uid,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({ id: docRef.id });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

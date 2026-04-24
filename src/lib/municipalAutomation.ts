@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { adminDb } from './firebase-admin.js';
+import { decrypt } from './encryption.js';
 
 export async function trackMunicipalityStatus(credentialId: string) {
   const credDoc = await adminDb.collection('municipal_credentials').doc(credentialId).get();
@@ -8,10 +9,16 @@ export async function trackMunicipalityStatus(credentialId: string) {
   }
 
   const cred = credDoc.data()!;
-  const { municipality, username, password: obfuscatedPassword } = cred;
+  const { municipality, username, encryptedPassword, iv, authTag } = cred;
 
-  // De-obfuscate for use in automation
-  const password = Buffer.from(obfuscatedPassword, 'base64').toString('utf-8');
+  // Decrypt password using enterprise standard
+  let password = '';
+  if (encryptedPassword && iv && authTag) {
+    password = decrypt(encryptedPassword, iv, authTag);
+  } else if (cred.password) {
+    // Fallback for legacy base64 if any exist during migration
+    password = Buffer.from(cred.password, 'base64').toString('utf-8');
+  }
 
   console.log(`[Automation] Starting tracking for ${municipality} (User: ${username})`);
 

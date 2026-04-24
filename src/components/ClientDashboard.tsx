@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { UserProfile, Job, Application, Submission, JobCategory, AIReviewResult } from '../types';
+import { UserProfile, Job, Application, Submission, JobCategory, AIReviewResult, ArchitectProfile } from '../types';
 import ProfileEditor from './ProfileEditor';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -13,15 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { toast } from 'sonner';
-import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X } from 'lucide-react';
+import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X, Building2, ShieldX } from 'lucide-react';
+import MunicipalTracker from './MunicipalTracker';
 import { ArchitectPortfolio } from './ArchitectPortfolio';
+import { ArchitectRecommendations } from './ArchitectRecommendations';
 import { Logo } from './Logo';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
-import { format } from 'date-fns';
+import { safeLocale } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 // import { motion } from 'framer-motion';
 
@@ -38,7 +40,7 @@ export default function ClientDashboard({
   const [isPosting, setIsPosting] = useState(false);
 
   // Map sidebar tabs to internal dashboard tabs
-  const internalTab = activeTab === 'projects' ? 'active' : 'active';
+  const internalTab = activeTab === 'projects' ? 'active' : activeTab === 'municipal' ? 'municipal' : 'active';
   const [newJob, setNewJob] = useState({ title: '', description: '', budget: '', deadline: '', requirements: '', category: 'Residential' as JobCategory });
 
   useEffect(() => {
@@ -168,15 +170,20 @@ export default function ClientDashboard({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <StatCard title="Active Jobs" value={jobs.filter(j => j.status === 'open' || j.status === 'in-progress').length} icon={<Clock className="text-primary" />} />
-        <StatCard title="Total Spent" value={`R ${jobs.reduce((acc, j) => acc + (j.status === 'completed' ? j.budget : 0), 0).toLocaleString()}`} icon={<CheckCircle2 className="text-primary" />} />
+        <StatCard title="Total Spent" value={`R ${safeLocale(jobs.reduce((acc, j) => acc + (j.status === 'completed' ? (j.budget || 0) : 0), 0))}`} icon={<CheckCircle2 className="text-primary" />} />
         <StatCard title="Pending Reviews" value={0} icon={<AlertCircle className="text-primary" />} />
       </div>
 
-      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'active' ? 'projects' : 'overview')} className="w-full">
+      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'active' ? 'projects' : val === 'municipal' ? 'municipal' : 'overview')} className="w-full">
         <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
           <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Active Jobs</TabsTrigger>
           <TabsTrigger value="completed" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Completed</TabsTrigger>
+          <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Municipal Tracker</TabsTrigger>
         </TabsList>
+        <TabsContent value="municipal" className="mt-8">
+          <MunicipalTracker user={user} />
+        </TabsContent>
+
         <TabsContent value="active" className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {jobs.filter(j => j.status !== 'completed').map(job => (
@@ -561,7 +568,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
             <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-primary font-mono">R {job.budget.toLocaleString()}</p>
+            <p className="text-xl font-bold text-primary font-mono">R {safeLocale(job.budget)}</p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Budget</p>
           </div>
         </div>
@@ -680,11 +687,12 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
 
               <ScrollArea className="flex-1 p-10 bg-secondary/10">
                 <TabsContent value="overview" className="mt-0 space-y-10">
-                  <section className="space-y-4">
-                    <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-                      <FileText size={14} className="text-primary" /> Project Brief
-                    </h4>
-                    <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    <section className="lg:col-span-2 space-y-4">
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
+                        <FileText size={14} className="text-primary" /> Project Brief
+                      </h4>
+                      <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm space-y-6">
                       <div className="text-base leading-relaxed text-foreground">
                         {job.description}
                       </div>
@@ -708,7 +716,14 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
                         </div>
                       </div>
                     </div>
-                  </section>
+                    </section>
+
+                    {job.status === 'open' && (
+                      <section className="space-y-4">
+                        <ArchitectRecommendations job={job} />
+                      </section>
+                    )}
+                  </div>
 
                   {isApproved && (
                     <section 
@@ -762,9 +777,10 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
                               <div className="flex items-center gap-3">
                                 <p className="font-heading font-bold text-2xl tracking-tight text-foreground">{app.architectName}</p>
                                 {app.sacapNumber && (
-                                  <Badge className="bg-green-50 text-green-700 border-green-100 gap-1 text-[9px] px-2 py-0 border">
-                                    <ShieldCheck size={10} /> Verified
-                                  </Badge>
+                                  <div className="flex gap-2">
+                                    <Badge variant="outline" className="text-[9px] px-2 py-0">SACAP: {app.sacapNumber}</Badge>
+                                    <SACAPStatusBadge architectId={app.architectId} initialStatus={(app as any).sacapStatus} />
+                                  </div>
                                 )}
                               </div>
                               <div className="flex items-center gap-3">
@@ -908,7 +924,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
                         <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Escrow Balance</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-4xl font-heading font-bold tracking-tighter">R {job.status === 'open' ? '0' : job.budget.toLocaleString()}</div>
+                        <div className="text-4xl font-heading font-bold tracking-tighter">R {job.status === 'open' ? '0' : safeLocale(job.budget)}</div>
                         <p className="text-[10px] text-primary font-bold uppercase tracking-widest mt-2 flex items-center gap-1">
                           <ShieldCheck size={12} /> {job.status === 'open' ? 'Awaiting Hire' : 'Funds Secured in Escrow'}
                         </p>
@@ -1082,6 +1098,42 @@ function MilestoneItem({ title, percentage, status }: { title: string, percentag
       </Badge>
     </div>
   );
+}
+
+function SACAPStatusBadge({ architectId, initialStatus }: { architectId: string, initialStatus?: string }) {
+  const [status, setStatus] = useState<string | undefined>(initialStatus);
+
+  useEffect(() => {
+    if (status) return; // Use initial status if provided
+
+    const fetchProfile = async () => {
+      const snap = await getDoc(doc(db, 'architect_profiles', architectId));
+      if (snap.exists()) {
+        setStatus((snap.data() as ArchitectProfile).sacapStatus);
+      }
+    };
+    fetchProfile();
+  }, [architectId, status]);
+
+  if (!status) return null;
+
+  if (status === 'verified') {
+    return (
+      <Badge className="bg-green-50 text-green-700 border-green-100 gap-1 text-[9px] px-2 py-0 border">
+        <ShieldCheck size={10} /> SACAP Verified
+      </Badge>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <Badge variant="destructive" className="gap-1 text-[9px] px-2 py-0 border">
+        <ShieldX size={10} /> Unverified
+      </Badge>
+    );
+  }
+
+  return null;
 }
 
 function ArchitectRating({ architectId }: { architectId: string }) {

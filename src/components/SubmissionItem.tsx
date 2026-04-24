@@ -3,7 +3,7 @@ import { Submission } from '../types';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { FileUp, CheckCircle2, AlertCircle, Loader2, Shield, Clock, Sparkles, ShieldCheck, ExternalLink, ArrowRight, History, User, Cpu, TrendingUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { safeFormat } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
 
@@ -109,7 +109,7 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold truncate max-w-[150px]">{sub.drawingName}</span>
-              <span className="text-[10px] text-muted-foreground">{format(new Date(sub.createdAt), 'MMM d, HH:mm')}</span>
+              <span className="text-[10px] text-muted-foreground">{safeFormat(sub.createdAt, 'MMM d, HH:mm')}</span>
             </div>
           </div>
           <Badge variant="outline" className={`px-3 py-0.5 rounded-full font-bold uppercase tracking-widest text-[10px] flex items-center gap-1 ${config.color}`}>
@@ -125,7 +125,7 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
               <div>
                 <DialogTitle className="font-heading font-bold text-3xl tracking-tighter">{sub.drawingName}</DialogTitle>
                 <DialogDescription className="text-muted-foreground mt-1 flex items-center gap-2">
-                  Submitted on {format(new Date(sub.createdAt), 'MMMM d, yyyy HH:mm')}
+                  Submitted on {safeFormat(sub.createdAt, 'MMMM d, yyyy HH:mm')}
                 </DialogDescription>
               </div>
               <Badge className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs ${config.color}`}>
@@ -355,7 +355,7 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
                   <div className="space-y-1">
                     <div className="flex justify-between items-center">
                       <p className="text-[10px] font-bold uppercase tracking-widest">{log.actor}</p>
-                      <p className="text-[9px] text-muted-foreground">{format(new Date(log.timestamp), 'HH:mm')}</p>
+                      <p className="text-[9px] text-muted-foreground">{safeFormat(log.timestamp, 'HH:mm')}</p>
                     </div>
                     <p className="text-xs font-bold text-foreground">{log.action}</p>
                     <p className="text-[10px] text-muted-foreground leading-tight">{log.details}</p>

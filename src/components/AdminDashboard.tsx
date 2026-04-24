@@ -3,6 +3,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
+import { safeFormat, safeLocale } from '@/lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -14,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Building2 } from 'lucide-react';
+import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 import {
   Accordion,
   AccordionContent,
@@ -28,6 +30,7 @@ import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
+import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import { Dialog as FullScreenDialog, DialogContent as FullScreenDialogContent } from './ui/dialog';
 
 const PROVIDER_CONFIGS = {
@@ -308,7 +311,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Last Active</label>
-            <p className="text-sm text-muted-foreground">{format(new Date(agent.lastActive), 'MMM d, yyyy HH:mm')}</p>
+            <p className="text-sm text-muted-foreground">{safeFormat(agent.lastActive, 'MMM d, yyyy HH:mm')}</p>
           </div>
           {agent.currentActivity && (
             <div>
@@ -373,6 +376,7 @@ export default function AdminDashboard({
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
+    activeTab === 'municipal' ? 'municipal' :
     'submissions';
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [stats, setStats] = useState({
@@ -620,6 +624,9 @@ export default function AdminDashboard({
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+              <Building2 size={16} /> Municipal Settings
+            </TabsTrigger>
           </TabsList>
         </ScrollArea>
 
@@ -646,11 +653,11 @@ export default function AdminDashboard({
                   {submissions.filter(s => s.status === 'admin_reviewing').map(sub => (
                     <TableRow key={sub.id} className="border-border hover:bg-secondary/20 transition-colors">
                       <TableCell className="font-heading font-bold px-8">{sub.drawingName}</TableCell>
-                      <TableCell className="text-xs font-mono">{sub.architectId.substring(0, 8)}...</TableCell>
+                      <TableCell className="text-xs font-mono">{(sub.architectId || '').substring(0, 8)}...</TableCell>
                       <TableCell>
                         <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold uppercase tracking-widest">AI PASSED</Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{format(new Date(sub.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{safeFormat(sub.createdAt, 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right px-8">
                         <Dialog>
                           <DialogTrigger render={<Button variant="ghost" size="sm" className="gap-2 hover:bg-primary hover:text-primary-foreground rounded-full px-4"><Eye size={14} />Review</Button>} />
@@ -764,7 +771,7 @@ export default function AdminDashboard({
                                       {sub.traceability.map((log, i) => (
                                         <div key={i} className="relative pl-6 border-l-2 border-primary/10 pb-6 last:pb-0">
                                           <div className="absolute left-[-7px] top-0 w-3 h-3 rounded-full bg-primary shadow-sm" />
-                                          <p className="text-[10px] font-mono text-muted-foreground font-bold">{format(new Date(log.timestamp), 'HH:mm:ss')}</p>
+                                          <p className="text-[10px] font-mono text-muted-foreground font-bold">{safeFormat(log.timestamp, 'HH:mm:ss')}</p>
                                           <p className="text-sm font-bold mt-1">{log.actor}: {log.action}</p>
                                           <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{log.details}</p>
                                         </div>
@@ -830,7 +837,7 @@ export default function AdminDashboard({
                   {allJobs.map(job => (
                     <TableRow key={job.id} className="hover:bg-secondary/10">
                       <TableCell className="px-8 font-bold">{job.title}</TableCell>
-                      <TableCell className="text-sm">{job.clientId.slice(0, 8)}...</TableCell>
+                      <TableCell className="text-sm">{(job.clientId || '').slice(0, 8)}...</TableCell>
                       <TableCell>
                         <Badge className={`${
                           job.status === 'open' ? 'bg-blue-100 text-blue-700' :
@@ -841,7 +848,7 @@ export default function AdminDashboard({
                           {job.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-sm font-bold">R {job.budget.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-sm font-bold">R {safeLocale(job.budget)}</TableCell>
                       <TableCell className="text-right px-8">
                         <div className="flex justify-end gap-2">
                           <ProjectDetailDialog job={job} />
@@ -927,7 +934,7 @@ export default function AdminDashboard({
                 <TableBody>
                   {logs.map(log => (
                     <TableRow key={log.id} className="border-border hover:bg-secondary/20 transition-colors">
-                      <TableCell className="text-xs font-mono px-8">{format(new Date(log.timestamp), 'HH:mm:ss.SSS')}</TableCell>
+                      <TableCell className="text-xs font-mono px-8">{safeFormat(log.timestamp, 'HH:mm:ss.SSS')}</TableCell>
                       <TableCell>
                         <Badge className={`text-[10px] font-bold uppercase tracking-widest ${
                           log.level === 'error' || log.level === 'critical' ? 'bg-destructive/10 text-destructive border-destructive/20' :
@@ -955,11 +962,18 @@ export default function AdminDashboard({
           <LLMSettings />
         </TabsContent>
 
-        <TabsContent value="knowledge">
+        <TabsContent value="municipal">
           <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
-            <AgentKnowledgeManager user={user} />
+            <MunicipalSettingsAdmin />
           </div>
         </TabsContent>
+
+<TabsContent value="knowledge">
+  <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm space-y-8">
+    <AdminKnowledgeUploader user={user} />
+    <AgentKnowledgeManager user={user} />
+  </div>
+</TabsContent>
       </Tabs>
 
       {/* Full Report Modal */}
@@ -1159,7 +1173,7 @@ function UserManagement({
                       <Badge variant="secondary" className="bg-green-100 text-green-700 rounded-full uppercase text-[10px]">Active</Badge>
                    )}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{format(new Date(u.createdAt), 'MMM d, yyyy')}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
                 <TableCell className="text-right px-8">
                   <div className="flex justify-end gap-2">
                     <Button 
@@ -1172,6 +1186,7 @@ function UserManagement({
                     >
                       {(u as any).status === 'suspended' ? 'Activate' : 'Suspend'}
                     </Button>
+                    <ProfileEditor user={u} isAdminEditing={true} />
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -1266,16 +1281,16 @@ function LLMSettings() {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
               <select 
                 value={config.provider} 
-                onChange={(e) => {
-                  const provider = e.target.value as LLMProvider;
-                  const pConfig = PROVIDER_CONFIGS[provider];
-                  setConfig({
-                    ...config,
-                    provider,
-                    baseUrl: pConfig.baseUrl,
-                    model: pConfig.models[0].value
-                  });
-                }}
+onChange={(e) => {
+  const provider = e.target.value as LLMProvider;
+  const pConfig = PROVIDER_CONFIGS[provider];
+  setConfig({
+    ...config,
+    provider,
+    baseUrl: pConfig?.baseUrl || '',
+    model: pConfig?.models?.[0]?.value || ''
+  });
+}}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
@@ -1307,9 +1322,9 @@ function LLMSettings() {
                 onChange={e => setConfig({...config, model: e.target.value})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
-                {PROVIDER_CONFIGS[config.provider].models.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
+{PROVIDER_CONFIGS[config.provider]?.models?.map(m => (
+  <option key={m.value} value={m.value}>{m.label}</option>
+))}
               </select>
             </div>
 
@@ -1471,14 +1486,14 @@ function AddAgentDialog() {
                   onChange={e => {
                     const provider = e.target.value as LLMProvider | 'global';
                     setLlmProvider(provider);
-                    if (provider !== 'global') {
-                      const pConfig = PROVIDER_CONFIGS[provider];
-                      setLlmBaseUrl(pConfig.baseUrl);
-                      setLlmModel(pConfig.models[0].value);
-                    } else {
-                      setLlmBaseUrl('');
-                      setLlmModel('');
-                    }
+if (provider !== 'global') {
+  const pConfig = PROVIDER_CONFIGS[provider];
+  setLlmBaseUrl(pConfig?.baseUrl || '');
+  setLlmModel(pConfig?.models?.[0]?.value || '');
+} else {
+  setLlmBaseUrl('');
+  setLlmModel('');
+}
                   }}
                   className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                 >
@@ -1508,9 +1523,9 @@ function AddAgentDialog() {
                       }}
                       className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
                     >
-                      {PROVIDER_CONFIGS[llmProvider as LLMProvider].models.map(m => (
-                        <option key={m.value} value={m.value}>{m.label}</option>
-                      ))}
+{PROVIDER_CONFIGS[llmProvider as LLMProvider]?.models?.map(m => (
+  <option key={m.value} value={m.value}>{m.label}</option>
+))}
                       <option value="custom">Enter custom model name...</option>
                     </select>
                     <Input 
