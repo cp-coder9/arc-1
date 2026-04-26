@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { auth, db } from '../lib/firebase';
-import { updateProfile, updateEmail, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { updateProfile, updateEmail, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -56,6 +56,17 @@ export default function UserSettings({ user }: UserSettingsProps) {
     if (email === user.email) return;
     setPendingEmail(email);
     setIsReauthModalOpen(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!user.email) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      toast.success('Password reset email sent to ' + user.email);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      toast.error('Failed to send password reset email');
+    }
   };
 
   const handleReauthAndEmailUpdate = async () => {
@@ -160,6 +171,28 @@ export default function UserSettings({ user }: UserSettingsProps) {
                   <Shield size={12} className="text-green-500" /> 
                   Changing your email requires re-authentication for security.
                 </p>
+              </div>
+
+              <div className="pt-4 space-y-4">
+                <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Account Password</label>
+                <div className="flex items-center justify-between p-6 bg-secondary/20 rounded-2xl border border-border">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-xl">
+                      <Key className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Password Management</p>
+                      <p className="text-sm text-muted-foreground">Update your password via a secure reset link.</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleChangePassword}
+                    className="rounded-full px-6 font-bold border-primary/20 hover:bg-primary/5"
+                  >
+                    Change Password
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

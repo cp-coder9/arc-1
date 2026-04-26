@@ -210,12 +210,28 @@ export default function FileManager({ user }: FileManagerProps) {
                   <Clock className="w-3 h-3" />
                   {safeFormat(file.uploadedAt, 'MMM d, yyyy')}
                 </div>
-                {user.role === 'admin' && (
-                  <div className="flex items-center gap-1 text-[8px] font-bold text-primary uppercase tracking-tighter">
-                    <User className="w-2.5 h-2.5" />
-                    {(file.uploadedBy || '').substring(0, 6)}
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {user.role === 'architect' && (file.fileType === 'application/pdf' || file.fileType.startsWith('image/')) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-[9px] font-bold uppercase tracking-widest text-primary hover:bg-primary/5"
+                      onClick={() => {
+                        toast.info("Scanning drawing for SANS 10400 compliance...");
+                        // Trigger general scan logic or redirect to dashboard with this file
+                        window.location.hash = "#quick-scan";
+                      }}
+                    >
+                      Scan
+                    </Button>
+                  )}
+                  {user.role === 'admin' && (
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-primary uppercase tracking-tighter">
+                      <User className="w-2.5 h-2.5" />
+                      {(file.uploadedBy || '').substring(0, 6)}
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
