@@ -13,7 +13,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal } from 'lucide-react';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, Upload } from 'lucide-react';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -155,6 +155,21 @@ export default function ArchitectDashboard({
             <ProfileEditor user={user} />
           </div>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Find new opportunities and submit your SANS compliant drawings on Architex.</p>
+        </div>
+        <div className="flex gap-4">
+          <Button
+            onClick={() => onTabChange?.('files')}
+            variant="outline"
+            className="rounded-full h-14 px-8 font-bold border-primary/20 hover:bg-primary/5"
+          >
+            <Upload className="mr-2 w-5 h-5" /> Quick Scan
+          </Button>
+          <Button
+            onClick={() => onTabChange?.('marketplace')}
+            className="rounded-full h-14 px-8 font-bold shadow-xl shadow-primary/20"
+          >
+            <Search className="mr-2 w-5 h-5" /> Browse Jobs
+          </Button>
         </div>
       </div>
 
@@ -590,12 +605,28 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
     });
     
     try {
+      // Create a temporary submission record for the pre-check
+      const tempSubRef = await addDoc(collection(db, 'submissions'), {
+        jobId: job.id,
+        architectId: user.uid,
+        drawingUrl: targetUrl,
+        drawingName: targetName,
+        status: 'ai_reviewing',
+        traceability: [{
+          timestamp: new Date().toISOString(),
+          actor: user.displayName,
+          action: 'Quick Scan Initiated',
+          details: `Architect ${user.displayName} initiated AI Pre-check for ${targetName}`
+        }],
+        createdAt: new Date().toISOString()
+      });
+
       // Log start of pre-check
       await logSystemEvent('info', 'Architect Studio', `Architect ${user.displayName} initiated AI Pre-check for ${targetName}`);
 
       const result = await reviewDrawing(targetUrl, targetName, (progress) => {
         setAiProgress(progress);
-      });
+      }, tempSubRef.id);
       
       setPreCheckResult(result);
       if (result.status === 'passed') {
@@ -947,9 +978,24 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
                           ) : (
                             <AlertCircle className="text-red-600" size={16} />
                           )}
-                          <span className={`text-[10px] font-bold uppercase tracking-widest ${preCheckResult.status === 'passed' ? 'text-green-700' : 'text-red-700'}`}>
-                            AI Pre-check: {preCheckResult.status}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className={`text-[10px] font-bold uppercase tracking-widest ${preCheckResult.status === 'passed' ? 'text-green-700' : 'text-red-700'}`}>
+                              AI Pre-check: {preCheckResult.status}
+                            </span>
+                            <Button
+                              variant="link"
+                              className="p-0 h-auto text-[10px] font-bold text-primary underline uppercase tracking-tighter"
+                              onClick={() => {
+                                if ((preCheckResult as any).visualReportUrl) {
+                                  window.open((preCheckResult as any).visualReportUrl, '_blank');
+                                } else {
+                                  toast.info("Visual Report being generated... check back in a moment.");
+                                }
+                              }}
+                            >
+                              <Eye size={10} className="mr-1" /> View Visual Highlights
+                            </Button>
+                          </div>
                         </div>
                         
                         <ScrollArea className="h-[200px] overflow-y-auto pr-2">
@@ -960,9 +1006,19 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
                                   <p className="text-[10px] font-bold text-muted-foreground uppercase">{cat.name}</p>
                                   <div className="space-y-2">
                                     {cat.issues.map((issue, j) => (
-                                      <div key={j} className="text-xs bg-white/50 p-3 rounded-xl border border-black/5">
-                                        <p className="font-bold">{issue.description}</p>
-                                        <p className="text-[10px] text-muted-foreground mt-1">Action: {issue.actionItem}</p>
+                                      <div key={j} className="text-xs bg-white/50 p-4 rounded-xl border border-black/5 space-y-2">
+                                        <div className="flex flex-col gap-1">
+                                          <p className="font-bold text-foreground">Issue: {issue.description}</p>
+                                          {issue.regulationStipulation && (
+                                            <div className="p-2 bg-primary/5 rounded-lg border-l-2 border-primary mt-1">
+                                              <p className="text-[10px] italic text-muted-foreground"><span className="font-bold uppercase text-[8px] not-italic mr-2">SANS Regulation:</span>{issue.regulationStipulation}</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-start gap-2 bg-secondary/20 p-2 rounded-lg">
+                                          <ArrowRight className="w-3 h-3 mt-0.5 text-primary shrink-0" />
+                                          <p className="text-[10px] font-medium text-foreground"><span className="font-bold uppercase text-[8px] mr-2">Fix:</span>{issue.actionItem}</p>
+                                        </div>
                                       </div>
                                     ))}
                                   </div>

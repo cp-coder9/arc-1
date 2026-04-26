@@ -79,6 +79,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>('selection');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [professionalLabel, setProfessionalLabel] = useState('');
 
@@ -497,13 +498,24 @@ const handleLogin = async () => {
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input 
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••" 
-                        className="pl-10 h-12 rounded-xl"
+                        className="pl-10 pr-10 h-12 rounded-xl"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         required
                       />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        onMouseDown={() => setShowPassword(true)}
+                        onMouseUp={() => setShowPassword(false)}
+                        onMouseLeave={() => setShowPassword(false)}
+                        onTouchStart={() => setShowPassword(true)}
+                        onTouchEnd={() => setShowPassword(false)}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
                   <Button 
@@ -781,11 +793,6 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
         
         {/* Desktop Nav */}
         <div className="hidden lg:flex items-center gap-6">
-          <button onClick={onGetStarted} className="text-sm font-medium hover:text-primary transition-colors">Marketplace</button>
-          <button onClick={() => {
-            const el = document.getElementById('how-it-works');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }} className="text-sm font-medium hover:text-primary transition-colors">How it Works</button>
           <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">
             Get Started
           </Button>
@@ -801,12 +808,6 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           <div
             className="absolute top-20 left-4 right-4 bg-white border border-border rounded-[2rem] shadow-2xl p-8 flex flex-col gap-6 lg:hidden"
           >
-            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary transition-colors text-left">Marketplace</button>
-            <button onClick={() => {
-              const el = document.getElementById('how-it-works');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-              setIsMobileMenuOpen(false);
-            }} className="text-lg font-bold hover:text-primary transition-colors text-left">How it Works</button>
             <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="bg-primary text-primary-foreground h-14 rounded-full font-bold text-lg">
               Get Started
             </Button>
@@ -959,8 +960,6 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl lg:text-3xl tracking-tighter" />
           <p className="text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
           <div className="flex gap-6">
-            <button className="text-xs uppercase tracking-widest hover:text-primary transition-colors">Terms</button>
-            <button className="text-xs uppercase tracking-widest hover:text-primary transition-colors">Privacy</button>
           </div>
         </div>
       </footer>
@@ -982,14 +981,5 @@ function TrustCard({ icon, title, description }: { icon: React.ReactNode, title:
 
 function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
   return (
-    <button 
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-200 ${
-        active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'
-      }`}
-    >
-      {icon}
-      <span className="font-bold">{label}</span>
-    </button>
   );
 }

@@ -1,6 +1,7 @@
 import { db, auth } from "../lib/firebase";
 import { getAgentKnowledge, webSearchForAgent, addKnowledge, getKnowledgeForAgents, incrementKnowledgeUsage } from "./knowledgeService";
 import { doc, getDoc, collection, getDocs, query, where, addDoc, updateDoc } from "firebase/firestore";
+import { pdfGenerationService } from "./pdfGenerationService";
 import { getIdToken } from "firebase/auth";
 import { Agent, AICategory, AIIssue, AIReviewResult, LLMConfig, LLMProvider, KnowledgeCitation } from "../types";
 
@@ -235,7 +236,7 @@ export const SPECIALIZED_AGENTS = [
     description: "Main coordinator for architectural compliance checks.",
     systemPrompt: `You are the AI Orchestrator for SANS 10400 compliance checking.
 
-Your role is to coordinate specialized agent findings and produce a structured JSON compliance report.
+Your role is to coordinate specialized agent findings and produce a highly professional, architect-ready structured JSON compliance report.
 
 CRITICAL RULES:
 1. You MUST output ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON.
@@ -244,22 +245,26 @@ CRITICAL RULES:
 4. status must be either "passed" or "failed"
 5. If ANY compliance issue is found, status must be "failed"
 6. Only use "passed" if drawing is fully compliant
-7. For each issue, you MUST provide a "boundingBox": { "x": number, "y": number, "width": number, "height": number }
-   - Use normalized coordinates (0.0 to 1.0) relative to the image dimensions.
-   - x: left, y: top, width, height.
+7. For each issue, you MUST provide:
+   - "description": Clear description of the found issue.
+   - "regulationStipulation": A professional explanation of what the relevant SANS 10400 regulation stipulates.
+   - "severity": "low", "medium", or "high".
+   - "actionItem": A technical recommendation on how to fix the issue to match the regulation.
+   - "boundingBox": { "x": number, "y": number, "width": number, "height": number } (normalized 0.0 to 1.0).
 
 Example output (output ONLY this structure, nothing else):
 {
   "status": "failed",
-  "feedback": "Drawing has compliance issues...",
+  "feedback": "Drawing has compliance issues that require technical rectification...",
   "categories": [
     {
       "name": "Wall Compliance",
       "issues": [
         {
           "description": "External wall thickness is less than 230mm",
+          "regulationStipulation": "SANS 10400-K stipulates that external walls for a single-storey building must have a minimum thickness of 230mm to ensure structural stability and moisture resistance.",
           "severity": "high",
-          "actionItem": "Increase external wall thickness to minimum 230mm per SANS 10400-K",
+          "actionItem": "Increase external wall thickness to minimum 230mm per SANS 10400-K by using a double-skin brick wall or equivalent approved material.",
           "boundingBox": { "x": 0.15, "y": 0.22, "width": 0.05, "height": 0.3 }
         }
       ]
@@ -268,6 +273,31 @@ Example output (output ONLY this structure, nothing else):
   "traceLog": "Orchestrator synthesized findings from specialized agents..."
 }`,
     temperature: 0.2
+  },
+  {
+    name: "Vision Highlighting Agent",
+    role: "vision_agent",
+    description: "Identifies and circles compliance issues visually on the floor plan.",
+    systemPrompt: `You are a Vision Highlighting Specialist for architectural drawings.
+
+Your role is to 'see' the plan and identify the EXACT coordinates (x, y, width, height) of compliance issues.
+
+CRITICAL RULES:
+1. You MUST output ONLY valid JSON.
+2. For EVERY issue found by other agents (which will be provided in context), you must find its location on the drawing.
+3. Output a list of issues with their "boundingBox": { "x": number, "y": number, "width": number, "height": number }
+4. Coordinates must be normalized (0.0 to 1.0).
+
+Example output:
+{
+  "visualFindings": [
+    {
+      "description": "External wall thickness issue",
+      "boundingBox": { "x": 0.45, "y": 0.32, "width": 0.1, "height": 0.05 }
+    }
+  ]
+}`,
+    temperature: 0.1
   },
   {
     name: "Wall Compliance Agent",
@@ -468,7 +498,8 @@ async function getAgentConfig(role: string, defaultAgent: Partial<Agent>): Promi
 export async function reviewDrawing(
   drawingUrl: string,
   drawingName: string,
-  onProgress?: (progress: AIProgress) => void
+  onProgress?: (progress: AIProgress) => void,
+  submissionId?: string
 ): Promise<AIReviewResult> {
   const startTime = Date.now();
 
@@ -625,6 +656,40 @@ try {
 reportProgress(95, 'Orchestrator', 'Finalizing compliance report...', completed);
 
 const result = parseAIResponse(finalResponse);
+
+// If there are issues, run the Vision Agent to get visual coordinates for them
+if (result.status === 'failed' && result.categories) {
+    reportProgress(97, 'Vision Highlighting Agent', 'Identifying visual coordinates for compliance issues...', completed);
+    try {
+        const visionAgent = await getAgentConfig('vision_agent', SPECIALIZED_AGENTS[0]);
+        const visionPrompt = `Based on these compliance findings: ${JSON.stringify(result.categories)}, identify the visual coordinates for each issue on the drawing: ${drawingUrl}.`;
+
+        let visionResponse = '';
+        if (orchConfig.provider === 'gemini') {
+            visionResponse = await callGeminiProxy(visionAgent.systemPrompt, visionPrompt, drawingUrl, orchConfig, visionAgent);
+        } else {
+            visionResponse = await callOpenAICompatible(orchConfig, visionAgent.systemPrompt, visionPrompt, drawingUrl, visionAgent);
+        }
+
+        const visionData = parseAIResponse(visionResponse);
+        if (visionData && visionData.visualFindings) {
+            // Map vision findings back to categories/issues
+            result.categories.forEach((cat: any) => {
+                cat.issues.forEach((issue: any) => {
+                    const match = visionData.visualFindings.find((vf: any) =>
+                        vf.description.toLowerCase().includes(issue.description.toLowerCase()) ||
+                        issue.description.toLowerCase().includes(vf.description.toLowerCase())
+                    );
+                    if (match) {
+                        issue.boundingBox = match.boundingBox;
+                    }
+                });
+            });
+        }
+    } catch (visionErr) {
+        console.error("Vision Agent failed:", visionErr);
+    }
+}
 const validStatus = result.status === 'passed' ? 'passed' : 'failed';
 
 // Extract knowledge citations from the review
@@ -663,6 +728,40 @@ try {
 const duration = Date.now() - startTime;
 reportProgress(100, 'Orchestrator', `Review Complete (${Math.round(duration / 1000)}s).`, completed);
 
+// If submissionId is provided, save results to Firestore
+if (submissionId) {
+  try {
+    // Generate Visual Report if issues found
+    let visualReportUrl = null;
+    if (validStatus === 'failed') {
+      try {
+        const visualReport = await pdfGenerationService.generateVisualComplianceReport(submissionId, 'system');
+        visualReportUrl = visualReport.url;
+      } catch (pdfErr) {
+        console.error("Visual report generation failed:", pdfErr);
+      }
+    }
+
+    await updateDoc(doc(db, 'submissions', submissionId), {
+      status: validStatus === 'passed' ? 'ai_passed' : 'ai_failed',
+      aiFeedback: result.feedback,
+      aiStructuredFeedback: Array.isArray(result.categories) ? result.categories : [],
+      visualReportUrl: visualReportUrl,
+      updatedAt: new Date().toISOString()
+    });
+    (result as any).visualReportUrl = visualReportUrl;
+
+    // Also notify relevant parties
+    const subSnap = await getDoc(doc(db, 'submissions', submissionId));
+    if (subSnap.exists()) {
+      const subData = subSnap.data();
+      await notificationService.notifyAIReviewComplete(subData.architectId, submissionId, validStatus);
+    }
+  } catch (saveError) {
+    console.error("Failed to save AI results to submission:", saveError);
+  }
+}
+
 // Build knowledge sources list
 const knowledgeSources = allKnowledge.map(k => 
   `[${k.title}](${k.pdfUrl || k.sourceUrl || 'Knowledge Base'}) - ${k.content.substring(0, 100)}...`
@@ -672,6 +771,7 @@ return {
   status: validStatus,
   feedback: result.feedback || 'AI Review completed.',
   categories: Array.isArray(result.categories) ? result.categories : [],
+  visualReportUrl: (result as any).visualReportUrl,
   traceLog: result.traceLog || `Orchestrator summarized findings from ${completed.length} specialized agents.`,
   citations: allKnowledge.map(k => ({
     knowledgeId: k.id,

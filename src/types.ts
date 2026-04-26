@@ -77,6 +77,7 @@ export interface TraceLog {
 
 export interface AIIssue {
   description: string;
+  regulationStipulation: string;
   severity: 'low' | 'medium' | 'high';
   actionItem: string;
   boundingBox?: { x: number; y: number; width: number; height: number };
@@ -92,6 +93,7 @@ export interface AIReviewResult {
   status: 'passed' | 'failed';
   feedback: string;
   categories: AICategory[];
+  visualReportUrl?: string;
   traceLog: string;
   citations?: KnowledgeCitation[];
   knowledgeSources?: string[];

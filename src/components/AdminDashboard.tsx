@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
@@ -15,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Building2 } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Building2, Key } from 'lucide-react';
 import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 import {
   Accordion,
@@ -37,6 +39,7 @@ const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+import { pdfGenerationService } from "../services/pdfGenerationService";
     models: [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-pro', label: 'Gemini 2.0 Pro' },
@@ -1072,6 +1075,26 @@ function UserManagement({
     }
   };
 
+  const handleResetPassword = async (email: string) => {
+    if (!confirm(`Send password reset email to ${email}?`)) return;
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("Password reset email sent");
+    } catch (error) {
+      toast.error("Failed to send reset email");
+    }
+  };
+
+  const handleResetPassword = async (email: string) => {
+    if (!confirm(`Send password reset email to ${email}?`)) return;
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("Password reset email sent");
+    } catch (error) {
+      toast.error("Failed to send reset email");
+    }
+  };
+
   return (
     <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
       <CardHeader className="bg-primary/5 border-b border-border p-8 flex flex-row items-center justify-between">
@@ -1187,6 +1210,15 @@ function UserManagement({
                       {(u as any).status === 'suspended' ? 'Activate' : 'Suspend'}
                     </Button>
                     <ProfileEditor user={u} isAdminEditing={true} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Reset Password"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => handleResetPassword(u.email)}
+                    >
+                      <Key size={14} />
+                    </Button>
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -1735,6 +1767,29 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleGenerateVisualReport = async () => {
+    toast.info("Generating professional visual report with highlighted issues...");
+    try {
+        // Find or create a temporary submission for this test drawing
+        const tempSubRef = await addDoc(collection(db, 'submissions'), {
+          jobId: 'system-test',
+          architectId: user.uid,
+          drawingUrl: 'test-url', // In a real scenario, this would be from the test file
+          drawingName: 'System Test Drawing',
+          status: 'ai_passed',
+          aiStructuredFeedback: testResult?.categories || [],
+          createdAt: new Date().toISOString()
+        });
+
+        const report = await pdfGenerationService.generateVisualComplianceReport(tempSubRef.id, user.uid);
+        window.open(report.url, '_blank');
+        toast.success("Visual Report generated successfully.");
+    } catch (error) {
+        console.error("Visual report generation failed:", error);
+        toast.error("Failed to generate visual report.");
+    }
+  };
+
   const handleSaveReport = async () => {
     if (!testResult) return;
     setIsSaving(true);
@@ -2013,6 +2068,9 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Report
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleGenerateVisualReport()} className="gap-2 border-primary/50 text-primary hover:bg-primary/5">
+                    <Eye className="w-4 h-4" /> Visual Report
+                  </Button>
                 </div>
               </div>
               
@@ -2050,12 +2108,20 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
                                     issue.severity === 'medium' ? <AlertCircle className="w-4 h-4 text-orange-500" /> : 
                                     <CheckCircle2 className="w-4 h-4 text-blue-500" />}
                                  </div>
-                                 <div className="space-y-1">
-                                   <p className="text-sm font-medium">{issue.description}</p>
+                                 <div className="space-y-2 flex-1">
+                                   <div className="flex flex-col gap-1">
+                                     <p className="text-sm font-bold text-foreground">Issue: {issue.description}</p>
+                                     {issue.regulationStipulation && (
+                                       <div className="p-2 bg-primary/5 rounded-lg border-l-4 border-primary mt-1">
+                                         <p className="text-[11px] italic text-muted-foreground"><span className="font-bold uppercase text-[9px] not-italic mr-2">Regulation:</span>{issue.regulationStipulation}</p>
+                                       </div>
+                                     )}
+                                   </div>
                                    {issue.actionItem && (
-                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                       <ArrowRight className="w-3 h-3" /> {issue.actionItem}
-                                     </p>
+                                     <div className="flex items-start gap-2 bg-white/50 p-2 rounded-lg border border-border">
+                                       <ArrowRight className="w-3 h-3 mt-1 text-primary shrink-0" />
+                                       <p className="text-xs font-medium text-foreground"><span className="font-bold uppercase text-[9px] mr-2">Rectification:</span>{issue.actionItem}</p>
+                                     </div>
                                    )}
                                  </div>
                                </div>
