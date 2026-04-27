@@ -169,7 +169,9 @@ class CouncilSubmissionService {
 
     const submission: Omit<CouncilSubmission, 'id'> = {
       jobId: job.id,
-      municipality: config.name,
+      userId: client.uid,
+      municipality: municipality as any, // TODO: Map to MunicipalityType
+      source: 'manual' as const,
       referenceNumber,
       status: 'preparing',
       documents,
@@ -178,6 +180,7 @@ class CouncilSubmissionService {
           status: 'Document Package Created',
           timestamp: new Date().toISOString(),
           notes: 'All required documents compiled and ready for submission',
+          source: 'manual' as const,
         },
       ],
     };
