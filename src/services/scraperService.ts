@@ -1,6 +1,6 @@
-import { adminDb } from '../lib/firebase-admin.js';
-import { decrypt } from '../lib/encryption.js';
-import { MunicipalityType, CouncilSubmission, TrackingEvent } from '../types.js';
+import { adminDb } from '../lib/firebase-admin';
+import { decrypt } from '../lib/encryption';
+import { MunicipalityType, CouncilSubmission, TrackingEvent } from '../types';
 
 export async function runMunicipalScraper(userId: string, municipality: MunicipalityType) {
   console.log(`[Scraper] Starting scraper for user ${userId} in ${municipality}`);
