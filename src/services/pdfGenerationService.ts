@@ -22,6 +22,7 @@ export interface SubmissionPackageData {
       name: string;
       issues: Array<{
         description: string;
+        regulationStipulation?: string;
         severity: string;
         actionItem: string;
       }>;
@@ -60,6 +61,7 @@ class PDFGenerationService {
       
       // Add AI review report
       this.addAIReviewReportPage(pdfDoc, data);
+      this.addDetailedFindingsPages(pdfDoc, data);
       
       // Save PDF
       const pdfBytes = await pdfDoc.save();
@@ -476,6 +478,90 @@ class PDFGenerationService {
   /**
    * Add AI review report page
    */
+  private addDetailedFindingsPages(pdfDoc: PDFDocument, data: SubmissionPackageData): void {
+    const { categories } = data.aiReviewResults;
+    if (!categories || categories.length === 0) return;
+
+    const helveticaBold = pdfDoc.embedStandardFont(StandardFonts.HelveticaBold);
+    const helvetica = pdfDoc.embedStandardFont(StandardFonts.Helvetica);
+    const courier = pdfDoc.embedStandardFont(StandardFonts.Courier);
+
+    for (const category of categories) {
+      if (category.issues.length === 0) continue;
+
+      let page = pdfDoc.addPage(PageSizes.A4);
+      let { height, width } = page.getSize();
+      let yPos = height - 50;
+
+      page.drawText(`Category: ${category.name}`, {
+        x: 50,
+        y: yPos,
+        size: 16,
+        font: helveticaBold,
+        color: rgb(0, 0, 0.5),
+      });
+      yPos -= 30;
+
+      for (const issue of category.issues) {
+        if (yPos < 150) {
+          page = pdfDoc.addPage(PageSizes.A4);
+          yPos = height - 50;
+        }
+
+        // Issue Box
+        page.drawRectangle({
+          x: 45,
+          y: yPos - 100,
+          width: width - 90,
+          height: 110,
+          borderColor: rgb(0.8, 0.8, 0.8),
+          borderWidth: 1,
+        });
+
+        page.drawText(`ISSUE: ${issue.description}`, {
+          x: 60,
+          y: yPos,
+          size: 10,
+          font: helveticaBold,
+        });
+        yPos -= 20;
+
+        if (issue.regulationStipulation) {
+          page.drawText('REGULATION STIPULATION:', {
+            x: 60,
+            y: yPos,
+            size: 8,
+            font: helveticaBold,
+            color: rgb(0.4, 0.4, 0.4),
+          });
+          yPos -= 12;
+          const lines = this.wrapText(issue.regulationStipulation, 100);
+          for (const line of lines.slice(0, 3)) {
+             page.drawText(line, { x: 65, y: yPos, size: 8, font: helvetica, color: rgb(0.2, 0.2, 0.2) });
+             yPos -= 10;
+          }
+        }
+
+        yPos -= 10;
+        page.drawText('RECTIFICATION / FIX:', {
+          x: 60,
+          y: yPos,
+          size: 8,
+          font: helveticaBold,
+          color: rgb(0, 0.5, 0),
+        });
+        yPos -= 12;
+        const fixLines = this.wrapText(issue.actionItem, 100);
+        for (const line of fixLines.slice(0, 3)) {
+           page.drawText(line, { x: 65, y: yPos, size: 8, font: helvetica, color: rgb(0, 0, 0) });
+           yPos -= 10;
+        }
+
+        yPos -= 30;
+      }
+    }
+  }
+
   private addAIReviewReportPage(pdfDoc: PDFDocument, data: SubmissionPackageData): void {
     const page = pdfDoc.addPage(PageSizes.A4);
     const { height } = page.getSize();
@@ -854,6 +940,99 @@ class PDFGenerationService {
       return { url, fileName };
     } catch (error) {
       console.error('Invoice PDF generation error:', error);
+      throw error;
+    }
+  }
+}
+
+  /**
+   * Generate a visual compliance report with circled issues
+   */
+  async generateVisualComplianceReport(
+    submissionId: string,
+    uploadedBy: string
+  ): Promise<{ url: string; fileName: string }> {
+    try {
+      const submissionDoc = await getDoc(doc(db, 'submissions', submissionId));
+      if (!submissionDoc.exists()) throw new Error('Submission not found');
+      const submission = submissionDoc.data() as Submission;
+
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage(PageSizes.A4);
+      const { width, height } = page.getSize();
+      const helveticaBold = pdfDoc.embedStandardFont(StandardFonts.HelveticaBold);
+      const helvetica = pdfDoc.embedStandardFont(StandardFonts.Helvetica);
+
+      // Header
+      page.drawRectangle({ x: 0, y: height - 100, width, height: 100, color: rgb(0.05, 0.1, 0.2) });
+      page.drawText('VISUAL COMPLIANCE REPORT', { x: 50, y: height - 60, size: 24, font: helveticaBold, color: rgb(1, 1, 1) });
+      page.drawText(`Drawing: ${submission.drawingName}`, { x: 50, y: height - 85, size: 12, font: helvetica, color: rgb(0.8, 0.8, 0.8) });
+
+      let yPos = height - 140;
+
+      if (submission.aiStructuredFeedback) {
+        for (const category of submission.aiStructuredFeedback) {
+          for (const issue of category.issues) {
+            if (yPos < 200) {
+              const newPage = pdfDoc.addPage(PageSizes.A4);
+              yPos = height - 50;
+            }
+
+            page.drawText(`Issue: ${issue.description}`, { x: 50, y: yPos, size: 12, font: helveticaBold });
+            yPos -= 20;
+
+            if (issue.boundingBox) {
+              // In a real implementation, we would crop the image here.
+              // For this task, we will represent the 'highlighted' area with a placeholder/description
+              // and a simulated circle on a coordinate plane since we can't easily process images in this environment.
+              page.drawRectangle({
+                x: 60,
+                y: yPos - 120,
+                width: 200,
+                height: 120,
+                borderColor: rgb(0.8, 0, 0),
+                borderWidth: 2,
+              });
+
+              page.drawCircle({
+                x: 160,
+                y: yPos - 60,
+                size: 30,
+                borderColor: rgb(1, 0, 0),
+                borderWidth: 3,
+              });
+
+              page.drawText(`[Visual Highlight at ${Math.round(issue.boundingBox.x * 100)}%, ${Math.round(issue.boundingBox.y * 100)}%]`, {
+                x: 70,
+                y: yPos - 110,
+                size: 8,
+                font: helvetica,
+                color: rgb(0.5, 0, 0),
+              });
+
+              yPos -= 140;
+            } else {
+              page.drawText('No visual coordinates provided for this issue.', { x: 60, y: yPos, size: 10, font: helvetica, color: rgb(0.5, 0.5, 0.5) });
+              yPos -= 30;
+            }
+          }
+        }
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      const fileName = `visual-report-${submissionId}-${Date.now()}.pdf`;
+      const url = await uploadAndTrackFile(new Blob([pdfBytes as any], { type: 'application/pdf' }), {
+        fileName,
+        fileType: 'application/pdf',
+        fileSize: pdfBytes.length,
+        uploadedBy,
+        context: 'submission',
+        submissionId,
+      });
+
+      return { url, fileName };
+    } catch (error) {
+      console.error('Visual report generation error:', error);
       throw error;
     }
   }

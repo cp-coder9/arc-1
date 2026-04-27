@@ -251,7 +251,8 @@ export async function getAgentConfig(role: string, defaultAgent: Partial<Agent>)
 export async function reviewDrawing(
   drawingUrl: string,
   drawingName: string,
-  onProgress?: (progress: AIProgress) => void
+  onProgress?: (progress: AIProgress) => void,
+  submissionId?: string
 ): Promise<AIReviewResult> {
   const startTime = Date.now();
 

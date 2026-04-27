@@ -62,7 +62,7 @@ export default async function handler(_req: Request, res: Response) {
           const fcmTokens: string[] = userDoc.data()?.fcmTokens || [];
 
           if (fcmTokens.length > 0) {
-            // TODO: Send via FCM using firebase-admin messaging
+            // TODO: Send via FCM using firebase-admin.js messaging
             console.log(
               `[Notification Worker] 📱 PUSH queued to ${fcmTokens.length} device(s)`
             );
