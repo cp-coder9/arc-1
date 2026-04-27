@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep';
 
 export interface UserProfile {
   uid: string;
@@ -6,7 +6,16 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   bio?: string;
+  nhbrcNumber?: string;
+  cidbGrading?: string;
+  hasPIInsurance?: boolean;
+  tradeLicense?: string;
   professionalLabels?: string[]; // e.g. ['Engineer', 'Builder', 'Construction Worker']
+  professionalLabel?: string;
+  region?: string;
+  averageRating?: number;
+  totalReviews?: number;
+  completedJobs?: number;
   createdAt: string;
   updatedAt?: string;
 }
@@ -54,7 +63,8 @@ export interface Review {
   toId: string;
   rating: number;
   comment: string;
-  type: 'client_to_architect' | 'architect_to_client';
+  status: 'pending_admin' | 'approved';
+  type: 'client_to_architect' | 'architect_to_client' | 'to_bep' | 'from_bep' | 'to_freelancer';
   createdAt: string;
 }
 
@@ -158,6 +168,7 @@ export interface JobCard extends DelegatedTask {
   priority: 'low' | 'medium' | 'high';
   estimatedHours?: number;
   attachments?: { name: string; url: string }[];
+  requirements?: string[];
 }
 
 export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
@@ -349,7 +360,7 @@ export interface MunicipalCredential {
   lastUsed?: string;
   status: 'valid' | 'invalid' | 'unchecked';
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface CrowdsourceUpdate {
