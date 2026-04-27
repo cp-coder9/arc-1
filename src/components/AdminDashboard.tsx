@@ -31,6 +31,7 @@ import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
+import { pdfGenerationService } from "../services/pdfGenerationService";
 import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import { Dialog as FullScreenDialog, DialogContent as FullScreenDialogContent } from './ui/dialog';
 
@@ -38,7 +39,7 @@ const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-import { pdfGenerationService } from "../services/pdfGenerationService";
+// Removed
     models: [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-pro', label: 'Gemini 2.0 Pro' },
@@ -1770,6 +1771,7 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
     toast.info("Generating professional visual report with highlighted issues...");
     try {
         // Find or create a temporary submission for this test drawing
+
         const tempSubRef = await addDoc(collection(db, 'submissions'), {
           jobId: 'system-test',
           architectId: user.uid,
@@ -1777,6 +1779,12 @@ function TestAgentDialog({ user }: { user: UserProfile }) {
           drawingName: 'System Test Drawing',
           status: 'ai_passed',
           aiStructuredFeedback: testResult?.categories || [],
+          traceability: [{
+            timestamp: new Date().toISOString(),
+            actor: user.displayName,
+            action: 'System Test Report Generated',
+            details: 'Visual report generated from test results'
+          }],
           createdAt: new Date().toISOString()
         });
 
