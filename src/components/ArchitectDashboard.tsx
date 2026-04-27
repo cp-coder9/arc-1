@@ -684,10 +684,11 @@ function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: a
         ]
       });
 
+
       // Trigger AI Review
       const aiResult = await reviewDrawing(drawingUrl, drawingName, (progress) => {
         setAiProgress(progress);
-      });
+      }, docRef.id);
       
       const finalStatus = aiResult.status === 'passed' ? 'admin_reviewing' : 'ai_failed';
       const statusLabel = aiResult.status === 'passed' ? 'Awaiting Admin Approval' : 'AI Review Failed';

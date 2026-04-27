@@ -109,7 +109,9 @@ export interface Submission {
   aiFeedback?: string;
   aiStructuredFeedback?: AICategory[];
   annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
+
   adminFeedback?: string;
+  visualReportUrl?: string;
   traceability: TraceLog[];
   createdAt: string;
 }
