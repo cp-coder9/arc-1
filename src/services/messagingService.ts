@@ -16,13 +16,13 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { Message, Conversation } from '../types';
+import { Message, Conversation, UserRole } from '../types';
 import DOMPurify from 'dompurify';
 
 export interface SendMessageParams {
   jobId: string;
   senderId: string;
-  senderRole: 'client' | 'architect' | 'admin';
+  senderRole: 'client' | 'architect' | 'admin' | 'freelancer';
   content: string;
   attachments?: { name: string; url: string; type: string }[];
 }

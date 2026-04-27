@@ -5,14 +5,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { MessageSquarePlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { addKnowledge } from '../services/knowledgeService';
-import { AIIssue } from '../types';
+import { AIIssue, UserRole } from '../types';
 import { auth } from '../lib/firebase';
 
 interface KnowledgeFeedbackProps {
   agentRole: string;
   categoryName: string;
   issue: AIIssue;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
 }
 
 export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: KnowledgeFeedbackProps) {
@@ -42,7 +42,7 @@ export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: 
         source: 'human_feedback',
         status: 'pending_review',
         submittedBy: user.uid,
-        submittedByRole: userRole || 'architect',
+        submittedByRole: (userRole || 'architect') as any,
         tags: [categoryName, 'correction'],
         createdAt: new Date().toISOString()
       });
