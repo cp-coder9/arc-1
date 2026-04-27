@@ -511,12 +511,19 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
     
     try {
       // Create a temporary submission record for the pre-check
+
       const tempSubRef = await addDoc(collection(db, 'submissions'), {
         jobId: job.id,
         architectId: 'client-pre-check',
         drawingUrl: drawingUrl,
         drawingName: drawingName,
         status: 'ai_reviewing',
+        traceability: [{
+          timestamp: new Date().toISOString(),
+          actor: 'Client',
+          action: 'Client Pre-check Initiated',
+          details: 'Client requested automated compliance pre-check'
+        }],
         createdAt: new Date().toISOString()
       });
 
