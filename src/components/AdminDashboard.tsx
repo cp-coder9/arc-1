@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '../types';
@@ -29,6 +30,7 @@ import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
+import { pdfGenerationService } from "../services/pdfGenerationService";
 import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import ReviewManagement from "./ReviewManagement";
 
@@ -36,6 +38,7 @@ const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+// Removed
     models: [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-pro', label: 'Gemini 2.0 Pro' },

@@ -96,6 +96,21 @@ export default function ArchitectDashboard({
            <StatPill icon={<Star size={14} className="text-yellow-500" />} label="Rating" value={`${Number(user.averageRating || 5.0).toFixed(1)}/5`} />
            <StatPill icon={<CheckCircle2 size={14} className="text-green-500" />} label="Jobs" value={user.completedJobs || 0} />
         </div>
+        <div className="flex gap-4">
+          <Button
+            onClick={() => onTabChange?.('files')}
+            variant="outline"
+            className="rounded-full h-14 px-8 font-bold border-primary/20 hover:bg-primary/5"
+          >
+            <Upload className="mr-2 w-5 h-5" /> Quick Scan
+          </Button>
+          <Button
+            onClick={() => onTabChange?.('marketplace')}
+            className="rounded-full h-14 px-8 font-bold shadow-xl shadow-primary/20"
+          >
+            <Search className="mr-2 w-5 h-5" /> Browse Jobs
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab || 'overview'} onValueChange={onTabChange} className="w-full">

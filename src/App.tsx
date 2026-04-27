@@ -83,6 +83,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>('selection');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [professionalLabel, setProfessionalLabel] = useState('');
 

@@ -1,0 +1,27 @@
+<<<<<<< SEARCH
+        const tempSubRef = await addDoc(collection(db, 'submissions'), {
+          jobId: 'system-test',
+          architectId: user.uid,
+          drawingUrl: 'test-url', // In a real scenario, this would be from the test file
+          drawingName: 'System Test Drawing',
+          status: 'ai_passed',
+          aiStructuredFeedback: testResult?.categories || [],
+          createdAt: new Date().toISOString()
+        });
+=======
+        const tempSubRef = await addDoc(collection(db, 'submissions'), {
+          jobId: 'system-test',
+          architectId: user.uid,
+          drawingUrl: 'test-url', // In a real scenario, this would be from the test file
+          drawingName: 'System Test Drawing',
+          status: 'ai_passed',
+          aiStructuredFeedback: testResult?.categories || [],
+          traceability: [{
+            timestamp: new Date().toISOString(),
+            actor: user.displayName,
+            action: 'System Test Report Generated',
+            details: 'Visual report generated from test results'
+          }],
+          createdAt: new Date().toISOString()
+        });
+>>>>>>> REPLACE
