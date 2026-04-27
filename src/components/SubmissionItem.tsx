@@ -13,6 +13,8 @@ import { Download } from 'lucide-react';
 
 import { UserRole } from '../types';
 
+import { UserRole } from '../types';
+
 interface SubmissionItemProps {
   sub: Submission;
   userRole?: 'admin' | 'architect' | 'client' | 'freelancer';

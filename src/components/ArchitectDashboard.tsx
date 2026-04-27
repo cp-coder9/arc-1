@@ -272,7 +272,7 @@ export default function ArchitectDashboard({
         </TabsContent>
 
         <TabsContent value="municipal" className="mt-8">
-          <MunicipalTracker user={user} />
+          <MunicipalTracker architect={user} jobs={myJobs} />
         </TabsContent>
       </Tabs>
     </div>

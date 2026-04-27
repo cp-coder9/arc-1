@@ -1025,75 +1025,30 @@ router.post("/track-municipality", async (req, res) => {
 // Get Municipal Settings
 router.get("/municipal/settings", async (req, res) => {
   try {
-    await verifyAuth(req.headers);
-    const doc = await adminDb.collection("system_settings").doc("municipal_tracker").get();
-    res.json(doc.exists ? doc.data() : { municipalTrackerEnabled: false });
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    return res.status(err.status || 401).json({ error: err.message });
   }
-});
 
-// Update Municipal Settings (Admin Only)
-router.post("/municipal/settings", async (req, res) => {
+  const { credentialId } = req.body;
+  if (!credentialId) return res.status(400).json({ error: "credentialId is required" });
+
   try {
-    const decoded = await verifyAuth(req.headers);
-    if (!(await isAdmin(decoded.uid))) {
-      return res.status(403).json({ error: "Admin access required" });
+    // Ownership verification
+    const credDoc = await adminDb.collection("municipal_credentials").doc(credentialId).get();
+    if (!credDoc.exists) {
+      return res.status(404).json({ error: "Credentials not found" });
     }
 
-    const settings = req.body;
-    await adminDb.collection("system_settings").doc("municipal_tracker").set({
-      ...settings,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-// Save Municipal Credentials
-router.post("/municipal/credentials", async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { municipality, username, password } = req.body;
-
-    if (!municipality || !username || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
+    const credData = credDoc.data();
+    if (credData?.userId !== decoded.uid && !(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Unauthorized access to credentials" });
     }
 
-    const { encrypted, iv, authTag } = encrypt(password);
-
-    const credRef = adminDb.collection("municipal_credentials").doc(`${decoded.uid}_${municipality}`);
-    await credRef.set({
-      userId: decoded.uid,
-      municipality,
-      username,
-      encryptedPassword: encrypted,
-      iv,
-      authTag,
-      status: 'unchecked',
-      createdAt: new Date().toISOString()
-    });
-
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-// Trigger Scraper
-router.post("/municipal/scrape", async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { municipality } = req.body;
-
-    if (!municipality) return res.status(400).json({ error: "Municipality is required" });
-
-    const result = await runMunicipalScraper(decoded.uid, municipality as MunicipalityType);
+    const result = await trackMunicipalityStatus(credentialId);
     res.json(result);
   } catch (err: any) {
+    console.error("Municipal tracking error:", err);
     res.status(err.status || 500).json({ error: err.message });
   }
 });

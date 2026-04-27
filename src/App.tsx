@@ -54,7 +54,6 @@ import {
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
-import { Building2 } from 'lucide-react';
 
 // Sub-components
 import ClientDashboard from './components/ClientDashboard';
@@ -280,7 +279,7 @@ const handleLogin = async () => {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')?.[0] || 'Anonymous',
+          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
           role: roleSelection || 'client',
           professionalLabels: (roleSelection === 'freelancer' && professionalLabel) ? [professionalLabel] : [],
           createdAt: new Date().toISOString(),
@@ -619,12 +618,6 @@ const handleLogin = async () => {
             active={activeTab === 'projects'} 
             onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }} 
           />
-          <NavItem
-            icon={<Building2 size={18} />}
-            label="Municipal Tracker"
-            active={activeTab === 'municipal'}
-            onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
-          />
           {user!.role === 'admin' && (
             <>
               <NavItem 
@@ -650,12 +643,6 @@ const handleLogin = async () => {
                 label="Knowledge Base" 
                 active={activeTab === 'knowledge'} 
                 onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }} 
-              />
-              <NavItem
-                icon={<Building2 size={18} />}
-                label="Municipal Settings"
-                active={activeTab === 'municipal'}
-                onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
               />
             </>
           )}
