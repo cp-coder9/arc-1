@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
-import { adminDb } from './firebase-admin.js';
-import { decrypt } from './encryption.js';
+import { adminDb } from './firebase-admin';
+import { decrypt } from './encryption';
 
 export async function trackMunicipalityStatus(credentialId: string) {
   const credDoc = await adminDb.collection('municipal_credentials').doc(credentialId).get();

@@ -7,7 +7,7 @@
  * This replaces the long-lived onSnapshot listener from server.ts,
  * which cannot run in a serverless environment.
  */
-import { admin, adminDb } from "../../src/lib/firebase-admin.js";
+import { admin, adminDb } from "../../src/lib/firebase-admin";
 import type { Request, Response } from "express";
 
 
