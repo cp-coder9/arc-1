@@ -28,7 +28,10 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X, Building2, ShieldX } from 'lucide-react';
+import { Users, CreditCard, Landmark, History as HistoryIcon, ShieldCheck, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, X, Building2, ShieldX } from 'lucide-react';
+import ProfileEditor from './ProfileEditor';
+import RatingSystem from './RatingSystem';
+import { Chat } from './Chat';
 import { ArchitectPortfolio } from './ArchitectPortfolio';
 import { ArchitectRecommendations } from './ArchitectRecommendations';
 import { Logo } from './Logo';

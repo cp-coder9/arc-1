@@ -4,6 +4,7 @@ import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, 
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review } from '../types';
 import ProfileEditor from './ProfileEditor';
+import RatingSystem from './RatingSystem';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
@@ -13,7 +14,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin } from 'lucide-react';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin, Upload } from 'lucide-react';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -183,7 +184,7 @@ export default function ArchitectDashboard({
         <TabsContent value="active" className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {myJobs.map(job => (
-              <ActiveProjectItem key={job.id} job={job} user={user} />
+              <ActiveProjectCard key={job.id} job={job} user={user} />
             ))}
             {myJobs.length === 0 && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">

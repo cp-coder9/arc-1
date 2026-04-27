@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -33,6 +33,7 @@ import AgentKnowledgeManager from './AgentKnowledgeManager';
 import { pdfGenerationService } from "../services/pdfGenerationService";
 import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import ReviewManagement from "./ReviewManagement";
+import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 
 const PROVIDER_CONFIGS = {
   gemini: {
