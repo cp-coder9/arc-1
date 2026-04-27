@@ -25,9 +25,12 @@ import {
   ShieldCheck,
   TrendingUp,
   Landmark,
-  FileText
+  FileText,
+  Loader2,
+  Download
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
+import { pdfGenerationService } from '@/services/pdfGenerationService';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { AnimatePresence } from 'framer-motion';
 
@@ -43,6 +46,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const [heatmap, setHeatmap] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -136,6 +140,29 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
       toast.error("OCR Failed");
     } finally {
       setOcrLoading(false);
+    }
+  };
+
+  const handleDownloadPackage = async (sub: CouncilSubmission) => {
+    if (!sub.id) return;
+    
+    setIsGenerating(sub.id);
+    try {
+      const { url, fileName } = await pdfGenerationService.generateCouncilSubmissionPackage(sub.id, user.uid);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Submission package generated successfully");
+    } catch (err) {
+      console.error("Package generation error:", err);
+      toast.error("Failed to generate submission package");
+    } finally {
+      setIsGenerating(null);
     }
   };
 
@@ -333,10 +360,22 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
                         )}
                       </div>
                     </CardContent>
-                    <CardFooter className="bg-secondary/10 border-t border-border/50">
-                      <Button variant="ghost" size="sm" className="w-full text-xs font-bold uppercase tracking-widest gap-2">
-                        <Eye className="w-4 h-4" /> View Full History
+                    <CardFooter className="bg-secondary/10 border-t border-border/50 gap-2">
+                      <Button variant="ghost" size="sm" className="flex-1 text-xs font-bold uppercase tracking-widest gap-2">
+                        <Eye className="w-4 h-4" /> History
                       </Button>
+                      {sub.jobId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDownloadPackage(sub)}
+                          disabled={!!isGenerating}
+                          className="flex-1 text-xs font-bold uppercase tracking-widest gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+                        >
+                          {isGenerating === sub.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                          Package
+                        </Button>
+                      )}
                     </CardFooter>
                   </Card>
                 ))

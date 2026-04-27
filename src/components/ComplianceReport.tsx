@@ -12,7 +12,8 @@ import {
   Download,
   Cpu,
   Activity,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -21,6 +22,8 @@ import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
 import { KnowledgeSources } from './KnowledgeSources';
+import { pdfGenerationService } from '@/services/pdfGenerationService';
+import { toast } from 'sonner';
 
 interface ComplianceReportProps {
   result: AIReviewResult & { citations?: any[]; knowledgeSources?: string[] };
@@ -29,6 +32,8 @@ interface ComplianceReportProps {
   projectName?: string;
   onClose?: () => void;
   userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
+  submissionId?: string;
+  userId?: string;
 }
 
 const getAgentRoleForCategory = (categoryName: string) => {
@@ -48,12 +53,43 @@ export default function ComplianceReport({
   drawingName,
   projectName = "Architectural Submission",
   onClose,
-  userRole
+  userRole,
+  submissionId,
+  userId
 }: ComplianceReportProps) {
   const [selectedIssue, setSelectedIssue] = useState<AIIssue | null>(null);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!submissionId || !userId) {
+      toast.error("Required information missing to generate PDF");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { url, fileName } = await pdfGenerationService.generateComplianceCertificate(submissionId, userId);
+      
+      // Create a temporary link and click it to download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Certificate generated successfully");
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast.error("Failed to generate PDF certificate");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -82,6 +118,18 @@ export default function ComplianceReport({
           <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-full gap-2">
             <Printer size={14} /> Print Report
           </Button>
+          {submissionId && userId && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDownloadPDF} 
+              disabled={isGenerating}
+              className="rounded-full gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+            >
+              {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Download Certificate
+            </Button>
+          )}
           {onClose && (
             <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full">
               Close

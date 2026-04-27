@@ -992,6 +992,8 @@ export default function AdminDashboard({
                 drawingName={reportSubmission.drawingName}
                 onClose={() => setReportSubmission(null)}
                 userRole={user.role}
+                submissionId={reportSubmission.id}
+                userId={user.uid}
               />
             </div>
           )}

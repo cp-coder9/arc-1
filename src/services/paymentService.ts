@@ -187,8 +187,8 @@ class PaymentService {
     const notifyUrl = `${window.location.origin}/api/payment/notify`;
 
     const data: Record<string, string> = {
-      merchant_id: PAYFAST_CONFIG.merchantId,
-      merchant_key: PAYFAST_CONFIG.merchantKey,
+      merchant_id: PAYFAST_CONFIG.merchantId as string,
+      merchant_key: PAYFAST_CONFIG.merchantKey as string,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,
