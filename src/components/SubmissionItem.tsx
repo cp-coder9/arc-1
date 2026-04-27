@@ -6,6 +6,10 @@ import { FileUp, CheckCircle2, AlertCircle, Loader2, Shield, Clock, Sparkles, Sh
 import { safeFormat } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
+import { pdfGenerationService } from '@/services/pdfGenerationService';
+import { toast } from 'sonner';
+import { Button } from './ui/button';
+import { Download } from 'lucide-react';
 
 import { UserRole } from '../types';
 
@@ -78,6 +82,30 @@ const calculateComplianceSummary = (feedback?: string, categories?: any[]) => {
 
 export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const handleDownloadCertificate = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // In case we want to use it outside the dialog trigger
+    
+    setIsGenerating(true);
+    try {
+      const { url, fileName } = await pdfGenerationService.generateComplianceCertificate(sub.id, sub.architectId);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Certificate downloaded successfully");
+    } catch (err) {
+      console.error("Certificate download error:", err);
+      toast.error("Failed to generate certificate");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   
   // Calculate compliance summary
   const complianceSummary = useMemo(
@@ -128,9 +156,23 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
                   Submitted on {safeFormat(sub.createdAt, 'MMMM d, yyyy HH:mm')}
                 </DialogDescription>
               </div>
-              <Badge className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs ${config.color}`}>
-                {config.label}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {sub.status === 'approved' && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleDownloadCertificate}
+                    disabled={isGenerating}
+                    className="h-8 rounded-full gap-1.5 border-primary/20 hover:bg-primary/5 text-primary text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    {isGenerating ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    Certificate
+                  </Button>
+                )}
+                <Badge className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs ${config.color}`}>
+                  {config.label}
+                </Badge>
+              </div>
             </div>
           </DialogHeader>
         </div>

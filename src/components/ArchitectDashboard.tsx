@@ -25,6 +25,7 @@ import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 // import { motion } from 'framer-motion';
+import MunicipalTracker from './MunicipalTracker';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -271,7 +272,7 @@ export default function ArchitectDashboard({
         </TabsContent>
 
         <TabsContent value="municipal" className="mt-8">
-          <LocalMunicipalTracker architect={user} jobs={myJobs} />
+          <MunicipalTracker user={user} />
         </TabsContent>
       </Tabs>
     </div>
@@ -1049,6 +1050,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [estimatedHours, setEstimatedHours] = useState<string>('');
+  const [requirements, setRequirements] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
