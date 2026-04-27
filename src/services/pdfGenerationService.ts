@@ -943,7 +943,6 @@ class PDFGenerationService {
       throw error;
     }
   }
-}
 
   /**
    * Generate a visual compliance report with circled issues

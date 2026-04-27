@@ -420,15 +420,14 @@ export default function App() {
               active={activeTab === 'profile-settings'} 
               onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }} 
             />
-          </div>
+            </div>
+          </nav>
           <div className="pt-6 border-t border-border">
             <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl h-12" onClick={handleLogout}>
               <LogOut size={20} /> <span className="font-bold">Logout</span>
             </Button>
           </div>
-        </div>
-      </aside>
-
+        </aside>
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>
