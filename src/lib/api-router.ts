@@ -3,15 +3,16 @@ import rateLimit from "express-rate-limit";
 import crypto from "crypto";
 import { del, put } from "@vercel/blob";
 import multer from "multer";
-import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
-import { extractCadData } from "./cadProcessor.js";
-import { encrypt, decrypt } from "./encryption.js";
-import { runMunicipalScraper } from "../services/scraperService.js";
-import { processReceiptOCR } from "../services/ocrService.js";
-import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
-import { verifySACAPByName } from "../services/sacapVerificationService.js";
+import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin";
+import { extractCadData } from "./cadProcessor";
+import { encrypt, decrypt } from "./encryption";
+import { runMunicipalScraper } from "../services/scraperService";
+import { processReceiptOCR } from "../services/ocrService";
+import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService";
+import { verifySACAPByName } from "../services/sacapVerificationService";
+import { trackMunicipalityStatus } from "./municipalAutomation";
 
-import { UserRole, MunicipalityType } from "../types.js";
+import { UserRole, MunicipalityType } from "../types";
 
 
 // ── Environment variables ─────────────────────────────────────────────────────
