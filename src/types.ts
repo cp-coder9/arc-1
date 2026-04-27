@@ -300,20 +300,28 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
-export type MunicipalityType = 'COJ' | 'COCT' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'eThekwini' | 'Other';
+export type MunicipalityType = 'COJ' | 'COCT' | 'ETH' | 'NMB' | 'Other';
+
+export interface TrackingEvent {
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  timestamp: string;
+  notes?: string;
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow' | string;
+}
 
 export interface CouncilSubmission {
   id: string;
-  jobId?: string;
+  jobId: string;
+  municipality: MunicipalityType | string;
+  municipalityName?: string;
   userId: string;
-  municipality: MunicipalityType;
-  municipalityName?: string; // For 'Other'
   referenceNumber?: string;
-  status: string; // Unified status
-  rawStatus?: string; // Status as reported by the municipality
-  submittedAt?: string;
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  rawStatus?: string;
   lastCheckedAt?: string;
+  submittedAt?: string;
   documents: { name: string; url: string }[];
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow';
   trackingHistory: TrackingEvent[];
   queries?: CouncilQuery[];
   erfNumber?: string;
@@ -407,14 +415,6 @@ export type UploadedFile = {
 
 export type KnowledgeSource = 'documentation' | 'human_feedback' | 'self_improvement' | 'web_search';
 export type KnowledgeStatus = 'active' | 'pending_review' | 'rejected' | 'archived';
-
-export interface SystemSettings {
-  municipalTrackerEnabled: boolean;
-  nvidiaApiKey?: string;
-  nvidiaOcrModel?: string;
-  xeroConnected?: boolean;
-  lastScraperRun?: string;
-}
 
 export interface AgentKnowledge {
   id: string;

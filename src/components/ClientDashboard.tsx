@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from './ui/scroll-area';
 import { toast } from 'sonner';
 import { Plus, Users, FileText, CheckCircle2, Clock, AlertCircle, CreditCard, Landmark, History as HistoryIcon, ArrowRight, ShieldCheck, MessageCircle, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, Briefcase, X, Building2, ShieldX } from 'lucide-react';
-import MunicipalTracker from './MunicipalTracker';
 import { ArchitectPortfolio } from './ArchitectPortfolio';
 import { ArchitectRecommendations } from './ArchitectRecommendations';
 import { Logo } from './Logo';
@@ -25,6 +24,7 @@ import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { safeLocale } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import MunicipalTracker from './MunicipalTracker';
 // import { motion } from 'framer-motion';
 
 export default function ClientDashboard({ 
