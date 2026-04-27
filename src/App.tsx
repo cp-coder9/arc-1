@@ -60,6 +60,7 @@ import { Building2 } from 'lucide-react';
 import ClientDashboard from './components/ClientDashboard';
 import ArchitectDashboard from './components/ArchitectDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import FreelancerDashboard from './components/FreelancerDashboard';
 import UserSettings from './components/UserSettings';
 import InvoiceManagement from './components/InvoiceManagement';
 import FileManager from './components/FileManager';
@@ -79,6 +80,7 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [professionalLabel, setProfessionalLabel] = useState('');
 
   useEffect(() => {
     // Seed admin user if requested
@@ -280,6 +282,7 @@ const handleLogin = async () => {
           email: firebaseUser.email || '',
           displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')?.[0] || 'Anonymous',
           role: roleSelection || 'client',
+          professionalLabels: (roleSelection === 'freelancer' && professionalLabel) ? [professionalLabel] : [],
           createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
@@ -381,6 +384,17 @@ const handleLogin = async () => {
                         <p className="text-[10px] opacity-70">Platform Management</p>
                       </div>
                     </Button>
+                    <Button
+                      variant={roleSelection === 'freelancer' ? 'default' : 'outline'}
+                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'freelancer' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
+                      onClick={() => setRoleSelection('freelancer')}
+                    >
+                      <Sparkles className="w-8 h-8" />
+                      <div className="text-center">
+                        <p className="font-bold">Freelancer</p>
+                        <p className="text-[10px] opacity-70">Engineer/Specialist</p>
+                      </div>
+                    </Button>
                   </div>
                   <div className="space-y-3">
                     <Button 
@@ -428,19 +442,41 @@ const handleLogin = async () => {
               ) : (
                 <form onSubmit={handleEmailAuth} className="space-y-4">
                   {authMode === 'email-signup' && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                      <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          placeholder="John Doe" 
-                          className="pl-10 h-12 rounded-xl"
-                          value={displayName}
-                          onChange={e => setDisplayName(e.target.value)}
-                          required
-                        />
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                        <div className="relative">
+                          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            placeholder="John Doe"
+                            className="pl-10 h-12 rounded-xl"
+                            value={displayName}
+                            onChange={e => setDisplayName(e.target.value)}
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
+                      {roleSelection === 'freelancer' && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Profession</label>
+                          <select
+                            value={professionalLabel}
+                            onChange={e => setProfessionalLabel(e.target.value)}
+                            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                            required
+                          >
+                            <option value="">Select your profession...</option>
+                            <option value="Engineer">Engineer</option>
+                            <option value="Construction Worker">Construction Worker</option>
+                            <option value="Builder">Builder</option>
+                            <option value="Electrician">Electrician</option>
+                            <option value="Plumber">Plumber</option>
+                            <option value="Landscaper">Landscaper</option>
+                            <option value="Interior Designer">Interior Designer</option>
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
@@ -567,6 +603,14 @@ const handleLogin = async () => {
               label="My Applications" 
               active={activeTab === 'applications'} 
               onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }} 
+            />
+          )}
+          {user!.role === 'architect' && (
+            <NavItem
+              icon={<Users size={18} />}
+              label="Team & Freelancers"
+              active={activeTab === 'team'}
+              onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
             />
           )}
           <NavItem 
@@ -701,6 +745,7 @@ const handleLogin = async () => {
                 {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'admin' && <AdminDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user!.role === 'freelancer' && <FreelancerDashboard user={user!} />}
               </>
             )}
           </div>
