@@ -437,7 +437,7 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
       // Trigger AI Review
       const aiResult = await reviewDrawing(url, name, (progress) => {
         setAiProgress(progress);
-      });
+      }, docRef.id);
       
       const finalStatus = aiResult.status === 'passed' ? 'admin_reviewing' : 'ai_failed';
       const statusLabel = aiResult.status === 'passed' ? 'Awaiting Admin Approval' : 'AI Review Failed';
@@ -510,9 +510,19 @@ function JobItem({ job, user, ...props }: { job: Job, user: UserProfile, [key: s
     });
     
     try {
+      // Create a temporary submission record for the pre-check
+      const tempSubRef = await addDoc(collection(db, 'submissions'), {
+        jobId: job.id,
+        architectId: 'client-pre-check',
+        drawingUrl: drawingUrl,
+        drawingName: drawingName,
+        status: 'ai_reviewing',
+        createdAt: new Date().toISOString()
+      });
+
       const result = await reviewDrawing(drawingUrl, drawingName, (progress) => {
         setAiProgress(progress);
-      });
+      }, tempSubRef.id);
       
       setPreCheckResult(result);
       if (result.status === 'passed') {

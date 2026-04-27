@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { sendPasswordResetEmail } from 'firebase/auth';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
