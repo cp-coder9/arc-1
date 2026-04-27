@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
 export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected']);
@@ -30,7 +30,9 @@ export const NotificationTypeEnum = z.enum([
   'payment_released',
   'message',
   'milestone_due',
-  'council_update'
+  'council_update',
+  'invoice_sent',
+  'invoice_paid'
 ]);
 export const PaymentTypeEnum = z.enum([
   'escrow_deposit',
@@ -162,7 +164,7 @@ export const ReviewSchema = z.object({
     professionalism: z.number().min(1).max(5).optional(),
   }).optional(),
   comment: z.string().min(10, 'Comment must be at least 10 characters').max(2000),
-  type: z.enum(['client_to_architect', 'architect_to_client']),
+  type: z.enum(['client_to_architect', 'architect_to_client', 'to_bep', 'from_bep', 'to_freelancer']),
   isPublic: z.boolean().default(true),
   createdAt: z.string().datetime().optional(),
 });

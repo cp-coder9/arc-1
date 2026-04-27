@@ -115,7 +115,7 @@ export default function ArchitectDashboard({
       </div>
 
       <Tabs value={activeTab || 'overview'} onValueChange={onTabChange} className="w-full">
-        <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
+        <ScrollArea className="w-full whitespace-nowrap mb-8">
           <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <LayoutList size={16} /> Overview
@@ -135,7 +135,7 @@ export default function ArchitectDashboard({
                 <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><Briefcase className="text-primary" /> Active Projects</h2>
                 <div className="grid grid-cols-1 gap-6">
                   {myJobs.map(job => (
-                    <ActiveProjectCard key={job.id} {...({job, user} as any)} job={job} user={user} />
+                    <ActiveProjectCard key={job.id} job={job} user={user} />
                   ))}
                   {myJobs.length === 0 && (
                     <div className="py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
@@ -175,7 +175,7 @@ export default function ArchitectDashboard({
               <SearchFilter filters={filters} onFiltersChange={setFilters} totalResults={availableJobs.length} />
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {availableJobs.map(job => (
-                  <JobCardUI key={job.id} {...({job, user} as any)} job={job} user={user} />
+                  <JobCardUI key={job.id} job={job} user={user} />
                 ))}
               </div>
            </div>
@@ -281,7 +281,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
                   <Dialog>
                     <DialogTrigger render={<Button size="sm" variant="outline" className="h-7 px-2 rounded-lg text-[8px] uppercase font-black tracking-tighter gap-1"><Star size={10} /> Rate</Button>} />
                     <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl border-none">
-                      <RatingSystem fromId={user.uid} toId={task.assigneeId} toName={task.assigneeName} jobId={job.id} />
+                       <RatingSystem fromId={user.uid} toId={task.assigneeId} toName={task.assigneeName} jobId={job.id} type={task.assigneeRole === 'bep' ? 'to_bep' : 'to_freelancer'} />
                     </DialogContent>
                   </Dialog>
                 )}
@@ -315,7 +315,7 @@ function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
           <h2 className="text-2xl font-heading font-bold">Team Assignment</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {myJobs.map(job => (
-              <Card key={job.id} {...({job, user} as any)} className="border-border shadow-sm bg-white rounded-3xl p-6">
+              <Card key={job.id} className="border-border shadow-sm bg-white rounded-3xl p-6">
                 <Badge variant="secondary" className="mb-2 uppercase text-[10px] tracking-widest">{job.category}</Badge>
                 <h3 className="font-bold text-lg mb-4">{job.title}</h3>
                 <Button className="w-full rounded-xl gap-2 font-bold" variant="outline">

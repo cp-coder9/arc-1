@@ -134,7 +134,7 @@ export default function ClientDashboard({
            <h2 className="text-2xl font-heading font-bold">Your Active Jobs</h2>
            <div className="grid grid-cols-1 gap-6">
               {myJobs.map(job => (
-                <ClientJobCard key={job.id} {...({job, user} as any)} />
+                <ClientJobCard key={job.id} />
               ))}
               {myJobs.length === 0 && !loading && (
                 <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
@@ -218,7 +218,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
                 <Dialog>
                   <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full gap-2"><Star size={16} /> Rate</Button>} />
                   <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl border-none">
-                    <RatingSystem fromId={user.uid} toId={architect.uid} toName={architect.displayName} jobId={job.id} />
+                    <RatingSystem fromId={user.uid} toId={architect.uid} toName={architect.displayName} jobId={job.id} type="client_to_architect" />
                   </DialogContent>
                 </Dialog>
               )}

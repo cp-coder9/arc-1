@@ -100,13 +100,21 @@ export interface AICategory {
 }
 
 export interface AIReviewResult {
-  status: 'passed' | 'failed';
-  feedback: string;
-  categories: AICategory[];
-  visualReportUrl?: string;
-  traceLog: string;
-  citations?: KnowledgeCitation[];
-  knowledgeSources?: string[];
+ status: 'passed' | 'failed';
+ feedback: string;
+ categories: AICategory[];
+ visualReportUrl?: string;
+ traceLog: string;
+ citations?: KnowledgeCitation[];
+ knowledgeSources?: string[];
+}
+
+export interface AIProgress {
+ percentage: number;
+ agentName: string;
+ activity: string;
+ completedAgents: string[];
+ thought?: string;
 }
 
 export interface Submission {
@@ -322,6 +330,7 @@ export interface TrackingEvent {
   timestamp: string;
   notes?: string;
   source: 'manual' | 'scraper' | 'ocr' | 'shadow' | string;
+  actorId?: string;
 }
 
 export interface CouncilSubmission {
@@ -336,20 +345,11 @@ export interface CouncilSubmission {
   lastCheckedAt?: string;
   submittedAt?: string;
   documents: { name: string; url: string }[];
-  source: 'manual' | 'scraper' | 'ocr' | 'shadow';
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow_tracker';
   trackingHistory: TrackingEvent[];
   queries?: CouncilQuery[];
   erfNumber?: string;
   projectDescription?: string;
-  source: 'manual' | 'ocr' | 'scraper' | 'shadow_tracker';
-}
-
-export interface TrackingEvent {
-  status: string;
-  timestamp: string;
-  notes?: string;
-  source: 'scraper' | 'ocr' | 'crowdsource' | 'shadow_tracker' | 'manual';
-  actorId?: string;
 }
 
 export interface CouncilQuery {

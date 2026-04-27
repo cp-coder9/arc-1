@@ -11,6 +11,7 @@ import { processReceiptOCR } from "../services/ocrService";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService";
 import { verifySACAPByName } from "../services/sacapVerificationService";
 import { trackMunicipalityStatus } from "./municipalAutomation";
+import { notificationService } from "../services/notificationService";
 
 import { UserRole, MunicipalityType } from "../types";
 
@@ -21,6 +22,7 @@ const PAYFAST_PASSPHRASE = process.env.VITE_PAYFAST_PASSPHRASE || "";
 const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
 const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || "";
 const PLATFORM_FEE_PERCENTAGE = 0.05;
+const PAYFAST_SANDBOX = process.env.VITE_PAYFAST_SANDBOX === "true";
 
 // ── Rate Limiters ─────────────────────────────────────────────────────────────
 const reviewLimiter = rateLimit({
@@ -63,13 +65,82 @@ async function getAdminLLMConfig() {
   return null;
 }
 
+// PayFast helpers
+function computePayFastSignature(data: Record<string, string>, passphrase: string): string {
+  const sortedKeys = Object.keys(data).sort();
+  let paramString = '';
+  sortedKeys.forEach(key => {
+    const value = data[key];
+    if (value !== undefined && value !== '') {
+      paramString += `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}&`;
+    }
+  });
+  paramString = paramString.slice(0, -1);
+  if (passphrase) {
+    paramString += `&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, '+')}`;
+  }
+  return crypto.createHash('md5').update(paramString).digest('hex');
+}
+
+function isPayFastIP(ip: string): boolean {
+  if (PAYFAST_SANDBOX) return true; // allow any IP in sandbox
+  const whitelist = [
+    '196.35.144.10',
+    '196.35.144.11',
+    '196.35.144.12',
+    '196.35.144.13',
+    '196.35.144.14',
+    '196.35.144.15'
+  ];
+  return whitelist.includes(ip);
+}
+
+async function validateWithPayFast(pfData: Record<string, any>): Promise<boolean> {
+  const validateUrl = PAYFAST_SANDBOX
+    ? 'https://sandbox.payfast.co.za/eng/query/validate'
+    : 'https://www.payfast.co.za/eng/query/validate';
+
+  // Reconstruct URL-encoded string with sorted keys
+  const sortedKeys = Object.keys(pfData).sort();
+  const body = sortedKeys.map(k => `${k}=${encodeURIComponent(pfData[k])}`).join('&');
+
+  try {
+    const response = await fetch(validateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    const text = await response.text();
+    return text.trim() === 'VALID';
+  } catch (error) {
+    console.error('PayFast validation error:', error);
+    return false;
+  }
+}
+
 async function verifyAuth(headers: Record<string, any>) {
   const authHeader = headers.authorization as string | undefined;
   const directApiKey = headers['api-key'] || headers['x-agent-key'];
 
+  // Helper to validate API key against configured AGENT_API_KEY
+  const validateAgentApiKey = (providedKey: string): boolean => {
+    const expectedKey = process.env.AGENT_API_KEY;
+    if (!expectedKey) {
+      // Refuse if AGENT_API_KEY is not set
+      throw Object.assign(new Error("Server configuration error: AGENT_API_KEY not set"), { status: 500 });
+    }
+    // Use timingSafeEqual to prevent timing attacks
+    const expectedBuf = Buffer.from(expectedKey);
+    const providedBuf = Buffer.from(providedKey);
+    if (expectedBuf.length !== providedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, providedBuf);
+  };
+
   // Handle direct API Key header (preferred for agents)
   if (directApiKey) {
-    // Return a mock agent user
+    if (!validateAgentApiKey(directApiKey)) {
+      throw Object.assign(new Error("Invalid API key"), { status: 401 });
+    }
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
       email: 'agent@architex.co.za',
@@ -113,6 +184,9 @@ async function verifyAuth(headers: Record<string, any>) {
     if (!apiKey) {
       throw Object.assign(new Error("Missing API key value"), { status: 401 });
     }
+    if (!validateAgentApiKey(apiKey)) {
+      throw Object.assign(new Error("Invalid API key"), { status: 401 });
+    }
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
       email: 'agent@architex.co.za',
@@ -128,6 +202,10 @@ async function verifyAuth(headers: Record<string, any>) {
     const customAuth = authHeader.split("Custom-Auth ")[1];
     if (!customAuth) {
       throw Object.assign(new Error("Missing custom auth value"), { status: 401 });
+    }
+    // Custom-Auth also requires AGENT_API_KEY validation
+    if (!validateAgentApiKey(customAuth)) {
+      throw Object.assign(new Error("Invalid custom auth token"), { status: 401 });
     }
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
@@ -180,19 +258,9 @@ router.get("/health", (_req, res) => {
 
 // 3. SECURED AI Review (authenticated + proxy)
 router.post("/review", reviewLimiter, async (req, res) => {
-  // --- COMMENT 4 IMPLEMENTATION: Add Firebase auth verification ---
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
-
-    // Admin whitelist check (log but allow for now to prevent blocking architects)
-    const adminEmails = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
-    const userEmail = decoded.email?.toLowerCase();
-    const isAdmin = userEmail && adminEmails.includes(userEmail);
-
-    if (userEmail && !isAdmin) {
-      console.log(`[API] AI Review requested by non-admin: ${userEmail}. Allowing as standard user.`);
-    }
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -755,7 +823,7 @@ router.post("/notifications/token", async (req, res) => {
 });
 
 // Payment – initialize escrow
-router.post("/payment/initialize-escrow", async (req, res) => {
+router.post("/payment/escrow/init", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -848,7 +916,7 @@ router.post("/payment/initialize-escrow", async (req, res) => {
 });
 
 // Payment – release milestone
-router.post("/payment/release-milestone", async (req, res) => {
+router.post("/payment/milestone/release", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -906,49 +974,162 @@ router.post("/payment/release-milestone", async (req, res) => {
     });
 
     await batch.commit();
-    res.json({ success: true, releasedAmount: architectAmount });
+     res.json({ success: true, architectAmount });
   } catch (err: any) {
     console.error("Release milestone error:", err);
     res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 
-// Payment – confirm
+// Payment – confirm (client return from PayFast)
 router.post("/payment/confirm", async (req, res) => {
   const { paymentId, pfData } = req.body;
-  if (!paymentId || !pfData) return res.status(400).json({ error: "Missing paymentId or pfData" });
+  if (!paymentId || !pfData) return res.status(400).json({ error: "paymentId and pfData are required" });
 
   try {
+    // Validate PfData signature and PayFast integrity
+    const receivedSignature = pfData.signature as string | undefined;
+    if (!receivedSignature) {
+      return res.status(400).json({ error: "Missing signature" });
+    }
+    const { signature: _, ...dataForSig } = pfData;
+    const expectedSignature = computePayFastSignature(dataForSig as Record<string, string>, PAYFAST_PASSPHRASE);
+    if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(receivedSignature))) {
+      return res.status(400).json({ error: "Invalid signature" });
+    }
+
+    const isValid = await validateWithPayFast(pfData);
+    if (!isValid) {
+      return res.status(400).json({ error: "PayFast validation failed" });
+    }
+
+    // Check payment status only; do not mutate based on client-supplied data
     const paymentRef = adminDb.collection("payments").doc(paymentId);
     const paymentDoc = await paymentRef.get();
     if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
 
     const payment = paymentDoc.data()!;
-    if (payment.status === "completed") return res.json({ success: true, message: "Payment already processed" });
+    if (payment.status === "completed") {
+      return res.json({ success: true, message: "Payment completed" });
+    } else {
+      // Payment not yet marked complete (ITN not received yet)
+      return res.status(202).json({ success: false, message: "Payment not yet completed" });
+    }
+} catch (err) {
+ console.error("Payment confirmation error:", err);
+ res.status(500).json({ error: "Internal server error" });
+ }
+});
 
-    if (pfData["amount_gross"] !== (payment.amount / 100).toFixed(2)) return res.status(400).json({ error: "Amount mismatch" });
+// Payment – milestone request (architect initiates)
+router.post("/payment/milestone/request", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
 
-    await paymentRef.update({
-      status: "completed",
-      transactionId: pfData["pf_payment_id"],
-      processedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      metadata: { ...(payment.metadata || {}), payfastData: pfData },
-    });
+  const { jobId, milestone } = req.body;
+  if (!jobId || !milestone) return res.status(400).json({ error: "jobId and milestone are required" });
 
-    if (payment.jobId) {
-      await adminDb.collection("escrow").doc(payment.jobId).update({
-        status: "funded",
-        heldAmount: payment.amount,
-        fundedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+  try {
+    const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+    const job = jobDoc.data()!;
+
+    if (job.selectedArchitectId !== decoded.uid) {
+      return res.status(403).json({ error: "Only the assigned architect can request milestone release" });
     }
 
-    res.json({ success: true });
+    const escrowRef = adminDb.collection("escrow").doc(jobId);
+    const escrowDoc = await escrowRef.get();
+    if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+    const escrow = escrowDoc.data()!;
+
+    if (!["funded", "partially_released"].includes(escrow.status)) {
+      return res.status(400).json({ error: "Escrow is not funded" });
+    }
+    if (escrow.milestones?.[milestone]?.released) {
+      return res.status(400).json({ error: "Milestone already released" });
+    }
+
+// Server-side notification emitted here (single source of truth).
+// JSDoc: This handler emits notifyMilestoneRequest to notify the client of the architect's release request.
+ res.json({ success: true });
   } catch (err: any) {
-    console.error("Payment confirmation error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Milestone request error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – refund
+router.post("/payment/refund", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { jobId, amount, reason } = req.body;
+  if (!jobId || !amount) return res.status(400).json({ error: "jobId and amount are required" });
+
+  try {
+    const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+    const job = jobDoc.data()!;
+
+    // Allow job client or admin to request refund
+    if (job.clientId !== decoded.uid && !(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Only the job client or admin can request refund" });
+    }
+
+    const escrowRef = adminDb.collection("escrow").doc(jobId);
+    const escrowDoc = await escrowRef.get();
+    if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+    const escrow = escrowDoc.data()!;
+
+    const refundAmount = Math.round(amount);
+    if (refundAmount > (escrow.heldAmount || 0)) {
+      return res.status(400).json({ error: "Refund amount exceeds held amount" });
+    }
+
+    // Use transaction to update escrow and create refund payment record
+    const refundPaymentId = adminDb.collection("payments").doc().id;
+    await adminDb.runTransaction(async (transaction) => {
+      const escrowSnap = await transaction.get(escrowRef);
+      const current = escrowSnap.data()!;
+      const newHeld = (current.heldAmount || 0) - refundAmount;
+      const newRefunded = (current.refundedAmount || 0) + refundAmount;
+      const newStatus = newHeld <= 0 ? 'refunded' : 'partially_refunded';
+
+      transaction.update(escrowRef, {
+        heldAmount: newHeld,
+        refundedAmount: newRefunded,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+
+      transaction.set(adminDb.collection("payments").doc(refundPaymentId), {
+        jobId,
+        payerId: job.clientId,
+        payeeId: job.selectedArchitectId || "",
+        amount: refundAmount,
+        type: "refund",
+        status: "completed",
+        metadata: { reason, originalEscrow: jobId },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    });
+
+// Server-side notification emitted here (single source of truth).
+// JSDoc: This handler emits notifyRefundProcessed to notify both architect and client of the refund.
+ res.json({ success: true, refundAmount });
+  } catch (err: any) {
+    console.error("Refund error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 
@@ -959,26 +1140,55 @@ router.post("/payment/notify", async (req, res) => {
     const paymentId = pfData["m_payment_id"];
     if (!paymentId) return res.status(400).send("No payment ID provided");
 
+    // IP validation: ensure request originates from PayFast
+    const clientIp = req.ip || (req.connection && (req.connection as any).remoteAddress) || '';
+    if (!isPayFastIP(clientIp)) {
+      console.warn(`ITN from unauthorized IP: ${clientIp}`);
+      return res.status(403).send("Unauthorized IP");
+    }
+
+    // Signature validation
+    const receivedSignature = pfData.signature as string | undefined;
+    if (!receivedSignature) {
+      return res.status(400).send("Missing signature");
+    }
+    const { signature: _, ...dataForSig } = pfData;
+    const expectedSignature = computePayFastSignature(dataForSig as Record<string, string>, PAYFAST_PASSPHRASE);
+    if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(receivedSignature))) {
+      console.warn(`ITN signature mismatch for payment ${paymentId}`);
+      return res.status(400).send("Invalid signature");
+    }
+
+    // PayFast server-side validation
+    const isValid = await validateWithPayFast(pfData);
+    if (!isValid) {
+      console.warn(`ITN validation failed for payment ${paymentId}`);
+      return res.status(400).send("PayFast validation failed");
+    }
+
     const paymentRef = adminDb.collection("payments").doc(paymentId);
     const paymentDoc = await paymentRef.get();
     if (!paymentDoc.exists) return res.status(404).send("Payment not found");
 
     if (pfData["payment_status"] === "COMPLETE") {
-      // Similar logic to /confirm
-      await paymentRef.update({
-        status: "completed",
-        transactionId: pfData["pf_payment_id"],
-        processedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        metadata: { ...(paymentDoc.data()?.metadata || {}), payfastData: pfData, itn: true },
-      });
-      if (paymentDoc.data()?.jobId) {
-        await adminDb.collection("escrow").doc(paymentDoc.data()!.jobId).update({
-          status: "funded",
-          heldAmount: paymentDoc.data()!.amount,
-          fundedAt: new Date().toISOString(),
+      const payment = paymentDoc.data()!;
+      // Only update if not already completed to ensure idempotency
+      if (payment.status !== "completed") {
+        await paymentRef.update({
+          status: "completed",
+          transactionId: pfData["pf_payment_id"],
+          processedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          metadata: { ...(payment.metadata || {}), payfastData: pfData, itn: true },
         });
+        if (payment.jobId) {
+          await adminDb.collection("escrow").doc(payment.jobId).update({
+            status: "funded",
+            heldAmount: payment.amount,
+            fundedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     }
     res.status(200).send("OK");
@@ -1022,7 +1232,7 @@ router.post("/track-municipality", async (req, res) => {
   }
 });
 
-// Get Municipal Settings
+// Get Municipal Settings (read-only)
 router.get("/municipal/settings", async (req, res) => {
   let decoded: any;
   try {
@@ -1031,12 +1241,14 @@ router.get("/municipal/settings", async (req, res) => {
     return res.status(err.status || 401).json({ error: err.message });
   }
 
-  const { credentialId } = req.body;
-  if (!credentialId) return res.status(400).json({ error: "credentialId is required" });
+  const { credentialId } = req.query;
+  if (!credentialId || typeof credentialId !== 'string') {
+    return res.status(400).json({ error: "credentialId query parameter is required" });
+  }
 
   try {
     // Ownership verification
-    const credDoc = await adminDb.collection("municipal_credentials").doc(credentialId).get();
+    const credDoc = await adminDb.collection("municipal_credentials").doc(credentialId as string).get();
     if (!credDoc.exists) {
       return res.status(404).json({ error: "Credentials not found" });
     }
@@ -1046,10 +1258,22 @@ router.get("/municipal/settings", async (req, res) => {
       return res.status(403).json({ error: "Unauthorized access to credentials" });
     }
 
-    const result = await trackMunicipalityStatus(credentialId);
-    res.json(result);
+    // Return stored credential and associated council submissions
+    const submissionsSnapshot = await adminDb.collection("council_submissions")
+      .where("userId", "==", decoded.uid)
+      .where("municipality", "==", credData.municipality)
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+
+    const submissions = submissionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    res.json({
+      credential: { id: credDoc.id, ...credData },
+      submissions
+    });
   } catch (err: any) {
-    console.error("Municipal tracking error:", err);
+    console.error("Municipal settings error:", err);
     res.status(err.status || 500).json({ error: err.message });
   }
 });

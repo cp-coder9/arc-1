@@ -5,20 +5,20 @@
 
 import { db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, getDocs } from "firebase/firestore";
-import { Agent, LLMConfig, LLMProvider, AIReviewResult, Submission, AICategory, AIIssue, TraceLog, KnowledgeCitation } from "../types";
+import { Agent, LLMConfig, LLMProvider, AIReviewResult, Submission, AICategory, AIIssue, TraceLog, KnowledgeCitation, AIProgress } from "../types";
 import { getAgentKnowledge, webSearchForAgent, addKnowledge, getKnowledgeForAgents, incrementKnowledgeUsage } from "./knowledgeService";
-
-// Progress reporting type
-export interface AIProgress {
-  percentage: number;
-  agentName: string;
-  activity: string;
-  completedAgents: string[];
-  thought?: string;
-}
+import { z } from "zod";
+import { AICategorySchema } from "../lib/schemas";
 
 const MAX_RETRIES = 2;
-const GEMINI_PROXY_URL = "/api/review";
+const GEMINI_PROXY_URL = "/api/gemini/review";
+
+const OrchestratorResultSchema = z.object({
+  status: z.string(),
+  feedback: z.string(),
+  categories: z.array(AICategorySchema).optional(),
+  traceLog: z.string().optional(),
+});
 
 // Default specialized agents configuration
 export const SPECIALIZED_AGENTS: Partial<Agent>[] = [
@@ -82,7 +82,7 @@ export const SPECIALIZED_AGENTS: Partial<Agent>[] = [
 
 export async function getLLMConfig(): Promise<LLMConfig> {
   try {
-    const configDoc = await getDoc(doc(db, 'settings', 'llm_config'));
+    const configDoc = await getDoc(doc(db, 'system_settings', 'llm_config'));
     if (configDoc.exists()) {
       return configDoc.data() as LLMConfig;
     }
@@ -132,8 +132,11 @@ export async function callGeminiProxy(systemInstruction: string, prompt: string,
   return data.text;
 }
 
+const NVIDIA_VISION_MODELS = ['nvidia/nemotron-4-340b-instruct', 'meta/llama-3.1-405b-instruct'];
+
 export async function callOpenAICompatible(config: LLMConfig, systemInstruction: string, prompt: string, drawingUrl?: string, agent?: Agent): Promise<string> {
-  const isVisionModel = config.model.includes('vision') || config.provider === 'nvidia';
+ const modelLower = (config.model ?? '').toLowerCase();
+ const isVisionModel = modelLower.includes('vision') || NVIDIA_VISION_MODELS.includes(config.model || '');
 
   const messages: any[] = [
     { role: 'system', content: systemInstruction },
@@ -330,11 +333,11 @@ export async function reviewDrawing(
         let response = '';
         const promptInstruction = `Identify compliance issues in this drawing: ${drawingName}. URL: ${drawingUrl}. If unsure, state "UNKNOWN_REGULATION: [Topic]".`;
         
-        if (config.provider === 'gemini') {
-          response = await callGeminiProxy(enrichedPrompt, promptInstruction, drawingUrl, config, agent);
-        } else {
-          response = await callOpenAICompatible(config, enrichedPrompt, promptInstruction, drawingUrl, agent);
-        }
+         if (config.provider === 'gemini') {
+           response = await callGeminiProxy(enrichedPrompt, promptInstruction, drawingUrl, config, agent);
+         } else {
+           response = await callAgentReview(enrichedPrompt, promptInstruction, drawingUrl, config, agent);
+         }
         
         completed.push(agent.name);
         reportProgress(20 + (completed.length * 10), agent.name, `${agent.name} completed.`, completed, "Sent to Orchestrator.");
@@ -348,10 +351,13 @@ export async function reviewDrawing(
         }
 
         agentFindings.push({ role: agent.role, name: agent.name, findings: response, id: agent.id });
-      } catch (err) {
-        console.error(`Agent ${agent.name} failed:`, err);
-        agentFindings.push({ role: agent.role, name: agent.name, findings: `Error: Agent failed.`, id: agent.id });
-      }
+       } catch (err) {
+         const errorMessage = err instanceof Error ? err.message : String(err);
+         console.error(`Agent ${agent.name} failed:`, err);
+         agentFindings.push({ role: agent.role, name: agent.name, findings: `Error: ${errorMessage}`, id: agent.id });
+         // Report failure in progress
+         reportProgress(25 + (completed.length * 10), agent.name, `Failed: ${errorMessage}`, completed);
+       }
     }
 
     if (needsWebSearch && webSearchQueries.length > 0) {
@@ -377,11 +383,47 @@ export async function reviewDrawing(
     const findingsContext = agentFindings.map(f => `### ${f.name} Findings:\n${f.findings}`).join('\n\n');
     const synthesisPrompt = `Specialized reports for ${drawingName}:\n\n${findingsContext}\n\nProduce final compliance report.`;
 
-    let finalResponse = '';
-    if (orchConfig.provider === 'gemini') {
-      finalResponse = await callGeminiProxy(orchestratorAgent.systemPrompt, synthesisPrompt, drawingUrl, orchConfig, orchestratorAgent);
-    } else {
-      finalResponse = await callOpenAICompatible(orchConfig, orchestratorAgent.systemPrompt, synthesisPrompt, undefined, orchestratorAgent);
+    let finalResponse: string;
+    let orchError: any = null;
+    let orchAttempt = 0;
+    const orchMaxAttempts = 2;
+    let orchestratorSucceeded = false;
+
+    while (orchAttempt < orchMaxAttempts && !orchestratorSucceeded) {
+      try {
+        if (orchConfig.provider === 'gemini') {
+          finalResponse = await callGeminiProxy(orchestratorAgent.systemPrompt, synthesisPrompt, undefined, orchConfig, orchestratorAgent);
+        } else {
+          finalResponse = await callAgentReview(orchestratorAgent.systemPrompt, synthesisPrompt, undefined, orchConfig, orchestratorAgent);
+        }
+
+        // Validate response structure (strict JSON compliance)
+        const parsed = parseAIResponse(finalResponse);
+        const validation = OrchestratorResultSchema.safeParse(parsed);
+        if (validation.success) {
+          orchestratorSucceeded = true;
+        } else {
+          orchError = validation.error;
+          if (orchAttempt === 0) {
+            // Augment system instruction to enforce strict JSON on retry
+            orchestratorAgent.systemPrompt += "\n\nIMPORTANT: Respond ONLY with valid JSON matching this schema: {\"status\":\"passed|failed\",\"feedback\":\"string\",\"categories\":[{\"name\":\"string\",\"issues\":[{\"description\":\"string\",\"severity\":\"low|medium|high\",\"actionItem\":\"string\"}]}],\"traceLog\":\"string\"}. Do not include markdown formatting or additional text.";
+            orchAttempt++;
+            continue;
+          } else {
+            console.warn('Orchestrator response failed validation after retry; proceeding with heuristic parsing.');
+            orchestratorSucceeded = true;
+          }
+        }
+      } catch (err) {
+        orchError = err;
+        console.error(`Orchestrator attempt ${orchAttempt + 1} failed:`, err);
+        if (orchAttempt === 0) {
+          orchAttempt++;
+          continue;
+        } else {
+          throw err;
+        }
+      }
     }
 
     reportProgress(95, 'Orchestrator', 'Finalizing report...', completed);
@@ -442,9 +484,48 @@ export async function reviewDrawing(
   }
 }
 
+/**
+ * Call the generic (/api/review) proxy for non-Gemini agents.
+ */
+async function callAgentReview(
+  systemInstruction: string,
+  prompt: string,
+  drawingUrl?: string,
+  config?: LLMConfig,
+  agent?: Agent
+): Promise<string> {
+  const response = await fetch('/api/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction,
+      prompt,
+      drawingUrl,
+      config,
+      agentId: agent?.id
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to call /api/review');
+  }
+
+  const data = await response.json();
+  // /api/review returns OpenAI-compatible response format
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('No content in response from /api/review');
+  }
+  return content;
+}
+
 export const AIUtils = {
-  parseAIResponse,
-  withRetry,
-  callGeminiProxy,
-  callOpenAICompatible
+ parseAIResponse,
+ withRetry,
+ callGeminiProxy,
+ callOpenAICompatible,
+ callAgentReview
 };
+
+export type { AIProgress };

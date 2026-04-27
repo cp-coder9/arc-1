@@ -9,13 +9,13 @@ export async function trackMunicipalityStatus(credentialId: string) {
   }
 
   const cred = credDoc.data()!;
-  const { municipality, username, encryptedPassword, iv, authTag } = cred;
+   const { municipality, username, encryptedPassword, iv, authTag, salt } = cred;
 
-  // Decrypt password using enterprise standard
-  let password = '';
-  if (encryptedPassword && iv && authTag) {
-    password = decrypt(encryptedPassword, iv, authTag);
-  } else if (cred.password) {
+   // Decrypt password using enterprise standard
+   let password = '';
+   if (encryptedPassword && iv && authTag) {
+     password = decrypt(encryptedPassword, iv, authTag, salt);
+   } else if (cred.password) {
     // Fallback for legacy base64 if any exist during migration
     password = Buffer.from(cred.password, 'base64').toString('utf-8');
   }

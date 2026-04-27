@@ -43,9 +43,9 @@ service cloud.firestore {
       // Allow reading user profiles if authenticated
       allow read: if isAuthenticated();
       
-      allow create: if isAuthenticated() && isOwner(userId) && 
-        request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
-        request.resource.data.role in ['client', 'architect', 'admin'];
+       allow create: if isAuthenticated() && isOwner(userId) && 
+         request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+         request.resource.data.role in ['client', 'architect', 'admin', 'freelancer', 'bep'];
 
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
@@ -152,32 +152,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Notifications collection
-    match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        (isAdmin() || request.resource.data.userId != request.auth.uid);
-      allow update: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-    }
+     // Notifications collection
+     match /notifications/{notificationId} {
+       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+       // Only admins or server-side identities can create notifications for arbitrary users.
+       // Users may create notifications for themselves.
+       allow create: if 
+         isAdmin() ||
+         request.resource.data.userId == request.auth.uid;
+       allow update: if isAuthenticated() && 
+         resource.data.userId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+     }
 
-    // Messages collection
-    match /messages/{messageId} {
-      allow read: if isAuthenticated() && (
-        resource.data.senderId == request.auth.uid ||
-        getJob(resource.data.jobId).data.clientId == request.auth.uid ||
-        getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid
-      );
-      allow create: if isAuthenticated() && (
-        request.resource.data.senderId == request.auth.uid &&
-        (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
-         getJob(request.resource.data.jobId).data.selectedArchitectId == request.auth.uid)
-      );
-      allow update: if false;
-      allow delete: if false;
-    }
+// Messages collection
+ match /messages/{messageId} {
+ allow read: if isAuthenticated() && (
+ resource.data.senderId == request.auth.uid ||
+ getJob(resource.data.jobId).data.clientId == request.auth.uid ||
+ getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid
+ );
+ allow create: if isAuthenticated() && (
+ request.resource.data.senderId == request.auth.uid &&
+ (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
+ getJob(request.resource.data.jobId).data.selectedArchitectId == request.auth.uid)
+ );
+ allow update: if isAuthenticated() && resource.data.senderId != request.auth.uid && (getJob(resource.data.jobId).data.clientId == request.auth.uid || getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+ allow delete: if false;
+ }
 
     // Conversations collection
     match /conversations/{conversationId} {

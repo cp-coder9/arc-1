@@ -12,7 +12,7 @@ export async function runMunicipalScraper(userId: string, municipality: Municipa
     }
 
     const creds = credDoc.data()!;
-    const password = decrypt(creds.encryptedPassword, creds.iv, creds.authTag);
+    const password = decrypt(creds.encryptedPassword, creds.iv, creds.authTag, creds.salt);
 
     let scrapedData: Partial<CouncilSubmission>[] = [];
 

@@ -16,7 +16,7 @@
   "crons": [
     {
       "path": "/api/notifications/worker",
-      "schedule": "0 0 * * *"
+      "schedule": "*/1 * * * *"
     }
   ],
   "routes": [
