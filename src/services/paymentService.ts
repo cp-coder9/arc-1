@@ -42,9 +42,9 @@ async function apiFetch(path: string, body: object): Promise<any> {
 
 // PayFast configuration
 const PAYFAST_CONFIG = {
-  merchantId: import.meta.env.VITE_PAYFAST_MERCHANT_ID || '',
-  merchantKey: import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '',
-  passphrase: import.meta.env.VITE_PAYFAST_PASSPHRASE || '',
+  merchantId: String(import.meta.env.VITE_PAYFAST_MERCHANT_ID || ''),
+  merchantKey: String(import.meta.env.VITE_PAYFAST_MERCHANT_KEY || ''),
+  passphrase: String(import.meta.env.VITE_PAYFAST_PASSPHRASE || ''),
   sandbox: import.meta.env.VITE_PAYFAST_SANDBOX === 'true',
   url: import.meta.env.VITE_PAYFAST_SANDBOX === 'true'
     ? 'https://sandbox.payfast.co.za/eng/process'
