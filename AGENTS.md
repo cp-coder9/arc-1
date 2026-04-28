@@ -106,7 +106,11 @@ src/
 
 ## Testing
 
-No test suite configured. Use `npm run lint` (type-checking) as primary validation.
+Run tests in order: `npm run lint && npm test && npm run test:e2e`
+
+- `npm run lint` - TypeScript type checking
+- `npm test` - Jest unit tests
+- `npm run test:e2e` - Playwright end-to-end tests
 
 ## Common Tasks
 

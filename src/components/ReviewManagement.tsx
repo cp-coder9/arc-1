@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Star, CheckCircle, XCircle, Trash2, Clock, User, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { notificationService } from '@/services/notificationService';
 
 export default function ReviewManagement() {
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -39,6 +40,17 @@ export default function ReviewManagement() {
           totalReviews: newTotalReviews,
           averageRating: Number(newAverageRating.toFixed(1))
         });
+      }
+      // Notify reviewer that their review was approved
+      try {
+        await notificationService.sendNotification(
+          review.fromId,
+          'message',
+          'Your review has been approved and is now visible.',
+          { jobId: review.jobId }
+        );
+      } catch (notifErr) {
+        console.error('Failed to send approval notification:', notifErr);
       }
       toast.success("Review approved!");
     } catch (error) {

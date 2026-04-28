@@ -5,3 +5,7 @@ dist
 .firebase
 *.log
 .env.local
+scripts
+maintenance_scripts
+src/test
+__tests__

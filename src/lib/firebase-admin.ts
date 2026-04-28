@@ -2,12 +2,16 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
-// Configuration with fallbacks
-const projectId = process.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0880960511";
-const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || "ai-studio-2ae3d9c3-70e6-4323-8a95-9d566bd24635";
+// Configuration - require environment variables
+const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID;
 
 let app;
 if (getApps().length === 0) {
+  if (!projectId) {
+    throw new Error('VITE_FIREBASE_PROJECT_ID environment variable is required');
+  }
+
   const adminConfig: any = {
     projectId: projectId,
   };
@@ -22,6 +26,7 @@ if (getApps().length === 0) {
       console.log("Firebase Admin initialized with service account.");
     } catch (err) {
       console.error("Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:", err);
+      throw err;
     }
   } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     adminConfig.credential = cert({
@@ -31,7 +36,7 @@ if (getApps().length === 0) {
     });
     console.log("Firebase Admin initialized with individual credentials.");
   } else {
-    console.warn("⚠️ No Firebase Admin credentials found! CRUD operations on server-side will likely fail.");
+    throw new Error("Firebase Admin credentials missing. Set either FIREBASE_SERVICE_ACCOUNT_KEY or both FIREBASE_PRIVATE_KEY and FIREBASE_CLIENT_EMAIL.");
   }
 
   app = initializeApp(adminConfig);
@@ -63,7 +68,7 @@ export async function testFirebase() {
   } catch (error) {
     return {
       status: "error",
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString()
     };
   }
