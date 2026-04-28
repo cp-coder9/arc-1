@@ -358,7 +358,7 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
-export type MunicipalityType = 'COJ' | 'COCT' | 'ETH' | 'NMB' | 'Other';
+export type MunicipalityType = 'COJ' | 'COCT' | 'ETH' | 'NMB' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'Other';
 
 export interface TrackingEvent {
   status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;

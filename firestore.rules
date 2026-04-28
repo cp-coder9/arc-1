@@ -58,7 +58,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-            ['displayName', 'bio', 'updatedAt', 'fcmTokens', 'notificationPreferences', 'professionalLabel', 'professionalLabels', 'region', 'nhbrcNumber', 'cidbGrading', 'hasPIInsurance', 'tradeLicense']
+            ['displayName', 'bio', 'updatedAt', 'fcmTokens', 'notificationPreferences', 'professionalLabel', 'professionalLabels', 'region', 'nhbrcNumber', 'cidbGrading', 'hasPIInsurance', 'tradeLicense', 'projectType', 'budgetRange', 'sacapNumber', 'experienceYears', 'mainSpecialization']
           )
         ) || isAdmin()
       );
@@ -134,13 +134,16 @@ service cloud.firestore {
         allow read: if isAuthenticated() && (
           isAdmin() ||
           getJob(jobId).data.clientId == request.auth.uid ||
-          resource.data.architectId == request.auth.uid
+          resource.data.architectId == request.auth.uid ||
+          resource.data.assigneeId == request.auth.uid
         );
         allow create: if isAuthenticated() && 
           request.resource.data.architectId == request.auth.uid &&
           getJob(jobId).data.selectedArchitectId == request.auth.uid;
-        allow update: if isAuthenticated() && 
-          resource.data.architectId == request.auth.uid;
+        allow update: if isAuthenticated() && (
+          resource.data.architectId == request.auth.uid ||
+          resource.data.assigneeId == request.auth.uid
+        );
         allow delete: if isAuthenticated() && 
           resource.data.architectId == request.auth.uid;
       }
@@ -296,12 +299,19 @@ service cloud.firestore {
     match /council_submissions/{submissionId} {
       allow read: if isAuthenticated() && (
         isAdmin() ||
-        (resource != null && 
+        resource.data.userId == request.auth.uid ||
+        (resource.data.jobId != null &&
          (getJob(resource.data.jobId).data.clientId == request.auth.uid ||
           getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid))
       );
-      allow create: if isAuthenticated() && isAdmin();
-      allow update: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.userId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
       allow delete: if false;
     }
 

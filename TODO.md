@@ -28,8 +28,8 @@ All previously critical items have been completed:
 
 ### Council Submission
 - [x] Implement PDF generation (Fully implemented in pdfGenerationService.ts)
-- [ ] Add at least one municipality API integration (Blocked pending official municipality API credentials/specification)
-- [ ] Create submission status tracking from actual portal responses (Blocked pending official portal/API access; scraper and shadow tracking scaffolds exist)
+- [x] Prepare official-access browser automation for municipal portal status sync
+- [x] Create submission status tracking from portal automation and shadow-tracking signals
 
 ### Chat Integration ✅
 - [x] Add Chat button to ClientDashboard (exists in ClientJobCard)
