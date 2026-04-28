@@ -7,11 +7,10 @@ import multer from "multer";
 import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin";
 import { extractCadData } from "./cadProcessor";
 import { encrypt, decrypt } from "./encryption";
-import { runMunicipalScraper } from "../services/scraperService";
 import { processReceiptOCR } from "../services/ocrService";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService";
 import { verifySACAPByName } from "../services/sacapVerificationService";
-import { trackMunicipalityStatus } from "./municipalAutomation";
+import { runMunicipalBrowserAutomation, trackMunicipalityStatus } from "./municipalAutomation";
 import { notificationService } from "../services/notificationService";
 
 import { UserRole, MunicipalityType } from "../types";
@@ -286,6 +285,31 @@ router.get("/health", (_req, res) => {
 // Server-side admin role assignment
 // Replaces client-side admin assignment in App.tsx for security
 const ADMIN_EMAILS = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
+const USER_PROFILE_FIELDS = [
+  'bio',
+  'budgetRange',
+  'cidbGrading',
+  'experienceYears',
+  'hasPIInsurance',
+  'mainSpecialization',
+  'nhbrcNumber',
+  'professionalLabel',
+  'projectType',
+  'region',
+  'sacapNumber',
+  'tradeLicense',
+];
+
+function sanitizeUserProfileData(profileData: unknown) {
+  if (!profileData || typeof profileData !== 'object') return {};
+
+  return USER_PROFILE_FIELDS.reduce<Record<string, unknown>>((safeData, field) => {
+    if (Object.prototype.hasOwnProperty.call(profileData, field)) {
+      safeData[field] = (profileData as Record<string, unknown>)[field];
+    }
+    return safeData;
+  }, {});
+}
 
 router.post("/auth/check-admin", async (req, res) => {
   let decoded;
@@ -299,14 +323,19 @@ router.post("/auth/check-admin", async (req, res) => {
     const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
     const userRef = adminDb.collection("users").doc(decoded.uid);
     const userDoc = await userRef.get();
+    const profileData = sanitizeUserProfileData(req.body.profileData);
+    const requestedRole = ['client', 'architect', 'freelancer', 'bep'].includes(req.body.role)
+      ? req.body.role
+      : 'client';
 
     if (!userDoc.exists) {
       // Create user with admin role if applicable
       const newUser = {
         uid: decoded.uid,
         email: decoded.email || '',
-        displayName: decoded.displayName || decoded.name || 'Anonymous',
-        role: isAdminEmail ? 'admin' : (req.body.role || 'client'),
+        displayName: req.body.displayName || decoded.displayName || decoded.name || 'Anonymous',
+        role: isAdminEmail ? 'admin' : requestedRole,
+        ...profileData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -316,6 +345,12 @@ router.post("/auth/check-admin", async (req, res) => {
 
     const userData = userDoc.data()!;
     const currentRole = userData.role;
+    if (Object.keys(profileData).length > 0) {
+      await userRef.set({
+        ...profileData,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    }
 
     // If user is in admin list but doesn't have admin role, upgrade them
     if (isAdminEmail && currentRole !== 'admin') {
@@ -1557,6 +1592,111 @@ router.post("/track-municipality", async (req, res) => {
   } catch (error: any) {
     console.error("Municipal tracking error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Official-access municipal portal sync. This uses stored portal credentials and
+// server-side browser automation instead of relying on unavailable municipal APIs.
+router.post("/municipal/scrape", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { municipality } = req.body;
+  if (!municipality) {
+    return res.status(400).json({ error: "municipality is required" });
+  }
+
+  try {
+    const result = await runMunicipalBrowserAutomation(decoded.uid, municipality as MunicipalityType);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Municipal portal automation error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Store official council portal credentials for browser automation.
+router.post("/municipal/credentials", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { municipality, username, password, referenceNumber, erfNumber, projectDescription } = req.body;
+
+  if (!municipality || !username || !password) {
+    return res.status(400).json({ error: "municipality, username, and password are required" });
+  }
+
+  if (typeof password !== "string" || password.length < 4) {
+    return res.status(400).json({ error: "password is too short" });
+  }
+
+  try {
+    const encrypted = encrypt(password);
+    const credentialId = `${decoded.uid}_${municipality}`;
+    const now = new Date().toISOString();
+
+    await adminDb.collection("municipal_credentials").doc(credentialId).set({
+      userId: decoded.uid,
+      municipality,
+      username,
+      encryptedPassword: encrypted.encrypted,
+      iv: encrypted.iv,
+      authTag: encrypted.authTag,
+      salt: encrypted.salt,
+      status: "unchecked",
+      updatedAt: now,
+      createdAt: now,
+      projectReference: referenceNumber || null,
+      erfNumber: erfNumber || null,
+      projectDescription: projectDescription || null,
+    }, { merge: true });
+
+    if (referenceNumber) {
+      const existingSubmission = await adminDb.collection("council_submissions")
+        .where("userId", "==", decoded.uid)
+        .where("municipality", "==", municipality)
+        .where("referenceNumber", "==", referenceNumber)
+        .limit(1)
+        .get();
+
+      if (existingSubmission.empty) {
+        await adminDb.collection("council_submissions").add({
+          userId: decoded.uid,
+          municipality,
+          referenceNumber,
+          erfNumber: erfNumber || null,
+          projectDescription: projectDescription || `Council portal project ${referenceNumber}`,
+          status: "Portal access configured",
+          rawStatus: "PORTAL_ACCESS_CONFIGURED",
+          source: "manual",
+          documents: [],
+          createdAt: now,
+          lastCheckedAt: now,
+          trackingHistory: [
+            {
+              status: "Portal access configured",
+              timestamp: now,
+              notes: "Architect added official council portal credentials for browser automation",
+              source: "manual",
+              actorId: decoded.uid,
+            }
+          ]
+        });
+      }
+    }
+
+    res.json({ success: true, credentialId });
+  } catch (error: any) {
+    console.error("Municipal credential save error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

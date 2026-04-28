@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   Building2,
@@ -47,6 +48,14 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
+  const [isSavingCredentials, setIsSavingCredentials] = useState(false);
+  const [credentialForm, setCredentialForm] = useState({
+    username: '',
+    password: '',
+    referenceNumber: '',
+    erfNumber: '',
+    projectDescription: ''
+  });
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -89,14 +98,53 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
       });
       const result = await res.json();
       if (result.success) {
-        toast.success(`Successfully found ${result.count} updates for ${activeMuni}`);
+        toast.success(`Portal automation found ${result.count} updates for ${activeMuni}`);
       } else {
-        toast.error(result.error || "Failed to run scraper. Check credentials.");
+        toast.error(result.error || "Failed to run portal automation. Check official access credentials.");
       }
     } catch (e) {
-      toast.error("Network error");
+      toast.error("Portal automation request failed");
     } finally {
       setIsScraping(false);
+    }
+  };
+
+  const handleSaveCouncilLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingCredentials(true);
+
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/municipal/credentials', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          municipality: activeMuni,
+          username: credentialForm.username.trim(),
+          password: credentialForm.password,
+          referenceNumber: credentialForm.referenceNumber.trim(),
+          erfNumber: credentialForm.erfNumber.trim(),
+          projectDescription: credentialForm.projectDescription.trim()
+        })
+      });
+
+      const result = await res.json();
+      if (!result.success) {
+        toast.error(result.error || 'Failed to save council login');
+        return;
+      }
+
+      toast.success('Council login saved for portal automation');
+      setCredentialForm({ username: '', password: '', referenceNumber: '', erfNumber: '', projectDescription: '' });
+      setShowAddModal(false);
+      await triggerScrape();
+    } catch (error) {
+      toast.error('Failed to save council login');
+    } finally {
+      setIsSavingCredentials(false);
     }
   };
 
@@ -195,7 +243,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
         <div>
           <h2 className="text-3xl font-heading font-bold tracking-tight text-foreground">Municipal Tracker</h2>
           <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold mt-1">
-            Hybrid Aggregator: Digital Scrapers • Vision OCR • Crowdsourced Intel
+            Official Portal Automation • Vision OCR • Shadow Tracking
           </p>
         </div>
         <div className="flex gap-2">
@@ -413,12 +461,96 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
             <h3 className="text-xl font-heading font-bold">Shadow Tracker Enabled</h3>
           </div>
           <p className="max-w-2xl text-primary-foreground/90 leading-relaxed font-medium">
-            We are monitoring your connected business accounts for municipal invoices.
+            We are monitoring connected business signals for municipal invoices.
             An invoice for Plan Fees is a 100% reliable trigger that your project has reached a critical milestone,
             often before the portal updates.
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="sm:max-w-xl rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading font-bold">Council Portal Login</DialogTitle>
+            <DialogDescription>
+              Add your official {activeMuni} portal credentials so browser automation can log in and sync this project's municipal status.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveCouncilLogin} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Council Username</label>
+                <Input
+                  value={credentialForm.username}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, username: event.target.value })}
+                  placeholder="Municipal portal username"
+                  autoComplete="username"
+                  required
+                  className="rounded-xl h-12"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Council Password</label>
+                <Input
+                  type="password"
+                  value={credentialForm.password}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, password: event.target.value })}
+                  placeholder="Municipal portal password"
+                  autoComplete="current-password"
+                  required
+                  className="rounded-xl h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Plan Reference</label>
+                <Input
+                  value={credentialForm.referenceNumber}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, referenceNumber: event.target.value })}
+                  placeholder="BP / DAMS reference"
+                  className="rounded-xl h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">ERF Number</label>
+                <Input
+                  value={credentialForm.erfNumber}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, erfNumber: event.target.value })}
+                  placeholder="ERF 1234"
+                  className="rounded-xl h-12"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Project Description</label>
+                <Input
+                  value={credentialForm.projectDescription}
+                  onChange={(event) => setCredentialForm({ ...credentialForm, projectDescription: event.target.value })}
+                  placeholder="Alterations, new residence, commercial tenant fit-out..."
+                  className="rounded-xl h-12"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-relaxed text-blue-800">
+              Credentials are encrypted on the server and used only for official portal browser automation. Saving a reference number creates a tracked project entry before the first sync.
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setShowAddModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSavingCredentials} className="rounded-xl gap-2">
+                {isSavingCredentials ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                Save & Sync Portal
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

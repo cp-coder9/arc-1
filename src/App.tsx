@@ -15,7 +15,7 @@ import {
   updateProfile,
   sendEmailVerification
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { UserProfile, UserRole, Job, JobCategory } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
@@ -110,7 +110,27 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
+  const syncServerProfile = async (selectedRole: UserRole | null) => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return null;
+
+    const res = await fetch('/api/auth/check-admin', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role: selectedRole || 'client', displayName, profileData: formData }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to sync Firebase profile');
+    }
+
+    return res.json();
+  };
+
+  const handleGoogleLogin = async () => {
     if (!roleSelection) {
       toast.error("Please select a role first");
       return;
@@ -121,34 +141,23 @@ export default function App() {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      await syncServerProfile(roleSelection);
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      
-      const adminEmails = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
-      const isAdmin = adminEmails.includes(firebaseUser.email || '');
       
       if (!userDoc.exists()) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
           displayName: firebaseUser.displayName || 'Anonymous',
-          role: isAdmin ? 'admin' : (roleSelection || 'client'),
+          role: roleSelection || 'client',
           ...formData,
           createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
         setUser(newUser);
         
-        if (isAdmin) {
-          toast.success('Logged in as Administrator');
-        }
       } else {
-        const existingUser = userDoc.data() as UserProfile;
-        if (isAdmin && existingUser.role !== 'admin') {
-          await updateDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' });
-          existingUser.role = 'admin';
-          toast.success('Admin privileges restored');
-        }
-        setUser(existingUser);
+        setUser(userDoc.data() as UserProfile);
       }
     } catch (error: any) {
       console.error("Login error:", error);
@@ -177,6 +186,7 @@ export default function App() {
         firebaseUser = result.user;
       }
 
+      await syncServerProfile(roleSelection);
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (!userDoc.exists()) {
         const newUser: UserProfile = {
@@ -275,7 +285,7 @@ export default function App() {
                     <RoleSelectButton data-testid="role-select-freelancer" role="freelancer" label="Freelancer" sub="Specialist" icon={<Sparkles className="w-8 h-8" />} active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
                   </div>
                   <div className="space-y-3">
-                    <Button onClick={handleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg" disabled={!roleSelection || isLoggingIn}>
+                    <Button onClick={handleGoogleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg" disabled={!roleSelection || isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                     </Button>
                     <div className="grid grid-cols-2 gap-4">
@@ -302,6 +312,9 @@ export default function App() {
                   </div>
                   <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg mt-4" disabled={isLoggingIn}>
                     {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full h-12 rounded-xl" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
+                    {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                   </Button>
                   <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => setAuthMode('selection')}>Back to Options</Button>
                 </form>
@@ -508,24 +521,19 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
-          <div aria-hidden="true" className="animated-bird pointer-events-none hidden lg:block absolute left-0 top-8 z-30">
-            <img src="/logo.png" alt="" className="animated-bird__body" />
-            <img src="/logo.png" alt="" className="animated-bird__wing animated-bird__wing--left" />
-            <img src="/logo.png" alt="" className="animated-bird__wing animated-bird__wing--right" />
-          </div>
           <div className="pb-16 relative z-20">
             <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
-            <div className="space-y-6 mb-10">
+            <div className="space-y-3 mb-10">
               {[
                 { word: 'Discover', icon: <Search size={42} /> },
                 { word: 'Verify', icon: <ShieldCheck size={42} /> },
                 { word: 'Collaborate', icon: <Users size={42} /> }
-              ].map(item => (
-                <div key={item.word} className="flex items-center gap-6 border-b border-border pb-5 last:border-b-0 overflow-visible">
+              ].map((item, index) => (
+                <div key={item.word} className="hero-word-row flex items-center gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible" style={{ animationDelay: `${index * 140}ms` }}>
                   <div className="h-20 w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20">
                     {item.icon}
                   </div>
-                  <h1 className="relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] text-foreground drop-shadow-sm">
+                  <h1 className={`relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
                     <span className="relative z-10">{item.word}</span>
                   </h1>
                 </div>
