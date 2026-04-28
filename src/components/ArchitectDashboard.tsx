@@ -21,6 +21,7 @@ import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { notificationService } from '../services/notificationService';
 import ReactMarkdown from 'react-markdown';
 import { safeLocale } from '@/lib/utils';
+import { paginateItems, totalPages } from '@/lib/utils';
 import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
@@ -52,6 +53,13 @@ export default function ArchitectDashboard({
     postedWithin: 0,
     sortBy: 'posted',
   });
+  const [marketplacePage, setMarketplacePage] = useState(1);
+  const [projectsPage, setProjectsPage] = useState(1);
+  const [applicationsPage, setApplicationsPage] = useState(1);
+  const pageSize = 6;
+  const pagedMarketplaceJobs = paginateItems<Job>(availableJobs, marketplacePage, pageSize);
+  const pagedMyJobs = paginateItems<Job>(myJobs, projectsPage, pageSize);
+  const pagedApplications = paginateItems<Application>(myApplications, applicationsPage, pageSize);
 
   useEffect(() => {
     const qJobs = query(collection(db, 'jobs'), where('status', '==', 'open'));
@@ -126,6 +134,9 @@ export default function ArchitectDashboard({
             <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Users size={16} /> Team & Match
             </TabsTrigger>
+            <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Send size={16} /> Applications
+            </TabsTrigger>
           </TabsList>
         </ScrollArea>
 
@@ -134,9 +145,10 @@ export default function ArchitectDashboard({
              <div className="lg:col-span-2 space-y-8">
                 <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><Briefcase className="text-primary" /> Active Projects</h2>
                 <div className="grid grid-cols-1 gap-6">
-                  {myJobs.map(job => (
-                    <ActiveProjectCard key={job.id} job={job} user={user} />
+                  {pagedMyJobs.map(job => (
+                    <div key={job.id}><ActiveProjectCard job={job} user={user} /></div>
                   ))}
+                  {myJobs.length > pageSize && <PaginationControls page={projectsPage} totalPages={totalPages(myJobs.length, pageSize)} onPageChange={setProjectsPage} />}
                   {myJobs.length === 0 && (
                     <div className="py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
                       <p className="text-muted-foreground italic">No active projects yet. Browse the marketplace to apply!</p>
@@ -174,17 +186,35 @@ export default function ArchitectDashboard({
            <div className="space-y-8">
               <SearchFilter filters={filters} onFiltersChange={setFilters} totalResults={availableJobs.length} />
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {availableJobs.map(job => (
-                  <JobCardUI key={job.id} job={job} user={user} />
-                ))}
+                 {pagedMarketplaceJobs.map(job => (
+                   <div key={job.id}><JobCardUI job={job} user={user} /></div>
+                 ))}
               </div>
-           </div>
+              {availableJobs.length > pageSize && <PaginationControls page={marketplacePage} totalPages={totalPages(availableJobs.length, pageSize)} onPageChange={setMarketplacePage} />}
+            </div>
+         </TabsContent>
+
+        <TabsContent value="applications" className="mt-8">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-heading font-bold">My Applications</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {pagedApplications.map(application => (
+                <div key={application.id}><ApplicationCard application={application} /></div>
+              ))}
+              {myApplications.length === 0 && (
+                <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                  <p className="text-muted-foreground italic">No applications submitted yet.</p>
+                </div>
+              )}
+            </div>
+            {myApplications.length > pageSize && <PaginationControls page={applicationsPage} totalPages={totalPages(myApplications.length, pageSize)} onPageChange={setApplicationsPage} />}
+          </div>
         </TabsContent>
 
         <TabsContent value="active" className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {myJobs.map(job => (
-              <ActiveProjectCard key={job.id} job={job} user={user} />
+              <div key={job.id}><ActiveProjectCard job={job} user={user} /></div>
             ))}
             {myJobs.length === 0 && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
@@ -198,9 +228,9 @@ export default function ArchitectDashboard({
           <TeamManager user={user} myJobs={myJobs} />
         </TabsContent>
 
-        <TabsContent value="municipal" className="mt-8">
-          <MunicipalTracker architect={user} jobs={myJobs} />
-        </TabsContent>
+<TabsContent value="municipal" className="mt-8">
+              <MunicipalTracker user={user} />
+            </TabsContent>
       </Tabs>
     </div>
   );
@@ -284,6 +314,35 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
     }
   };
 
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, `jobs/${job.id}/tasks`), {
+        jobId: job.id,
+        architectId: user.uid,
+        assigneeName,
+        assigneeRole,
+        deadline,
+        notes,
+        priority,
+        estimatedHours: estimatedHours ? Number(estimatedHours) : null,
+        requirements: requirements.split('\n').map(item => item.trim()).filter(Boolean),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      setAssigneeName('');
+      setAssigneeRole('');
+      setDeadline('');
+      setNotes('');
+      setEstimatedHours('');
+      setRequirements('');
+      setIsAdding(false);
+      toast.success('Team task assigned');
+    } catch {
+      toast.error('Failed to assign task');
+    }
+  };
+
   return (
     <div className="space-y-4 mt-6">
       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -322,6 +381,26 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
         ))}
         {tasks.length === 0 && <p className="text-[10px] text-muted-foreground italic">No job cards assigned yet.</p>}
       </div>
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full gap-2"><Plus size={14} /> Add Team Task</Button>} />
+        <DialogContent className="sm:max-w-lg rounded-3xl">
+          <DialogHeader><DialogTitle>Assign Team Deliverable</DialogTitle></DialogHeader>
+          <form onSubmit={handleAddTask} className="space-y-4">
+            <Input placeholder="Assignee name" value={assigneeName} onChange={e => setAssigneeName(e.target.value)} required />
+            <Input placeholder="Role, e.g. Structural Engineer" value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} required />
+            <Input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} required />
+            <Input type="number" placeholder="Estimated hours" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} />
+            <select value={priority} onChange={e => setPriority(e.target.value as 'low' | 'medium' | 'high')} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
+              <option value="low">Low priority</option>
+              <option value="medium">Medium priority</option>
+              <option value="high">High priority</option>
+            </select>
+            <Textarea placeholder="Notes" value={notes} onChange={e => setNotes(e.target.value)} required />
+            <Textarea placeholder="Requirements, one per line" value={requirements} onChange={e => setRequirements(e.target.value)} />
+            <Button type="submit" className="w-full">Assign task</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -395,6 +474,31 @@ function StatPill({ icon, label, value }: { icon: React.ReactNode, label: string
 }
 
 function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
+  const [isApplying, setIsApplying] = useState(false);
+  const [proposal, setProposal] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleApply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, `jobs/${job.id}/applications`), {
+        jobId: job.id,
+        architectId: user.uid,
+        architectName: user.displayName,
+        proposal,
+        notes,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      setIsApplying(false);
+      setProposal('');
+      setNotes('');
+      toast.success('Application submitted');
+    } catch {
+      toast.error('Failed to submit application');
+    }
+  };
+
   return (
     <Card className="border-border shadow-sm bg-white rounded-3xl p-8 hover:border-primary/50 transition-all flex flex-col group">
        <div className="flex justify-between items-start mb-4">
@@ -405,8 +509,75 @@ function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
        <p className="text-xs text-muted-foreground line-clamp-3 mb-6 leading-relaxed">{job.description}</p>
        <div className="mt-auto flex items-center justify-between pt-4 border-t border-border/50">
           <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1"><MapPin size={12} /> {job.location || 'RSA'}</span>
-          <Button size="sm" className="rounded-full px-6 font-bold uppercase text-[10px] tracking-widest">Apply</Button>
-       </div>
+           <Dialog open={isApplying} onOpenChange={setIsApplying}>
+             <DialogTrigger render={<Button size="sm" className="rounded-full px-6 font-bold uppercase text-[10px] tracking-widest">Apply</Button>} />
+             <DialogContent className="sm:max-w-lg rounded-3xl">
+               <DialogHeader><DialogTitle>Apply for {job.title}</DialogTitle></DialogHeader>
+               <form onSubmit={handleApply} className="space-y-4">
+                 <Textarea placeholder="Proposal" value={proposal} onChange={e => setProposal(e.target.value)} required />
+                 <Textarea placeholder="Private notes/comments" value={notes} onChange={e => setNotes(e.target.value)} />
+                 <Button type="submit" className="w-full">Submit application</Button>
+               </form>
+             </DialogContent>
+           </Dialog>
+        </div>
+     </Card>
+  );
+}
+
+function ApplicationCard({ application }: { application: Application }) {
+  const [localNotes, setLocalNotes] = useState(application.notes || '');
+
+  const handleWithdraw = async () => {
+    try {
+      await updateDoc(doc(db, `jobs/${application.jobId}/applications`, application.id), {
+        status: 'withdrawn',
+        withdrawnAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('Application withdrawn');
+    } catch {
+      toast.error('Failed to withdraw application');
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      await updateDoc(doc(db, `jobs/${application.jobId}/applications`, application.id), {
+        notes: localNotes,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('Application notes saved');
+    } catch {
+      toast.error('Failed to save notes');
+    }
+  };
+
+  return (
+    <Card className="border-border shadow-sm bg-white rounded-3xl p-6 space-y-4">
+      <div className="flex justify-between gap-4">
+        <div>
+          <h3 className="font-bold">Application</h3>
+          <p className="text-xs text-muted-foreground">Submitted {new Date(application.createdAt).toLocaleDateString()}</p>
+        </div>
+        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{application.status}</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground line-clamp-3">{application.proposal}</p>
+      <Textarea value={localNotes} onChange={e => setLocalNotes(e.target.value)} placeholder="Add notes/comments" />
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={handleSaveNotes}>Save Notes</Button>
+        {application.status === 'pending' && <Button size="sm" variant="destructive" onClick={handleWithdraw}>Withdraw</Button>}
+      </div>
     </Card>
+  );
+}
+
+function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+      <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
+      <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+    </div>
   );
 }

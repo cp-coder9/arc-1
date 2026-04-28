@@ -18,6 +18,7 @@ export interface UserProfile {
   completedJobs?: number;
   createdAt: string;
   updatedAt?: string;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -35,6 +36,17 @@ export interface Job {
   status: 'open' | 'in-progress' | 'completed' | 'cancelled';
   selectedArchitectId?: string;
   createdAt: string;
+  updatedAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  statusHistory?: JobStatusHistory[];
+}
+
+export interface JobStatusHistory {
+  status: Job['status'];
+  timestamp: string;
+  actorId: string;
+  note?: string;
 }
 
 export interface Application {
@@ -45,8 +57,11 @@ export interface Application {
   proposal: string;
   portfolioUrl?: string;
   documents?: string[];
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   createdAt: string;
+  updatedAt?: string;
+  withdrawnAt?: string;
+  notes?: string;
   
   // Denormalized profile fields
   sacapNumber?: string;
@@ -224,6 +239,26 @@ export interface Notification {
   createdAt: string;
   readAt?: string;
   deliveryStatus?: 'pending' | 'processing' | 'delivered' | 'failed';
+}
+
+export interface Dispute {
+  id: string;
+  jobId: string;
+  filedBy: string;
+  filedAgainst?: string;
+  reason: string;
+  requestedResolution: string;
+  status: 'open' | 'in_mediation' | 'resolved' | 'rejected';
+  adminNotes?: string;
+  resolution?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface NotificationPreferences {
+  in_app: boolean;
+  email: boolean;
+  push: boolean;
 }
 
 // Message types

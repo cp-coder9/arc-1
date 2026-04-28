@@ -31,7 +31,7 @@ interface ComplianceReportProps {
   drawingName?: string;
   projectName?: string;
   onClose?: () => void;
-  userRole?: 'admin' | 'architect' | 'client' | 'freelancer';
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer' | 'bep';
   submissionId?: string;
   userId?: string;
 }

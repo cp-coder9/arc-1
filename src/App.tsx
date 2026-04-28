@@ -12,7 +12,8 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendEmailVerification
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
 import { UserProfile, UserRole, Job, JobCategory } from './types';
@@ -170,6 +171,7 @@ export default function App() {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         firebaseUser = result.user;
         if (displayName) await updateProfile(firebaseUser, { displayName });
+        await sendEmailVerification(firebaseUser);
       } else {
         const result = await signInWithEmailAndPassword(auth, email, password);
         firebaseUser = result.user;
@@ -190,7 +192,7 @@ export default function App() {
       } else {
         setUser(userDoc.data() as UserProfile);
       }
-      toast.success(authMode === 'email-signup' ? "Account created!" : "Welcome back!");
+      toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
     } catch (error: any) {
       console.error("Auth error:", error);
       toast.error("Authentication failed.");
@@ -313,8 +315,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] flex flex-col md:flex-row">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <div className="min-h-screen bg-[#FDFDFD] flex flex-col md:flex-row relative overflow-hidden">
+      <AnimatedFloorPlan />
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-6">
           <div className="flex items-center justify-between mb-10">
             <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
@@ -428,7 +431,7 @@ export default function App() {
             </Button>
           </div>
         </aside>
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 relative z-10">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>
           <div className="flex-1" />
@@ -490,7 +493,8 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] overflow-x-hidden">
+    <div className="min-h-screen bg-[#FDFDFD] overflow-x-hidden relative">
+      <AnimatedFloorPlan />
       <nav className="h-20 border-b border-border px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-50">
         <Logo showText iconClassName="w-12 h-12 text-primary" />
         <div className="hidden lg:flex items-center gap-6">

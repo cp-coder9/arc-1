@@ -1,15 +1,51 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export function AnimatedFloorPlan() {
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateOffset = (value: number) => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(() => {
+        setOffset(Math.min(value * 0.035, 36));
+      });
+    };
+
+    const handleScroll = (event: Event) => {
+      const target = event.target as HTMLElement | Document | null;
+      const scrollTop = target && 'scrollTop' in target
+        ? target.scrollTop
+        : window.scrollY || document.documentElement.scrollTop;
+
+      updateOffset(scrollTop);
+    };
+
+    updateOffset(window.scrollY || document.documentElement.scrollTop);
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+      document.removeEventListener('scroll', handleScroll, { capture: true });
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-[0.15] flex items-center justify-center z-0">
+    <div
+      aria-hidden="true"
+      className="fixed inset-0 overflow-hidden pointer-events-none opacity-[0.08] flex items-center justify-center z-0 mix-blend-multiply"
+    >
       <svg
-        width="100%"
-        height="100%"
+        width="120%"
+        height="120%"
         viewBox="0 0 1200 800"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="stroke-primary w-full h-full object-cover"
+        className="stroke-primary h-[120vh] min-w-[120vw] object-cover transition-transform duration-150 ease-out"
+        style={{ transform: `translate3d(-2%, ${offset}px, 0) rotate(-2deg) scale(1.08)` }}
         strokeWidth="1.5"
         strokeLinecap="square"
         strokeLinejoin="miter"

@@ -16,9 +16,10 @@ import {
   orderBy,
   limit,
   getDocs,
+  getDoc,
   writeBatch
 } from 'firebase/firestore';
-import { Notification, NotificationType } from '../types';
+import { Notification, NotificationPreferences, NotificationType } from '../types';
 
 // Notification types with their default channels
 const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: ('in_app' | 'email' | 'push')[] }> = {
@@ -75,6 +76,16 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
 class NotificationService {
   private unsubscribeFns: Map<string, () => void> = new Map();
 
+  private async getUserPreferences(userId: string): Promise<NotificationPreferences> {
+    const userSnap = await getDoc(doc(db, 'users', userId));
+    const preferences = userSnap.data()?.notificationPreferences as Partial<NotificationPreferences> | undefined;
+    return {
+      in_app: preferences?.in_app ?? true,
+      email: preferences?.email ?? true,
+      push: preferences?.push ?? true,
+    };
+  }
+
   /**
    * Send a notification to a user
    */
@@ -85,6 +96,10 @@ class NotificationService {
     data?: { jobId?: string; submissionId?: string; senderId?: string; applicationId?: string }
   ): Promise<void> {
     const config = NOTIFICATION_CONFIG[type];
+    const preferences = await this.getUserPreferences(userId);
+    const channels = config.channels.filter(channel => preferences[channel]);
+
+    if (channels.length === 0) return;
 
     const notification: Omit<Notification, 'id'> = {
       userId,
@@ -93,7 +108,7 @@ class NotificationService {
       body,
       data: data || {},
       isRead: false,
-      channels: config.channels,
+      channels,
       createdAt: new Date().toISOString(),
       deliveryStatus: 'pending' as any, // Tracked by the server.ts notification worker
     };
@@ -102,7 +117,7 @@ class NotificationService {
     await addDoc(collection(db, 'notifications'), notification);
 
     // Also send in-app immediately
-    if (config.channels.includes('in_app')) {
+    if (channels.includes('in_app')) {
       this.showToast(notification.title, body, type);
     }
   }

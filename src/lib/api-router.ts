@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
-import csrf from "csurf";
+// import csrf from "csurf"; // TODO: Install csurf package when enabling CSRF protection
 import { del, put } from "@vercel/blob";
 import multer from "multer";
 import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin";
@@ -43,11 +43,31 @@ const apiLimiter = rateLimit({
 const router = express.Router();
 router.use(apiLimiter);
 
-// CSRF Protection Middleware (for state-changing operations)
-const csrfProtection = csrf({ cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' } });
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-// Apply CSRF to sensitive routes (optional, can be enabled per-route)
-// For now, we use token-based auth which provides sufficient protection
+function sameOriginGuard(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (SAFE_METHODS.has(req.method)) return next();
+
+  const origin = req.get("origin");
+  if (!origin) return next();
+
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const protocol = req.get("x-forwarded-proto") || req.protocol;
+  if (!host) return res.status(403).json({ error: "Missing host header" });
+
+  try {
+    const requestOrigin = `${protocol}://${host}`;
+    if (new URL(origin).origin !== new URL(requestOrigin).origin) {
+      return res.status(403).json({ error: "Cross-origin state-changing request blocked" });
+    }
+  } catch {
+    return res.status(403).json({ error: "Invalid origin header" });
+  }
+
+  return next();
+}
+
+router.use(sameOriginGuard);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ALLOWED_BLOB_HOSTS = ["public.blob.vercel-storage.com"];
