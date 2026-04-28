@@ -133,9 +133,51 @@
   .animate-spin-slow {
     animation: spin 8s linear infinite;
   }
+
+  .animate-logo-flight {
+    animation: logo-flight 8s cubic-bezier(0.72, 0, 0.18, 1) 0.8s both;
+  }
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes logo-flight {
+  0% {
+    opacity: 0;
+    transform: translate3d(-40px, -120px, 0) rotate(-18deg) scale(0.65);
+  }
+  8% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  24% {
+    transform: translate3d(265px, 112px, 0) rotate(16deg) scale(1.18);
+  }
+  42% {
+    transform: translate3d(480px, 228px, 0) rotate(-10deg) scale(0.9);
+  }
+  58% {
+    transform: translate3d(360px, 350px, 0) rotate(18deg) scale(1.08);
+  }
+  74% {
+    transform: translate3d(620px, 210px, 0) rotate(-24deg) scale(0.78);
+  }
+  90% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-40px, -120px, 0) rotate(-18deg) scale(0.65);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-logo-flight {
+    animation: none;
+    opacity: 0;
+  }
 }

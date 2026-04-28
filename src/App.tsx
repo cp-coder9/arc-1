@@ -488,13 +488,13 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F7FBFB] overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#FDFDFD] overflow-x-hidden relative">
       <AnimatedFloorPlan />
-      <nav className="h-20 border-b border-teal-900/10 px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/85 backdrop-blur-md z-50">
-        <Logo showText iconClassName="w-12 h-12 text-[#0E8F8A]" textClassName="font-heading font-bold text-3xl tracking-tight text-[#031B3A]" />
+      <nav className="h-28 border-b border-border px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-50">
+        <Logo showText iconClassName="w-24 h-24 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-4xl lg:text-5xl tracking-tighter text-foreground" />
         <div className="hidden lg:flex items-center gap-6">
-          <button onClick={onGetStarted} className="text-sm font-bold text-[#031B3A] hover:text-[#0E8F8A]">Marketplace</button>
-          <Button onClick={onGetStarted} className="bg-[#0E8F8A] text-white px-6 rounded-full font-bold shadow-lg shadow-teal-900/10">Get Started</Button>
+          <button onClick={onGetStarted} className="text-sm font-medium hover:text-primary">Marketplace</button>
+          <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
         </div>
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
         {isMobileMenuOpen && (
@@ -506,74 +506,72 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-24 pb-0 px-6 lg:px-20 relative z-10 overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 hidden lg:block w-[44vw] bg-gradient-to-br from-[#0E8F8A] via-[#0A7777] to-[#024455] opacity-95 [clip-path:polygon(30%_0,100%_0,100%_100%,0_100%)]" />
-        <div className="absolute right-[8vw] top-28 hidden lg:block w-[420px] h-[420px] border border-white/40 [clip-path:polygon(25%_0,100%_0,75%_100%,0_75%)]" />
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.05fr_0.95fr] gap-12 items-center min-h-[760px] relative">
-          <div className="pb-16">
-            <Badge className="bg-[#0E8F8A]/10 text-[#0E8F8A] border-[#0E8F8A]/20 mb-8 px-4 py-1 text-xs uppercase tracking-[0.22em] font-black">Smarter projects. Stronger built environments.</Badge>
+      <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
+          <img src="/logo.png" alt="" aria-hidden="true" className="pointer-events-none hidden lg:block absolute left-0 top-8 w-44 h-44 object-contain z-30 animate-logo-flight drop-shadow-2xl" />
+          <div className="pb-16 relative z-20">
+            <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
             <div className="space-y-6 mb-10">
               {[
                 { word: 'Discover', icon: <Search size={42} /> },
                 { word: 'Verify', icon: <ShieldCheck size={42} /> },
                 { word: 'Collaborate', icon: <Users size={42} /> }
               ].map(item => (
-                <div key={item.word} className="flex items-center gap-6 border-b border-[#031B3A]/15 pb-5 last:border-b-0">
-                  <div className="h-20 w-20 shrink-0 rounded-full bg-gradient-to-br from-[#15A9A1] to-[#03606B] text-white flex items-center justify-center shadow-xl shadow-teal-900/15">
+                <div key={item.word} className="flex items-center gap-6 border-b border-border pb-5 last:border-b-0 overflow-visible">
+                  <div className="h-20 w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20">
                     {item.icon}
                   </div>
-                  <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] text-[#031B3A] drop-shadow-sm">{item.word}</h1>
+                  <h1 className="relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] text-foreground drop-shadow-sm">
+                    <span className="relative z-10">{item.word}</span>
+                  </h1>
                 </div>
               ))}
             </div>
-            <p className="text-xl lg:text-2xl text-[#031B3A] mb-10 max-w-2xl leading-relaxed">
+            <p className="text-xl lg:text-2xl text-foreground mb-10 max-w-2xl leading-relaxed">
               Architex connects clients with elite professionals and contractors through an AI-powered marketplace for the built environment. Providing tailored management and resource sharing tools to deliver projects end-to-end.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-[#0E8F8A] text-white h-16 px-10 rounded-full text-lg font-bold shadow-xl shadow-teal-900/20">Post a Job <ArrowRight className="ml-2" /></Button>
-              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold border-[#0E8F8A]/30 text-[#031B3A] bg-white/70">Browse Talent</Button>
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl">Post a Job <ArrowRight className="ml-2" /></Button>
+              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-white/70">Browse Talent</Button>
             </div>
           </div>
           <div className="relative min-h-[560px] hidden lg:block">
-            <div className="absolute right-0 top-8 w-[540px] h-[420px] bg-white/10 border border-white/40 backdrop-blur-sm [clip-path:polygon(20%_0,100%_0,100%_78%,55%_100%,0_70%)] overflow-hidden">
-              <svg viewBox="0 0 520 400" className="absolute inset-0 w-full h-full text-white/75" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-border bg-secondary/20 p-8 flex items-center justify-center">
+              <Logo iconClassName="w-64 h-64 object-contain text-primary/40" />
+            </div>
+            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/50 border border-primary/15 backdrop-blur-sm rounded-[2rem] overflow-hidden">
+              <svg viewBox="0 0 520 400" className="absolute inset-0 w-full h-full text-primary/40" fill="none" stroke="currentColor" strokeWidth="1.4">
                 <path d="M80 330V155l115-60 170 85v150M195 95v235M365 180v150M80 155l285 25M80 205l285 25M80 255l285 25M115 315h285M115 285h285M115 255h285M115 225h285" />
                 <path d="M195 95l170 85 75-45-170-85-75 45ZM365 180l75-45v145l-75 50" />
                 <circle cx="80" cy="155" r="3" fill="currentColor" /><circle cx="195" cy="95" r="3" fill="currentColor" /><circle cx="365" cy="180" r="3" fill="currentColor" /><circle cx="440" cy="135" r="3" fill="currentColor" />
               </svg>
-            </div>
-            <div className="absolute right-10 bottom-0 w-[500px] h-[360px] rounded-t-[3rem] border border-white/30 bg-gradient-to-t from-white/60 to-white/10 shadow-2xl shadow-teal-950/20 overflow-hidden">
-              <div className="absolute inset-x-10 bottom-0 h-[300px] bg-white/70 border border-[#0E8F8A]/20" />
-              <div className="absolute inset-x-16 bottom-0 grid grid-cols-5 gap-2 h-[280px] p-4">
-                {Array.from({ length: 25 }).map((_, index) => <div key={index} className="bg-[#5BA8B7]/25 border border-[#031B3A]/10" />)}
-              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Marketplace Preview */}
-      <section className="py-12 bg-gradient-to-r from-[#022A3F] via-[#086B70] to-[#10A39B] px-8 lg:px-20 relative z-10 border-y border-white/20 text-white">
+      <section className="py-12 bg-secondary/20 px-8 lg:px-20 relative z-10 border-y border-border">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-white/30">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               ['AI-Powered Intelligence', 'SANS 10400 compliance checks for drawings and collaborative design workflows.'],
               ['Built for the Built Environment', 'Purpose-built tools for every project stage.'],
               ['Connected Ecosystem', 'Clients, professionals, and contractors working as one.']
             ].map(([title, copy]) => (
-              <div key={title} className="py-4 md:px-8 first:pl-0">
+              <div key={title} className="rounded-3xl border border-border bg-white/50 backdrop-blur-sm p-8">
                 <h2 className="text-lg font-black uppercase tracking-wide mb-3">{title}</h2>
-                <p className="text-white/85 leading-relaxed max-w-sm">{copy}</p>
+                <p className="text-muted-foreground leading-relaxed max-w-sm">{copy}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="bg-white/80 py-8 px-8 lg:px-20 border-t border-[#0E8F8A]/20 relative z-10">
+      <footer className="bg-secondary/50 py-20 px-8 lg:px-20 border-t border-border relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <p className="text-[#0E8F8A] font-black uppercase tracking-[0.28em]">Build better. Together.</p>
-          <p className="text-sm font-bold tracking-[0.25em] text-[#0E8F8A]">architex.co.za</p>
+          <Logo showText iconClassName="w-16 h-16 object-contain" textClassName="font-heading font-bold text-2xl lg:text-3xl" />
+          <p className="text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
         </div>
       </footer>
     </div>
