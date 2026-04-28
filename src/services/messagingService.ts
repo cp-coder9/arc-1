@@ -106,26 +106,28 @@ class MessagingService {
   /**
    * Mark messages as read
    */
-  async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
-    const q = query(
-      collection(db, 'messages'),
-      where('jobId', '==', jobId),
-      where('senderId', '!=', userId),
-      where('isRead', '==', false)
-    );
+async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
+ const q = query(
+ collection(db, 'messages'),
+ where('jobId', '==', jobId),
+ where('isRead', '==', false)
+ );
 
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
+ const snapshot = await getDocs(q);
+ const batch = writeBatch(db);
 
-    snapshot.docs.forEach(doc => {
-      batch.update(doc.ref, {
-        isRead: true,
-        readAt: new Date().toISOString(),
-      });
-    });
+ snapshot.docs.forEach(doc => {
+ const message = doc.data() as Message;
+ if (message.senderId !== userId) {
+ batch.update(doc.ref, {
+ isRead: true,
+ readAt: new Date().toISOString(),
+ });
+ }
+ });
 
-    await batch.commit();
-  }
+ await batch.commit();
+}
 
   /**
    * Get or create conversation

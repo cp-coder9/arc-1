@@ -18,6 +18,7 @@ export interface UserProfile {
   completedJobs?: number;
   createdAt: string;
   updatedAt?: string;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -35,6 +36,17 @@ export interface Job {
   status: 'open' | 'in-progress' | 'completed' | 'cancelled';
   selectedArchitectId?: string;
   createdAt: string;
+  updatedAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  statusHistory?: JobStatusHistory[];
+}
+
+export interface JobStatusHistory {
+  status: Job['status'];
+  timestamp: string;
+  actorId: string;
+  note?: string;
 }
 
 export interface Application {
@@ -45,8 +57,11 @@ export interface Application {
   proposal: string;
   portfolioUrl?: string;
   documents?: string[];
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   createdAt: string;
+  updatedAt?: string;
+  withdrawnAt?: string;
+  notes?: string;
   
   // Denormalized profile fields
   sacapNumber?: string;
@@ -100,13 +115,21 @@ export interface AICategory {
 }
 
 export interface AIReviewResult {
-  status: 'passed' | 'failed';
-  feedback: string;
-  categories: AICategory[];
-  visualReportUrl?: string;
-  traceLog: string;
-  citations?: KnowledgeCitation[];
-  knowledgeSources?: string[];
+ status: 'passed' | 'failed';
+ feedback: string;
+ categories: AICategory[];
+ visualReportUrl?: string;
+ traceLog: string;
+ citations?: KnowledgeCitation[];
+ knowledgeSources?: string[];
+}
+
+export interface AIProgress {
+ percentage: number;
+ agentName: string;
+ activity: string;
+ completedAgents: string[];
+ thought?: string;
 }
 
 export interface Submission {
@@ -218,6 +241,26 @@ export interface Notification {
   deliveryStatus?: 'pending' | 'processing' | 'delivered' | 'failed';
 }
 
+export interface Dispute {
+  id: string;
+  jobId: string;
+  filedBy: string;
+  filedAgainst?: string;
+  reason: string;
+  requestedResolution: string;
+  status: 'open' | 'in_mediation' | 'resolved' | 'rejected';
+  adminNotes?: string;
+  resolution?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface NotificationPreferences {
+  in_app: boolean;
+  email: boolean;
+  push: boolean;
+}
+
 // Message types
 export interface Message {
   id: string;
@@ -322,6 +365,7 @@ export interface TrackingEvent {
   timestamp: string;
   notes?: string;
   source: 'manual' | 'scraper' | 'ocr' | 'shadow' | string;
+  actorId?: string;
 }
 
 export interface CouncilSubmission {
@@ -336,20 +380,11 @@ export interface CouncilSubmission {
   lastCheckedAt?: string;
   submittedAt?: string;
   documents: { name: string; url: string }[];
-  source: 'manual' | 'scraper' | 'ocr' | 'shadow';
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow_tracker';
   trackingHistory: TrackingEvent[];
   queries?: CouncilQuery[];
   erfNumber?: string;
   projectDescription?: string;
-  source: 'manual' | 'ocr' | 'scraper' | 'shadow_tracker';
-}
-
-export interface TrackingEvent {
-  status: string;
-  timestamp: string;
-  notes?: string;
-  source: 'scraper' | 'ocr' | 'crowdsource' | 'shadow_tracker' | 'manual';
-  actorId?: string;
 }
 
 export interface CouncilQuery {

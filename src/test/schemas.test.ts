@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { JobCreateSchema, ApplicationCreateSchema, ReviewCreateSchema, validateForm } from '../lib/schemas';
+import { JobCreateSchema, ApplicationCreateSchema, ReviewCreateSchema, validateForm, UserRoleEnum, NotificationTypeEnum } from '../lib/schemas';
 
 describe('Validation Schemas', () => {
   describe('JobCreateSchema', () => {
@@ -144,6 +144,45 @@ describe('Validation Schemas', () => {
 
       const result = validateForm(ReviewCreateSchema, review);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('Enum Consistency', () => {
+    const userRoles: Array<'client' | 'architect' | 'admin' | 'freelancer' | 'bep'> = ['client', 'architect', 'admin', 'freelancer', 'bep'];
+    it('should accept all UserRole values', () => {
+      for (const role of userRoles) {
+        const result = UserRoleEnum.safeParse(role);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    const notificationTypes: Array<'job_application' | 'application_accepted' | 'drawing_submitted' | 'ai_review_complete' | 'admin_approval' | 'admin_rejection' | 'payment_released' | 'message' | 'milestone_due' | 'council_update' | 'invoice_sent' | 'invoice_paid'> = [
+      'job_application',
+      'application_accepted',
+      'drawing_submitted',
+      'ai_review_complete',
+      'admin_approval',
+      'admin_rejection',
+      'payment_released',
+      'message',
+      'milestone_due',
+      'council_update',
+      'invoice_sent',
+      'invoice_paid'
+    ];
+    it('should accept all NotificationType values', () => {
+      for (const type of notificationTypes) {
+        const result = NotificationTypeEnum.safeParse(type);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    const reviewTypes = ['client_to_architect', 'architect_to_client', 'to_bep', 'from_bep', 'to_freelancer'];
+    it('should accept all Review type values', () => {
+      for (const type of reviewTypes) {
+        const result = ReviewCreateSchema.pick({ type: true }).safeParse({ type });
+        expect(result.success).toBe(true);
+      }
     });
   });
 });

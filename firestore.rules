@@ -33,6 +33,14 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/architect_verifications/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/architect_verifications/$(request.auth.uid)).data.status == 'verified';
     }
+
+    function isProjectParticipant(jobId) {
+      return isAuthenticated() && (
+        getJob(jobId).data.clientId == request.auth.uid ||
+        getJob(jobId).data.selectedArchitectId == request.auth.uid ||
+        isAdmin()
+      );
+    }
     
     function getJob(jobId) {
       return get(/databases/$(database)/documents/jobs/$(jobId));
@@ -43,14 +51,14 @@ service cloud.firestore {
       // Allow reading user profiles if authenticated
       allow read: if isAuthenticated();
       
-      allow create: if isAuthenticated() && isOwner(userId) && 
-        request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
-        request.resource.data.role in ['client', 'architect', 'admin'];
+       allow create: if isAuthenticated() && isOwner(userId) && 
+         request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+         request.resource.data.role in ['client', 'architect', 'admin', 'freelancer', 'bep'];
 
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-            ['displayName', 'bio', 'updatedAt', 'fcmTokens', 'role']
+            ['displayName', 'bio', 'updatedAt', 'fcmTokens', 'notificationPreferences', 'professionalLabel', 'professionalLabels', 'region', 'nhbrcNumber', 'cidbGrading', 'hasPIInsurance', 'tradeLicense']
           )
         ) || isAdmin()
       );
@@ -69,9 +77,12 @@ service cloud.firestore {
         request.resource.data.clientId == request.auth.uid &&
         request.resource.data.keys().hasAll(['clientId', 'title', 'description', 'budget', 'status', 'createdAt']);
       allow update: if isAuthenticated() && (
-        resource.data.clientId == request.auth.uid ||
-        resource.data.selectedArchitectId == request.auth.uid ||
-        isAdmin()
+        isAdmin() ||
+        (resource.data.clientId == request.auth.uid &&
+          request.resource.data.clientId == resource.data.clientId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'requirements', 'deadline', 'budget', 'category', 'location', 'status', 'selectedArchitectId', 'updatedAt', 'cancelledAt', 'cancellationReason', 'statusHistory'])) ||
+        (resource.data.selectedArchitectId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'statusHistory']))
       );
       allow delete: if isAdmin();
 
@@ -88,6 +99,8 @@ service cloud.firestore {
           isVerifiedArchitect();
         allow update: if isAuthenticated() && (
           (getJob(jobId).data.clientId == request.auth.uid) ||
+          (resource.data.architectId == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'withdrawnAt', 'notes', 'updatedAt'])) ||
           isAdmin()
         );
         allow delete: if false;
@@ -133,6 +146,23 @@ service cloud.firestore {
       }
     }
 
+    // Disputes collection
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.filedBy == request.auth.uid ||
+        resource.data.filedAgainst == request.auth.uid ||
+        isProjectParticipant(resource.data.jobId)
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.filedBy == request.auth.uid &&
+        isProjectParticipant(request.resource.data.jobId) &&
+        request.resource.data.keys().hasAll(['jobId', 'filedBy', 'reason', 'requestedResolution', 'status', 'createdAt']) &&
+        request.resource.data.status == 'open';
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
     // Collection Group matches for Admin Dashboard
     match /{path=**}/submissions/{subId} {
       allow read: if isAuthenticated() && isAdmin();
@@ -152,32 +182,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Notifications collection
-    match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        (isAdmin() || request.resource.data.userId != request.auth.uid);
-      allow update: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-    }
+     // Notifications collection
+     match /notifications/{notificationId} {
+       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+       // Only admins or server-side identities can create notifications for arbitrary users.
+       // Users may create notifications for themselves.
+       allow create: if 
+         isAdmin() ||
+         request.resource.data.userId == request.auth.uid;
+       allow update: if isAuthenticated() && 
+         resource.data.userId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+     }
 
-    // Messages collection
-    match /messages/{messageId} {
-      allow read: if isAuthenticated() && (
-        resource.data.senderId == request.auth.uid ||
-        getJob(resource.data.jobId).data.clientId == request.auth.uid ||
-        getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid
-      );
-      allow create: if isAuthenticated() && (
-        request.resource.data.senderId == request.auth.uid &&
-        (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
-         getJob(request.resource.data.jobId).data.selectedArchitectId == request.auth.uid)
-      );
-      allow update: if false;
-      allow delete: if false;
-    }
+// Messages collection
+ match /messages/{messageId} {
+ allow read: if isAuthenticated() && (
+ resource.data.senderId == request.auth.uid ||
+ getJob(resource.data.jobId).data.clientId == request.auth.uid ||
+ getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid
+ );
+ allow create: if isAuthenticated() && (
+ request.resource.data.senderId == request.auth.uid &&
+ (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
+ getJob(request.resource.data.jobId).data.selectedArchitectId == request.auth.uid)
+ );
+ allow update: if isAuthenticated() && resource.data.senderId != request.auth.uid && (getJob(resource.data.jobId).data.clientId == request.auth.uid || getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+ allow delete: if false;
+ }
 
     // Conversations collection
     match /conversations/{conversationId} {

@@ -5,16 +5,18 @@ import { Star, MessageSquare, Send } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { toast } from 'sonner';
+import { Review } from '@/types';
 
 interface RatingSystemProps {
   fromId: string;
   toId: string;
   toName: string;
   jobId: string;
+  type: Review['type'];
   onSuccess?: () => void;
 }
 
-export default function RatingSystem({ fromId, toId, toName, jobId, onSuccess }: RatingSystemProps) {
+export default function RatingSystem({ fromId, toId, toName, jobId, type, onSuccess }: RatingSystemProps) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState('');
@@ -35,6 +37,7 @@ export default function RatingSystem({ fromId, toId, toName, jobId, onSuccess }:
         rating,
         comment,
         status: 'pending_admin',
+        type,
         createdAt: new Date().toISOString()
       });
 

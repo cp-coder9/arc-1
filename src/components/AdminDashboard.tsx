@@ -3,8 +3,8 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '../types';
-import { safeFormat, safeLocale } from '../lib/utils';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute } from '../types';
+import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -382,6 +382,63 @@ export default function AdminDashboard({
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [submissionPage, setSubmissionPage] = useState(1);
+  const [disputePage, setDisputePage] = useState(1);
+  const pageSize = 8;
+
+  useEffect(() => {
+    const unsubSubmissions = onSnapshot(query(collectionGroup(db, 'submissions'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
+      setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
+    });
+    const unsubAgents = onSnapshot(query(collection(db, 'agents'), orderBy('name')), (snapshot) => {
+      setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
+    });
+    const unsubJobs = onSnapshot(query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
+      const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+      setAllJobs(jobs);
+      setStats(current => ({ ...current, totalJobs: jobs.length }));
+    });
+    const unsubLogs = onSnapshot(query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)), (snapshot) => {
+      const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
+      setLogs(nextLogs);
+      setStats(current => ({ ...current, errorCount: nextLogs.filter(log => log.level === 'error' || log.level === 'critical').length }));
+    });
+    const unsubDisputes = onSnapshot(query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
+      setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
+    });
+    return () => {
+      unsubSubmissions();
+      unsubAgents();
+      unsubJobs();
+      unsubLogs();
+      unsubDisputes();
+    };
+  }, []);
+
+  useEffect(() => {
+    setStats(current => ({
+      ...current,
+      approvedDrawings: submissions.filter(submission => submission.status === 'approved').length,
+      activeAgents: agents.filter(agent => agent.status === 'online').length
+    }));
+  }, [agents, submissions]);
+
+  const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
+  const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+
+  const updateSubmissionStatus = async (submission: Submission, status: Submission['status']) => {
+    try {
+      await updateDoc(doc(db, `jobs/${submission.jobId}/submissions`, submission.id), {
+        status,
+        adminFeedback: status === 'approved' ? 'Approved by admin review.' : 'Rejected by admin review.',
+        updatedAt: new Date().toISOString()
+      });
+      toast.success(status === 'approved' ? 'Submission approved' : 'Submission rejected');
+    } catch {
+      toast.error('Failed to update submission');
+    }
+  };
 
   return (
     <div className="space-y-12">
@@ -409,14 +466,57 @@ export default function AdminDashboard({
             <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest relative">
               <Sparkles size={16} /> Brain
             </TabsTrigger>
+            <TabsTrigger value="disputes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <AlertTriangle size={16} /> Disputes
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Activity size={16} /> Analytics
+            </TabsTrigger>
           </TabsList>
         </ScrollArea>
 
         <TabsContent value="submissions">
-           <div className="bg-white p-8 rounded-[2rem] border border-border">
-              <h2 className="text-2xl font-bold mb-6">Review Pipeline</h2>
-              <p className="text-muted-foreground italic">Pipeline management interface...</p>
+           <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
+              <h2 className="text-2xl font-bold">Review Pipeline</h2>
+              <div className="space-y-3">
+                {pagedSubmissions.map(submission => (
+                  <div key={submission.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-border p-4">
+                    <div>
+                      <p className="font-bold">{submission.drawingName}</p>
+                      <p className="text-xs text-muted-foreground">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{submission.status.replace('_', ' ')}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => setReportSubmission(submission)}>View Report</Button>
+                      <Button size="sm" onClick={() => updateSubmissionStatus(submission, 'approved')}>Approve</Button>
+                      <Button size="sm" variant="destructive" onClick={() => updateSubmissionStatus(submission, 'admin_rejected')}>Reject</Button>
+                    </div>
+                  </div>
+                ))}
+                {submissions.length === 0 && <p className="text-muted-foreground italic">No submissions awaiting review.</p>}
+              </div>
+              {submissions.length > pageSize && <PaginationControls page={submissionPage} totalPages={totalPages(submissions.length, pageSize)} onPageChange={setSubmissionPage} />}
            </div>
+        </TabsContent>
+
+        <TabsContent value="disputes">
+          <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
+            <h2 className="text-2xl font-bold">Dispute Mediation</h2>
+            <div className="space-y-3">
+              {pagedDisputes.map(dispute => <div key={dispute.id}><DisputeRow dispute={dispute} /></div>)}
+              {disputes.length === 0 && <p className="text-muted-foreground italic">No open disputes.</p>}
+            </div>
+            {disputes.length > pageSize && <PaginationControls page={disputePage} totalPages={totalPages(disputes.length, pageSize)} onPageChange={setDisputePage} />}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <StatCard title="Jobs" value={stats.totalJobs} />
+            <StatCard title="Approved Drawings" value={stats.approvedDrawings} />
+            <StatCard title="Active Agents" value={stats.activeAgents} />
+            <StatCard title="Errors" value={stats.errorCount} />
+          </div>
         </TabsContent>
 
         <TabsContent value="reviews">
@@ -462,6 +562,66 @@ export default function AdminDashboard({
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function DisputeRow({ dispute }: { dispute: Dispute }) {
+  const [adminNotes, setAdminNotes] = useState(dispute.adminNotes || '');
+  const [resolution, setResolution] = useState(dispute.resolution || '');
+
+  const updateDispute = async (status: Dispute['status']) => {
+    try {
+      await updateDoc(doc(db, 'disputes', dispute.id), {
+        status,
+        adminNotes,
+        resolution,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('Dispute updated');
+    } catch {
+      toast.error('Failed to update dispute');
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border p-4 space-y-4">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div>
+          <p className="font-bold">Job {dispute.jobId}</p>
+          <p className="text-sm text-muted-foreground">{dispute.reason}</p>
+          <p className="text-xs text-muted-foreground mt-1">Requested: {dispute.requestedResolution}</p>
+        </div>
+        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{dispute.status.replace('_', ' ')}</Badge>
+      </div>
+      <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} placeholder="Admin mediation notes" />
+      <Textarea value={resolution} onChange={e => setResolution(e.target.value)} placeholder="Resolution outcome" />
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => updateDispute('in_mediation')}>Start Mediation</Button>
+        <Button size="sm" onClick={() => updateDispute('resolved')}>Resolve</Button>
+        <Button size="sm" variant="destructive" onClick={() => updateDispute('rejected')}>Reject</Button>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value }: { title: string; value: number }) {
+  return (
+    <Card className="border-border shadow-sm bg-white rounded-3xl">
+      <CardHeader>
+        <CardDescription className="uppercase text-[10px] tracking-widest font-bold">{title}</CardDescription>
+        <CardTitle className="text-3xl font-heading">{value}</CardTitle>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+      <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
+      <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
     </div>
   );
 }

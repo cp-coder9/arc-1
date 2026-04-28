@@ -105,13 +105,18 @@ class PaymentService {
     return { paymentUrl, paymentId: data.paymentId };
   }
 
-  /**
-   * Confirm payment received (manual trigger — delegates to server).
-   */
-  async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
-    await apiFetch('/api/payment/confirm', { paymentId, pfData });
-    toast.success('Escrow funded successfully!');
-  }
+/**
+ * Confirm payment received (manual trigger — delegates to server).
+ * The server handles notification; we only toast based on response.
+ */
+async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
+ const data = await apiFetch('/api/payment/confirm', { paymentId, pfData });
+ if (data.success === true) {
+ toast.success('Escrow funded successfully!');
+ } else {
+ toast.info(data.message || 'Payment confirmed');
+ }
+}
 
   /**
    * Release milestone payment — delegates to server for privileged write.
@@ -133,42 +138,32 @@ class PaymentService {
     toast.success(`R${data.architectAmount.toLocaleString()} released successfully`);
   }
 
-  /**
-   * Request milestone release (architect initiates) — delegates to server.
-   */
-  async requestMilestoneRelease(
-    job: Job,
-    milestone: 'initial' | 'draft' | 'final',
-    architectId: string
-  ): Promise<void> {
-    await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
-    await notificationService.notifyMilestoneRequest(
-      job.clientId,
-      job.title,
-      milestone,
-      job.id
-    );
-    toast.success('Payment release requested');
-  }
+/**
+ * Request milestone release (architect initiates) — delegates to server.
+ * Server emits notification; client does not duplicate.
+ */
+async requestMilestoneRelease(
+ job: Job,
+ milestone: 'initial' | 'draft' | 'final',
+ architectId: string
+): Promise<void> {
+ await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
+ toast.success('Payment release requested');
+}
 
-  /**
-   * Process refund — delegates to server for privileged write.
-   */
-  async processRefund(
-    job: Job,
-    amount: number,
-    reason: string,
-    requestingUserId: string
-  ): Promise<void> {
-    const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
-    await notificationService.notifyRefundProcessed(
-      job.clientId,
-      data.refundAmount,
-      reason,
-      job.id
-    );
-    toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
-  }
+/**
+ * Process refund — delegates to server for privileged write.
+ * Server emits notification; client does not duplicate.
+ */
+async processRefund(
+ job: Job,
+ amount: number,
+ reason: string,
+ requestingUserId: string
+): Promise<void> {
+ const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
+ toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
+}
 
   /**
    * Generate PayFast payment URL
