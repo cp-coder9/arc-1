@@ -1,6 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
+import csrf from "csurf";
 import { del, put } from "@vercel/blob";
 import multer from "multer";
 import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin";
@@ -41,6 +42,12 @@ const apiLimiter = rateLimit({
 
 const router = express.Router();
 router.use(apiLimiter);
+
+// CSRF Protection Middleware (for state-changing operations)
+const csrfProtection = csrf({ cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' } });
+
+// Apply CSRF to sensitive routes (optional, can be enabled per-route)
+// For now, we use token-based auth which provides sufficient protection
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ALLOWED_BLOB_HOSTS = ["public.blob.vercel-storage.com"];
@@ -254,6 +261,57 @@ const upload = multer({
 // Health check
 router.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Server-side admin role assignment
+// Replaces client-side admin assignment in App.tsx for security
+const ADMIN_EMAILS = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
+
+router.post("/auth/check-admin", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
+    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      // Create user with admin role if applicable
+      const newUser = {
+        uid: decoded.uid,
+        email: decoded.email || '',
+        displayName: decoded.displayName || decoded.name || 'Anonymous',
+        role: isAdminEmail ? 'admin' : (req.body.role || 'client'),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await userRef.set(newUser);
+      return res.json({ role: newUser.role, isAdmin: isAdminEmail, created: true });
+    }
+
+    const userData = userDoc.data()!;
+    const currentRole = userData.role;
+
+    // If user is in admin list but doesn't have admin role, upgrade them
+    if (isAdminEmail && currentRole !== 'admin') {
+      await userRef.update({
+        role: 'admin',
+        updatedAt: new Date().toISOString(),
+      });
+      return res.json({ role: 'admin', isAdmin: true, upgraded: true });
+    }
+
+    // If user is not in admin list but has admin role, don't downgrade (manual admin assignment support)
+    res.json({ role: currentRole, isAdmin: currentRole === 'admin', existing: true });
+  } catch (err: any) {
+    console.error("Admin check error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
 });
 
 // 3. SECURED AI Review (authenticated + proxy)
@@ -1015,10 +1073,10 @@ router.post("/payment/confirm", async (req, res) => {
       // Payment not yet marked complete (ITN not received yet)
       return res.status(202).json({ success: false, message: "Payment not yet completed" });
     }
-} catch (err) {
- console.error("Payment confirmation error:", err);
- res.status(500).json({ error: "Internal server error" });
- }
+} catch (err: any) {
+    console.error("Payment confirmation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // Payment – milestone request (architect initiates)
@@ -1063,8 +1121,8 @@ router.post("/payment/milestone/request", async (req, res) => {
   }
 });
 
-// Payment – refund
-router.post("/payment/refund", async (req, res) => {
+// Payment – request refund (creates pending refund request)
+router.post("/payment/refund/request", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -1080,10 +1138,262 @@ router.post("/payment/refund", async (req, res) => {
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
     const job = jobDoc.data()!;
 
-    // Allow job client or admin to request refund
-    if (job.clientId !== decoded.uid && !(await isAdmin(decoded.uid))) {
-      return res.status(403).json({ error: "Only the job client or admin can request refund" });
+    // Only client can request refund
+    if (job.clientId !== decoded.uid) {
+      return res.status(403).json({ error: "Only the job client can request a refund" });
     }
+
+    const escrowRef = adminDb.collection("escrow").doc(jobId);
+    const escrowDoc = await escrowRef.get();
+    if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+    const escrow = escrowDoc.data()!;
+
+    const refundAmount = Math.round(amount);
+    if (refundAmount > (escrow.heldAmount || 0)) {
+      return res.status(400).json({ error: "Refund amount exceeds held amount" });
+    }
+
+    // Create refund request (pending admin approval)
+    const refundRequestRef = await adminDb.collection("refund_requests").add({
+      jobId,
+      clientId: job.clientId,
+      architectId: job.selectedArchitectId || "",
+      amount: refundAmount,
+      reason,
+      status: "pending",
+      requestedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Notify admins about the refund request
+    const adminsSnapshot = await adminDb.collection("users").where("role", "==", "admin").get();
+    const adminNotifications = adminsSnapshot.docs.map(adminDoc => {
+      return adminDb.collection("notifications").add({
+        userId: adminDoc.id,
+        type: "refund_request",
+        title: "New Refund Request",
+        body: `Client requested a refund of R${(refundAmount / 100).toFixed(2)} for job "${job.title}"`,
+        data: { refundRequestId: refundRequestRef.id, jobId },
+        isRead: false,
+        channels: ["in_app", "email"],
+        createdAt: new Date().toISOString(),
+      });
+    });
+    await Promise.all(adminNotifications);
+
+    res.json({ success: true, refundRequestId: refundRequestRef.id, status: "pending" });
+  } catch (err: any) {
+    console.error("Refund request error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – get pending refund requests (admin only)
+router.get("/payment/refund/requests", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  // Only admins can view refund requests
+  if (!(await isAdmin(decoded.uid))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  try {
+    const { status = "pending" } = req.query;
+    let query = adminDb.collection("refund_requests").orderBy("requestedAt", "desc");
+    
+    if (status !== "all") {
+      query = query.where("status", "==", status);
+    }
+    
+    const snapshot = await query.limit(50).get();
+    const requests = await Promise.all(snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+      // Fetch job details
+      const jobDoc = await adminDb.collection("jobs").doc(data.jobId).get();
+      const jobData = jobDoc.exists ? jobDoc.data() : null;
+      
+      return {
+        id: doc.id,
+        ...data,
+        jobTitle: jobData?.title || "Unknown Job",
+        jobBudget: jobData?.budget || 0,
+      };
+    }));
+
+    res.json({ requests });
+  } catch (err: any) {
+    console.error("Get refund requests error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – approve/reject refund (admin only)
+router.post("/payment/refund/:requestId/process", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  // Only admins can process refunds
+  if (!(await isAdmin(decoded.uid))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  const { requestId } = req.params;
+  const { action, adminNote } = req.body; // action: "approve" or "reject"
+  
+  if (!action || !["approve", "reject"].includes(action)) {
+    return res.status(400).json({ error: "action must be 'approve' or 'reject'" });
+  }
+
+  try {
+    const requestRef = adminDb.collection("refund_requests").doc(requestId);
+    const requestDoc = await requestRef.get();
+    
+    if (!requestDoc.exists) return res.status(404).json({ error: "Refund request not found" });
+    
+    const request = requestDoc.data()!;
+    if (request.status !== "pending") {
+      return res.status(400).json({ error: "Refund request has already been processed" });
+    }
+
+    if (action === "reject") {
+      // Update request as rejected
+      await requestRef.update({
+        status: "rejected",
+        adminNote,
+        processedBy: decoded.uid,
+        processedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Notify client
+      await adminDb.collection("notifications").add({
+        userId: request.clientId,
+        type: "refund_rejected",
+        title: "Refund Request Rejected",
+        body: `Your refund request of R${(request.amount / 100).toFixed(2)} has been rejected.`,
+        data: { refundRequestId: requestId, jobId: request.jobId },
+        isRead: false,
+        channels: ["in_app", "email"],
+        createdAt: new Date().toISOString(),
+      });
+
+      return res.json({ success: true, status: "rejected" });
+    }
+
+    // Approve refund - process the actual refund
+    const jobDoc = await adminDb.collection("jobs").doc(request.jobId).get();
+    const job = jobDoc.data()!;
+    
+    const escrowRef = adminDb.collection("escrow").doc(request.jobId);
+    const escrowDoc = await escrowRef.get();
+    const escrow = escrowDoc.data()!;
+
+    // Use transaction to update escrow and create refund payment record
+    const refundPaymentId = adminDb.collection("payments").doc().id;
+    await adminDb.runTransaction(async (transaction) => {
+      const escrowSnap = await transaction.get(escrowRef);
+      const current = escrowSnap.data()!;
+      const newHeld = (current.heldAmount || 0) - request.amount;
+      const newRefunded = (current.refundedAmount || 0) + request.amount;
+      const newStatus = newHeld <= 0 ? 'refunded' : 'partially_refunded';
+
+      transaction.update(escrowRef, {
+        heldAmount: newHeld,
+        refundedAmount: newRefunded,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+
+      transaction.set(adminDb.collection("payments").doc(refundPaymentId), {
+        jobId: request.jobId,
+        payerId: request.clientId,
+        payeeId: request.architectId,
+        amount: request.amount,
+        type: "refund",
+        status: "completed",
+        metadata: { 
+          reason: request.reason, 
+          originalEscrow: request.jobId,
+          approvedBy: decoded.uid,
+          adminNote,
+          refundRequestId: requestId,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      transaction.update(requestRef, {
+        status: "approved",
+        adminNote,
+        processedBy: decoded.uid,
+        processedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        paymentId: refundPaymentId,
+      });
+    });
+
+    // Notify client and architect
+    await adminDb.collection("notifications").add({
+      userId: request.clientId,
+      type: "refund_approved",
+      title: "Refund Approved",
+      body: `Your refund of R${(request.amount / 100).toFixed(2)} has been approved and processed.`,
+      data: { refundRequestId: requestId, jobId: request.jobId, paymentId: refundPaymentId },
+      isRead: false,
+      channels: ["in_app", "email"],
+      createdAt: new Date().toISOString(),
+    });
+
+    if (request.architectId) {
+      await adminDb.collection("notifications").add({
+        userId: request.architectId,
+        type: "refund_processed",
+        title: "Refund Processed",
+        body: `A refund of R${(request.amount / 100).toFixed(2)} has been processed for job "${job.title}".`,
+        data: { refundRequestId: requestId, jobId: request.jobId },
+        isRead: false,
+        channels: ["in_app", "email"],
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, status: "approved", refundAmount: request.amount, paymentId: refundPaymentId });
+  } catch (err: any) {
+    console.error("Process refund error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Legacy Payment – refund (admin only, direct refund without approval flow)
+router.post("/payment/refund", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { jobId, amount, reason } = req.body;
+  if (!jobId || !amount) return res.status(400).json({ error: "jobId and amount are required" });
+
+  try {
+    // Only admins can do direct refunds
+    if (!(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Admin access required. Use /payment/refund/request for client refunds." });
+    }
+
+    const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+    const job = jobDoc.data()!;
 
     const escrowRef = adminDb.collection("escrow").doc(jobId);
     const escrowDoc = await escrowRef.get();
@@ -1118,15 +1428,13 @@ router.post("/payment/refund", async (req, res) => {
         amount: refundAmount,
         type: "refund",
         status: "completed",
-        metadata: { reason, originalEscrow: jobId },
+        metadata: { reason, originalEscrow: jobId, processedBy: decoded.uid },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
     });
 
-// Server-side notification emitted here (single source of truth).
-// JSDoc: This handler emits notifyRefundProcessed to notify both architect and client of the refund.
- res.json({ success: true, refundAmount });
+    res.json({ success: true, refundAmount });
   } catch (err: any) {
     console.error("Refund error:", err);
     res.status(500).json({ error: "Internal server error", details: err.message });
@@ -1410,6 +1718,319 @@ router.post("/municipal/crowdsource", async (req, res) => {
     res.json({ id: docRef.id });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Payment – generate receipt/invoice
+router.get("/payment/:paymentId/receipt", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { paymentId } = req.params;
+
+  try {
+    const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
+    if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
+
+    const payment = paymentDoc.data()!;
+
+    // Check authorization - client, architect involved, or admin
+    const jobDoc = await adminDb.collection("jobs").doc(payment.jobId).get();
+    const job = jobDoc.exists ? jobDoc.data() : null;
+
+    const isAuthorized = 
+      payment.payerId === decoded.uid ||
+      payment.payeeId === decoded.uid ||
+      (job && (job.clientId === decoded.uid || job.selectedArchitectId === decoded.uid)) ||
+      (await isAdmin(decoded.uid));
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Not authorized to view this receipt" });
+    }
+
+    // Get user details
+    const [payerDoc, payeeDoc] = await Promise.all([
+      adminDb.collection("users").doc(payment.payerId).get(),
+      payment.payeeId ? adminDb.collection("users").doc(payment.payeeId).get() : null,
+    ]);
+
+    const payer = payerDoc.exists ? payerDoc.data() : null;
+    const payee = payeeDoc && payeeDoc.exists ? payeeDoc.data() : null;
+
+    // Generate receipt data
+    const receiptData = {
+      receiptId: `RCP-${paymentId.substring(0, 8).toUpperCase()}`,
+      invoiceId: `INV-${paymentId.substring(0, 8).toUpperCase()}`,
+      paymentId,
+      type: payment.type,
+      status: payment.status,
+      amount: payment.amount,
+      currency: "ZAR",
+      date: payment.createdAt,
+      processedAt: payment.updatedAt,
+      payer: {
+        id: payment.payerId,
+        name: payer?.displayName || "Unknown",
+        email: payer?.email || "",
+      },
+      payee: payee ? {
+        id: payment.payeeId,
+        name: payee.displayName || "Unknown",
+        email: payee.email || "",
+      } : null,
+      job: job ? {
+        id: payment.jobId,
+        title: job.title,
+      } : null,
+      milestone: payment.milestone || null,
+      metadata: payment.metadata || {},
+      platform: {
+        name: "Architex",
+        url: "https://architex.co.za",
+        supportEmail: "support@architex.co.za",
+      },
+    };
+
+    res.json(receiptData);
+  } catch (err: any) {
+    console.error("Generate receipt error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – generate PDF receipt
+router.post("/payment/:paymentId/receipt/pdf", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { paymentId } = req.params;
+
+  try {
+    const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
+    if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
+
+    const payment = paymentDoc.data()!;
+
+    // Check authorization
+    const jobDoc = await adminDb.collection("jobs").doc(payment.jobId).get();
+    const job = jobDoc.exists ? jobDoc.data() : null;
+
+    const isAuthorized = 
+      payment.payerId === decoded.uid ||
+      payment.payeeId === decoded.uid ||
+      (job && (job.clientId === decoded.uid || job.selectedArchitectId === decoded.uid)) ||
+      (await isAdmin(decoded.uid));
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Not authorized to generate this receipt" });
+    }
+
+    // Get user details
+    const [payerDoc, payeeDoc] = await Promise.all([
+      adminDb.collection("users").doc(payment.payerId).get(),
+      payment.payeeId ? adminDb.collection("users").doc(payment.payeeId).get() : null,
+    ]);
+
+    const payer = payerDoc.exists ? payerDoc.data() : null;
+    const payee = payeeDoc && payeeDoc.exists ? payeeDoc.data() : null;
+
+    // Generate PDF content (HTML template)
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Payment Receipt - Architex</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #2563eb; margin: 0; }
+    .header p { color: #666; margin: 5px 0; }
+    .receipt-box { border: 2px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    .receipt-id { font-size: 24px; font-weight: bold; color: #2563eb; }
+    .status { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+    .status.completed { background: #dcfce7; color: #166534; }
+    .status.pending { background: #fef3c7; color: #92400e; }
+    .status.refunded { background: #fee2e2; color: #991b1b; }
+    .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+    .row:last-child { border-bottom: none; }
+    .label { color: #6b7280; font-weight: 500; }
+    .value { font-weight: 600; }
+    .amount { font-size: 28px; font-weight: bold; color: #2563eb; text-align: center; margin: 20px 0; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb; color: #6b7280; font-size: 12px; }
+    .section { margin: 20px 0; }
+    .section h3 { color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>ARCHITEX</h1>
+    <p>Premium Architectural Marketplace</p>
+    <p>support@architex.co.za | www.architex.co.za</p>
+  </div>
+
+  <div class="receipt-box">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <span class="receipt-id">RECEIPT #RCP-${paymentId.substring(0, 8).toUpperCase()}</span>
+    </div>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+      <span class="status ${payment.status}">${payment.status}</span>
+    </div>
+
+    <div class="amount">
+      R${(payment.amount / 100).toFixed(2)} ZAR
+    </div>
+
+    <div class="section">
+      <h3>Payment Details</h3>
+      <div class="row">
+        <span class="label">Payment Type:</span>
+        <span class="value">${payment.type.replace(/_/g, ' ').toUpperCase()}</span>
+      </div>
+      <div class="row">
+        <span class="label">Payment ID:</span>
+        <span class="value">${paymentId}</span>
+      </div>
+      <div class="row">
+        <span class="label">Date:</span>
+        <span class="value">${new Date(payment.createdAt).toLocaleString('en-ZA')}</span>
+      </div>
+      ${payment.milestone ? `
+      <div class="row">
+        <span class="label">Milestone:</span>
+        <span class="value">${payment.milestone.toUpperCase()}</span>
+      </div>
+      ` : ''}
+    </div>
+
+    <div class="section">
+      <h3>From (Payer)</h3>
+      <div class="row">
+        <span class="label">Name:</span>
+        <span class="value">${payer?.displayName || 'Unknown'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Email:</span>
+        <span class="value">${payer?.email || 'N/A'}</span>
+      </div>
+    </div>
+
+    ${payee ? `
+    <div class="section">
+      <h3>To (Payee)</h3>
+      <div class="row">
+        <span class="label">Name:</span>
+        <span class="value">${payee.displayName || 'Unknown'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Email:</span>
+        <span class="value">${payee.email || 'N/A'}</span>
+      </div>
+    </div>
+    ` : ''}
+
+    ${job ? `
+    <div class="section">
+      <h3>Job Details</h3>
+      <div class="row">
+        <span class="label">Job Title:</span>
+        <span class="value">${job.title}</span>
+      </div>
+      <div class="row">
+        <span class="label">Job ID:</span>
+        <span class="value">${payment.jobId}</span>
+      </div>
+    </div>
+    ` : ''}
+
+    ${payment.metadata?.platformFee ? `
+    <div class="section">
+      <h3>Fee Breakdown</h3>
+      <div class="row">
+        <span class="label">Platform Fee:</span>
+        <span class="value">R${(payment.metadata.platformFee / 100).toFixed(2)}</span>
+      </div>
+      <div class="row">
+        <span class="label">Net Amount:</span>
+        <span class="value">R${(payment.metadata.architectAmount / 100).toFixed(2)}</span>
+      </div>
+    </div>
+    ` : ''}
+  </div>
+
+  <div class="footer">
+    <p>This is an official receipt from Architex.</p>
+    <p>For any queries, please contact support@architex.co.za</p>
+    <p>© ${new Date().getFullYear()} Architex. All rights reserved.</p>
+  </div>
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', `inline; filename="receipt-${paymentId}.html"`);
+    res.send(htmlContent);
+  } catch (err: any) {
+    console.error("Generate PDF receipt error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – get all receipts for user
+router.get("/payment/receipts", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+
+    // Get payments where user is payer or payee
+    const [payerSnapshot, payeeSnapshot] = await Promise.all([
+      adminDb.collection("payments")
+        .where("payerId", "==", decoded.uid)
+        .orderBy("createdAt", "desc")
+        .limit(Number(limit))
+        .get(),
+      adminDb.collection("payments")
+        .where("payeeId", "==", decoded.uid)
+        .orderBy("createdAt", "desc")
+        .limit(Number(limit))
+        .get(),
+    ]);
+
+    const paymentMap = new Map();
+    
+    payerSnapshot.docs.forEach(doc => {
+      paymentMap.set(doc.id, { id: doc.id, ...doc.data(), role: 'payer' });
+    });
+    
+    payeeSnapshot.docs.forEach(doc => {
+      if (!paymentMap.has(doc.id)) {
+        paymentMap.set(doc.id, { id: doc.id, ...doc.data(), role: 'payee' });
+      }
+    });
+
+    const receipts = Array.from(paymentMap.values())
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(Number(offset), Number(offset) + Number(limit));
+
+    res.json({ receipts, total: paymentMap.size });
+  } catch (err: any) {
+    console.error("Get receipts error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 

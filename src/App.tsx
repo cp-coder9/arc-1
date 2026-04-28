@@ -267,10 +267,10 @@ export default function App() {
               {authMode === 'selection' ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
-                    <RoleSelectButton role="client" label="Client" sub="I want to post jobs" icon={<Users className="w-8 h-8" />} active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
-                    <RoleSelectButton role="architect" label="Architect" sub="I want to find work" icon={<Briefcase className="w-8 h-8" />} active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
-                    <RoleSelectButton role="admin" label="Admin" sub="Platform Mgmt" icon={<ShieldCheck className="w-8 h-8" />} active={roleSelection === 'admin'} onClick={() => setRoleSelection('admin')} />
-                    <RoleSelectButton role="freelancer" label="Freelancer" sub="Specialist" icon={<Sparkles className="w-8 h-8" />} active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
+                    <RoleSelectButton data-testid="role-select-client" role="client" label="Client" sub="I want to post jobs" icon={<Users className="w-8 h-8" />} active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
+                    <RoleSelectButton data-testid="role-select-architect" role="architect" label="Architect" sub="I want to find work" icon={<Briefcase className="w-8 h-8" />} active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
+                    <RoleSelectButton data-testid="role-select-admin" role="admin" label="Admin" sub="Platform Mgmt" icon={<ShieldCheck className="w-8 h-8" />} active={roleSelection === 'admin'} onClick={() => setRoleSelection('admin')} />
+                    <RoleSelectButton data-testid="role-select-freelancer" role="freelancer" label="Freelancer" sub="Specialist" icon={<Sparkles className="w-8 h-8" />} active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
                   </div>
                   <div className="space-y-3">
                     <Button onClick={handleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg" disabled={!roleSelection || isLoggingIn}>
@@ -461,9 +461,9 @@ export default function App() {
   );
 }
 
-function RoleSelectButton({ role, label, sub, icon, active, onClick }: any) {
+function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }: any) {
   return (
-    <Button variant={active ? 'default' : 'outline'} className={`h-32 flex flex-col gap-3 transition-all ${active ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg' : 'hover:border-primary/50'}`} onClick={onClick}>
+    <Button variant={active ? 'default' : 'outline'} className={`h-32 flex flex-col gap-3 transition-all ${active ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg' : 'hover:border-primary/50'}`} onClick={onClick} {...props}>
       {icon}
       <div className="text-center">
         <p className="font-bold">{label}</p>

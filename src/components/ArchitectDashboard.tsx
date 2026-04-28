@@ -207,6 +207,19 @@ export default function ArchitectDashboard({
 }
 
 function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
+  const [client, setClient] = useState<UserProfile | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  useEffect(() => {
+    if (job.clientId) {
+      const fetchClient = async () => {
+        const clientDoc = await getDoc(doc(db, 'users', job.clientId));
+        if (clientDoc.exists()) setClient({ uid: clientDoc.id, ...clientDoc.data() } as UserProfile);
+      };
+      fetchClient();
+    }
+  }, [job.clientId]);
+
   return (
     <Card className="border-border shadow-sm bg-white overflow-hidden rounded-3xl hover:border-primary/30 transition-all group">
       <div className="p-8 space-y-6">
@@ -217,8 +230,25 @@ function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
            <Badge variant="outline" className="rounded-full px-3 uppercase text-[10px] font-bold tracking-widest">In Progress</Badge>
         </div>
         <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
+        {client && (
+          <div className="flex items-center justify-between pt-4 border-t border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{client.displayName[0]}</div>
+              <div>
+                <p className="text-sm font-bold text-foreground">{client.displayName}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Client</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="rounded-full gap-2" onClick={() => setIsChatOpen(true)}>
+              <MessageCircle size={16} /> Chat
+            </Button>
+          </div>
+        )}
         <DelegatedTasksList job={job} user={user} />
       </div>
+      {isChatOpen && client && (
+        <Chat job={job} currentUser={user} otherUser={client} isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      )}
     </Card>
   );
 }
