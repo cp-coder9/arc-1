@@ -137,6 +137,48 @@
   .animate-logo-flight {
     animation: logo-flight 8s cubic-bezier(0.72, 0, 0.18, 1) 0.8s both;
   }
+
+  .animated-bird {
+    width: 13rem;
+    height: 13rem;
+    animation: bird-flight 9.5s cubic-bezier(0.72, 0, 0.18, 1) 0.6s both;
+    filter: drop-shadow(0 26px 28px rgb(15 23 42 / 0.2));
+    transform-origin: 52% 55%;
+  }
+
+  .animated-bird__body,
+  .animated-bird__wing {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform-origin: 52% 54%;
+  }
+
+  .animated-bird__body {
+    animation: bird-body 0.72s ease-in-out infinite;
+  }
+
+  .animated-bird__wing {
+    opacity: 0.88;
+    mix-blend-mode: multiply;
+    animation-duration: 0.26s;
+    animation-timing-function: cubic-bezier(0.35, 0, 0.65, 1);
+    animation-iteration-count: infinite;
+  }
+
+  .animated-bird__wing--left {
+    clip-path: polygon(0 0, 57% 0, 51% 100%, 0 100%);
+    transform-origin: 55% 53%;
+    animation-name: bird-left-wing;
+  }
+
+  .animated-bird__wing--right {
+    clip-path: polygon(43% 0, 100% 0, 100% 100%, 49% 100%);
+    transform-origin: 48% 53%;
+    animation-name: bird-right-wing;
+  }
 }
 
 @keyframes spin {
@@ -175,8 +217,76 @@
   }
 }
 
+@keyframes bird-flight {
+  0% {
+    opacity: 0;
+    transform: translate3d(-70px, -130px, 0) rotate(-22deg) scale(0.58);
+  }
+  8% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(-4deg) scale(0.92);
+  }
+  18% {
+    transform: translate3d(232px, 112px, 0) rotate(14deg) scale(1.18);
+  }
+  25% {
+    transform: translate3d(302px, 106px, 0) rotate(-7deg) scale(0.72);
+  }
+  31% {
+    transform: translate3d(302px, 106px, 0) rotate(-3deg) scale(0.72);
+  }
+  43% {
+    transform: translate3d(456px, 234px, 0) rotate(18deg) scale(0.96);
+  }
+  50% {
+    transform: translate3d(514px, 224px, 0) rotate(-6deg) scale(0.68);
+  }
+  56% {
+    transform: translate3d(514px, 224px, 0) rotate(-2deg) scale(0.68);
+  }
+  68% {
+    transform: translate3d(358px, 354px, 0) rotate(16deg) scale(1.08);
+  }
+  76% {
+    transform: translate3d(646px, 342px, 0) rotate(-9deg) scale(0.62);
+  }
+  82% {
+    transform: translate3d(646px, 342px, 0) rotate(-4deg) scale(0.62);
+  }
+  93% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.92);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-70px, -130px, 0) rotate(-22deg) scale(0.58);
+  }
+}
+
+@keyframes bird-body {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  50% { transform: translateY(-7px) rotate(2deg) scale(1.015); }
+}
+
+@keyframes bird-left-wing {
+  0%, 100% { transform: rotate(-16deg) translateY(2px) scaleX(1.04); }
+  50% { transform: rotate(22deg) translateY(-8px) scaleX(0.94); }
+}
+
+@keyframes bird-right-wing {
+  0%, 100% { transform: rotate(16deg) translateY(2px) scaleX(1.04); }
+  50% { transform: rotate(-22deg) translateY(-8px) scaleX(0.94); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-logo-flight {
+    animation: none;
+    opacity: 0;
+  }
+
+  .animated-bird,
+  .animated-bird__body,
+  .animated-bird__wing {
     animation: none;
     opacity: 0;
   }

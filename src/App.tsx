@@ -508,7 +508,11 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
-          <img src="/logo.png" alt="" aria-hidden="true" className="pointer-events-none hidden lg:block absolute left-0 top-8 w-44 h-44 object-contain z-30 animate-logo-flight drop-shadow-2xl" />
+          <div aria-hidden="true" className="animated-bird pointer-events-none hidden lg:block absolute left-0 top-8 z-30">
+            <img src="/logo.png" alt="" className="animated-bird__body" />
+            <img src="/logo.png" alt="" className="animated-bird__wing animated-bird__wing--left" />
+            <img src="/logo.png" alt="" className="animated-bird__wing animated-bird__wing--right" />
+          </div>
           <div className="pb-16 relative z-20">
             <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
             <div className="space-y-6 mb-10">
@@ -536,10 +540,10 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             </div>
           </div>
           <div className="relative min-h-[560px] hidden lg:block">
-            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-border bg-secondary/20 p-8 flex items-center justify-center">
-              <Logo iconClassName="w-64 h-64 object-contain text-primary/40" />
+            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-border bg-white/70 p-8 flex items-center justify-center">
+              <Logo iconClassName="w-[28rem] h-[28rem] object-contain opacity-95" />
             </div>
-            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/50 border border-primary/15 backdrop-blur-sm rounded-[2rem] overflow-hidden">
+            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/30 border border-primary/15 rounded-[2rem] overflow-hidden">
               <svg viewBox="0 0 520 400" className="absolute inset-0 w-full h-full text-primary/40" fill="none" stroke="currentColor" strokeWidth="1.4">
                 <path d="M80 330V155l115-60 170 85v150M195 95v235M365 180v150M80 155l285 25M80 205l285 25M80 255l285 25M115 315h285M115 285h285M115 255h285M115 225h285" />
                 <path d="M195 95l170 85 75-45-170-85-75 45ZM365 180l75-45v145l-75 50" />
