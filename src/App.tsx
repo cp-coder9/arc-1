@@ -330,120 +330,121 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#FDFDFD] flex flex-col md:flex-row relative overflow-hidden">
       <AnimatedFloorPlan />
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col p-6">
-          <div className="flex items-center justify-between mb-10">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-full flex flex-col p-6 overflow-y-auto">
+          <div className="flex items-center justify-between mb-10 shrink-0">
             <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}><X size={20} /></Button>
           </div>
-        </div>
 
-        <nav className="flex-1 px-6 space-y-2">
-          <NavItem 
-            icon={<LayoutDashboard size={18} />} 
-            label="Overview" 
-            active={activeTab === 'overview'} 
-            onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }} 
-          />
-          {user!.role === 'client' && (
+          <nav className="flex-1 space-y-2">
             <NavItem 
-              icon={<Plus size={18} />} 
-              label="Post a Job" 
-              active={activeTab === 'post-job'} 
-              onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }} 
+              icon={<LayoutDashboard size={18} />}
+              label="Overview"
+              active={activeTab === 'overview'}
+              onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
             />
-          )}
-          {user!.role === 'architect' && (
-            <NavItem 
-              icon={<Search size={18} />} 
-              label="Marketplace" 
-              active={activeTab === 'marketplace'} 
-              onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }} 
-            />
-          )}
-          {user!.role === 'architect' && (
-            <NavItem 
-              icon={<Send size={18} />} 
-              label="My Applications" 
-              active={activeTab === 'applications'} 
-              onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }} 
-            />
-          )}
-          {user!.role === 'architect' && (
-            <NavItem
-              icon={<Users size={18} />}
-              label="Team & Freelancers"
-              active={activeTab === 'team'}
-              onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
-            />
-          )}
-          <NavItem 
-            icon={<FileText size={18} />} 
-            label="Active Projects" 
-            active={activeTab === 'projects'} 
-            onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }} 
-          />
-          {user!.role === 'admin' && (
-            <>
+            {user!.role === 'client' && (
               <NavItem 
-                icon={<ShieldCheck size={18} />} 
-                label="Compliance Hub" 
-                active={activeTab === 'compliance'} 
-                onClick={() => { setActiveTab('compliance'); setIsSidebarOpen(false); }} 
+                icon={<Plus size={18} />}
+                label="Post a Job"
+                active={activeTab === 'post-job'}
+                onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }}
               />
+            )}
+            {user!.role === 'architect' && (
               <NavItem 
-                icon={<Users size={18} />} 
-                label="User Management" 
-                active={activeTab === 'users'} 
-                onClick={() => { setActiveTab('users'); setIsSidebarOpen(false); }} 
+                icon={<Search size={18} />}
+                label="Marketplace"
+                active={activeTab === 'marketplace'}
+                onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
               />
+            )}
+            {user!.role === 'architect' && (
               <NavItem 
-                icon={<Settings2 size={18} />} 
-                label="LLM Settings" 
-                active={activeTab === 'settings'} 
-                onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} 
+                icon={<Send size={18} />}
+                label="My Applications"
+                active={activeTab === 'applications'}
+                onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }}
               />
-              <NavItem 
-                icon={<Sparkles size={18} />} 
-                label="Knowledge Base" 
-                active={activeTab === 'knowledge'} 
-                onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }} 
+            )}
+            {user!.role === 'architect' && (
+              <NavItem
+                icon={<Users size={18} />}
+                label="Team & Freelancers"
+                active={activeTab === 'team'}
+                onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
               />
-            </>
-          )}
-          <NavItem 
-            icon={<History size={18} />} 
-            label="Audit Logs" 
-            active={activeTab === 'audit'} 
-            onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }} 
-          />
-          <div className="pt-4 mt-4 border-t border-border">
+            )}
             <NavItem 
-              icon={<CreditCard size={18} />} 
-              label="Invoices" 
-              active={activeTab === 'invoices'} 
-              onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }} 
+              icon={<FileText size={18} />}
+              label="Active Projects"
+              active={activeTab === 'projects'}
+              onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }}
             />
+            {user!.role === 'admin' && (
+              <>
+                <NavItem
+                  icon={<ShieldCheck size={18} />}
+                  label="Compliance Hub"
+                  active={activeTab === 'compliance'}
+                  onClick={() => { setActiveTab('compliance'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Users size={18} />}
+                  label="User Management"
+                  active={activeTab === 'users'}
+                  onClick={() => { setActiveTab('users'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Settings2 size={18} />}
+                  label="LLM Settings"
+                  active={activeTab === 'settings'}
+                  onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Sparkles size={18} />}
+                  label="Knowledge Base"
+                  active={activeTab === 'knowledge'}
+                  onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }}
+                />
+              </>
+            )}
             <NavItem 
-              icon={<HardDrive size={18} />} 
-              label="Files" 
-              active={activeTab === 'files'} 
-              onClick={() => { setActiveTab('files'); setIsSidebarOpen(false); }} 
+              icon={<History size={18} />}
+              label="Audit Logs"
+              active={activeTab === 'audit'}
+              onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }}
             />
-            <NavItem 
-              icon={<UserCircle size={18} />} 
-              label="My Settings" 
-              active={activeTab === 'profile-settings'} 
-              onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }} 
-            />
+            <div className="pt-4 mt-4 border-t border-border">
+              <NavItem
+                icon={<CreditCard size={18} />}
+                label="Invoices"
+                active={activeTab === 'invoices'}
+                onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }}
+              />
+              <NavItem
+                icon={<HardDrive size={18} />}
+                label="Files"
+                active={activeTab === 'files'}
+                onClick={() => { setActiveTab('files'); setIsSidebarOpen(false); }}
+              />
+              <NavItem
+                icon={<UserCircle size={18} />}
+                label="My Settings"
+                active={activeTab === 'profile-settings'}
+                onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }}
+              />
             </div>
           </nav>
-          <div className="pt-6 border-t border-border">
+
+          <div className="pt-6 mt-auto border-t border-border shrink-0">
             <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl h-12" onClick={handleLogout}>
               <LogOut size={20} /> <span className="font-bold">Logout</span>
             </Button>
           </div>
-        </aside>
+        </div>
+      </aside>
       <main className="flex-1 flex flex-col min-w-0 relative z-10">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>

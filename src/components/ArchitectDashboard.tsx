@@ -211,7 +211,7 @@ export default function ArchitectDashboard({
           </div>
         </TabsContent>
 
-        <TabsContent value="active" className="mt-8">
+        <TabsContent value="projects" className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {myJobs.map(job => (
               <div key={job.id}><ActiveProjectCard job={job} user={user} /></div>
