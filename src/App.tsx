@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
+import { auth, db, trackEvent } from './lib/firebase';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
@@ -57,17 +57,17 @@ import {
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
 
-// Sub-components
-import ClientDashboard from './components/ClientDashboard';
-import ArchitectDashboard from './components/ArchitectDashboard';
-import AdminDashboard from './components/AdminDashboard';
-import FreelancerDashboard from './components/FreelancerDashboard';
-import BEPDashboard from './components/BEPDashboard';
-import UserSettings from './components/UserSettings';
-import InvoiceManagement from './components/InvoiceManagement';
-import FileManager from './components/FileManager';
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
-import OnboardingFlow from "./components/OnboardingFlow";
+
+const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
+const ArchitectDashboard = lazy(() => import('./components/ArchitectDashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const FreelancerDashboard = lazy(() => import('./components/FreelancerDashboard'));
+const BEPDashboard = lazy(() => import('./components/BEPDashboard'));
+const UserSettings = lazy(() => import('./components/UserSettings'));
+const InvoiceManagement = lazy(() => import('./components/InvoiceManagement'));
+const FileManager = lazy(() => import('./components/FileManager'));
+const OnboardingFlow = lazy(() => import('./components/OnboardingFlow'));
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -87,6 +87,14 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [professionalLabel, setProfessionalLabel] = useState('');
+
+  useEffect(() => {
+    if (!user) return;
+    void trackEvent('dashboard_tab_view', {
+      tab: activeTab,
+      role: user.role,
+    });
+  }, [activeTab, user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -239,16 +247,18 @@ export default function App() {
 
   if (!user && showOnboarding) {
     return (
-      <OnboardingFlow
-        onComplete={(data) => {
-          setRoleSelection(data.role);
-          setFormData(data);
-          setShowOnboarding(false);
-          setShowLogin(true);
-          setAuthMode("email-signup");
-        }}
-        onCancel={() => setShowOnboarding(false)}
-      />
+      <Suspense fallback={<LoadingScreen />}>
+        <OnboardingFlow
+          onComplete={(data) => {
+            setRoleSelection(data.role);
+            setFormData(data);
+            setShowOnboarding(false);
+            setShowLogin(true);
+            setAuthMode("email-signup");
+          }}
+          onCancel={() => setShowOnboarding(false)}
+        />
+      </Suspense>
     );
   }
 
@@ -336,9 +346,8 @@ export default function App() {
             <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}><X size={20} /></Button>
           </div>
-        </div>
 
-        <nav className="flex-1 px-6 space-y-2">
+        <nav className="flex-1 space-y-2">
           <NavItem 
             icon={<LayoutDashboard size={18} />} 
             label="Overview" 
@@ -443,6 +452,7 @@ export default function App() {
               <LogOut size={20} /> <span className="font-bold">Logout</span>
             </Button>
           </div>
+        </div>
         </aside>
       <main className="flex-1 flex flex-col min-w-0 relative z-10">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
@@ -457,22 +467,47 @@ export default function App() {
         </header>
         <ScrollArea className="flex-1">
           <div className="p-8 max-w-7xl mx-auto w-full">
-            {activeTab === 'invoices' && <InvoiceManagement user={user} />}
-            {activeTab === 'files' && <FileManager user={user} />}
-            {activeTab === 'profile-settings' && <UserSettings user={user} />}
-            {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings') && (
-              <>
-                {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
-                {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
-                {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
-                {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
-                {user.role === 'bep' && <BEPDashboard user={user} />}
-              </>
-            )}
+            <Suspense fallback={<DashboardFallback />}>
+              {activeTab === 'invoices' && <InvoiceManagement user={user} />}
+              {activeTab === 'files' && <FileManager user={user} />}
+              {activeTab === 'profile-settings' && <UserSettings user={user} />}
+              {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings') && (
+                <>
+                  {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
+                  {user.role === 'bep' && <BEPDashboard user={user} />}
+                </>
+              )}
+            </Suspense>
           </div>
         </ScrollArea>
       </main>
       <Toaster />
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="rounded-full h-12 w-12 border-b-2 border-primary animate-spin" />
+        <p className="text-sm text-muted-foreground animate-pulse font-medium">Loading workspace...</p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardFallback() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      <div className="h-40 rounded-[2.5rem] bg-secondary" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 h-96 rounded-[2rem] bg-secondary/70" />
+        <div className="h-96 rounded-[2rem] bg-secondary/50" />
+      </div>
     </div>
   );
 }

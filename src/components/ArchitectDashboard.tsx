@@ -38,6 +38,7 @@ export default function ArchitectDashboard({
   activeTab?: string, 
   onTabChange?: (tab: string) => void 
 }) {
+  const currentTab = activeTab === 'projects' ? 'active' : activeTab || 'overview';
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [myApplications, setMyApplications] = useState<Application[]>([]);
@@ -122,7 +123,7 @@ export default function ArchitectDashboard({
         </div>
       </div>
 
-      <Tabs value={activeTab || 'overview'} onValueChange={onTabChange} className="w-full">
+      <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">
         <ScrollArea className="w-full whitespace-nowrap mb-8">
           <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">

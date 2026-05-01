@@ -8,7 +8,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { User, Mail, Shield, AlertCircle, Loader2, Save, Key, UserCircle, Bell } from 'lucide-react';
+import { User, Mail, Shield, AlertCircle, Loader2, Save, Key, UserCircle, Bell, Moon } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 
 interface UserSettingsProps {
@@ -29,6 +29,13 @@ export default function UserSettings({ user }: UserSettingsProps) {
     email: user.notificationPreferences?.email ?? true,
     push: user.notificationPreferences?.push ?? true,
   });
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
+
+  const handleDarkModeChange = (enabled: boolean) => {
+    document.documentElement.classList.toggle('dark', enabled);
+    localStorage.setItem('architex-theme', enabled ? 'dark' : 'light');
+    setIsDarkMode(enabled);
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,6 +283,18 @@ export default function UserSettings({ user }: UserSettingsProps) {
                   description="Allow browser or device push notifications after token registration."
                   checked={notificationPreferences.push}
                   onChange={(checked) => handleNotificationPreferenceChange('push', checked)}
+                />
+              </div>
+
+              <div className="pt-8 border-t border-border space-y-4">
+                <h3 className="text-2xl font-heading font-bold flex items-center gap-3">
+                  <Moon className="text-primary w-6 h-6" /> Appearance
+                </h3>
+                <NotificationToggle
+                  label="Dark mode"
+                  description="Use the darker high-contrast workspace theme on this device."
+                  checked={isDarkMode}
+                  onChange={handleDarkModeChange}
                 />
               </div>
             </div>
