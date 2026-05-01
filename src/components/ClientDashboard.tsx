@@ -192,7 +192,7 @@ export default function ClientDashboard({
           <h2 className="text-2xl font-heading font-bold">Project Portfolio</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {myJobs.map(job => (
-              <ClientJobCard job={job} user={user} />
+              <div key={job.id}><ClientJobCard job={job} user={user} /></div>
             ))}
             {myJobs.length === 0 && !loading && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">

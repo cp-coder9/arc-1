@@ -38,7 +38,7 @@ export default function ArchitectDashboard({
   activeTab?: string, 
   onTabChange?: (tab: string) => void 
 }) {
-  const currentTab = activeTab === 'projects' ? 'active' : activeTab || 'overview';
+  const currentTab = activeTab || 'overview';
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [myApplications, setMyApplications] = useState<Application[]>([]);

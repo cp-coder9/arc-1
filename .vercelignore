@@ -1,6 +1,9 @@
 node_modules
 .git
 .bun-cache
+.tmp
+tmp.*
+*.tgz
 dist
 .firebase
 *.log
