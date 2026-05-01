@@ -59,6 +59,12 @@ export default function ClientDashboard({
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'post-job') {
+      setIsPosting(true);
+    }
+  }, [activeTab]);
   const [newJob, setNewJob] = useState<Partial<Job>>({
     title: '',
     description: '',
@@ -107,6 +113,9 @@ export default function ClientDashboard({
     }
   };
 
+  const showOverview = !activeTab || activeTab === 'overview' || activeTab === 'post-job';
+  const showProjects = activeTab === 'projects';
+
   return (
     <div className="space-y-12">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
@@ -134,47 +143,65 @@ export default function ClientDashboard({
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-           <h2 className="text-2xl font-heading font-bold">Your Active Jobs</h2>
-           <div className="grid grid-cols-1 gap-6">
-              {pagedJobs.map(job => (
-                <div key={job.id}><ClientJobCard job={job} user={user} /></div>
-              ))}
-              {myJobs.length > pageSize && (
-                <PaginationControls page={jobPage} totalPages={jobPages} onPageChange={setJobPage} />
-              )}
-              {myJobs.length === 0 && !loading && (
-                <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
-                  <p className="text-muted-foreground italic">You haven't posted any jobs yet.</p>
-                </div>
-              )}
-           </div>
-        </div>
-        <div className="space-y-8">
-           <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
-              <CardHeader className="bg-primary/5 p-6 border-b border-border">
-                <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Star size={16} className="text-yellow-500" /> Professional Feedback
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                {reviews.map(review => (
-                  <div key={review.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
-                    <div className="flex justify-between items-center mb-1">
-                       <div className="flex text-yellow-400">
-                         {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />)}
-                       </div>
-                       <span className="text-[10px] text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-xs italic text-foreground leading-relaxed">"{review.comment}"</p>
-                  </div>
+      {showOverview && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <h2 className="text-2xl font-heading font-bold">Your Active Jobs</h2>
+            <div className="grid grid-cols-1 gap-6">
+                {pagedJobs.map(job => (
+                  <div key={job.id}><ClientJobCard job={job} user={user} /></div>
                 ))}
-                {reviews.length === 0 && <p className="text-xs text-center text-muted-foreground py-10 italic">No reviews yet.</p>}
-              </CardContent>
-           </Card>
+                {myJobs.length > pageSize && (
+                  <PaginationControls page={jobPage} totalPages={jobPages} onPageChange={setJobPage} />
+                )}
+                {myJobs.length === 0 && !loading && (
+                  <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                    <p className="text-muted-foreground italic">You haven't posted any jobs yet.</p>
+                  </div>
+                )}
+            </div>
+          </div>
+          <div className="space-y-8">
+            <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
+                <CardHeader className="bg-primary/5 p-6 border-b border-border">
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                    <Star size={16} className="text-yellow-500" /> Professional Feedback
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  {reviews.map(review => (
+                    <div key={review.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex text-yellow-400">
+                          {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />)}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs italic text-foreground leading-relaxed">"{review.comment}"</p>
+                    </div>
+                  ))}
+                  {reviews.length === 0 && <p className="text-xs text-center text-muted-foreground py-10 italic">No reviews yet.</p>}
+                </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
+
+      {showProjects && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-heading font-bold">Project Portfolio</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {myJobs.map(job => (
+              <ClientJobCard job={job} user={user} />
+            ))}
+            {myJobs.length === 0 && !loading && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                <p className="text-muted-foreground italic">No projects found.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

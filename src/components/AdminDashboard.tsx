@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2 } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -407,12 +407,16 @@ export default function AdminDashboard({
     const unsubDisputes = onSnapshot(query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
       setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
     });
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)), (snapshot) => {
+      setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+    });
     return () => {
       unsubSubmissions();
       unsubAgents();
       unsubJobs();
       unsubLogs();
       unsubDisputes();
+      unsubUsers();
     };
   }, []);
 
@@ -451,7 +455,18 @@ export default function AdminDashboard({
         </div>
       </div>
 
-      <Tabs value={activeTab || 'submissions'} onValueChange={onTabChange} className="w-full">
+      <Tabs value={internalTab} onValueChange={(val) => {
+        const reverseMapping: Record<string, string> = {
+          agents: 'compliance',
+          logs: 'audit',
+          users: 'users',
+          settings: 'settings',
+          knowledge: 'knowledge',
+          jobs: 'projects',
+          submissions: 'overview'
+        };
+        onTabChange?.(reverseMapping[val] || val);
+      }} className="w-full">
         <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
           <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
             <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
@@ -459,6 +474,12 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Cpu size={16} /> Agents
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Users size={16} /> Users
+            </TabsTrigger>
+            <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Briefcase size={16} /> Jobs
             </TabsTrigger>
             <TabsTrigger value="reviews" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Star size={16} /> Moderation
@@ -468,6 +489,15 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="disputes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <AlertTriangle size={16} /> Disputes
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <History size={16} /> Audit Logs
+            </TabsTrigger>
+            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Building2 size={16} /> Municipal
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Settings2 size={16} /> LLM Settings
             </TabsTrigger>
             <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Activity size={16} /> Analytics
@@ -519,10 +549,184 @@ export default function AdminDashboard({
           </div>
         </TabsContent>
 
+        <TabsContent value="logs">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
+            <h2 className="text-2xl font-bold mb-8">System Activity Logs</h2>
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Timestamp</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map(log => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <Badge variant={log.level === 'error' || log.level === 'critical' ? 'destructive' : 'outline'} className="uppercase text-[10px]">
+                          {log.level}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{log.source}</TableCell>
+                      <TableCell className="text-xs">{log.message}</TableCell>
+                      <TableCell className="text-muted-foreground text-[10px]">{safeFormat(log.timestamp, 'MMM d, HH:mm:ss')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="jobs">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
+            <h2 className="text-2xl font-bold mb-8">Platform Jobs</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {allJobs.map(job => (
+                <Card key={job.id} className="border-border shadow-sm rounded-2xl p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <Badge className="bg-primary/5 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
+                    <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status}</Badge>
+                  </div>
+                  <h3 className="font-bold mb-2">{job.title}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
+                    <span>Budget: R {job.budget.toLocaleString()}</span>
+                    <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <div className="bg-white p-8 rounded-[2rem] border border-border">
+            <h2 className="text-2xl font-bold mb-8">System Configuration</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div className="space-y-6">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Cpu size={16} /> Global LLM Strategy
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Active Provider</label>
+                    <select className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-primary">
+                      <option value="gemini">Google Gemini (Recommended)</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="openrouter">OpenRouter</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Default Model</label>
+                    <Input placeholder="gemini-2.0-flash" className="h-12 rounded-xl" />
+                  </div>
+                  <Button className="w-full h-12 rounded-xl font-bold shadow-lg shadow-primary/20">Save Global Settings</Button>
+                </div>
+              </div>
+
+              <div className="space-y-6 p-8 bg-secondary/20 rounded-[2rem] border border-border">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Activity size={16} /> System Health
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">API Latency</span>
+                    <span className="font-bold text-green-600">142ms</span>
+                  </div>
+                  <div className="flex justify-between text-xs py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Database Connectivity</span>
+                    <span className="font-bold text-green-600">Stable</span>
+                  </div>
+                  <div className="flex justify-between text-xs py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Agent Response Rate</span>
+                    <span className="font-bold">98.4%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
         <TabsContent value="reviews">
            <div className="bg-white p-8 rounded-[2rem] border border-border">
               <ReviewManagement />
            </div>
+        </TabsContent>
+
+        <TabsContent value="agents">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {agents.map(agent => (
+              <AgentCard key={agent.id} agent={agent} />
+            ))}
+            {agents.length === 0 && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
+                <p className="text-muted-foreground italic">No agents found in the system.</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold">User Management</h2>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search users..."
+                    className="pl-10 rounded-full w-[300px]"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allUsers
+                    .filter(u => u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map(u => (
+                    <TableRow key={u.uid}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                            {u.displayName[0]}
+                          </div>
+                          <span className="font-medium">{u.displayName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{u.role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{u.email}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Managing user ${u.displayName}`)}>
+                          <Settings2 size={16} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="knowledge">
