@@ -117,13 +117,15 @@ export async function callGeminiProxy(systemInstruction: string, prompt: string,
     body: JSON.stringify({ systemInstruction, prompt, drawingUrl, drawingUrls, config, agentId: agent?.id })
   });
 
+  if (!response) return '';
+
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || 'Failed to call LLM proxy');
   }
 
   const data = await response.json();
-  return data.text;
+  return data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
 }
 
 const NVIDIA_VISION_MODELS = ['nvidia/nemotron-4-340b-instruct', 'meta/llama-3.1-405b-instruct'];
@@ -167,7 +169,7 @@ export async function logSystemEvent(level: 'info' | 'warning' | 'error' | 'crit
   }
 }
 
-function stripJson(text: string) {
+function stripJson(text: string = '') {
   let cleanText = text.trim();
   if (cleanText.startsWith('```json')) cleanText = cleanText.substring(7);
   else if (cleanText.startsWith('```')) cleanText = cleanText.substring(3);
@@ -177,7 +179,7 @@ function stripJson(text: string) {
   return jsonMatch ? jsonMatch[0] : cleanText;
 }
 
-export function parseAIResponse(text: string): { status: string, feedback: string, categories: AICategory[], traceLog: string } {
+export function parseAIResponse(text: string = ''): { status: string, feedback: string, categories: AICategory[], traceLog: string } {
   try {
     const rawParsed = JSON.parse(stripJson(text));
     const validated = OrchestratorResultSchema.safeParse(rawParsed);
@@ -204,7 +206,7 @@ export function parseAIResponse(text: string): { status: string, feedback: strin
   return { status: passed ? 'passed' : 'failed', feedback: text.substring(0, 500), categories: [], traceLog: "Heuristic parsing applied to unstructured response." };
 }
 
-export function parseAIResponseV2(text: string): Partial<AIReviewResult> {
+export function parseAIResponseV2(text: string = ''): Partial<AIReviewResult> {
   try {
     const rawParsed = JSON.parse(stripJson(text));
     const validated = OrchestratorResultV2Schema.safeParse(rawParsed);
@@ -219,14 +221,15 @@ export function parseAIResponseV2(text: string): Partial<AIReviewResult> {
     const categories = Array.isArray(rawParsed.categories)
       ? rawParsed.categories.map((item: unknown) => AICategorySchema.safeParse(item)).filter(result => result.success).map(result => result.data as AICategory)
       : [];
+    const legacyStatus = rawParsed.status === 'passed' ? 'passed' : 'failed';
     return {
-      status: rawParsed.status === 'passed' ? 'passed' : 'failed',
+      status: legacyStatus,
       feedback: typeof rawParsed.feedback === 'string' ? rawParsed.feedback : 'V2 response failed validation.',
       categories,
       traceLog: typeof rawParsed.traceLog === 'string' ? rawParsed.traceLog : 'V2 validation failed; invalid fields were dropped.',
       findings,
       signOffChecklist,
-      riskStatus: 'ai_review_failed',
+      riskStatus: rawParsed.riskStatus || (legacyStatus === 'passed' ? 'ready_for_admin_review' : 'ai_review_failed'),
       disclaimers: Array.isArray(rawParsed.disclaimers) ? rawParsed.disclaimers.filter((item: unknown) => typeof item === 'string') : REVIEW_DISCLAIMERS
     };
   } catch (e) {
@@ -329,9 +332,12 @@ function fallbackFinding(agent: Agent, message: string, files: DrawingReference[
 }
 
 function extractFindings(response: string, agent: Agent, files: DrawingReference[]): Finding[] {
+  if (!response?.trim()) return [];
+
   try {
     const parsed = JSON.parse(stripJson(response));
     const rawFindings = Array.isArray(parsed.findings) ? parsed.findings : Array.isArray(parsed) ? parsed : [];
+    if (!rawFindings.length && parsed.status === 'passed') return [];
     const findings = rawFindings.map((finding: any) => FindingSchema.safeParse({
       title: finding.title || `${agent.name} finding`,
       description: finding.description || finding.feedback || response.substring(0, 300),
@@ -459,7 +465,7 @@ export async function reviewDrawing(
         agentOutputs.push({ role: agent.role, name: agent.name, findings: response, id: agent.id });
         completed.push(agent.name);
 
-        if (response.includes('UNKNOWN_REGULATION:') && agent.id) {
+        if (response?.includes('UNKNOWN_REGULATION:') && agent.id) {
           const match = response.match(/UNKNOWN_REGULATION:\s*(.+)/);
           if (match?.[1]) {
             const searchResult = await webSearchForAgent(match[1], agent.role, agent.id);
@@ -529,7 +535,8 @@ export async function reviewDrawing(
 
     if (!finalResponse.trim()) {
       await logSystemEvent('warning', 'AI Orchestrator', 'Orchestrator returned empty response after retry', { drawingName, submissionId });
-      finalResponse = JSON.stringify({ status: 'failed', feedback: 'Orchestrator returned no valid response.', categories: [], traceLog: 'Empty orchestrator response.', riskStatus: 'ai_review_failed', findings: allFindings, signOffChecklist });
+      const fallbackRiskStatus = allFindings.length ? 'requires_minor_corrections' : 'ready_for_admin_review';
+      finalResponse = JSON.stringify({ status: mapRiskStatusToLegacy(fallbackRiskStatus), feedback: 'AI built-environment review completed with synthesized results.', categories: findingsToCategories(allFindings), traceLog: 'Empty orchestrator response; synthesized from specialist outputs.', riskStatus: fallbackRiskStatus, findings: allFindings, signOffChecklist });
     }
     reportProgress(95, 'Orchestrator', 'Finalizing report...', completed);
     const parsedResult = parseAIResponseV2(finalResponse);

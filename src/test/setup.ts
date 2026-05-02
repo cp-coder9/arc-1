@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom';
 import { jest } from '@jest/globals';
 
+Object.defineProperty(globalThis, 'jest', {
+  configurable: true,
+  value: jest,
+});
+
 // Mock Firebase with full implementation
 const mockDb = {
   collection: jest.fn<any>(() => ({
@@ -83,12 +88,15 @@ globalThis.process = {
 };
 
 // Mock window.crypto for MD5 hashing
-(globalThis as any).crypto = {
-  ...(globalThis as any).crypto,
-  subtle: {
-    digest: jest.fn<any>().mockResolvedValue(new ArrayBuffer(16)),
+Object.defineProperty(globalThis, 'crypto', {
+  configurable: true,
+  value: {
+    ...(globalThis as any).crypto,
+    subtle: {
+      digest: jest.fn<any>().mockResolvedValue(new ArrayBuffer(16)),
+    },
   },
-};
+});
 
 // Mock ResizeObserver
 (global as any).ResizeObserver = jest.fn<any>().mockImplementation(() => ({

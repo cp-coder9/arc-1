@@ -4,8 +4,9 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { notificationService } from '../notificationService';
 import { NotificationType } from '../../types';
+
+const { notificationService } = await import('../notificationService');
 
 // Mock Firebase
 jest.mock('@/lib/firebase', () => ({

@@ -24,12 +24,9 @@
     "noEmit": true,
     "types": [
       "vite/client",
-      "@jest/globals",
+      "vitest/globals",
+      "jest",
       "@testing-library/jest-dom"
-    ],
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
     ]
   }
 }

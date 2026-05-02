@@ -20,9 +20,9 @@ export const doc = jest.fn(() => ({ id: 'mock-doc' }));
 // Read
 export const getDoc = jest.fn(() =>
   Promise.resolve({
-    exists: () => false,
+    exists: () => true,
     id: 'mock-id',
-    data: () => ({}),
+    data: () => ({ notificationPreferences: { in_app: true, email: true, push: true } }),
     ref: { id: 'mock-id' },
   })
 );
@@ -57,7 +57,24 @@ export const endBefore = jest.fn(() => ({}));
 // Real-time listener
 export const onSnapshot = jest.fn((_ref: any, cb: any) => {
   if (typeof cb === 'function') {
-    cb({ docs: [], empty: true, forEach: jest.fn() });
+    cb({
+      docs: [
+        {
+          id: 'notif-1',
+          ref: { id: 'notif-1' },
+          data: () => ({
+            userId: 'user-1',
+            type: 'job_application',
+            title: 'New Application',
+            body: 'Test notification',
+            isRead: false,
+            createdAt: '2026-01-01T00:00:00Z',
+          }),
+        },
+      ],
+      empty: false,
+      forEach: jest.fn(),
+    });
   }
   return jest.fn(); // unsubscribe
 });

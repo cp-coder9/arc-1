@@ -229,6 +229,10 @@ class NotificationService {
     this.unsubscribeFns.clear();
   }
 
+  unsubscribe(): void {
+    this.cleanup();
+  }
+
   /**
    * Register FCM token for push notifications
    */
@@ -263,6 +267,15 @@ class NotificationService {
       'job_application',
       `${architectName} applied for "${jobTitle}"`,
       { jobId }
+    );
+  }
+
+  async notifyJobApplication(clientId: string, architectId: string, jobId: string, applicationId: string): Promise<void> {
+    await this.sendNotification(
+      clientId,
+      'job_application',
+      `${architectId} applied for your job`,
+      { jobId, applicationId }
     );
   }
 
@@ -356,6 +369,24 @@ class NotificationService {
       'message',
       `New message from ${senderName} on "${jobTitle}"`,
       { jobId, senderId: recipientId }
+    );
+  }
+
+  async notifyMessage(recipientId: string, senderId: string, body: string, jobId: string): Promise<void> {
+    await this.sendNotification(
+      recipientId,
+      'message',
+      body,
+      { jobId, senderId }
+    );
+  }
+
+  async notifyMilestoneDue(architectId: string, milestone: string, jobId: string, daysUntilDue: number): Promise<void> {
+    await this.sendNotification(
+      architectId,
+      'milestone_due',
+      `${milestone} milestone is due in ${daysUntilDue} days`,
+      { jobId }
     );
   }
 

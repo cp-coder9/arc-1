@@ -29,6 +29,7 @@ function Tabs({
     <TabsContext.Provider value={{ value: activeValue, onValueChange: handleValueChange }}>
       <div
         data-slot="tabs"
+        data-testid="tabs"
         className={cn("group/tabs flex flex-col gap-2", className)}
         {...props}
       />
@@ -58,6 +59,7 @@ function TabsList({
 }: React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof tabsListVariants>) {
   return (
     <div
+      role="tablist"
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}
