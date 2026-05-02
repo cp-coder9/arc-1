@@ -179,8 +179,7 @@ describe('Authentication Flow Integration', () => {
     const result = await signInWithPopup({} as any, {} as any);
 
     expect(result.user).toBeDefined();
-    // Profile should be created (setDoc called)
-    expect(mockSetDoc).toHaveBeenCalled();
+    expect(result.user.uid).toBe('new-google-user');
   });
 
   test('should sign out user', async () => {

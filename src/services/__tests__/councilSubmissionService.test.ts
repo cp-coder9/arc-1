@@ -71,6 +71,7 @@ describe('CouncilSubmissionService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(notificationService, 'notifyCouncilUpdate').mockResolvedValue(undefined);
   });
 
   describe('getMunicipalityConfig', () => {

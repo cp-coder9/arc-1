@@ -154,42 +154,55 @@ describe('reviewDrawing', () => {
   test('should return review result on success', async () => {
     // Orchestrator summary mock
     const mockSuccessResponse = {
-      candidates: [{
-        content: {
-          parts: [{
-            text: JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
               status: 'passed',
               feedback: 'All good',
               categories: [{ name: 'Walls', issues: [] }],
               traceLog: 'Test trace'
             })
-          }]
+        }
+      }]
+    };
+
+    const mockScopeResponse = {
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            route: 'standard',
+            requiredAgents: ['wall_compliance_specialist']
+          })
         }
       }]
     };
 
     // Agent findings mock
     const mockAgentResponse = {
-      candidates: [{
-        content: {
-          parts: [{
-            text: "No issues detected in this sector."
-          }]
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            status: 'passed',
+            riskStatus: 'ready_for_admin_review',
+            findings: [],
+            categories: [],
+            signOffChecklist: [],
+            feedback: 'No issues detected in this sector.'
+          })
         }
       }]
     };
 
     // Need multiple mocks for the multiple stages of reviewDrawing
-    mockFetch
-      .mockResolvedValue({
-        ok: true,
-        json: async () => mockAgentResponse
-      });
-    
-    // Override the last call (orchestrator) to return the actual report JSON
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      json: async () => mockScopeResponse
+    }).mockResolvedValueOnce({
+      ok: true,
       json: async () => mockAgentResponse
+    }).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockSuccessResponse
     }).mockResolvedValue({
       ok: true,
       json: async () => mockSuccessResponse

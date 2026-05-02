@@ -84,18 +84,32 @@ describe('AI Review Flow Integration', () => {
 
   test('should complete full AI review workflow', async () => {
     // Mock successful LLM responses for orchestrator and agents
+    const successResponse = {
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            status: 'passed',
+            riskStatus: 'ready_for_admin_review',
+            feedback: 'AI review passed',
+            findings: [],
+            signOffChecklist: [],
+            categories: [],
+            traceLog: 'Reviewed successfully',
+          }),
+        },
+      }],
+    };
+
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
+          choices: [{
+            message: {
+                content: JSON.stringify({
                   agents: ['wall_compliance_specialist', 'fenestration_specialist'],
                   priority: 'high',
                 }),
-              }],
             },
           }],
         }),
@@ -103,10 +117,9 @@ describe('AI Review Flow Integration', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
+          choices: [{
+            message: {
+                content: JSON.stringify({
                   status: 'passed',
                   feedback: 'Wall thickness complies with SANS 10400-K',
                   categories: [{
@@ -115,7 +128,6 @@ describe('AI Review Flow Integration', () => {
                   }],
                   traceLog: 'Reviewed wall specifications',
                 }),
-              }],
             },
           }],
         }),
@@ -123,10 +135,9 @@ describe('AI Review Flow Integration', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
+          choices: [{
+            message: {
+                content: JSON.stringify({
                   status: 'passed',
                   feedback: 'Fenestration meets ventilation requirements',
                   categories: [{
@@ -135,10 +146,13 @@ describe('AI Review Flow Integration', () => {
                   }],
                   traceLog: 'Reviewed window specifications',
                 }),
-              }],
             },
           }],
         }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        json: async () => successResponse,
       });
 
     const result = await reviewDrawing(

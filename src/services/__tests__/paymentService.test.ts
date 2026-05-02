@@ -103,6 +103,9 @@ describe('PaymentService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetch.mockReset();
+    jest.spyOn(notificationService, 'notifyPaymentReleased').mockResolvedValue(undefined);
+    jest.spyOn(notificationService, 'notifyEscrowFunded').mockResolvedValue(undefined);
+    jest.spyOn(notificationService, 'notifyRefundProcessed').mockResolvedValue(undefined);
   });
 
   describe('calculateEscrowAmounts', () => {

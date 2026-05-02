@@ -552,7 +552,7 @@ export default function AdminDashboard({
                       <p className="text-xs text-muted-foreground">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{submission.status.replace('_', ' ')}</Badge>
+                      <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{(submission.status || 'processing').replace('_', ' ')}</Badge>
                       <ExecutionModePicker value={(submissionModes[submission.id] || submission.executionMode || 'basic_ai_screen') as ExecutionMode} onChange={(mode) => setSubmissionModes(current => ({ ...current, [submission.id]: mode }))} className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
                       <Button size="sm" variant="outline" disabled={reviewingSubmissionId === submission.id} onClick={() => rerunAIReview(submission)}>
                         {reviewingSubmissionId === submission.id ? <Loader2 size={14} className="animate-spin" /> : 'Run AI'}
@@ -629,12 +629,12 @@ export default function AdminDashboard({
                 <Card key={job.id} className="border-border shadow-sm rounded-2xl p-6">
                   <div className="flex justify-between items-start mb-4">
                     <Badge className="bg-primary/5 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
-                    <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status}</Badge>
+                    <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status || 'open'}</Badge>
                   </div>
                   <h3 className="font-bold mb-2">{job.title}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
                   <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
-                    <span>Budget: R {job.budget.toLocaleString()}</span>
+                    <span>Budget: R {(job.budget || 0).toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
                   </div>
                 </Card>
@@ -740,15 +740,15 @@ export default function AdminDashboard({
                 </TableHeader>
                 <TableBody>
                   {allUsers
-                    .filter(u => u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .filter(u => (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()))
                     .map(u => (
                     <TableRow key={u.uid}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                            {u.displayName[0]}
+                            {(u.displayName || u.email || 'U')[0]}
                           </div>
-                          <span className="font-medium">{u.displayName}</span>
+                          <span className="font-medium">{u.displayName || u.email || 'Unknown User'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -757,7 +757,7 @@ export default function AdminDashboard({
                       <TableCell className="text-muted-foreground text-xs">{u.email}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Managing user ${u.displayName}`)}>
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Managing user ${u.displayName || u.email || u.uid}`)}>
                           <Settings2 size={16} />
                         </Button>
                       </TableCell>

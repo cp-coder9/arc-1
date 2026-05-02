@@ -311,7 +311,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
             job.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
             'bg-yellow-100 text-yellow-700'
           }`}>
-            {job.status.replace('-', ' ')}
+            {(job.status || 'open').replace('-', ' ')}
           </Badge>
         </div>
         <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>

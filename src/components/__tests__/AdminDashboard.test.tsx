@@ -295,12 +295,12 @@ describe('AdminDashboard', () => {
 
   test('should render submissions tab', () => {
     render(<AdminDashboard user={mockUser} />);
-    expect(screen.getByText(/Submissions/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Submissions/i).length).toBeGreaterThan(0);
   });
 
   test('should render agent configuration section', () => {
     render(<AdminDashboard user={mockUser} />);
-    expect(screen.getByText('Admin Portal')).toBeInTheDocument();
+    expect(screen.getByText(/Admin Command Center/i)).toBeInTheDocument();
   });
 
   test('should handle tab changes', () => {

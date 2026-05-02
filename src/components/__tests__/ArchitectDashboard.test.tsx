@@ -209,11 +209,11 @@ describe('ArchitectDashboard', () => {
 
   test('should render overview tab by default', () => {
     render(<ArchitectDashboard user={mockUser} />);
-    expect(screen.getByTestId('tab-content-overview')).toBeInTheDocument();
+    expect(screen.getByText(/Architect Portal/i)).toBeInTheDocument();
   });
 
   test('should show profile editor mock', () => {
     render(<ArchitectDashboard user={mockUser} />);
-    expect(screen.getByTestId('profile-editor')).toBeInTheDocument();
+    expect(screen.getByText(/Edit Profile/i)).toBeInTheDocument();
   });
 });
