@@ -537,12 +537,12 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#f8fafc] overflow-x-hidden relative text-foreground">
       <AnimatedFloorPlan />
-      <nav className="h-28 border-b border-border px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-50">
+      <nav className="h-28 border-b border-slate-200 px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-50 shadow-sm">
         <Logo showText iconClassName="w-24 h-24 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-4xl lg:text-5xl tracking-tighter text-foreground" />
         <div className="hidden lg:flex items-center gap-6">
-          <button onClick={onGetStarted} className="text-sm font-medium hover:text-primary">Marketplace</button>
+          <button onClick={onGetStarted} className="text-sm font-bold text-slate-700 hover:text-primary">Marketplace</button>
           <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
         </div>
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
@@ -555,7 +555,7 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden">
+      <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden bg-white/80">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
           <div className="pb-16 relative z-20">
             <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
@@ -565,29 +565,29 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
                 { word: 'Verify', icon: <ShieldCheck size={42} /> },
                 { word: 'Collaborate', icon: <Users size={42} /> }
               ].map((item, index) => (
-                <div key={item.word} className="hero-word-row flex items-center gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible" style={{ animationDelay: `${index * 140}ms` }}>
+                <div key={item.word} className="hero-word-row flex items-center gap-5 border-b border-slate-200 pb-3 last:border-b-0 overflow-visible" style={{ animationDelay: `${index * 140}ms` }}>
                   <div className="h-20 w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20">
                     {item.icon}
                   </div>
-                  <h1 className={`relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
+                  <h1 className={`relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm ${item.word === 'Collaborate' ? 'text-primary' : 'text-slate-950'}`}>
                     <span className="relative z-10">{item.word}</span>
                   </h1>
                 </div>
               ))}
             </div>
-            <p className="text-xl lg:text-2xl text-foreground mb-10 max-w-2xl leading-relaxed">
+            <p className="text-xl lg:text-2xl text-slate-700 mb-10 max-w-2xl leading-relaxed font-medium">
               Architex connects clients with elite professionals and contractors through an AI-powered marketplace for the built environment. Providing tailored management and resource sharing tools to deliver projects end-to-end.
             </p>
             <div className="flex flex-wrap gap-4">
               <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl">Post a Job <ArrowRight className="ml-2" /></Button>
-              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-white/70">Browse Talent</Button>
+              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-white text-slate-950 border-slate-900 hover:bg-slate-50">Browse Talent</Button>
             </div>
           </div>
           <div className="relative min-h-[560px] hidden lg:block">
-            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-border bg-white/70 p-8 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-slate-900/20 bg-white p-8 flex items-center justify-center">
               <Logo iconClassName="w-[28rem] h-[28rem] object-contain opacity-95" />
             </div>
-            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/30 border border-primary/15 rounded-[2rem] overflow-hidden">
+            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/85 border border-primary/20 rounded-[2rem] overflow-hidden">
               <svg viewBox="0 0 520 400" className="absolute inset-0 w-full h-full text-primary/40" fill="none" stroke="currentColor" strokeWidth="1.4">
                 <path d="M80 330V155l115-60 170 85v150M195 95v235M365 180v150M80 155l285 25M80 205l285 25M80 255l285 25M115 315h285M115 285h285M115 255h285M115 225h285" />
                 <path d="M195 95l170 85 75-45-170-85-75 45ZM365 180l75-45v145l-75 50" />
@@ -599,7 +599,7 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* Marketplace Preview */}
-      <section className="py-12 bg-secondary/20 px-8 lg:px-20 relative z-10 border-y border-border">
+      <section className="py-12 bg-slate-100 px-8 lg:px-20 relative z-10 border-y border-slate-300">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
@@ -607,19 +607,19 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               ['Built for the Built Environment', 'Purpose-built tools for every project stage.'],
               ['Connected Ecosystem', 'Clients, professionals, and contractors working as one.']
             ].map(([title, copy]) => (
-              <div key={title} className="rounded-3xl border border-border bg-white/50 backdrop-blur-sm p-8">
-                <h2 className="text-lg font-black uppercase tracking-wide mb-3">{title}</h2>
-                <p className="text-muted-foreground leading-relaxed max-w-sm">{copy}</p>
+              <div key={title} className="rounded-3xl border border-slate-300 bg-white p-8 shadow-sm">
+                <h2 className="text-lg font-black uppercase tracking-wide mb-3 text-slate-950">{title}</h2>
+                <p className="text-slate-600 leading-relaxed max-w-sm font-medium">{copy}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="bg-secondary/50 py-20 px-8 lg:px-20 border-t border-border relative z-10">
+      <footer className="bg-slate-900 py-20 px-8 lg:px-20 border-t border-slate-800 relative z-10 text-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <Logo showText iconClassName="w-16 h-16 object-contain" textClassName="font-heading font-bold text-2xl lg:text-3xl" />
-          <p className="text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
+          <p className="text-sm text-slate-300">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
         </div>
       </footer>
     </div>

@@ -36,7 +36,7 @@ export function AnimatedFloorPlan() {
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 overflow-hidden pointer-events-none opacity-[0.08] flex items-center justify-center z-0 mix-blend-multiply"
+      className="fixed inset-0 overflow-hidden pointer-events-none opacity-[0.045] flex items-center justify-center z-0"
     >
       <svg
         width="120%"
