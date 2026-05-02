@@ -3,7 +3,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference } from '../types';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -34,6 +34,7 @@ import { pdfGenerationService } from "../services/pdfGenerationService";
 import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import ReviewManagement from "./ReviewManagement";
 import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
+import ExecutionModePicker from './ExecutionModePicker';
 
 const PROVIDER_CONFIGS = {
   gemini: {
@@ -385,6 +386,8 @@ export default function AdminDashboard({
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
+  const [submissionModes, setSubmissionModes] = useState<Record<string, ExecutionMode | ''>>({});
+  const [reviewingSubmissionId, setReviewingSubmissionId] = useState<string | null>(null);
   const pageSize = 8;
 
   useEffect(() => {
@@ -441,6 +444,39 @@ export default function AdminDashboard({
       toast.success(status === 'approved' ? 'Submission approved' : 'Submission rejected');
     } catch {
       toast.error('Failed to update submission');
+    }
+  };
+
+  const rerunAIReview = async (submission: Submission) => {
+    setReviewingSubmissionId(submission.id);
+    try {
+      const selectedMode = submissionModes[submission.id] || undefined;
+      const files: DrawingReference[] = [{ url: submission.drawingUrl, name: submission.drawingName }];
+      const result = await reviewDrawing(
+        submission.drawingUrl,
+        submission.drawingName,
+        undefined,
+        submission.id,
+        selectedMode || undefined,
+        files,
+        submission.findings || []
+      );
+      await updateDoc(doc(db, `jobs/${submission.jobId}/submissions`, submission.id), {
+        status: result.status === 'passed' ? 'ai_passed' : 'ai_failed',
+        aiFeedback: result.feedback,
+        aiStructuredFeedback: result.categories,
+        findings: result.findings || [],
+        signOffChecklist: result.signOffChecklist || [],
+        riskStatus: result.riskStatus || 'ai_review_failed',
+        executionMode: result.mode || selectedMode || null,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('AI review completed and persisted');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to run AI review');
+    } finally {
+      setReviewingSubmissionId(null);
     }
   };
 
@@ -517,6 +553,10 @@ export default function AdminDashboard({
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{submission.status.replace('_', ' ')}</Badge>
+                      <ExecutionModePicker value={(submissionModes[submission.id] || submission.executionMode || 'basic_ai_screen') as ExecutionMode} onChange={(mode) => setSubmissionModes(current => ({ ...current, [submission.id]: mode }))} className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                      <Button size="sm" variant="outline" disabled={reviewingSubmissionId === submission.id} onClick={() => rerunAIReview(submission)}>
+                        {reviewingSubmissionId === submission.id ? <Loader2 size={14} className="animate-spin" /> : 'Run AI'}
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => setReportSubmission(submission)}>View Report</Button>
                       <Button size="sm" onClick={() => updateSubmissionStatus(submission, 'approved')}>Approve</Button>
                       <Button size="sm" variant="destructive" onClick={() => updateSubmissionStatus(submission, 'admin_rejected')}>Reject</Button>
@@ -753,7 +793,12 @@ export default function AdminDashboard({
                   status: reportSubmission.status === 'ai_passed' ? 'passed' : 'failed',
                   feedback: reportSubmission.aiFeedback || '',
                   categories: reportSubmission.aiStructuredFeedback || [],
-                  traceLog: reportSubmission.traceability?.[0]?.details || 'Review trace not found.'
+                  traceLog: reportSubmission.traceability?.[0]?.details || 'Review trace not found.',
+                  findings: reportSubmission.findings || [],
+                  signOffChecklist: reportSubmission.signOffChecklist || [],
+                  riskStatus: reportSubmission.riskStatus,
+                  mode: reportSubmission.executionMode,
+                  submissionIndex: reportSubmission.drawingUrl ? [{ url: reportSubmission.drawingUrl, name: reportSubmission.drawingName, detectedType: 'architectural_drawing' }] : undefined
                 }}
                 drawingUrl={reportSubmission.drawingUrl}
                 drawingName={reportSubmission.drawingName}

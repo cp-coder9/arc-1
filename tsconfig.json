@@ -23,7 +23,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "@jest/globals",
+      "@testing-library/jest-dom"
     ],
     "typeRoots": [
       "./types",

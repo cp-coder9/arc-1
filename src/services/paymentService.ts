@@ -40,20 +40,41 @@ async function apiFetch(path: string, body: object): Promise<any> {
   return data;
 }
 
+// Safe env accessor that works in both Vite (browser) and Jest (Node)
+const getEnv = (key: string) => {
+  try { if (import.meta && import.meta.env) return import.meta.env[key]; } catch (e) {}
+  try { if (typeof process !== 'undefined') return process.env[key]; } catch (e) {}
+  return '';
+};
+
 // PayFast configuration
 const PAYFAST_CONFIG = {
-  merchantId: String(import.meta.env.VITE_PAYFAST_MERCHANT_ID || ''),
-  merchantKey: String(import.meta.env.VITE_PAYFAST_MERCHANT_KEY || ''),
-  passphrase: String(import.meta.env.VITE_PAYFAST_PASSPHRASE || ''),
-  sandbox: import.meta.env.VITE_PAYFAST_SANDBOX === 'true',
-  url: import.meta.env.VITE_PAYFAST_SANDBOX === 'true'
+  merchantId: String(getEnv('VITE_PAYFAST_MERCHANT_ID')),
+  merchantKey: String(getEnv('VITE_PAYFAST_MERCHANT_KEY')),
+  passphrase: String(getEnv('VITE_PAYFAST_PASSPHRASE')),
+  sandbox: getEnv('VITE_PAYFAST_SANDBOX') === 'true',
+  url: getEnv('VITE_PAYFAST_SANDBOX') === 'true'
     ? 'https://sandbox.payfast.co.za/eng/process'
     : 'https://www.payfast.co.za/eng/process',
 };
 
 const PLATFORM_FEE_PERCENTAGE = 0.05;
+const VAT_PERCENTAGE = 0.15;
 
 class PaymentService {
+  /**
+   * Calculate escrow amounts including platform fees
+   */
+  calculateEscrowAmounts(baseAmount: number, feePercentage: number = PLATFORM_FEE_PERCENTAGE) {
+    const platformFee = Math.round(baseAmount * feePercentage);
+    const total = baseAmount + platformFee;
+    return {
+      architectAmount: baseAmount,
+      platformFee,
+      total,
+    };
+  }
+
   /**
    * Generate MD5 hash for PayFast signature
    */

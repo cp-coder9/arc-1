@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AgentKnowledge, KnowledgeSource } from '../types';
+import { AgentKnowledge, KnowledgeSource, Discipline, StandardFamily } from '../types';
 import { addKnowledge } from '../services/knowledgeService';
 import { SPECIALIZED_AGENTS } from '../services/geminiService';
 import { Upload, FileText, Plus, Loader2, X } from 'lucide-react';
@@ -25,6 +25,19 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'manual' | 'pdf'>('manual');
+  const [standardFamily, setStandardFamily] = useState<StandardFamily>('SANS10400');
+  const [standardPart, setStandardPart] = useState('');
+  const [municipality, setMunicipality] = useState('');
+  const [province, setProvince] = useState('');
+  const [discipline, setDiscipline] = useState<Discipline>('architecture');
+  const [effectiveDate, setEffectiveDate] = useState('');
+  const [reviewDate, setReviewDate] = useState('');
+  const [version, setVersion] = useState('');
+  const [disclaimer, setDisclaimer] = useState('Summary only — refer to official SANS document for authoritative text.');
+
+  const metadata = { standardFamily, standardPart, municipality, province, discipline, effectiveDate, reviewDate, version, disclaimer };
+  const knowledgeStatus = user.role === 'admin' ? 'active' : 'pending_review';
+  const submittedByRole = user.role || 'architect';
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -58,11 +71,12 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
         title: title || file.name.replace('.pdf', ''),
         content: `[PDF Document](${url})\n\n*Content extraction pending implementation. Please manually add key points from this PDF in the content field below.*`,
         source: 'documentation',
-        status: 'pending_review',
+        status: knowledgeStatus,
         submittedBy: user.uid,
-        submittedByRole: 'admin',
+        submittedByRole,
         pdfUrl: url,
         tags: [...tags, 'pdf', 'uploaded'],
+        ...metadata,
         createdAt: new Date().toISOString(),
       });
 
@@ -88,11 +102,12 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
         title,
         content,
         source: 'documentation',
-        status: 'active', // Admin uploads are auto-approved
+        status: knowledgeStatus,
         submittedBy: user.uid,
-        submittedByRole: 'admin',
+        submittedByRole,
         pdfUrl: pdfFile ? undefined : undefined,
         tags: [...tags, 'admin_uploaded'],
+        ...metadata,
         createdAt: new Date().toISOString(),
       });
 
@@ -113,6 +128,12 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
     setTags([]);
     setTagInput('');
     setPdfFile(null);
+    setStandardPart('');
+    setMunicipality('');
+    setProvince('');
+    setEffectiveDate('');
+    setReviewDate('');
+    setVersion('');
   };
 
   return (
@@ -230,6 +251,32 @@ export default function AdminKnowledgeUploader({ user }: AdminKnowledgeUploaderP
             </div>
           </>
         )}
+
+        {/* Tags */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Discipline</label>
+            <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm" value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)}>
+              {(['architecture', 'structure', 'fire', 'accessibility', 'energy', 'drainage', 'electrical', 'mechanical', 'planning', 'documentation', 'environmental', 'nhbrc', 'coordination'] as Discipline[]).map(value => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Standard Family</label>
+            <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm" value={standardFamily} onChange={(e) => setStandardFamily(e.target.value as StandardFamily)}>
+              {(['NBR', 'SANS10400', 'SANS10160', 'SANS10100', 'SANS10162', 'SANS10142', 'SANS10252', 'MunicipalBylaw', 'NHBRC', 'ProfessionalCoordination', 'Other'] as StandardFamily[]).map(value => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </div>
+          <Input placeholder="Standard part (e.g. Part T)" value={standardPart} onChange={(e) => setStandardPart(e.target.value)} />
+          <Input placeholder="Municipality" value={municipality} onChange={(e) => setMunicipality(e.target.value)} />
+          <Input placeholder="Province" value={province} onChange={(e) => setProvince(e.target.value)} />
+          <Input placeholder="Version" value={version} onChange={(e) => setVersion(e.target.value)} />
+          <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+          <Input type="date" value={reviewDate} onChange={(e) => setReviewDate(e.target.value)} />
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-medium">Disclaimer</label>
+            <Input value={disclaimer} onChange={(e) => setDisclaimer(e.target.value)} />
+          </div>
+        </div>
 
         {/* Tags */}
         <div className="space-y-2">

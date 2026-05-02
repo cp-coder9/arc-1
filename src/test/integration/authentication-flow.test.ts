@@ -5,27 +5,17 @@
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 
-// Mock Firebase Auth
-const mockSignInWithEmailAndPassword = jest.fn();
-const mockCreateUserWithEmailAndPassword = jest.fn();
-const mockSignInWithPopup = jest.fn();
-const mockSignOut = jest.fn();
-const mockOnAuthStateChanged = jest.fn();
-const mockUpdateProfile = jest.fn();
-const mockGetIdToken = jest.fn().mockResolvedValue('mock-token');
+// Import standard Firebase Auth mock (this uses the one from src/test/__mocks__/firebase-auth.ts)
+import * as auth from 'firebase/auth';
 
-jest.mock('firebase/auth', () => ({
-  signInWithEmailAndPassword: (...args: any[]) => mockSignInWithEmailAndPassword(...args),
-  createUserWithEmailAndPassword: (...args: any[]) => mockCreateUserWithEmailAndPassword(...args),
-  signInWithPopup: (...args: any[]) => mockSignInWithPopup(...args),
-  signOut: (...args: any[]) => mockSignOut(...args),
-  onAuthStateChanged: (...args: any[]) => mockOnAuthStateChanged(...args),
-  updateProfile: (...args: any[]) => mockUpdateProfile(...args),
-  getIdToken: (user: any) => mockGetIdToken(),
-  GoogleAuthProvider: jest.fn(() => ({
-    addScope: jest.fn(),
-  })),
-}));
+const mockSignInWithEmailAndPassword = auth.signInWithEmailAndPassword as jest.Mock;
+const mockCreateUserWithEmailAndPassword = auth.createUserWithEmailAndPassword as jest.Mock;
+const mockSignInWithPopup = auth.signInWithPopup as jest.Mock;
+const mockSignOut = auth.signOut as jest.Mock;
+const mockOnAuthStateChanged = auth.onAuthStateChanged as jest.Mock;
+const mockUpdateProfile = auth.updateProfile as jest.Mock;
+const mockGetIdToken = auth.getIdToken as jest.Mock;
+
 
 // Mock Firestore
 const mockSetDoc = jest.fn();
@@ -41,10 +31,14 @@ jest.mock('firebase/firestore', () => ({
   query: jest.fn(),
   where: jest.fn(),
   onSnapshot: jest.fn(),
+  CACHE_SIZE_UNLIMITED: -1,
+  initializeFirestore: jest.fn(() => ({})),
+  persistentLocalCache: jest.fn(() => ({})),
+  persistentMultipleTabManager: jest.fn(() => ({})),
 }));
 
-// Mock the firebase module
-jest.mock('../../lib/firebase', () => ({
+// Use the path alias so Jest resolves correctly regardless of file location
+jest.mock('@/lib/firebase', () => ({
   auth: {
     currentUser: null,
   },
@@ -202,7 +196,7 @@ describe('Authentication Flow Integration', () => {
     const mockCallback = jest.fn();
     const mockUnsubscribe = jest.fn();
 
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth: any, callback: any) => {
       callback({
         uid: 'user-123',
         email: 'user@example.com',

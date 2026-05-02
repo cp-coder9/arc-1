@@ -100,11 +100,122 @@ export interface TraceLog {
   details: string;
 }
 
+export type Discipline =
+  | 'architecture'
+  | 'structure'
+  | 'fire'
+  | 'accessibility'
+  | 'energy'
+  | 'drainage'
+  | 'electrical'
+  | 'mechanical'
+  | 'planning'
+  | 'documentation'
+  | 'environmental'
+  | 'nhbrc'
+  | 'coordination';
+
+export type StandardFamily =
+  | 'NBR'
+  | 'SANS10400'
+  | 'SANS10160'
+  | 'SANS10100'
+  | 'SANS10162'
+  | 'SANS10142'
+  | 'SANS10252'
+  | 'MunicipalBylaw'
+  | 'NHBRC'
+  | 'ProfessionalCoordination'
+  | 'Other';
+
+export type AutonomyLabel =
+  | 'autonomous_check'
+  | 'professional_review_required'
+  | 'competent_person_required'
+  | 'municipal_confirmation_required'
+  | 'insufficient_information';
+
+export type ResponsibleParty =
+  | 'architect'
+  | 'structural_engineer'
+  | 'civil_engineer'
+  | 'fire_engineer'
+  | 'electrical_engineer'
+  | 'mechanical_engineer'
+  | 'energy_professional'
+  | 'client'
+  | 'contractor'
+  | 'municipality'
+  | 'admin';
+
+export type RiskStatus =
+  | 'ready_for_admin_review'
+  | 'ready_for_professional_review'
+  | 'requires_minor_corrections'
+  | 'requires_major_corrections'
+  | 'requires_specialist_design'
+  | 'not_assessable_insufficient_information'
+  | 'ai_review_failed';
+
+export type ExecutionMode =
+  | 'basic_ai_screen'
+  | 'council_readiness'
+  | 'fire_plan_review'
+  | 'engineering_coordination'
+  | 'full_professional_review'
+  | 'resubmission_delta_review'
+  | 'specialist_pack_review';
+
+export interface DrawingReference {
+  url: string;
+  name: string;
+  type?: string;
+}
+
+export interface SubmissionIndexItem extends DrawingReference {
+  detectedType: string;
+}
+
+export interface SignOffRequirement {
+  discipline: Discipline;
+  responsibleParty: ResponsibleParty;
+  requirement: string;
+  reason: string;
+  standardFamily?: StandardFamily;
+  reference?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface Finding {
+  title: string;
+  description: string;
+  discipline: Discipline;
+  standardFamily: StandardFamily;
+  reference: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'low' | 'medium' | 'high';
+  autonomyLabel: AutonomyLabel;
+  responsibleParty: ResponsibleParty;
+  actionItem: string;
+  evidence: string;
+  sourceCitations: KnowledgeCitation[];
+  drawingReferences: DrawingReference[];
+  requiresProfessionalSignoff: boolean;
+}
+
 export interface AIIssue {
   description: string;
   regulationStipulation: string;
-  severity: 'low' | 'medium' | 'high';
+  severity: 'low' | 'medium' | 'high' | 'critical';
   actionItem: string;
+  discipline?: Discipline;
+  standardFamily?: StandardFamily;
+  reference?: string;
+  confidence?: 'low' | 'medium' | 'high';
+  autonomyLabel?: AutonomyLabel;
+  responsibleParty?: ResponsibleParty;
+  evidence?: string;
+  requiresProfessionalSignoff?: boolean;
   boundingBox?: { x: number; y: number; width: number; height: number };
   annotatedImageUrl?: string;
 }
@@ -122,6 +233,12 @@ export interface AIReviewResult {
  traceLog: string;
  citations?: KnowledgeCitation[];
  knowledgeSources?: string[];
+ riskStatus?: RiskStatus;
+ findings?: Finding[];
+ signOffChecklist?: SignOffRequirement[];
+ submissionIndex?: SubmissionIndexItem[];
+ mode?: ExecutionMode;
+ disclaimers?: string[];
 }
 
 export interface AIProgress {
@@ -130,6 +247,9 @@ export interface AIProgress {
  activity: string;
  completedAgents: string[];
  thought?: string;
+ mode?: ExecutionMode;
+ discipline?: Discipline;
+ plannedAgents?: string[];
 }
 
 export interface Submission {
@@ -141,6 +261,10 @@ export interface Submission {
   status: SubmissionStatus;
   aiFeedback?: string;
   aiStructuredFeedback?: AICategory[];
+  findings?: Finding[];
+  signOffChecklist?: SignOffRequirement[];
+  riskStatus?: RiskStatus;
+  executionMode?: ExecutionMode;
   annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
 
   adminFeedback?: string;
@@ -157,6 +281,13 @@ export interface Agent {
   systemPrompt: string;
   temperature: number;
   status: 'online' | 'offline' | 'maintenance';
+  discipline?: Discipline;
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+  standardsCoverage?: string[];
+  executionModes?: ExecutionMode[];
+  requiresHumanReview?: boolean;
+  version?: string;
+  approvedBy?: string;
   currentActivity?: string;
   lastActive: string;
   llmProvider?: LLMProvider | 'global';
@@ -485,6 +616,16 @@ export interface AgentKnowledge {
   pdfUrl?: string; // if uploaded from PDF
   pdfPageNumber?: number; // page number in PDF
   tags: string[]; // e.g. ['SANS 10400-K', 'wall thickness', 'DPC']
+  standardFamily?: StandardFamily;
+  standardPart?: string;
+  municipality?: string;
+  province?: string;
+  discipline?: Discipline;
+  effectiveDate?: string;
+  reviewDate?: string;
+  version?: string;
+  disclaimer?: string;
+  confidence?: 'low' | 'medium' | 'high';
   createdAt: string;
   updatedAt?: string;
   usageCount?: number; // Track how often this knowledge is used

@@ -8,7 +8,7 @@ import { notificationService } from '../notificationService';
 import { NotificationType } from '../../types';
 
 // Mock Firebase
-jest.mock('../../lib/firebase', () => ({
+jest.mock('@/lib/firebase', () => ({
   db: {
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({

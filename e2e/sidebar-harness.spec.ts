@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 
-type RoleName = 'client' | 'architect' | 'admin';
+type RoleName = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep';
 
 const roles: Record<RoleName, { port: number; menuItems: string[] }> = {
   client: {
@@ -15,6 +15,14 @@ const roles: Record<RoleName, { port: number; menuItems: string[] }> = {
   admin: {
     port: 4513,
     menuItems: ['Overview', 'Active Projects', 'Compliance Hub', 'User Management', 'LLM Settings', 'Knowledge Base', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
+  },
+  freelancer: {
+    port: 4514,
+    menuItems: ['Overview', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
+  },
+  bep: {
+    port: 4515,
+    menuItems: ['Overview', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
   },
 };
 

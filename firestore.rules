@@ -124,7 +124,7 @@ service cloud.firestore {
         allow update: if isAuthenticated() && (
           isAdmin() ||
           (resource.data.architectId == request.auth.uid && 
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'aiFeedback', 'aiStructuredFeedback', 'findings', 'signOffChecklist', 'riskStatus', 'executionMode']))
         );
         allow delete: if false;
       }
@@ -344,8 +344,14 @@ service cloud.firestore {
     // Agent Knowledge collection
     match /agent_knowledge/{entryId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (isAdmin() || (resource != null && resource.data.submittedBy == request.auth.uid));
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.status == 'pending_review');
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource != null &&
+         resource.data.submittedBy == request.auth.uid &&
+         resource.data.status == 'pending_review' &&
+         request.resource.data.status == resource.data.status)
+      );
       allow delete: if isAuthenticated() && isAdmin();
     }
 

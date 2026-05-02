@@ -118,16 +118,16 @@ export default function ClientDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 md:p-10 rounded-[2.5rem] border border-primary/10 shadow-2xl shadow-primary/5 relative overflow-hidden group transition-all duration-500 hover:shadow-primary/10">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Welcome, {user.displayName}</h1>
+            <h1 className="text-4xl md:text-6xl font-heading font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Welcome, {user.displayName}</h1>
             <ProfileEditor user={user} />
           </div>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Manage your projects and connect with top architectural experts.</p>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed font-medium">Manage your projects and connect with elite architectural experts.</p>
         </div>
         <Dialog open={isPosting} onOpenChange={setIsPosting}>
-          <DialogTrigger render={<Button className="rounded-full h-14 px-8 font-bold text-lg shadow-lg shadow-primary/20"><Plus className="mr-2" /> Post New Job</Button>} />
+          <DialogTrigger render={<Button className="rounded-2xl h-14 md:h-16 px-8 md:px-10 font-bold tracking-wide text-lg shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all duration-300"><Plus className="mr-2" /> Post New Job</Button>} />
           <DialogContent className="sm:max-w-[500px] rounded-3xl">
              <DialogHeader>
                 <DialogTitle>Post a New Job</DialogTitle>
@@ -137,7 +137,7 @@ export default function ClientDashboard({
                 <Textarea placeholder="Job Description" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} required />
                 <Input type="number" placeholder="Budget" value={newJob.budget} onChange={e => setNewJob({...newJob, budget: Number(e.target.value)})} required />
                 <Input type="date" value={newJob.deadline} onChange={e => setNewJob({...newJob, deadline: e.target.value})} required />
-                <Button type="submit" className="w-full">Post Job</Button>
+                <Button type="submit" className="w-full h-14 rounded-2xl font-bold tracking-wide text-lg mt-4 hover:scale-[1.02] transition-all duration-300 shadow-xl shadow-primary/20">Post Job</Button>
              </form>
           </DialogContent>
         </Dialog>
@@ -162,20 +162,20 @@ export default function ClientDashboard({
             </div>
           </div>
           <div className="space-y-8">
-            <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
-                <CardHeader className="bg-primary/5 p-6 border-b border-border">
+            <Card className="border-primary/10 shadow-xl shadow-primary/5 bg-white/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500">
+                <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent p-6 border-b border-border/50">
                   <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                    <Star size={16} className="text-yellow-500" /> Professional Feedback
+                    <Star size={16} className="text-yellow-500 fill-yellow-500" /> Professional Feedback
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
                   {reviews.map(review => (
-                    <div key={review.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
+                    <div key={review.id} className="p-4 rounded-2xl bg-secondary/5 border border-border/50 hover:bg-secondary/10 transition-colors duration-300 mb-4 last:mb-0">
                       <div className="flex justify-between items-center mb-1">
                         <div className="flex text-yellow-400">
-                          {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />)}
+                          {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? 'scale-110' : 'opacity-30'} />)}
                         </div>
-                        <span className="text-[10px] text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
                       </div>
                       <p className="text-xs italic text-foreground leading-relaxed">"{review.comment}"</p>
                     </div>

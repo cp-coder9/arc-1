@@ -97,7 +97,7 @@ export default function ArchitectDashboard({
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Architect Portal</h1>
+            <h1 className="text-4xl md:text-6xl font-heading font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Architect Portal</h1>
             <ProfileEditor user={user} />
           </div>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Elite architectural workspace with SANS-powered compliance verification.</p>
@@ -106,7 +106,7 @@ export default function ArchitectDashboard({
            <StatPill icon={<Star size={14} className="text-yellow-500" />} label="Rating" value={`${Number(user.averageRating || 5.0).toFixed(1)}/5`} />
            <StatPill icon={<CheckCircle2 size={14} className="text-green-500" />} label="Jobs" value={user.completedJobs || 0} />
         </div>
-        <div className="flex gap-4">
+        <div className="relative z-10 flex gap-4">
           <Button
             onClick={() => onTabChange?.('files')}
             variant="outline"
@@ -158,7 +158,7 @@ export default function ArchitectDashboard({
                 </div>
              </div>
              <div className="space-y-8">
-                <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
+                <Card className="border-primary/10 shadow-xl shadow-primary/5 bg-white/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500">
                   <CardHeader className="bg-primary/5 p-6 border-b border-border">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <Star size={16} className="text-yellow-500" /> Client Reviews
@@ -166,12 +166,12 @@ export default function ArchitectDashboard({
                   </CardHeader>
                   <CardContent className="p-6 space-y-4">
                     {reviews.map(review => (
-                      <div key={review.id} className="pb-4 border-b border-border last:border-0 last:pb-0">
+                      <div key={review.id} className="p-4 rounded-2xl bg-secondary/5 border border-border/50 hover:bg-secondary/10 transition-colors duration-300 mb-4 last:mb-0">
                         <div className="flex justify-between items-center mb-1">
                            <div className="flex text-yellow-400">
-                             {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />)}
+                             {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? 'scale-110' : 'opacity-30'} />)}
                            </div>
-                           <span className="text-[10px] text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+                           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
                         </div>
                         <p className="text-xs italic text-foreground leading-relaxed">"{review.comment}"</p>
                       </div>

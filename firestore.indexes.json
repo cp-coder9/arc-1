@@ -135,6 +135,30 @@
         { "fieldPath": "agentRole", "arrayConfig": "CONTAINS" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "agent_knowledge",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "discipline", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "agent_knowledge",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "standardFamily", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "agent_knowledge",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "municipality", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

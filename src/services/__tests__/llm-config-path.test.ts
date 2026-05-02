@@ -1,8 +1,9 @@
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { getLLMConfig } from '../../services/geminiService';
 import { doc } from 'firebase/firestore';
 
 // Mock firebase modules
-jest.mock('../../lib/firebase', () => ({
+jest.mock('@/lib/firebase', () => ({
  db: {}
 }));
 
