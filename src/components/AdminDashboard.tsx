@@ -9,7 +9,6 @@ import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -431,6 +430,9 @@ export default function AdminDashboard({
 
   const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
   const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+  const pendingSubmissionCount = submissions.filter(submission => ['ai_passed', 'admin_reviewing'].includes(submission.status)).length;
+  const failedSubmissionCount = submissions.filter(submission => ['ai_failed', 'admin_rejected'].includes(submission.status)).length;
+  const tabTriggerClass = "min-h-11 w-full rounded-2xl px-3 py-2 gap-2 font-bold text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm";
 
   const updateSubmissionStatus = async (submission: Submission, status: Submission['status']) => {
     try {
@@ -468,55 +470,74 @@ export default function AdminDashboard({
         };
         onTabChange?.(reverseMapping[val] || val);
       }} className="w-full">
-        <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
-          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+        <div className="mb-8 rounded-[2rem] border border-border bg-white/80 p-3 shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-[1.5rem] bg-secondary/40 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <TabsTrigger value="submissions" className={tabTriggerClass}>
               <FileText size={16} /> Submissions
             </TabsTrigger>
-            <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="agents" className={tabTriggerClass}>
               <Cpu size={16} /> Agents
             </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="users" className={tabTriggerClass}>
               <Users size={16} /> Users
             </TabsTrigger>
-            <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="jobs" className={tabTriggerClass}>
               <Briefcase size={16} /> Jobs
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="reviews" className={tabTriggerClass}>
               <Star size={16} /> Moderation
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest relative">
+            <TabsTrigger value="knowledge" className={`${tabTriggerClass} relative`}>
               <Sparkles size={16} /> Brain
             </TabsTrigger>
-            <TabsTrigger value="disputes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="disputes" className={tabTriggerClass}>
               <AlertTriangle size={16} /> Disputes
             </TabsTrigger>
-            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="logs" className={tabTriggerClass}>
               <History size={16} /> Audit Logs
             </TabsTrigger>
-            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="municipal" className={tabTriggerClass}>
               <Building2 size={16} /> Municipal
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="analytics" className={tabTriggerClass}>
               <Activity size={16} /> Analytics
             </TabsTrigger>
           </TabsList>
-        </ScrollArea>
+        </div>
 
         <TabsContent value="submissions">
-           <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
-              <h2 className="text-2xl font-bold">Review Pipeline</h2>
-              <div className="space-y-3">
+           <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-border space-y-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Submissions Review Pipeline</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Review, approve, or reject uploaded drawings from one clear queue.</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
+                  <div className="rounded-2xl border border-border bg-secondary/30 p-3">
+                    <p className="text-xl font-bold">{submissions.length}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total</p>
+                  </div>
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-xl font-bold text-primary">{pendingSubmissionCount}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pending</p>
+                  </div>
+                  <div className="rounded-2xl border border-red-100 bg-red-50 p-3">
+                    <p className="text-xl font-bold text-red-700">{failedSubmissionCount}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Issues</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 {pagedSubmissions.map(submission => (
-                  <div key={submission.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-border p-4">
-                    <div>
-                      <p className="font-bold">{submission.drawingName}</p>
+                  <div key={submission.id} className="grid gap-4 rounded-2xl border border-border bg-white p-4 transition-colors hover:border-primary/30 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">{submission.drawingName}</p>
                       <p className="text-xs text-muted-foreground">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{submission.status.replace('_', ' ')}</Badge>
                       <Button size="sm" variant="outline" onClick={() => setReportSubmission(submission)}>View Report</Button>
                       <Button size="sm" onClick={() => updateSubmissionStatus(submission, 'approved')}>Approve</Button>

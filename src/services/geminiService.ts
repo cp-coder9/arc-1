@@ -3,7 +3,7 @@
  * Handles drawing review through specialized agents
  */
 
-import { db } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, getDocs } from "firebase/firestore";
 import { Agent, LLMConfig, LLMProvider, AIReviewResult, Submission, AICategory, AIIssue, TraceLog, KnowledgeCitation, AIProgress } from "../types";
 import { getAgentKnowledge, webSearchForAgent, addKnowledge, getKnowledgeForAgents, incrementKnowledgeUsage } from "./knowledgeService";
@@ -12,6 +12,21 @@ import { AICategorySchema } from "../lib/schemas";
 
 const MAX_RETRIES = 2;
 const GEMINI_PROXY_URL = "/api/gemini/review";
+
+async function getAuthenticatedHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = await auth.currentUser?.getIdToken?.();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+function extractGeminiProxyText(data: any): string | undefined {
+  return data?.text || data?.candidates?.[0]?.content?.parts?.[0]?.text;
+}
+
+function extractOpenAICompatibleText(data: any): string | undefined {
+  return data?.choices?.[0]?.message?.content || data?.text;
+}
 
 const OrchestratorResultSchema = z.object({
   status: z.string(),
@@ -113,7 +128,7 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES):
 export async function callGeminiProxy(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig, agent?: Agent): Promise<string> {
   const response = await fetch(GEMINI_PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await getAuthenticatedHeaders(),
     body: JSON.stringify({
       systemInstruction,
       prompt,
@@ -129,7 +144,11 @@ export async function callGeminiProxy(systemInstruction: string, prompt: string,
   }
 
   const data = await response.json();
-  return data.text;
+  const text = extractGeminiProxyText(data);
+  if (!text) {
+    throw new Error('No content in response from Gemini proxy');
+  }
+  return text;
 }
 
 const NVIDIA_VISION_MODELS = ['meta/llama-3.2-90b-vision-instruct', 'meta/llama-3.2-11b-vision-instruct'];
@@ -496,7 +515,7 @@ async function callAgentReview(
 ): Promise<string> {
   const response = await fetch('/api/review', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await getAuthenticatedHeaders(),
     body: JSON.stringify({
       systemInstruction,
       prompt,
@@ -513,7 +532,7 @@ async function callAgentReview(
 
   const data = await response.json();
   // /api/review returns OpenAI-compatible response format
-  const content = data.choices?.[0]?.message?.content;
+  const content = extractOpenAICompatibleText(data);
   if (!content) {
     throw new Error('No content in response from /api/review');
   }

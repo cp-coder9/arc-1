@@ -24,6 +24,12 @@ jest.mock('../../lib/firebase', () => ({
       })),
     })),
   },
+  auth: {
+    currentUser: {
+      uid: 'test-user-id',
+      getIdToken: jest.fn(() => Promise.resolve('mock-firebase-id-token')),
+    },
+  },
 }));
 
 // Mock getAgents
@@ -40,6 +46,7 @@ jest.mock('firebase/firestore', () => ({
   where: jest.fn(),
   orderBy: jest.fn(),
   doc: jest.fn(),
+  getDoc: jest.fn(() => Promise.resolve({ exists: () => false })),
   updateDoc: jest.fn(() => Promise.resolve()),
   addDoc: jest.fn(() => Promise.resolve({ id: 'new-doc-id' })),
 }));
@@ -72,8 +79,68 @@ describe('AIUtils.parseAIResponse', () => {
     expect(result.status).toBe('passed');
   });
 
-  test('should throw on unparseable response', () => {
-    expect(() => AIUtils.parseAIResponse('invalid')).toThrow('Could not parse AI response');
+  test('should apply heuristic parsing on unparseable response', () => {
+    const result = AIUtils.parseAIResponse('invalid');
+
+    expect(result.status).toBe('failed');
+    expect(result.feedback).toBe('invalid');
+    expect(result.traceLog).toContain('Heuristic parsing');
+  });
+});
+
+describe('AIUtils.callAgentReview', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+    jest.clearAllMocks();
+  });
+
+  test('routes NVIDIA agent requests through /api/review with Firebase bearer auth', async () => {
+    (mockFetch as any).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              status: 'failed',
+              feedback: 'NVIDIA agent reviewed drawing',
+              categories: [],
+              traceLog: 'nvidia-test',
+            }),
+          },
+        }],
+      }),
+    });
+
+    const result = await AIUtils.callAgentReview(
+      'You are a SANS 10400 wall checker.',
+      'Review this drawing.',
+      'https://example.public.blob.vercel-storage.com/test.png',
+      {
+        provider: 'nvidia',
+        apiKey: 'client-side-placeholder',
+        model: 'meta/llama-3.2-90b-vision-instruct',
+        baseUrl: 'https://integrate.api.nvidia.com/v1',
+      },
+      {
+        id: 'wall_checker',
+        role: 'wall_checker',
+        name: 'Wall Agent',
+        description: 'Wall compliance',
+        systemPrompt: 'Check walls',
+        temperature: 0.1,
+        status: 'online',
+        lastActive: new Date().toISOString(),
+      }
+    );
+
+    expect(result).toContain('NVIDIA agent reviewed drawing');
+    expect(mockFetch).toHaveBeenCalledWith('/api/review', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer mock-firebase-id-token',
+      }),
+    }));
   });
 });
 
