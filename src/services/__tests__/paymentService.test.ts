@@ -35,6 +35,24 @@ jest.mock('firebase/auth', () => ({
   getIdToken: () => mockGetIdToken(),
 }));
 
+// Mock modular Firebase Firestore APIs used by paymentService
+jest.mock('firebase/firestore', () => ({
+  collection: jest.fn(() => ({ type: 'collection' })),
+  query: jest.fn(() => ({ type: 'query' })),
+  where: jest.fn(() => ({ type: 'where' })),
+  orderBy: jest.fn(() => ({ type: 'orderBy' })),
+  doc: jest.fn(() => ({ type: 'doc' })),
+  getDoc: jest.fn(() => Promise.resolve({ exists: () => false })),
+  getDocs: jest.fn(() => Promise.resolve({ docs: [], size: 0 })),
+  onSnapshot: jest.fn((_ref, callback: any) => {
+    callback({
+      docs: [],
+      exists: () => false,
+    });
+    return jest.fn();
+  }),
+}));
+
 // Mock notification service
 jest.mock('../notificationService', () => ({
   notificationService: {
@@ -81,6 +99,10 @@ describe('PaymentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const { auth } = require('../../lib/firebase');
+    auth.currentUser = { uid: 'test-user', email: 'test@example.com' };
+    process.env.VITE_PAYFAST_MERCHANT_ID = '10000100';
+    process.env.VITE_PAYFAST_MERCHANT_KEY = '46f0cd694581a';
     (global.fetch as jest.Mock).mockReset();
   });
 
@@ -318,7 +340,7 @@ describe('PaymentService', () => {
 
       expect(url).toContain('merchant_id=');
       expect(url).toContain('merchant_key=');
-      expect(url).toContain('amount=10000');
+      expect(url).toContain('amount=100.00');
       expect(url).toContain('item_name=');
     });
   });

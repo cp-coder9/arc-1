@@ -17,6 +17,17 @@ import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
 const md5 = (jsMd5 as any).default || jsMd5;
 
+type PayFastEnv = {
+  VITE_PAYFAST_MERCHANT_ID?: string;
+  VITE_PAYFAST_MERCHANT_KEY?: string;
+  VITE_PAYFAST_PASSPHRASE?: string;
+  VITE_PAYFAST_SANDBOX?: string;
+};
+
+function getPayFastEnv(): PayFastEnv {
+  return typeof process !== 'undefined' ? (process.env as PayFastEnv) : {};
+}
+
 /** Fetch a fresh Firebase ID token for the current user, or throw if not signed in. */
 async function requireIdToken(): Promise<string> {
   const user = auth.currentUser;
@@ -41,12 +52,13 @@ async function apiFetch(path: string, body: object): Promise<any> {
 }
 
 // PayFast configuration
+const payFastEnv = getPayFastEnv();
 const PAYFAST_CONFIG = {
-  merchantId: String(import.meta.env.VITE_PAYFAST_MERCHANT_ID || ''),
-  merchantKey: String(import.meta.env.VITE_PAYFAST_MERCHANT_KEY || ''),
-  passphrase: String(import.meta.env.VITE_PAYFAST_PASSPHRASE || ''),
-  sandbox: import.meta.env.VITE_PAYFAST_SANDBOX === 'true',
-  url: import.meta.env.VITE_PAYFAST_SANDBOX === 'true'
+  merchantId: String(payFastEnv.VITE_PAYFAST_MERCHANT_ID || ''),
+  merchantKey: String(payFastEnv.VITE_PAYFAST_MERCHANT_KEY || ''),
+  passphrase: String(payFastEnv.VITE_PAYFAST_PASSPHRASE || ''),
+  sandbox: payFastEnv.VITE_PAYFAST_SANDBOX === 'true',
+  url: payFastEnv.VITE_PAYFAST_SANDBOX === 'true'
     ? 'https://sandbox.payfast.co.za/eng/process'
     : 'https://www.payfast.co.za/eng/process',
 };
@@ -94,6 +106,19 @@ class PaymentService {
   async verifyITNSignature(pfData: Record<string, string>, signature: string): Promise<boolean> {
     const expectedSignature = await this.generateSignature(pfData);
     return expectedSignature === signature;
+  }
+
+  calculateEscrowAmounts(budget: number, platformFeePercentage = PLATFORM_FEE_PERCENTAGE): {
+    total: number;
+    platformFee: number;
+    architectAmount: number;
+  } {
+    const platformFee = Math.round(budget * platformFeePercentage);
+    return {
+      total: budget + platformFee,
+      platformFee,
+      architectAmount: budget,
+    };
   }
 
   /**

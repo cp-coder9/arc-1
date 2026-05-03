@@ -141,6 +141,14 @@ jest.mock('../ui/dialog', () => ({
   DialogTrigger: ({ children }: { children: React.ReactNode }) => <div data-testid="dialog-trigger">{children}</div>,
 }));
 
+jest.mock('../ui/input', () => ({
+  Input: (props: any) => <input data-testid="input" {...props} />,
+}));
+
+jest.mock('../ui/textarea', () => ({
+  Textarea: (props: any) => <textarea data-testid="textarea" {...props} />,
+}));
+
 // Mock services
 jest.mock('../../services/geminiService', () => ({
   reviewDrawing: jest.fn().mockResolvedValue({
@@ -165,16 +173,16 @@ jest.mock('../../lib/uploadService', () => ({
 }));
 
 // Mock child components
-jest.mock('../ProfileEditor', () => () => <div data-testid="profile-editor">Profile Editor</div>);
+jest.mock('../ProfileEditor', () => ({ __esModule: true, default: () => <div data-testid="profile-editor">Profile Editor</div> }));
 jest.mock('../Chat', () => ({
   Chat: () => <div data-testid="chat">Chat Component</div>,
   ChatButton: () => <button data-testid="chat-button">Chat</button>,
 }));
-jest.mock('../RatingSystem', () => () => <div data-testid="rating-system">Rating System</div>);
-jest.mock('../SubmissionItem', () => () => <div data-testid="submission-item">Submission Item</div>);
-jest.mock('../OrchestrationProgressModal', () => () => <div data-testid="progress-modal">Progress Modal</div>);
-jest.mock('../SearchFilter', () => () => <div data-testid="search-filter">Search Filter</div>);
-jest.mock('../MunicipalTracker', () => () => <div data-testid="municipal-tracker">Municipal Tracker</div>);
+jest.mock('../RatingSystem', () => ({ __esModule: true, default: () => <div data-testid="rating-system">Rating System</div> }));
+jest.mock('../SubmissionItem', () => ({ __esModule: true, default: () => <div data-testid="submission-item">Submission Item</div>, SubmissionItem: () => <div data-testid="submission-item">Submission Item</div> }));
+jest.mock('../OrchestrationProgressModal', () => ({ __esModule: true, default: () => <div data-testid="progress-modal">Progress Modal</div>, OrchestrationProgressModal: () => <div data-testid="progress-modal">Progress Modal</div> }));
+jest.mock('../SearchFilter', () => ({ __esModule: true, default: () => <div data-testid="search-filter">Search Filter</div>, SearchFilter: () => <div data-testid="search-filter">Search Filter</div> }));
+jest.mock('../MunicipalTracker', () => ({ __esModule: true, default: () => <div data-testid="municipal-tracker">Municipal Tracker</div> }));
 
 // Mock sonner toast
 jest.mock('sonner', () => ({
@@ -220,7 +228,7 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Mock ReactMarkdown
-jest.mock('react-markdown', () => ({ children }: { children: string }) => <div>{children}</div>);
+jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: { children: string }) => <div>{children}</div> }));
 
 // Mock date-fns
 describe('ArchitectDashboard', () => {
@@ -266,7 +274,7 @@ describe('ArchitectDashboard', () => {
   test('should display empty state when no jobs available', () => {
     render(<ArchitectDashboard user={mockUser} />);
 
-    expect(screen.getByText(/No available jobs/i)).toBeInTheDocument();
+    expect(screen.getByText(/No active projects yet/i)).toBeInTheDocument();
   });
 
   test('should handle tab navigation', () => {

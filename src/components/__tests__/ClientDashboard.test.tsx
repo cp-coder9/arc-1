@@ -140,14 +140,14 @@ jest.mock('../../lib/uploadService', () => ({
 }));
 
 // Mock child components
-jest.mock('../ProfileEditor', () => () => <div data-testid="profile-editor">Profile Editor</div>);
+jest.mock('../ProfileEditor', () => ({ __esModule: true, default: () => <div data-testid="profile-editor">Profile Editor</div> }));
 jest.mock('../Chat', () => ({
   Chat: () => <div data-testid="chat">Chat Component</div>,
 }));
-jest.mock('../ArchitectRecommendations', () => () => <div data-testid="architect-recommendations">Recommendations</div>);
-jest.mock('../MunicipalTracker', () => () => <div data-testid="municipal-tracker">Municipal Tracker</div>);
-jest.mock('../SubmissionItem', () => () => <div data-testid="submission-item">Submission Item</div>);
-jest.mock('../OrchestrationProgressModal', () => () => <div data-testid="progress-modal">Progress Modal</div>);
+jest.mock('../ArchitectRecommendations', () => ({ __esModule: true, default: () => <div data-testid="architect-recommendations">Recommendations</div> }));
+jest.mock('../MunicipalTracker', () => ({ __esModule: true, default: () => <div data-testid="municipal-tracker">Municipal Tracker</div> }));
+jest.mock('../SubmissionItem', () => ({ __esModule: true, default: () => <div data-testid="submission-item">Submission Item</div>, SubmissionItem: () => <div data-testid="submission-item">Submission Item</div> }));
+jest.mock('../OrchestrationProgressModal', () => ({ __esModule: true, default: () => <div data-testid="progress-modal">Progress Modal</div>, OrchestrationProgressModal: () => <div data-testid="progress-modal">Progress Modal</div> }));
 
 // Mock sonner toast
 jest.mock('sonner', () => ({
@@ -193,7 +193,7 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Mock ReactMarkdown
-jest.mock('react-markdown', () => ({ children }: { children: string }) => <div>{children}</div>);
+jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: { children: string }) => <div>{children}</div> }));
 
 describe('ClientDashboard', () => {
   const mockUser: UserProfile = {
@@ -211,13 +211,13 @@ describe('ClientDashboard', () => {
   test('should render dashboard with user name', () => {
     render(<ClientDashboard user={mockUser} />);
 
-    expect(screen.getByText('Client Portal')).toBeInTheDocument();
+    expect(screen.getByText(/Welcome,\s*Test Client/i)).toBeInTheDocument();
   });
 
   test('should display empty state when no jobs', () => {
     render(<ClientDashboard user={mockUser} />);
 
-    expect(screen.getByText(/No active projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/You haven't posted any jobs yet/i)).toBeInTheDocument();
   });
 
   test('should render profile editor', () => {
@@ -231,6 +231,6 @@ describe('ClientDashboard', () => {
     render(<ClientDashboard user={mockUser} activeTab="jobs" onTabChange={onTabChange} />);
 
     // Dashboard should render with the specified tab
-    expect(screen.getByText('Client Portal')).toBeInTheDocument();
+    expect(screen.getByText(/Welcome,\s*Test Client/i)).toBeInTheDocument();
   });
 });

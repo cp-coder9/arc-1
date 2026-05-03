@@ -15,7 +15,7 @@ import {
   updateProfile,
   sendEmailVerification
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { UserProfile, UserRole, Job, JobCategory } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
@@ -23,7 +23,7 @@ import { Badge } from './components/ui/badge';
 import { ScrollArea } from './components/ui/scroll-area';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Input } from './components/ui/input';
 import { 
   LayoutDashboard, 
@@ -51,7 +51,17 @@ import {
   HardDrive,
   Sparkles,
   Send,
-  Building2
+  Building2,
+  BookOpen,
+  Bot,
+  Workflow,
+  Files,
+  ClipboardCheck,
+  Network,
+  Hammer,
+  Download,
+  Lightbulb,
+  Database
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -301,7 +311,7 @@ export default function App() {
   }
 
   if (!user && !showLogin) {
-    return <LandingPage onGetStarted={() => setShowOnboarding(true)} />;
+    return <LandingPage onGetStarted={() => setShowOnboarding(true)} onLogin={() => setShowLogin(true)} />;
   }
 
   if (!user && showLogin) {
@@ -628,95 +638,361 @@ function NavItem({ icon, label, active, onClick }: any) {
   );
 }
 
-function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
+function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLogin: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [landingTab, setLandingTab] = useState<'home' | 'resources'>('home');
+  const [liveJobs, setLiveJobs] = useState<Job[]>([]);
+  const prefersReducedMotion = useReducedMotion();
+  const fadeUp = prefersReducedMotion ? {} : { opacity: 0, y: 24 };
+  const visible = { opacity: 1, y: 0 };
+
+  const goToTab = (tab: 'home' | 'resources') => {
+    setLandingTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'jobs'),
+      where('status', '==', 'open'),
+      orderBy('createdAt', 'desc'),
+      limit(3)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLiveJobs(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job)));
+    }, (error) => {
+      console.error('Error loading live marketplace preview:', error);
+      setLiveJobs([]);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] overflow-x-hidden relative">
+    <div className="min-h-screen bg-background overflow-x-hidden relative text-foreground">
       <AnimatedFloorPlan />
-      <nav className="h-28 border-b border-border px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-50">
-        <Logo showText iconClassName="w-24 h-24 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-4xl lg:text-5xl tracking-tighter text-foreground" />
+      <nav className="h-20 sm:h-24 lg:h-28 border-b border-border px-4 sm:px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-card/95 backdrop-blur-md z-50 shadow-sm">
+        <Logo showText iconClassName="w-16 h-16 sm:w-20 sm:h-20 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-2xl sm:text-3xl lg:text-5xl tracking-tighter text-foreground" />
         <div className="hidden lg:flex items-center gap-6">
-          <button onClick={onGetStarted} className="text-sm font-medium hover:text-primary">Marketplace</button>
+          <button onClick={() => goToTab('home')} className={`text-sm font-bold underline-offset-4 hover:underline ${landingTab === 'home' ? 'text-primary' : 'text-foreground/80 hover:text-primary'}`}>Home</button>
+          <button onClick={() => goToTab('resources')} className={`text-sm font-bold underline-offset-4 hover:underline ${landingTab === 'resources' ? 'text-primary' : 'text-foreground/80 hover:text-primary'}`}>Resources</button>
+          <button onClick={onGetStarted} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
+          <button onClick={onLogin} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Login</button>
           <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
         </div>
-        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
         {isMobileMenuOpen && (
-          <div className="absolute top-20 left-4 right-4 bg-white border border-border rounded-[2rem] shadow-2xl p-8 flex flex-col gap-6 lg:hidden">
-            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold">Marketplace</button>
+          <div className="absolute top-20 left-3 right-3 bg-card border border-border rounded-[1.5rem] shadow-2xl p-5 sm:p-8 flex flex-col gap-5 sm:gap-6 lg:hidden">
+            <button onClick={() => goToTab('home')} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Home</button>
+            <button onClick={() => goToTab('resources')} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Resources</button>
+            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
+            <button onClick={() => { onLogin(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Login</button>
             <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="bg-primary text-primary-foreground h-14 rounded-full font-bold">Get Started</Button>
           </div>
         )}
       </nav>
 
+      <AnimatePresence mode="wait">
+        {landingTab === 'resources' ? (
+          <motion.div
+            key="resources"
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -18 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
+            <ResourcesLanding onGetStarted={onGetStarted} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="home"
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -18 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
+
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
-          <div className="pb-16 relative z-20">
-            <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
-            <div className="space-y-3 mb-10">
+      <section className="pt-16 sm:pt-24 lg:pt-32 pb-14 sm:pb-20 px-4 sm:px-6 lg:px-20 relative z-10 overflow-hidden bg-card">
+        <div className="max-w-7xl mx-auto min-h-[auto] lg:min-h-[680px] relative">
+          <motion.div
+            initial={fadeUp}
+            animate={visible}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+            className="pb-16 relative z-20 max-w-4xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+            >
+              <Badge className="bg-primary/10 text-primary border-primary/20 mb-6 sm:mb-8 px-3 sm:px-4 py-1 text-[10px] sm:text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
+            </motion.div>
+            <div className="space-y-2 sm:space-y-3 mb-8 sm:mb-10">
               {[
                 { word: 'Discover', icon: <Search size={42} /> },
                 { word: 'Verify', icon: <ShieldCheck size={42} /> },
                 { word: 'Collaborate', icon: <Users size={42} /> }
               ].map((item, index) => (
-                <div key={item.word} className="hero-word-row flex items-center gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible" style={{ animationDelay: `${index * 140}ms` }}>
-                  <div className="h-20 w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20">
+                <motion.div
+                  key={item.word}
+                  initial={{ opacity: 0, x: -40 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.15 }}
+                  viewport={{ once: true }}
+                  className="hero-word-row flex items-center gap-3 sm:gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible"
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className="h-12 w-12 sm:h-16 sm:w-16 lg:h-20 lg:w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-8 sm:[&>svg]:w-8 lg:[&>svg]:h-[42px] lg:[&>svg]:w-[42px]"
+                  >
                     {item.icon}
-                  </div>
-                  <h1 className={`relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
+                  </motion.div>
+                  <h1 className={`relative text-4xl min-[380px]:text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm break-words ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
                     <span className="relative z-10">{item.word}</span>
                   </h1>
-                </div>
+                </motion.div>
               ))}
             </div>
-            <p className="text-xl lg:text-2xl text-foreground mb-10 max-w-2xl leading-relaxed">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              viewport={{ once: true }}
+              className="text-base sm:text-xl lg:text-2xl text-muted-foreground mb-8 sm:mb-10 max-w-2xl leading-relaxed font-medium"
+            >
               Architex connects clients with elite professionals and contractors through an AI-powered marketplace for the built environment. Providing tailored management and resource sharing tools to deliver projects end-to-end.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl">Post a Job <ArrowRight className="ml-2" /></Button>
-              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-white/70">Browse Talent</Button>
-            </div>
-          </div>
-          <div className="relative min-h-[560px] hidden lg:block">
-            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-border bg-white/70 p-8 flex items-center justify-center">
-              <Logo iconClassName="w-[28rem] h-[28rem] object-contain opacity-95" />
-            </div>
-            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/30 border border-primary/15 rounded-[2rem] overflow-hidden">
-              <svg viewBox="0 0 520 400" className="absolute inset-0 w-full h-full text-primary/40" fill="none" stroke="currentColor" strokeWidth="1.4">
-                <path d="M80 330V155l115-60 170 85v150M195 95v235M365 180v150M80 155l285 25M80 205l285 25M80 255l285 25M115 315h285M115 285h285M115 255h285M115 225h285" />
-                <path d="M195 95l170 85 75-45-170-85-75 45ZM365 180l75-45v145l-75 50" />
-                <circle cx="80" cy="155" r="3" fill="currentColor" /><circle cx="195" cy="95" r="3" fill="currentColor" /><circle cx="365" cy="180" r="3" fill="currentColor" /><circle cx="440" cy="135" r="3" fill="currentColor" />
-              </svg>
-            </div>
-          </div>
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              viewport={{ once: true }}
+              className="flex flex-wrap gap-3 sm:gap-4"
+            >
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-14 sm:h-16 px-8 sm:px-10 rounded-full text-base sm:text-lg font-bold shadow-xl hover:bg-primary-dark transition-colors">Post a Job <ArrowRight className="ml-2" /></Button>
+              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-full text-base sm:text-lg font-bold bg-card text-foreground border-border hover:bg-accent transition-colors">Browse Talent</Button>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
+      <ServicesInfographic prefersReducedMotion={Boolean(prefersReducedMotion)} onGetStarted={onGetStarted} />
+
       {/* Marketplace Preview */}
-      <section className="py-12 bg-secondary/20 px-8 lg:px-20 relative z-10 border-y border-border">
+      <section className="py-12 bg-secondary px-4 sm:px-8 lg:px-20 relative z-10 border-y border-border">
         <div className="max-w-7xl mx-auto">
+          <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 uppercase tracking-widest">Live Marketplace</Badge>
+              <h2 className="text-3xl md:text-5xl font-heading font-black tracking-tight text-foreground">Current open projects</h2>
+              <p className="mt-3 max-w-2xl text-muted-foreground font-medium">Browse live opportunities from clients looking for built-environment professionals.</p>
+            </div>
+            <Button onClick={onGetStarted} variant="outline" className="rounded-full font-bold">View Marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {(liveJobs.length > 0 ? liveJobs : [
+              { id: 'sample-1', title: 'Residential renovation concept', category: 'Residential', location: 'Cape Town', budget: 85000, deadline: 'Open brief', description: 'Kitchen and living area redesign with council-ready documentation.' },
+              { id: 'sample-2', title: 'Retail fit-out documentation', category: 'Commercial', location: 'Johannesburg', budget: 140000, deadline: 'Open brief', description: 'Technical drawing package for a small retail interior fit-out.' },
+              { id: 'sample-3', title: 'New home compliance review', category: 'Residential', location: 'Pretoria', budget: 65000, deadline: 'Open brief', description: 'Plan review and compliance support before municipal submission.' }
+            ] as Partial<Job>[]).map((job) => (
+              <motion.div
+                key={job.id}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                viewport={{ once: true }}
+                className="rounded-3xl border border-border bg-card p-6 shadow-sm hover:shadow-lg transition-shadow flex flex-col min-h-[260px]"
+              >
+                <div className="flex items-center justify-between gap-3 mb-5">
+                  <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">{job.category || 'Project'}</Badge>
+                  <span className="text-sm font-bold text-primary font-mono">R {(job.budget || 0).toLocaleString()}</span>
+                </div>
+                <h3 className="text-xl font-heading font-black text-foreground mb-3">{job.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-6">{job.description}</p>
+                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-[10px] uppercase font-bold text-muted-foreground">
+                  <span className="flex items-center gap-1"><MapPin size={12} /> {job.location || 'South Africa'}</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> {job.deadline || 'Open'}</span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               ['AI-Powered Intelligence', 'SANS 10400 compliance checks for drawings and collaborative design workflows.'],
               ['Built for the Built Environment', 'Purpose-built tools for every project stage.'],
               ['Connected Ecosystem', 'Clients, professionals, and contractors working as one.']
-            ].map(([title, copy]) => (
-              <div key={title} className="rounded-3xl border border-border bg-white/50 backdrop-blur-sm p-8">
-                <h2 className="text-lg font-black uppercase tracking-wide mb-3">{title}</h2>
-                <p className="text-muted-foreground leading-relaxed max-w-sm">{copy}</p>
-              </div>
+            ].map(([title, copy], idx) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: idx * 0.1 }}
+                viewport={{ once: true }}
+                className="rounded-3xl border border-border bg-card p-8 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <h2 className="text-lg font-black uppercase tracking-wide mb-3 text-foreground">{title}</h2>
+                <p className="text-muted-foreground leading-relaxed max-w-sm font-medium">{copy}</p>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="bg-secondary/50 py-20 px-8 lg:px-20 border-t border-border relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <Logo showText iconClassName="w-16 h-16 object-contain" textClassName="font-heading font-bold text-2xl lg:text-3xl" />
-          <p className="text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <footer className="bg-card py-12 sm:py-16 lg:py-20 px-4 sm:px-8 lg:px-20 border-t border-border relative z-10 text-foreground">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-6 sm:gap-8">
+          <Logo showText iconClassName="w-14 h-14 sm:w-16 sm:h-16 object-contain" textClassName="font-heading font-bold text-xl sm:text-2xl lg:text-3xl" />
+          <p className="text-xs sm:text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function ServicesInfographic({ prefersReducedMotion, onGetStarted }: { prefersReducedMotion: boolean; onGetStarted: () => void }) {
+  const services = [
+    { title: 'Client Brief', copy: 'Capture scope, budget, site context, and project goals.', icon: <FileText size={22} /> },
+    { title: 'Smart Matching', copy: 'Connect with architects, freelancers, and contractors.', icon: <Network size={22} /> },
+    { title: 'AI Automation', copy: 'Orchestrated agents review drawings, risks, and next actions.', icon: <Bot size={22} /> },
+    { title: 'SANS Compliance', copy: 'Automated checks for walls, fenestration, fire, and area rules.', icon: <ClipboardCheck size={22} /> },
+    { title: 'Resource Sharing', copy: 'Centralise documents, knowledge, files, and project evidence.', icon: <Files size={22} /> },
+    { title: 'Delivery', copy: 'Move from concept to municipal-ready submission workflows.', icon: <Hammer size={22} /> },
+  ];
+
+  return (
+    <section className="py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-20 relative z-10 bg-[linear-gradient(135deg,#021817_0%,#04302c_54%,#0f6b62_100%)] text-primary-foreground overflow-hidden">
+      <div aria-hidden="true" className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,white,transparent_24%),radial-gradient(circle_at_80%_70%,white,transparent_20%)]" />
+      <div className="max-w-7xl mx-auto relative z-10">
+        <div className="mb-10 sm:mb-14 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <Badge className="mb-5 bg-white/10 text-white border-white/20 uppercase tracking-widest text-[10px] sm:text-xs">Animated platform map</Badge>
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-heading font-black tracking-tight max-w-3xl">All services, AI automation, and delivery workflows in one connected hub.</h2>
+          </div>
+          <Button onClick={onGetStarted} variant="outline" className="w-full sm:w-auto rounded-full h-14 px-8 bg-white/10 border-white/25 text-white hover:bg-white hover:text-primary font-bold">
+            Start a project <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-5 sm:gap-6 items-center">
+          <div className="grid gap-5">
+            {services.slice(0, 3).map((service, index) => <ServiceNode key={service.title} service={service} index={index} />)}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            animate={prefersReducedMotion ? undefined : { boxShadow: ['0 0 0 rgba(255,255,255,0.10)', '0 0 70px rgba(255,255,255,0.28)', '0 0 0 rgba(255,255,255,0.10)'] }}
+            transition={{ duration: 2.8, repeat: prefersReducedMotion ? 0 : Infinity, ease: 'easeInOut' }}
+            viewport={{ once: true }}
+            className="relative mx-auto my-4 sm:my-6 lg:my-0 h-64 w-64 sm:h-80 sm:w-80 rounded-full border border-white/20 bg-white/10 backdrop-blur-md flex items-center justify-center shadow-2xl"
+          >
+            <div className="absolute inset-8 rounded-full border border-dashed border-white/30 animate-spin-slow" />
+            <div className="absolute inset-16 rounded-full bg-primary-dark/80 border border-white/20" />
+            <div className="relative z-10 text-center px-10">
+              <div className="mx-auto mb-4 h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-white text-primary flex items-center justify-center shadow-xl">
+                <Workflow className="h-8 w-8 sm:h-[34px] sm:w-[34px]" />
+              </div>
+              <h3 className="font-heading text-2xl sm:text-3xl font-black">Architex AI</h3>
+              <p className="mt-2 text-xs sm:text-sm text-white/75 font-medium">Multi-agent automation coordinates compliance, marketplace, files, teams, and project intelligence.</p>
+            </div>
+          </motion.div>
+
+          <div className="grid gap-5">
+            {services.slice(3).map((service, index) => <ServiceNode key={service.title} service={service} index={index + 3} />)}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type ServiceNodeProps = {
+  service: { title: string; copy: string; icon: React.ReactNode };
+  index: number;
+};
+
+function ServiceNode({ service, index }: React.PropsWithChildren<ServiceNodeProps>) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 22 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, delay: index * 0.08 }}
+      viewport={{ once: true }}
+      className="group rounded-[1.5rem] sm:rounded-[2rem] border border-white/15 bg-white/10 p-4 sm:p-5 backdrop-blur-md hover:bg-white/15 transition-colors"
+    >
+      <div className="flex gap-3 sm:gap-4">
+        <div className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 rounded-2xl bg-white text-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+          {service.icon}
+        </div>
+        <div>
+          <h3 className="font-heading text-lg sm:text-xl font-black">{service.title}</h3>
+          <p className="mt-1 text-xs sm:text-sm text-white/75 leading-relaxed font-medium">{service.copy}</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ResourcesLanding({ onGetStarted }: { onGetStarted: () => void }) {
+  const resources = [
+    { title: 'SANS 10400 Readiness Guide', copy: 'Understand the checks Architex AI performs across walls, fire, fenestration, area sizing, and documentation.', icon: <BookOpen size={24} />, tag: 'Compliance' },
+    { title: 'Client Briefing Template', copy: 'Prepare scope, site details, inspiration, budget, and timeline before posting your project.', icon: <FileText size={24} />, tag: 'Clients' },
+    { title: 'AI Review Checklist', copy: 'A practical list for title blocks, north points, scale bars, room schedules, and municipal submission basics.', icon: <ClipboardCheck size={24} />, tag: 'AI Automation' },
+    { title: 'Professional Onboarding', copy: 'Guidance for architects and freelancers setting up verified marketplace profiles.', icon: <Users size={24} />, tag: 'Professionals' },
+    { title: 'Resource Library Workflow', copy: 'Learn how shared files, knowledge sources, and project evidence support faster decisions.', icon: <Database size={24} />, tag: 'Knowledge' },
+    { title: 'Project Delivery Playbook', copy: 'Coordinate teams from concept to approval using payments, files, reviews, and audit trails.', icon: <Lightbulb size={24} />, tag: 'Delivery' },
+  ];
+
+  return (
+    <main className="relative z-10 bg-background">
+      <section className="px-4 sm:px-6 lg:px-20 py-16 sm:py-20 lg:py-24 bg-card border-b border-border overflow-hidden relative">
+        <div aria-hidden="true" className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-12 items-center">
+          <div>
+            <Badge className="mb-5 sm:mb-6 bg-primary/10 text-primary border-primary/20 uppercase tracking-widest text-[10px] sm:text-xs">Resources</Badge>
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-heading font-black tracking-[-0.06em] leading-none">Practical tools for smarter built-environment projects.</h1>
+            <p className="mt-6 sm:mt-8 text-base sm:text-xl text-muted-foreground leading-relaxed font-medium max-w-2xl">Use these guides and templates to brief clearly, prepare compliant drawings, understand AI automation, and move faster from idea to approved project.</p>
+            <div className="mt-8 sm:mt-10 flex flex-wrap gap-3 sm:gap-4">
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full bg-primary text-primary-foreground font-bold">Use the marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              <Button variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full font-bold">Browse guides</Button>
+            </div>
+          </div>
+          <div className="rounded-[2rem] sm:rounded-[2.5rem] border border-primary/15 bg-primary/5 p-4 sm:p-8 shadow-xl">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {['Brief', 'Match', 'Review', 'Submit'].map((step, index) => (
+                <motion.div key={step} initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.08 }} viewport={{ once: true }} className="rounded-2xl sm:rounded-3xl bg-card border border-border p-4 sm:p-6">
+                  <span className="text-xs font-black text-primary font-mono">0{index + 1}</span>
+                  <p className="mt-6 sm:mt-8 font-heading text-xl sm:text-2xl font-black">{step}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 sm:px-6 lg:px-20 py-14 sm:py-20 bg-secondary border-b border-border">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {resources.map((resource, index) => (
+            <motion.article key={resource.title} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: index * 0.06 }} viewport={{ once: true }} className="rounded-[1.5rem] sm:rounded-[2rem] border border-border bg-card p-5 sm:p-7 shadow-sm hover:shadow-lg hover:border-primary/25 transition-all">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">{resource.icon}</div>
+                <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">{resource.tag}</Badge>
+              </div>
+              <h2 className="text-2xl font-heading font-black mb-3">{resource.title}</h2>
+              <p className="text-muted-foreground leading-relaxed font-medium mb-6">{resource.copy}</p>
+              <button className="inline-flex items-center gap-2 text-sm font-black text-primary hover:underline underline-offset-4">
+                View resource <Download size={14} />
+              </button>
+            </motion.article>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
