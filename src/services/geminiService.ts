@@ -132,7 +132,7 @@ export async function callGeminiProxy(systemInstruction: string, prompt: string,
   return data.text;
 }
 
-const NVIDIA_VISION_MODELS = ['nvidia/nemotron-4-340b-instruct', 'meta/llama-3.1-405b-instruct'];
+const NVIDIA_VISION_MODELS = ['meta/llama-3.2-90b-vision-instruct', 'meta/llama-3.2-11b-vision-instruct'];
 
 export async function callOpenAICompatible(config: LLMConfig, systemInstruction: string, prompt: string, drawingUrl?: string, agent?: Agent): Promise<string> {
  const modelLower = (config.model ?? '').toLowerCase();

@@ -68,10 +68,11 @@ const PROVIDER_CONFIGS = {
     label: 'NVIDIA NIM',
     baseUrl: 'https://integrate.api.nvidia.com/v1',
     models: [
-      { value: 'nvidia/nemotron-4-340b-instruct', label: 'Nemotron 4 340B' },
-      { value: 'meta/llama-3.1-70b-instruct', label: 'Llama 3.1 70B' },
-      { value: 'meta/llama-3.1-405b-instruct', label: 'Llama 3.1 405B' },
-      { value: 'mistralai/mistral-large-2-instruct', label: 'Mistral Large 2' }
+      { value: 'mistralai/mistral-large-3-675b-instruct-2512', label: 'Mistral Large 3 675B Instruct' },
+      { value: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B Instruct' },
+      { value: 'meta/llama-3.2-90b-vision-instruct', label: 'Llama 3.2 90B Vision Instruct' },
+      { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B' },
+      { value: 'qwen/qwen3-next-80b-a3b-instruct', label: 'Qwen3 Next 80B Instruct' }
     ]
   }
 } as const;

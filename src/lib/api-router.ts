@@ -18,6 +18,7 @@ import { UserRole, MunicipalityType } from "../types";
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "";
 const PAYFAST_PASSPHRASE = process.env.VITE_PAYFAST_PASSPHRASE || "";
 const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
 const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || "";
@@ -89,6 +90,13 @@ async function getAdminLLMConfig() {
     console.error("Error fetching LLM config:", error);
   }
   return null;
+}
+
+function getProviderApiKey(provider?: string, configuredApiKey?: string): string {
+  if (configuredApiKey) return configuredApiKey;
+  if (provider === "nvidia") return NVIDIA_API_KEY;
+  if (provider === "gemini") return GEMINI_API_KEY;
+  return "";
 }
 
 // PayFast helpers
@@ -397,7 +405,7 @@ router.post("/review", reviewLimiter, async (req, res) => {
     });
   }
 
-  const activeApiKey = config.apiKey || "";
+  const activeApiKey = getProviderApiKey(config.provider, config.apiKey);
   const activeModel = config.model || "";
   // Deep-clean the baseUrl to prevent double-pathing (e.g. /v1/chat/completions/chat/completions)
   let cleanBaseUrl = (config.baseUrl || (config.provider === 'nvidia' ? 'https://integrate.api.nvidia.com/v1' : '')).replace(/\/$/, "");
@@ -735,7 +743,7 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
     }
 
     const provider = dbConfig.provider;
-    const activeApiKey = dbConfig.apiKey || GEMINI_API_KEY;
+    const activeApiKey = getProviderApiKey(provider, dbConfig.apiKey);
     const activeModel = dbConfig.model || (provider === 'gemini' ? "gemini-1.5-flash" : "");
     const searchPrompt = `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references based on your training data.`;
 
