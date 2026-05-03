@@ -362,6 +362,22 @@ export default function AdminDashboard({
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [reportSubmission, setReportSubmission] = useState<Submission | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [isAddingAgent, setIsAddingAgent] = useState(false);
+  const [newAgent, setNewAgent] = useState<Partial<Agent>>({
+    name: '',
+    role: '',
+    description: '',
+    systemPrompt: '',
+    temperature: 0.1,
+    status: 'online',
+    riskLevel: 'medium',
+    standardsCoverage: [],
+    executionModes: ['basic_ai_screen', 'full_professional_review'],
+    requiresHumanReview: true,
+    llmProvider: 'global',
+    version: '1.0.0'
+  });
 
   // Map sidebar tabs to internal dashboard tabs
   const internalTab = 
@@ -477,6 +493,61 @@ export default function AdminDashboard({
       toast.error('Failed to run AI review');
     } finally {
       setReviewingSubmissionId(null);
+    }
+  };
+
+  const handleCreateAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const role = (newAgent.role || '').trim().toLowerCase().replace(/\s+/g, '_');
+    const name = (newAgent.name || '').trim();
+    const systemPrompt = (newAgent.systemPrompt || '').trim();
+
+    if (!name || !role || !systemPrompt) {
+      toast.error('Agent name, role, and system prompt are required');
+      return;
+    }
+
+    if (agents.some(agent => agent.role === role)) {
+      toast.error('An agent with this role already exists');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'agents'), {
+        ...newAgent,
+        name,
+        role,
+        description: newAgent.description || 'Custom admin-created agent.',
+        systemPrompt,
+        temperature: Number(newAgent.temperature ?? 0.1),
+        status: newAgent.status || 'online',
+        standardsCoverage: Array.isArray(newAgent.standardsCoverage) ? newAgent.standardsCoverage : [],
+        executionModes: Array.isArray(newAgent.executionModes) ? newAgent.executionModes : ['basic_ai_screen'],
+        requiresHumanReview: newAgent.requiresHumanReview ?? true,
+        llmProvider: newAgent.llmProvider || 'global',
+        lastActive: new Date().toISOString(),
+        version: newAgent.version || '1.0.0'
+      });
+
+      toast.success('Agent created');
+      setIsAddingAgent(false);
+      setNewAgent({
+        name: '',
+        role: '',
+        description: '',
+        systemPrompt: '',
+        temperature: 0.1,
+        status: 'online',
+        riskLevel: 'medium',
+        standardsCoverage: [],
+        executionModes: ['basic_ai_screen', 'full_professional_review'],
+        requiresHumanReview: true,
+        llmProvider: 'global',
+        version: '1.0.0'
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to create agent');
     }
   };
 
@@ -623,22 +694,41 @@ export default function AdminDashboard({
 
         <TabsContent value="jobs">
           <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
-            <h2 className="text-2xl font-bold mb-8">Platform Jobs</h2>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+              <div>
+                <h2 className="text-2xl font-bold">Platform Jobs</h2>
+                <p className="text-sm text-muted-foreground mt-1">Click any project to inspect the full brief, stakeholders, compliance activity, and lifecycle history.</p>
+              </div>
+              <Badge variant="outline" className="w-fit rounded-full px-4 py-2 text-[10px] uppercase tracking-widest">{allJobs.length} projects tracked</Badge>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {allJobs.map(job => (
-                <Card key={job.id} className="border-border shadow-sm rounded-2xl p-6">
+                <button key={job.id} onClick={() => setSelectedJob(job)} className="text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-2xl">
+                <Card className="h-full border-border shadow-sm rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer group">
                   <div className="flex justify-between items-start mb-4">
                     <Badge className="bg-primary/5 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
                     <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status || 'open'}</Badge>
                   </div>
-                  <h3 className="font-bold mb-2">{job.title}</h3>
+                  <h3 className="font-bold mb-2 group-hover:text-primary transition-colors">{job.title}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
+                  <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-muted-foreground uppercase mb-5">
                     <span>Budget: R {(job.budget || 0).toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
+                    <span>Deadline: {safeFormat(job.deadline, 'MMM d, yyyy')}</span>
+                    <span>{submissions.filter(submission => submission.jobId === job.id).length} submissions</span>
+                  </div>
+                  <div className="pt-4 border-t border-border flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary">
+                    <span>View in-depth details</span>
+                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                   </div>
                 </Card>
+                </button>
               ))}
+              {allJobs.length === 0 && (
+                <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                  <p className="text-muted-foreground italic">No platform jobs found.</p>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -698,6 +788,86 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="agents">
+          <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 rounded-[2rem] border border-border bg-white p-6 shadow-sm">
+              <div>
+                <h2 className="text-2xl font-heading font-bold tracking-tight">AI Agents</h2>
+                <p className="text-sm text-muted-foreground mt-1">Manage specialist compliance agents or add a custom agent to the platform workflow.</p>
+              </div>
+              <Dialog open={isAddingAgent} onOpenChange={setIsAddingAgent}>
+                <DialogTrigger render={
+                  <Button className="h-12 rounded-2xl font-bold gap-2 shadow-lg shadow-primary/20">
+                    <Plus size={16} /> Add Agent
+                  </Button>
+                } />
+                <DialogContent className="sm:max-w-[720px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="font-heading text-2xl">Add New Agent</DialogTitle>
+                    <DialogDescription>Create a custom AI specialist agent for admin-managed compliance workflows.</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateAgent} className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Agent Name</label>
+                        <Input value={newAgent.name || ''} onChange={e => setNewAgent(current => ({ ...current, name: e.target.value }))} placeholder="e.g. Roof Compliance Agent" className="h-12 rounded-xl" required />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Role Key</label>
+                        <Input value={newAgent.role || ''} onChange={e => setNewAgent(current => ({ ...current, role: e.target.value }))} placeholder="roof_compliance" className="h-12 rounded-xl" required />
+                        <p className="text-[10px] text-muted-foreground">Spaces will be converted to underscores.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</label>
+                      <Textarea value={newAgent.description || ''} onChange={e => setNewAgent(current => ({ ...current, description: e.target.value }))} placeholder="What this agent reviews and when it should be used." className="rounded-xl" rows={3} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">System Prompt</label>
+                      <Textarea value={newAgent.systemPrompt || ''} onChange={e => setNewAgent(current => ({ ...current, systemPrompt: e.target.value }))} placeholder="Define the agent's review instructions, expected evidence, and output format." className="rounded-xl min-h-[160px]" required />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</label>
+                        <select value={newAgent.status || 'online'} onChange={e => setNewAgent(current => ({ ...current, status: e.target.value as Agent['status'] }))} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
+                          <option value="online">Online</option>
+                          <option value="offline">Offline</option>
+                          <option value="maintenance">Maintenance</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Risk Level</label>
+                        <select value={newAgent.riskLevel || 'medium'} onChange={e => setNewAgent(current => ({ ...current, riskLevel: e.target.value as Agent['riskLevel'] }))} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                          <option value="critical">Critical</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Temperature</label>
+                        <Input type="number" min="0" max="1" step="0.1" value={newAgent.temperature ?? 0.1} onChange={e => setNewAgent(current => ({ ...current, temperature: Number(e.target.value) }))} className="h-12 rounded-xl" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Standards Coverage</label>
+                      <Input value={(newAgent.standardsCoverage || []).join(', ')} onChange={e => setNewAgent(current => ({ ...current, standardsCoverage: e.target.value.split(',').map(item => item.trim()).filter(Boolean) }))} placeholder="SANS 10400-L, SANS 10400-K, MunicipalBylaw" className="h-12 rounded-xl" />
+                    </div>
+
+                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
+                      <Button type="button" variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setIsAddingAgent(false)}>Cancel</Button>
+                      <Button type="submit" className="h-12 rounded-xl font-bold gap-2">
+                        <Plus size={16} /> Create Agent
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {agents.map(agent => (
               <AgentCard key={agent.id} agent={agent} />
@@ -707,6 +877,7 @@ export default function AdminDashboard({
                 <p className="text-muted-foreground italic">No agents found in the system.</p>
               </div>
             )}
+          </div>
           </div>
         </TabsContent>
 
@@ -811,6 +982,195 @@ export default function AdminDashboard({
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
+        <DialogContent className="max-w-[95vw] w-[1100px] max-h-[90vh] overflow-y-auto rounded-[2rem] p-0">
+          {selectedJob && (() => {
+            const client = allUsers.find(u => u.uid === selectedJob.clientId);
+            const architect = selectedJob.selectedArchitectId ? allUsers.find(u => u.uid === selectedJob.selectedArchitectId) : null;
+            const jobSubmissions = submissions.filter(submission => submission.jobId === selectedJob.id);
+            const jobDisputes = disputes.filter(dispute => dispute.jobId === selectedJob.id);
+
+            return (
+              <div className="bg-white">
+                <DialogHeader className="p-8 border-b border-border bg-primary/5 text-left">
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <Badge className="bg-primary text-primary-foreground uppercase text-[10px] tracking-widest">{selectedJob.category}</Badge>
+                        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{selectedJob.status || 'open'}</Badge>
+                      </div>
+                      <DialogTitle className="text-3xl md:text-4xl font-heading font-black tracking-tight">{selectedJob.title}</DialogTitle>
+                      <DialogDescription className="mt-2 text-sm font-mono">Project ID: {selectedJob.id}</DialogDescription>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 min-w-[260px]">
+                      <ProjectMetric label="Budget" value={`R ${(selectedJob.budget || 0).toLocaleString()}`} />
+                      <ProjectMetric label="Submissions" value={jobSubmissions.length} />
+                      <ProjectMetric label="Disputes" value={jobDisputes.length} />
+                      <ProjectMetric label="Requirements" value={selectedJob.requirements?.length || 0} />
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                <div className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <DetailPanel title="Project Brief" className="lg:col-span-2">
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{selectedJob.description || 'No description provided.'}</p>
+                    </DetailPanel>
+                    <DetailPanel title="Project Metadata">
+                      <DetailRow label="Location" value={selectedJob.location || 'Not specified'} />
+                      <DetailRow label="Created" value={safeFormat(selectedJob.createdAt, 'MMM d, yyyy HH:mm')} />
+                      <DetailRow label="Updated" value={selectedJob.updatedAt ? safeFormat(selectedJob.updatedAt, 'MMM d, yyyy HH:mm') : 'No updates recorded'} />
+                      <DetailRow label="Deadline" value={safeFormat(selectedJob.deadline, 'MMM d, yyyy')} />
+                      {selectedJob.cancelledAt && <DetailRow label="Cancelled" value={safeFormat(selectedJob.cancelledAt, 'MMM d, yyyy HH:mm')} />}
+                      {selectedJob.cancellationReason && <DetailRow label="Cancellation reason" value={selectedJob.cancellationReason} />}
+                    </DetailPanel>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <DetailPanel title="Stakeholders">
+                      <StakeholderBlock label="Client" user={client} fallbackId={selectedJob.clientId} />
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <StakeholderBlock label="Selected Architect" user={architect} fallbackId={selectedJob.selectedArchitectId} empty="No architect selected yet" />
+                      </div>
+                    </DetailPanel>
+
+                    <DetailPanel title="Requirements">
+                      {selectedJob.requirements?.length ? (
+                        <ul className="space-y-2">
+                          {selectedJob.requirements.map((requirement, index) => (
+                            <li key={`${requirement}-${index}`} className="flex gap-3 rounded-xl border border-border bg-secondary/20 p-3 text-sm">
+                              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
+                              <span>{requirement}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No requirements captured for this project.</p>
+                      )}
+                    </DetailPanel>
+                  </div>
+
+                  <DetailPanel title="Compliance & Submission Activity">
+                    {jobSubmissions.length ? (
+                      <div className="space-y-3">
+                        {jobSubmissions.map(submission => (
+                          <div key={submission.id} className="rounded-2xl border border-border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                              <p className="font-bold text-sm">{submission.drawingName}</p>
+                              <p className="text-xs text-muted-foreground">Submitted {safeFormat(submission.createdAt, 'MMM d, yyyy HH:mm')} · Architect {submission.architectId}</p>
+                              {submission.riskStatus && <p className="text-xs text-primary mt-1">Risk: {submission.riskStatus.replaceAll('_', ' ')}</p>}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{(submission.status || 'processing').replaceAll('_', ' ')}</Badge>
+                              <Button size="sm" variant="outline" onClick={() => setReportSubmission(submission)}>View Report</Button>
+                              {submission.drawingUrl && (
+                                <Button size="sm" variant="ghost" onClick={() => window.open(submission.drawingUrl, '_blank', 'noopener,noreferrer')}>
+                                  <ExternalLink size={14} /> Drawing
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No drawing submissions or compliance activity recorded yet.</p>
+                    )}
+                  </DetailPanel>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <DetailPanel title="Status History">
+                      {selectedJob.statusHistory?.length ? (
+                        <div className="space-y-3">
+                          {selectedJob.statusHistory.map((item, index) => (
+                            <div key={`${item.status}-${item.timestamp}-${index}`} className="border-l-2 border-primary/30 pl-4 py-1">
+                              <p className="text-sm font-bold capitalize">{item.status.replace('-', ' ')}</p>
+                              <p className="text-xs text-muted-foreground">{safeFormat(item.timestamp, 'MMM d, yyyy HH:mm')} · Actor {item.actorId}</p>
+                              {item.note && <p className="text-xs mt-1">{item.note}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No status history has been recorded.</p>
+                      )}
+                    </DetailPanel>
+
+                    <DetailPanel title="Disputes & Admin Attention">
+                      {jobDisputes.length ? (
+                        <div className="space-y-3">
+                          {jobDisputes.map(dispute => (
+                            <div key={dispute.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                              <div className="flex items-center justify-between gap-3 mb-2">
+                                <p className="text-sm font-bold">{dispute.reason}</p>
+                                <Badge variant="outline" className="uppercase text-[10px] tracking-widest bg-white">{dispute.status.replaceAll('_', ' ')}</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">Requested: {dispute.requestedResolution}</p>
+                              {dispute.adminNotes && <p className="text-xs mt-2">Admin notes: {dispute.adminNotes}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No disputes linked to this project.</p>
+                      )}
+                    </DetailPanel>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ProjectMetric({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-heading font-black text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function DetailPanel({ title, className = '', children }: React.PropsWithChildren<{ title: string; className?: string }>) {
+  return (
+    <section className={`rounded-[1.5rem] border border-border bg-white p-6 shadow-sm ${className}`}>
+      <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="py-3 border-b border-border/60 last:border-b-0">
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground break-words">{value}</p>
+    </div>
+  );
+}
+
+function StakeholderBlock({ label, user, fallbackId, empty = 'Not assigned' }: { label: string; user?: UserProfile | null; fallbackId?: string; empty?: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{label}</p>
+      {user ? (
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+            {(user.displayName || user.email || 'U')[0]}
+          </div>
+          <div className="min-w-0">
+            <p className="font-bold text-sm">{user.displayName || 'Unnamed user'}</p>
+            <p className="text-xs text-muted-foreground break-all">{user.email}</p>
+            <Badge variant="outline" className="mt-2 uppercase text-[10px] tracking-widest">{user.role}</Badge>
+          </div>
+        </div>
+      ) : fallbackId ? (
+        <p className="text-sm text-muted-foreground">User ID: <span className="font-mono">{fallbackId}</span></p>
+      ) : (
+        <p className="text-sm text-muted-foreground italic">{empty}</p>
+      )}
     </div>
   );
 }
