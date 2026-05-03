@@ -198,7 +198,7 @@ export interface JobCard extends DelegatedTask {
   requirements?: string[];
 }
 
-export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
+export type LLMProvider = 'gemini' | 'openai' | 'openrouter' | 'nvidia';
 
 export interface LLMConfig {
   provider: LLMProvider;

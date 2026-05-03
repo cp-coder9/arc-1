@@ -38,7 +38,9 @@ const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-// Removed
+    envApiKey: 'GEMINI_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-pro', label: 'Gemini 2.0 Pro' },
@@ -49,6 +51,9 @@ const PROVIDER_CONFIGS = {
   openai: {
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
+    envApiKey: 'OPENAI_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'gpt-4o', label: 'GPT-4o' },
       { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
@@ -58,6 +63,9 @@ const PROVIDER_CONFIGS = {
   openrouter: {
     label: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',
+    envApiKey: 'OPENROUTER_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'anthropic/claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
       { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus' }
@@ -65,7 +73,11 @@ const PROVIDER_CONFIGS = {
   },
   nvidia: {
     label: 'NVIDIA NIM',
+    // NVIDIA Build / NIM OpenAI-compatible endpoint.
     baseUrl: 'https://integrate.api.nvidia.com/v1',
+    envApiKey: 'NVIDIA_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'mistralai/mistral-large-3-675b-instruct-2512', label: 'Mistral Large 3 675B Instruct' },
       { value: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B Instruct' },
@@ -76,17 +88,129 @@ const PROVIDER_CONFIGS = {
   }
 } as const;
 
+const providerKeys = Object.keys(PROVIDER_CONFIGS) as LLMProvider[];
+
+function applyProviderDefaults(agent: Agent, provider: LLMProvider | 'global', model?: string): Agent {
+  if (provider === 'global') {
+    return {
+      ...agent,
+      llmProvider: 'global',
+      llmModel: '',
+      llmApiKey: '',
+      llmBaseUrl: '',
+      authorizationType: undefined,
+      authorizationValue: '',
+      authorizationHeader: '',
+    };
+  }
+
+  const config = PROVIDER_CONFIGS[provider];
+  const selectedModel = model || agent.llmModel || config.models[0]?.value || '';
+  return {
+    ...agent,
+    llmProvider: provider,
+    llmModel: selectedModel,
+    llmBaseUrl: config.baseUrl,
+    llmApiKey: `env:${config.envApiKey}`,
+    authorizationType: config.authorizationType as 'bearer',
+    authorizationValue: `env:${config.envApiKey}`,
+    authorizationHeader: config.authorizationHeader,
+  };
+}
+
+function createBlankAgent(): Agent {
+  return applyProviderDefaults({
+    id: '',
+    name: 'New Compliance Agent',
+    role: 'custom_agent',
+    description: 'Describe this agent\'s compliance responsibility.',
+    systemPrompt: 'You are an architectural compliance specialist. Review drawings and return concise, regulation-grounded findings.',
+    temperature: 0.1,
+    status: 'online',
+    lastActive: new Date().toISOString(),
+    llmProvider: 'nvidia',
+  }, 'nvidia');
+}
+
 // Agent Card Component
-function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
-  const [editing, setEditing] = useState(false);
+function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent; key?: React.Key; isNew?: boolean; onCreated?: () => void; onCancel?: () => void }) {
+  const [editing, setEditing] = useState(isNew);
   const [tempAgent, setTempAgent] = useState<Agent>(agent);
+  const [isTesting, setIsTesting] = useState(false);
+  const [settingsTested, setSettingsTested] = useState(false);
+
+  const updateTempAgent = (next: Agent) => {
+    setTempAgent(next);
+    setSettingsTested(false);
+  };
+
+  const handleProviderChange = (provider: LLMProvider | 'global') => {
+    updateTempAgent(applyProviderDefaults(tempAgent, provider));
+  };
+
+  const handleModelChange = (model: string) => {
+    if (tempAgent.llmProvider && tempAgent.llmProvider !== 'global') {
+      updateTempAgent(applyProviderDefaults(tempAgent, tempAgent.llmProvider as LLMProvider, model));
+    } else {
+      updateTempAgent({ ...tempAgent, llmModel: model });
+    }
+  };
+
+  const handleTestSettings = async () => {
+    if (!tempAgent.llmProvider || tempAgent.llmProvider === 'global') {
+      toast.error('Select a concrete LLM provider before testing');
+      return;
+    }
+    setIsTesting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/agent/test-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          provider: tempAgent.llmProvider,
+          model: tempAgent.llmModel,
+          apiKey: tempAgent.llmApiKey,
+          baseUrl: tempAgent.llmBaseUrl,
+          authorizationType: tempAgent.authorizationType,
+          authorizationValue: tempAgent.authorizationValue,
+          authorizationHeader: tempAgent.authorizationHeader,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data.error || data.details || 'Agent settings test failed');
+      setSettingsTested(true);
+      toast.success(data.message || 'Agent settings test passed');
+    } catch (error: any) {
+      setSettingsTested(false);
+      toast.error(error.message || 'Agent settings test failed');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSave = async () => {
+    if (isNew && !settingsTested) {
+      toast.error('Test the agent settings successfully before creating this agent');
+      return;
+    }
     try {
-      await updateDoc(doc(db, 'agents', agent.id), {
+      const payload = {
         ...tempAgent,
-        updatedAt: new Date().toISOString()
-      });
+        id: undefined,
+        updatedAt: new Date().toISOString(),
+        ...(isNew ? { createdAt: new Date().toISOString() } : {}),
+      };
+      if (isNew) {
+        await addDoc(collection(db, 'agents'), payload);
+        onCreated?.();
+        toast.success("Agent created");
+        return;
+      }
+      await updateDoc(doc(db, 'agents', agent.id), payload);
       setEditing(false);
       toast.success("Agent configuration saved");
     } catch (error) {
@@ -96,6 +220,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
 
   const handleReset = () => {
     setTempAgent(agent);
+    setSettingsTested(false);
     setEditing(false);
   };
 
@@ -113,8 +238,8 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
     return (
       <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
         <CardHeader className="bg-primary/5 border-b border-border p-8">
-          <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-            <Cpu size={14} /> {agent.name} (Editing)
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Cpu size={14} /> {isNew ? 'New Agent' : `${agent.name} (Editing)`}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-8 space-y-6">
@@ -123,7 +248,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Name</label>
               <Input 
                 value={tempAgent.name} 
-                onChange={e => setTempAgent({...tempAgent, name: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, name: e.target.value})}
                 className="rounded-xl"
               />
             </div>
@@ -131,7 +256,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
               <Input 
                 value={tempAgent.role} 
-                onChange={e => setTempAgent({...tempAgent, role: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, role: e.target.value})}
                 className="rounded-xl"
               />
             </div>
@@ -139,7 +264,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
               <Textarea 
                 value={tempAgent.description} 
-                onChange={e => setTempAgent({...tempAgent, description: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, description: e.target.value})}
                 className="rounded-xl"
                 rows={3}
               />
@@ -158,7 +283,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     value={tempAgent.llmModel || ''} 
                     onChange={e => {
                       const val = e.target.value;
-                      setTempAgent({...tempAgent, llmModel: val === 'custom' ? '' : val});
+                      handleModelChange(val === 'custom' ? '' : val);
                     }}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
@@ -172,7 +297,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   </select>
                   <Input 
                     value={tempAgent.llmModel || ''}
-                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    onChange={e => handleModelChange(e.target.value)}
                     placeholder="Enter model name (e.g. nvidia/llama-3.1-70b-instruct)"
                     className="h-12 rounded-xl"
                   />
@@ -183,11 +308,11 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Provider</label>
               <select 
                 value={tempAgent.llmProvider || 'global'} 
-                onChange={e => setTempAgent({...tempAgent, llmProvider: e.target.value as LLMProvider | 'global'})}
+                onChange={e => handleProviderChange(e.target.value as LLMProvider | 'global')}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="global">Global (Use System Config)</option>
-                {Object.keys(PROVIDER_CONFIGS).map((key) => (
+                {providerKeys.map((key) => (
                   <option key={key} value={key}>{PROVIDER_CONFIGS[key as LLMProvider].label}</option>
                 ))}
               </select>
@@ -198,7 +323,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Model</label>
                   <select 
                     value={tempAgent.llmModel || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    onChange={e => handleModelChange(e.target.value)}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
                     <option value="">Select a model</option>
@@ -214,7 +339,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <Input 
                     type="password"
                     value={tempAgent.llmApiKey || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmApiKey: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, llmApiKey: e.target.value, authorizationValue: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -222,7 +347,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
                   <Input 
                     value={tempAgent.llmBaseUrl || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -232,7 +357,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authorization Type</label>
               <select 
                 value={tempAgent.authorizationType || ''} 
-                onChange={e => setTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
+                onChange={e => updateTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="">None</option>
@@ -248,7 +373,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <Input 
                     type={tempAgent.authorizationType === 'bearer' ? 'password' : 'text'}
                     value={tempAgent.authorizationValue || ''} 
-                    onChange={e => setTempAgent({...tempAgent, authorizationValue: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, authorizationValue: e.target.value, llmApiKey: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -257,7 +382,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Header Name</label>
                     <Input 
                       value={tempAgent.authorizationHeader || ''} 
-                      onChange={e => setTempAgent({...tempAgent, authorizationHeader: e.target.value})}
+                      onChange={e => updateTempAgent({...tempAgent, authorizationHeader: e.target.value})}
                       className="rounded-xl"
                     />
                   </div>
@@ -266,13 +391,16 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
             )}
           </div>
           <div className="flex gap-2">
+            <Button onClick={handleTestSettings} variant={settingsTested ? 'default' : 'outline'} className="h-12 rounded-xl font-bold gap-2" disabled={isTesting || tempAgent.llmProvider === 'global'}>
+              {isTesting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} {settingsTested ? 'Test Passed' : 'Test Settings'}
+            </Button>
             <Button onClick={handleSave} className="bg-primary text-primary-foreground h-12 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
-              <Save size={16} /> Save Changes
+              <Save size={16} /> {isNew ? 'Create Agent' : 'Save Changes'}
             </Button>
             <Button onClick={handleReset} variant="outline" className="h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
               <RefreshCcw size={16} /> Reset
             </Button>
-            <Button onClick={() => setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
+            <Button onClick={() => isNew ? onCancel?.() : setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
               Cancel
             </Button>
           </div>
@@ -383,6 +511,7 @@ export default function AdminDashboard({
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
   const pageSize = 8;
@@ -680,11 +809,28 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="agents">
+          <div className="mb-6 flex flex-col gap-3 rounded-[2rem] border border-border bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Agent Configuration</h2>
+              <p className="text-sm text-muted-foreground">Create, test, and tune specialist agents with provider defaults filled automatically.</p>
+            </div>
+            <Button onClick={() => setIsCreatingAgent(true)} className="h-12 rounded-xl font-bold gap-2" disabled={isCreatingAgent}>
+              <Plus size={16} /> New Agent
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {isCreatingAgent && (
+              <AgentCard
+                agent={createBlankAgent()}
+                isNew
+                onCreated={() => setIsCreatingAgent(false)}
+                onCancel={() => setIsCreatingAgent(false)}
+              />
+            )}
             {agents.map(agent => (
               <AgentCard key={agent.id} agent={agent} />
             ))}
-            {agents.length === 0 && (
+            {agents.length === 0 && !isCreatingAgent && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
                 <p className="text-muted-foreground italic">No agents found in the system.</p>
               </div>

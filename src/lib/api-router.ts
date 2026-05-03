@@ -19,6 +19,8 @@ import { UserRole, MunicipalityType } from "../types";
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const PAYFAST_PASSPHRASE = process.env.VITE_PAYFAST_PASSPHRASE || "";
 const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
 const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || "";
@@ -93,9 +95,13 @@ async function getAdminLLMConfig() {
 }
 
 function getProviderApiKey(provider?: string, configuredApiKey?: string): string {
-  if (configuredApiKey) return configuredApiKey;
+  if (configuredApiKey && !configuredApiKey.startsWith("env:")) return configuredApiKey;
+  const envKey = configuredApiKey?.replace(/^env:/, "");
+  if (envKey && process.env[envKey]) return process.env[envKey] || "";
   if (provider === "nvidia") return NVIDIA_API_KEY;
   if (provider === "gemini") return GEMINI_API_KEY;
+  if (provider === "openai") return OPENAI_API_KEY;
+  if (provider === "openrouter") return OPENROUTER_API_KEY;
   return "";
 }
 
@@ -722,6 +728,92 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
   } catch (error) {
     console.error("Gemini Proxy Error:", error);
     res.status(500).json({ error: "Failed to fetch from Gemini API" });
+  }
+});
+
+// Test provider/model settings before saving an agent configuration.
+router.post("/agent/test-settings", apiLimiter, async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  if (!(await isAdmin(decoded.uid))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  const { provider, model, apiKey, baseUrl, authorizationType, authorizationValue, authorizationHeader } = req.body || {};
+  if (!provider || provider === "global") return res.status(400).json({ error: "Select a concrete LLM provider before testing" });
+  if (!model) return res.status(400).json({ error: "Select an LLM model before testing" });
+
+  const activeApiKey = getProviderApiKey(provider, apiKey || authorizationValue);
+  if (!activeApiKey) {
+    return res.status(400).json({ error: `No API key configured for ${provider}. Set the mapped environment variable or enter a key.` });
+  }
+
+  try {
+    if (provider === "gemini") {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "Reply with exactly: agent settings ok" }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 32 },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const details = await response.text();
+        return res.status(response.status).json({ success: false, error: "Gemini test failed", details: details.substring(0, 500) });
+      }
+
+      return res.json({ success: true, message: "Gemini settings test passed" });
+    }
+
+    let cleanBaseUrl = (baseUrl || (provider === "nvidia" ? "https://integrate.api.nvidia.com/v1" : provider === "openai" ? "https://api.openai.com/v1" : "https://openrouter.ai/api/v1")).replace(/\/$/, "");
+    if (cleanBaseUrl.endsWith("/chat/completions")) cleanBaseUrl = cleanBaseUrl.replace(/\/chat\/completions$/, "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+    if (authorizationType === "custom" && authorizationHeader) {
+      headers[authorizationHeader] = activeApiKey;
+    } else if (authorizationType === "api_key") {
+      headers["api-key"] = activeApiKey;
+    } else {
+      headers.Authorization = `Bearer ${activeApiKey}`;
+    }
+    if (provider === "openrouter") {
+      headers["HTTP-Referer"] = process.env.APP_BASE_URL || "https://architex.co.za";
+      headers["X-Title"] = "Architex";
+    }
+
+    const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "Reply with exactly: agent settings ok" }],
+        temperature: 0,
+        max_tokens: 32,
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      return res.status(response.status).json({ success: false, error: "Provider settings test failed", details: details.substring(0, 500), targetUrl: `${cleanBaseUrl}/chat/completions` });
+    }
+
+    res.json({ success: true, message: "Provider settings test passed", targetUrl: `${cleanBaseUrl}/chat/completions` });
+  } catch (error: any) {
+    console.error("Agent settings test failed:", error);
+    res.status(500).json({ success: false, error: "Agent settings test failed", details: error.message });
   }
 });
 
