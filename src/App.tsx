@@ -13,7 +13,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
-  sendEmailVerification
+  sendEmailVerification,
+  type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { UserProfile, UserRole, Job, JobCategory } from './types';
@@ -89,6 +90,27 @@ export default function App() {
   const [displayName, setDisplayName] = useState('');
   const [professionalLabel, setProfessionalLabel] = useState('');
 
+  const getAuthErrorMessage = (error: unknown) => {
+    const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code) : '';
+
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists. Please log in instead.';
+      case 'auth/invalid-credential':
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+        return 'Invalid email or password. Please check your details and try again.';
+      case 'auth/weak-password':
+        return 'Please choose a stronger password with at least 6 characters.';
+      case 'auth/popup-closed-by-user':
+        return 'Google sign-in was cancelled before it completed.';
+      case 'auth/popup-blocked':
+        return 'Your browser blocked the Google sign-in popup. Please allow popups and try again.';
+      default:
+        return 'Authentication failed. Please try again.';
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     void trackEvent('dashboard_tab_view', {
@@ -119,8 +141,8 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const syncServerProfile = async (selectedRole: UserRole | null) => {
-    const token = await auth.currentUser?.getIdToken();
+  const syncServerProfile = async (selectedRole: UserRole | null, firebaseUser: FirebaseUser = auth.currentUser!) => {
+    const token = await firebaseUser?.getIdToken();
     if (!token) return null;
 
     const res = await fetch('/api/auth/check-admin', {
@@ -133,7 +155,8 @@ export default function App() {
     });
 
     if (!res.ok) {
-      throw new Error('Failed to sync Firebase profile');
+      const details = await res.json().catch(() => null);
+      throw new Error(details?.details || details?.error || 'Failed to sync Firebase profile');
     }
 
     return res.json();
@@ -150,7 +173,7 @@ export default function App() {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      await syncServerProfile(roleSelection);
+      await syncServerProfile(roleSelection, firebaseUser);
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       
       if (!userDoc.exists()) {
@@ -170,7 +193,7 @@ export default function App() {
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      toast.error("Failed to login");
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoggingIn(false);
       setProfileLoading(false);
@@ -195,7 +218,7 @@ export default function App() {
         firebaseUser = result.user;
       }
 
-      await syncServerProfile(roleSelection);
+      await syncServerProfile(roleSelection, firebaseUser);
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (!userDoc.exists()) {
         const newUser: UserProfile = {
@@ -214,7 +237,7 @@ export default function App() {
       toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
     } catch (error: any) {
       console.error("Auth error:", error);
-      toast.error("Authentication failed.");
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoggingIn(false);
       setProfileLoading(false);
@@ -310,16 +333,16 @@ export default function App() {
                   {authMode === 'email-signup' && (
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                      <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
+                      <Input autoComplete="name" placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
                     </div>
                   )}
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
-                    <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
+                    <Input type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
-                    <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
+                    <Input type="password" autoComplete={authMode === 'email-login' ? 'current-password' : 'new-password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
                   </div>
                   <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg mt-4" disabled={isLoggingIn}>
                     {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}

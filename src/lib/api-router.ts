@@ -298,6 +298,7 @@ const USER_PROFILE_FIELDS = [
   'projectType',
   'region',
   'sacapNumber',
+  'specializations',
   'tradeLicense',
 ];
 
@@ -305,8 +306,9 @@ function sanitizeUserProfileData(profileData: unknown) {
   if (!profileData || typeof profileData !== 'object') return {};
 
   return USER_PROFILE_FIELDS.reduce<Record<string, unknown>>((safeData, field) => {
-    if (Object.prototype.hasOwnProperty.call(profileData, field)) {
-      safeData[field] = (profileData as Record<string, unknown>)[field];
+    const value = (profileData as Record<string, unknown>)[field];
+    if (value !== undefined) {
+      safeData[field] = value;
     }
     return safeData;
   }, {});

@@ -157,7 +157,7 @@
   }
 
   .dashboard-header {
-    @apply dashboard-panel p-6 md:p-10;
+    @apply bg-card border border-border shadow-sm rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10;
   }
 
   .interactive-card {
