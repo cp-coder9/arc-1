@@ -1,15 +1,24 @@
+import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
-import apiRouter from "./src/lib/api-router.js";
-import { adminDb, testFirebase } from "./src/lib/firebase-admin.js";
+
+const mode = process.env.NODE_ENV || "development";
+dotenv.config({
+  path: [`.env.${mode}.local`, ".env.local", `.env.${mode}`, ".env"],
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  const [{ default: apiRouter }, { adminDb, testFirebase }] = await Promise.all([
+    import("./src/lib/api-router.js"),
+    import("./src/lib/firebase-admin.js"),
+  ]);
+
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 

@@ -50,9 +50,9 @@ export default function FreelancerDashboard({ user }: { user: UserProfile }) {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard label="Assigned Tasks" value={stats.total} icon={<LayoutDashboard size={20} />} />
-        <StatCard label="Pending" value={stats.pending} icon={<Clock size={20} />} color="text-yellow-600" />
-        <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} color="text-blue-600" />
-        <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={20} />} color="text-green-600" />
+        <StatCard label="Pending" value={stats.pending} icon={<Clock size={20} />} color="text-primary" />
+        <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} color="text-primary/80" />
+        <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={20} />} color="text-primary" />
       </div>
 
       <div className="space-y-6">

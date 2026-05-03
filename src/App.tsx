@@ -276,7 +276,7 @@ export default function App() {
             <p className="text-sm text-muted-foreground uppercase tracking-widest">Join the premier architectural marketplace</p>
           </div>
 
-          <Card className="border-border shadow-xl bg-white/80 backdrop-blur-md">
+          <Card className="border-border shadow-xl bg-card">
             <CardHeader>
               <CardTitle className="font-heading text-2xl">
                 {authMode === 'selection' ? 'Create Account' : authMode === 'email-login' ? 'Welcome Back' : 'Join Architex'}
@@ -338,7 +338,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] flex flex-col md:flex-row relative overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row relative overflow-hidden">
       <AnimatedFloorPlan />
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-6 overflow-y-auto">
@@ -457,7 +457,7 @@ export default function App() {
       </aside>
       <main className="flex-1 flex flex-col min-w-0 relative z-10">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation menu" aria-expanded={isSidebarOpen}><Menu size={24} /></Button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
             <NotificationBell userId={user.uid} />
@@ -515,7 +515,14 @@ function DashboardFallback() {
 
 function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }: any) {
   return (
-    <Button variant={active ? 'default' : 'outline'} className={`h-32 flex flex-col gap-3 transition-all ${active ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg' : 'hover:border-primary/50'}`} onClick={onClick} {...props}>
+    <Button
+      variant={active ? 'default' : 'outline'}
+      className={`h-32 flex flex-col gap-3 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg' : 'hover:border-primary/50'}`}
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={`Select ${label} role: ${sub}`}
+      {...props}
+    >
       {icon}
       <div className="text-center">
         <p className="font-bold">{label}</p>
@@ -527,7 +534,11 @@ function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }:
 
 function NavItem({ icon, label, active, onClick }: any) {
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'}`}>
+    <button
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'}`}
+    >
       {icon} <span className="font-bold">{label}</span>
     </button>
   );
@@ -537,7 +548,7 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] overflow-x-hidden relative text-foreground">
+    <div className="min-h-screen bg-background overflow-x-hidden relative text-foreground">
       <AnimatedFloorPlan />
       <nav className="h-28 border-b border-slate-200 px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-50 shadow-sm">
         <Logo showText iconClassName="w-24 h-24 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-4xl lg:text-5xl tracking-tighter text-foreground" />
@@ -545,7 +556,7 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           <button onClick={onGetStarted} className="text-sm font-bold text-slate-700 hover:text-primary">Marketplace</button>
           <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
         </div>
-        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
         {isMobileMenuOpen && (
           <div className="absolute top-20 left-4 right-4 bg-white border border-border rounded-[2rem] shadow-2xl p-8 flex flex-col gap-6 lg:hidden">
             <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold">Marketplace</button>
@@ -555,33 +566,62 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden bg-white/80">
+      <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden bg-card">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
           <div className="pb-16 relative z-20">
-            <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+            >
+              <Badge className="bg-primary/10 text-primary border-primary/20 mb-8 px-4 py-1 text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
+            </motion.div>
             <div className="space-y-3 mb-10">
               {[
                 { word: 'Discover', icon: <Search size={42} /> },
                 { word: 'Verify', icon: <ShieldCheck size={42} /> },
                 { word: 'Collaborate', icon: <Users size={42} /> }
               ].map((item, index) => (
-                <div key={item.word} className="hero-word-row flex items-center gap-5 border-b border-slate-200 pb-3 last:border-b-0 overflow-visible" style={{ animationDelay: `${index * 140}ms` }}>
-                  <div className="h-20 w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20">
+                <motion.div
+                  key={item.word}
+                  initial={{ opacity: 0, x: -40 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.15 }}
+                  viewport={{ once: true }}
+                  className="hero-word-row flex items-center gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible"
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className="h-20 w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20"
+                  >
                     {item.icon}
-                  </div>
-                  <h1 className={`relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm ${item.word === 'Collaborate' ? 'text-primary' : 'text-slate-950'}`}>
+                  </motion.div>
+                  <h1 className={`relative text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
                     <span className="relative z-10">{item.word}</span>
                   </h1>
-                </div>
+                </motion.div>
               ))}
             </div>
-            <p className="text-xl lg:text-2xl text-slate-700 mb-10 max-w-2xl leading-relaxed font-medium">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              viewport={{ once: true }}
+              className="text-xl lg:text-2xl text-muted-foreground mb-10 max-w-2xl leading-relaxed font-medium"
+            >
               Architex connects clients with elite professionals and contractors through an AI-powered marketplace for the built environment. Providing tailored management and resource sharing tools to deliver projects end-to-end.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl">Post a Job <ArrowRight className="ml-2" /></Button>
-              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-white text-slate-950 border-slate-900 hover:bg-slate-50">Browse Talent</Button>
-            </div>
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              viewport={{ once: true }}
+              className="flex flex-wrap gap-4"
+            >
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl hover:bg-primary-dark transition-colors">Post a Job <ArrowRight className="ml-2" /></Button>
+              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-card text-foreground border-border hover:bg-accent transition-colors">Browse Talent</Button>
+            </motion.div>
           </div>
           <div className="relative min-h-[560px] hidden lg:block">
             <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-slate-900/20 bg-white p-8 flex items-center justify-center">
@@ -599,27 +639,34 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       </section>
 
       {/* Marketplace Preview */}
-      <section className="py-12 bg-slate-100 px-8 lg:px-20 relative z-10 border-y border-slate-300">
+      <section className="py-12 bg-secondary px-8 lg:px-20 relative z-10 border-y border-border">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               ['AI-Powered Intelligence', 'SANS 10400 compliance checks for drawings and collaborative design workflows.'],
               ['Built for the Built Environment', 'Purpose-built tools for every project stage.'],
               ['Connected Ecosystem', 'Clients, professionals, and contractors working as one.']
-            ].map(([title, copy]) => (
-              <div key={title} className="rounded-3xl border border-slate-300 bg-white p-8 shadow-sm">
-                <h2 className="text-lg font-black uppercase tracking-wide mb-3 text-slate-950">{title}</h2>
-                <p className="text-slate-600 leading-relaxed max-w-sm font-medium">{copy}</p>
-              </div>
+            ].map(([title, copy], idx) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: idx * 0.1 }}
+                viewport={{ once: true }}
+                className="rounded-3xl border border-border bg-card p-8 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <h2 className="text-lg font-black uppercase tracking-wide mb-3 text-foreground">{title}</h2>
+                <p className="text-muted-foreground leading-relaxed max-w-sm font-medium">{copy}</p>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="bg-slate-900 py-20 px-8 lg:px-20 border-t border-slate-800 relative z-10 text-white">
+      <footer className="bg-foreground py-20 px-8 lg:px-20 border-t border-border relative z-10 text-background">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <Logo showText iconClassName="w-16 h-16 object-contain" textClassName="font-heading font-bold text-2xl lg:text-3xl" />
-          <p className="text-sm text-slate-300">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
+          <p className="text-sm text-background/70">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
         </div>
       </footer>
     </div>

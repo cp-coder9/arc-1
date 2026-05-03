@@ -141,8 +141,8 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
           <div className="lg:col-span-2 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard label="My Tasks" value={stats.totalTasks} icon={<LayoutDashboard size={20} />} />
-              <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} color="text-blue-600" />
-              <StatCard label="Rating" value={`${Number(stats.rating).toFixed(1)}/5`} icon={<Star size={20} />} color="text-yellow-500" />
+              <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} color="text-primary" />
+              <StatCard label="Rating" value={`${Number(stats.rating).toFixed(1)}/5`} icon={<Star size={20} />} color="text-primary" />
             </div>
 
             {recommendedJobs.length > 0 && (

@@ -1,15 +1,17 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import firebaseAppletConfig from "../../firebase-applet-config.json";
 
-// Configuration - require environment variables
-const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
-const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID;
+// Non-secret Firebase identifiers can come from env or the shared app config.
+// Credentials still must come from environment variables.
+const projectId = process.env.VITE_FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId;
+const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId;
 
 let app;
 if (getApps().length === 0) {
   if (!projectId) {
-    throw new Error('VITE_FIREBASE_PROJECT_ID environment variable is required');
+    throw new Error('Firebase project ID is required via VITE_FIREBASE_PROJECT_ID or firebase-applet-config.json');
   }
 
   const adminConfig: any = {
