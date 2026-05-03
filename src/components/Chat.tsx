@@ -58,7 +58,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
+      <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col p-0 overflow-hidden rounded-3xl border-border shadow-2xl">
         <div className="bg-primary p-6 flex justify-between items-center text-primary-foreground">
            <div className="flex items-center gap-3">
               <Avatar className="bg-white/20">
@@ -69,13 +69,13 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
                 <p className="text-[10px] opacity-70 uppercase font-bold tracking-widest">{otherUser?.role}</p>
               </div>
            </div>
-           <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-white/10 rounded-full"><X size={20} /></Button>
+            <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-white/10 rounded-full text-primary-foreground" aria-label="Close chat"><X size={20} /></Button>
         </div>
         <ScrollArea className="flex-1 p-6 bg-secondary/10">
            <div className="space-y-4">
               {messages.map(m => (
                 <div key={m.id} className={`flex ${m.senderId === currentUser.uid ? 'justify-end' : 'justify-start'}`}>
-                   <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${m.senderId === currentUser.uid ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-white border border-border rounded-tl-none shadow-sm'}`}>
+                   <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${m.senderId === currentUser.uid ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-card border border-border rounded-tl-none shadow-sm'}`}>
                       <p>{m.content}</p>
                       <p className={`text-[8px] mt-2 opacity-50 ${m.senderId === currentUser.uid ? 'text-right' : 'text-left'}`}>
                         {safeFormat(m.createdAt, 'HH:mm')}
@@ -86,9 +86,9 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
               <div ref={scrollRef} />
            </div>
         </ScrollArea>
-        <form onSubmit={handleSend} className="p-4 bg-white border-t border-border flex gap-2">
-           <Input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type a message..." className="rounded-xl" />
-           <Button type="submit" size="icon" className="rounded-xl"><Send size={18} /></Button>
+        <form onSubmit={handleSend} className="p-4 bg-card border-t border-border flex gap-2">
+           <Input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type a message..." className="rounded-xl h-11" aria-label="Message text" />
+           <Button type="submit" size="icon" className="rounded-xl h-11 w-11" aria-label="Send message"><Send size={18} /></Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -97,7 +97,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
 
 export function ChatButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button onClick={onClick} size="icon" className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-2xl z-50">
+    <Button onClick={onClick} size="icon" className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-2xl z-50" aria-label="Open chat">
       <MessageCircle size={24} />
     </Button>
   );

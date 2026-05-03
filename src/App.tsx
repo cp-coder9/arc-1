@@ -23,7 +23,7 @@ import { Badge } from './components/ui/badge';
 import { ScrollArea } from './components/ui/scroll-area';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Input } from './components/ui/input';
 import { 
   LayoutDashboard, 
@@ -70,6 +70,7 @@ const FileManager = lazy(() => import('./components/FileManager'));
 const OnboardingFlow = lazy(() => import('./components/OnboardingFlow'));
 
 export default function App() {
+  const prefersReducedMotion = useReducedMotion();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -340,11 +341,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row relative overflow-hidden">
       <AnimatedFloorPlan />
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-card/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-10 shrink-0">
             <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}><X size={20} /></Button>
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
           <nav className="flex-1 space-y-2">
@@ -456,7 +457,7 @@ export default function App() {
         </div>
       </aside>
       <main className="flex-1 flex flex-col min-w-0 relative z-10">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
+        <header className="h-20 bg-card/80 backdrop-blur-md border-b border-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation menu" aria-expanded={isSidebarOpen}><Menu size={24} /></Button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
@@ -467,7 +468,13 @@ export default function App() {
           </div>
         </header>
         <ScrollArea className="flex-1">
-          <div className="p-8 max-w-7xl mx-auto w-full">
+          <motion.div
+            key={`${user.role}-${activeTab}`}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="p-6 md:p-8 max-w-7xl mx-auto w-full"
+          >
             <Suspense fallback={<DashboardFallback />}>
               {activeTab === 'invoices' && <InvoiceManagement user={user} />}
               {activeTab === 'files' && <FileManager user={user} />}
@@ -482,7 +489,7 @@ export default function App() {
                 </>
               )}
             </Suspense>
-          </div>
+          </motion.div>
         </ScrollArea>
       </main>
       <Toaster />
@@ -546,20 +553,23 @@ function NavItem({ icon, label, active, onClick }: any) {
 
 function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+  const fadeUp = prefersReducedMotion ? {} : { opacity: 0, y: 24 };
+  const visible = { opacity: 1, y: 0 };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden relative text-foreground">
       <AnimatedFloorPlan />
-      <nav className="h-28 border-b border-slate-200 px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-50 shadow-sm">
+      <nav className="h-28 border-b border-border px-6 sm:px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-card/95 backdrop-blur-md z-50 shadow-sm">
         <Logo showText iconClassName="w-24 h-24 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-4xl lg:text-5xl tracking-tighter text-foreground" />
         <div className="hidden lg:flex items-center gap-6">
-          <button onClick={onGetStarted} className="text-sm font-bold text-slate-700 hover:text-primary">Marketplace</button>
+          <button onClick={onGetStarted} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
           <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
         </div>
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
         {isMobileMenuOpen && (
-          <div className="absolute top-20 left-4 right-4 bg-white border border-border rounded-[2rem] shadow-2xl p-8 flex flex-col gap-6 lg:hidden">
-            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold">Marketplace</button>
+          <div className="absolute top-20 left-4 right-4 bg-card border border-border rounded-[2rem] shadow-2xl p-8 flex flex-col gap-6 lg:hidden">
+            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
             <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="bg-primary text-primary-foreground h-14 rounded-full font-bold">Get Started</Button>
           </div>
         )}
@@ -568,7 +578,12 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 lg:px-20 relative z-10 overflow-hidden bg-card">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center min-h-[680px] relative">
-          <div className="pb-16 relative z-20">
+          <motion.div
+            initial={fadeUp}
+            animate={visible}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+            className="pb-16 relative z-20"
+          >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -622,19 +637,28 @@ function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl hover:bg-primary-dark transition-colors">Post a Job <ArrowRight className="ml-2" /></Button>
               <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold bg-card text-foreground border-border hover:bg-accent transition-colors">Browse Talent</Button>
             </motion.div>
-          </div>
-          <div className="relative min-h-[560px] hidden lg:block">
-            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-slate-900/20 bg-white p-8 flex items-center justify-center">
+          </motion.div>
+          <motion.div
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96, x: 30 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+            className="relative min-h-[560px] hidden lg:block"
+          >
+            <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-foreground/20 bg-card p-8 flex items-center justify-center">
               <Logo iconClassName="w-[28rem] h-[28rem] object-contain opacity-95" />
             </div>
-            <div className="absolute right-0 top-12 w-[520px] h-[390px] bg-white/85 border border-primary/20 rounded-[2rem] overflow-hidden">
+            <motion.div
+              animate={prefersReducedMotion ? undefined : { y: [0, -10, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute right-0 top-12 w-[520px] h-[390px] bg-card/85 border border-primary/20 rounded-[2rem] overflow-hidden"
+            >
               <svg viewBox="0 0 520 400" className="absolute inset-0 w-full h-full text-primary/40" fill="none" stroke="currentColor" strokeWidth="1.4">
                 <path d="M80 330V155l115-60 170 85v150M195 95v235M365 180v150M80 155l285 25M80 205l285 25M80 255l285 25M115 315h285M115 285h285M115 255h285M115 225h285" />
                 <path d="M195 95l170 85 75-45-170-85-75 45ZM365 180l75-45v145l-75 50" />
                 <circle cx="80" cy="155" r="3" fill="currentColor" /><circle cx="195" cy="95" r="3" fill="currentColor" /><circle cx="365" cy="180" r="3" fill="currentColor" /><circle cx="440" cy="135" r="3" fill="currentColor" />
               </svg>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 

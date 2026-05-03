@@ -125,13 +125,17 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
     }
   body {
     @apply bg-background text-foreground font-sans;
     }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
+  }
+
+  :where(a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
   }
 }
 
@@ -145,7 +149,23 @@
   }
 
   .focus-visible-ring {
-    @apply outline-2 outline-offset-2 outline-ring focus-visible:outline;
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+  }
+
+  .dashboard-panel {
+    @apply bg-card border border-border shadow-sm rounded-[2rem] md:rounded-[2.5rem];
+  }
+
+  .dashboard-header {
+    @apply dashboard-panel p-6 md:p-10;
+  }
+
+  .interactive-card {
+    @apply transition-all duration-300 hover:border-primary/30 hover:shadow-xl;
+  }
+
+  .empty-state {
+    @apply border-2 border-dashed border-border rounded-[2rem] bg-card/70 text-center;
   }
 
 }
@@ -169,6 +189,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
   .hero-word-row {
     animation: none;
   }

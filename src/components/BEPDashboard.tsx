@@ -31,6 +31,12 @@ import ProfileEditor from './ProfileEditor';
 import { safeFormat } from '../lib/utils';
 import { Chat } from './Chat';
 
+const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
+  pending: 'bg-primary/5 text-primary border-primary/10',
+  'in-progress': 'bg-accent/10 text-primary border-accent/20',
+  completed: 'bg-primary-light/10 text-primary-light border-primary-light/20',
+};
+
 export default function BEPDashboard({ user }: { user: UserProfile }) {
   const [assignedTasks, setAssignedTasks] = useState<JobCard[]>([]);
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
@@ -89,7 +95,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div className="flex-1">
           <div className="flex items-center gap-4 mb-2">
             <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">
@@ -102,12 +108,12 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
               {user.professionalLabel || 'BEP'}
             </Badge>
             {user.nhbrcNumber && (
-              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-green-50 text-green-700 border-green-200 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-primary-light/10 text-primary-light border-primary-light/20 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
                 <ShieldCheck size={12} /> NHBRC: {user.nhbrcNumber}
               </Badge>
             )}
             {user.cidbGrading && (
-              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-blue-50 text-blue-700 border-blue-200 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-accent/10 text-primary border-accent/20 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
                 <BadgeCheck size={12} /> CIDB: {user.cidbGrading}
               </Badge>
             )}
@@ -141,15 +147,15 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
           <div className="lg:col-span-2 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard label="My Tasks" value={stats.totalTasks} icon={<LayoutDashboard size={20} />} />
-              <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} color="text-primary" />
-              <StatCard label="Rating" value={`${Number(stats.rating).toFixed(1)}/5`} icon={<Star size={20} />} color="text-primary" />
+              <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} tone="accent" />
+              <StatCard label="Rating" value={`${Number(stats.rating).toFixed(1)}/5`} icon={<Star size={20} />} tone="success" />
             </div>
 
             {recommendedJobs.length > 0 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-heading font-bold tracking-tight flex items-center gap-2">
-                    <Zap className="text-yellow-500 fill-yellow-500" size={24} /> Recommended Projects
+                    <Zap className="text-primary fill-primary" size={24} /> Recommended Projects
                   </h2>
                   <Button variant="ghost" size="sm" className="text-primary font-bold" onClick={() => setActiveView('marketplace')}>
                     View All <ArrowRight size={16} className="ml-1" />
@@ -159,7 +165,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
                   {recommendedJobs.slice(0, 2).map(job => (
                     <Card key={job.id} {...({job, user} as any)} className="border-primary/20 bg-primary/5 rounded-[2rem] overflow-hidden hover:border-primary transition-all group relative">
                       <div className="absolute top-4 right-4">
-                        <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 uppercase text-[8px] font-black tracking-tighter">
+                        <Badge className="bg-primary/10 text-primary border-primary/20 uppercase text-[8px] font-black tracking-tighter">
                           {job.matchScore}% Match
                         </Badge>
                       </div>
@@ -189,7 +195,10 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
                   <BEPJobCard key={task.id} {...({task, user} as any)} task={task} user={user} />
                 ))}
                 {assignedTasks.length === 0 && !loading && (
-                  <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                  <div className="empty-state py-20 px-6">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
+                      <Briefcase className="w-8 h-8" />
+                    </div>
                     <p className="text-muted-foreground italic">No tasks currently assigned to you.</p>
                   </div>
                 )}
@@ -198,7 +207,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
           </div>
 
           <div className="space-y-8">
-            <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
+            <Card className="border-border shadow-sm bg-card rounded-3xl overflow-hidden">
               <CardHeader className="bg-primary/5 p-6 border-b border-border flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                   <Star size={16} className="text-yellow-500" /> Feedback
@@ -295,14 +304,10 @@ function BEPJobCard({ task, user }: { task: JobCard, user: UserProfile }) {
   };
 
   return (
-    <Card className="border-border shadow-sm bg-white overflow-hidden group hover:border-primary/30 transition-all flex flex-col rounded-3xl hover:shadow-xl">
+    <Card className="interactive-card border-border shadow-sm bg-card overflow-hidden group flex flex-col rounded-3xl">
       <div className="p-8 flex-1 space-y-6">
         <div className="flex justify-between items-start">
-          <Badge className={`text-[10px] uppercase tracking-widest ${
-            task.status === 'completed' ? 'bg-green-100 text-green-700' :
-            task.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-            'bg-yellow-100 text-yellow-700'
-          }`}>
+          <Badge className={`text-[10px] uppercase tracking-widest ${taskStatusStyles[task.status]}`}>
             {task.status.replace('-', ' ')}
           </Badge>
           <div className="text-right">
@@ -370,7 +375,7 @@ function MarketplaceJobCard({ job, user }: { job: Job, user: UserProfile }) {
   };
 
   return (
-    <Card className="border-border shadow-sm bg-white hover:border-primary/50 transition-all rounded-[2.5rem] overflow-hidden flex flex-col group shadow-sm hover:shadow-2xl">
+    <Card className="interactive-card border-border shadow-sm bg-card hover:border-primary/50 rounded-[2.5rem] overflow-hidden flex flex-col group hover:shadow-2xl">
       <CardHeader className="p-8">
         <Badge variant="secondary" className="w-fit bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest mb-4 font-bold">
           {job.category}
@@ -395,11 +400,17 @@ function MarketplaceJobCard({ job, user }: { job: Job, user: UserProfile }) {
   );
 }
 
-function StatCard({ label, value, icon, color = "text-primary" }: { label: string, value: string | number, icon: React.ReactNode, color?: string }) {
+function StatCard({ label, value, icon, tone = "default" }: { label: string, value: string | number, icon: React.ReactNode, tone?: 'default' | 'accent' | 'success' }) {
+  const toneClass = {
+    default: 'bg-primary/10 text-primary',
+    accent: 'bg-accent/10 text-primary',
+    success: 'bg-primary-light/10 text-primary-light',
+  }[tone];
+
   return (
-    <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
+    <Card className="interactive-card border-border shadow-sm bg-card rounded-[2rem] overflow-hidden">
       <CardContent className="p-8 flex items-center gap-6">
-        <div className={`p-4 rounded-2xl bg-secondary/50 ${color}`}>
+        <div className={`p-4 rounded-2xl ${toneClass}`}>
           {icon}
         </div>
         <div>

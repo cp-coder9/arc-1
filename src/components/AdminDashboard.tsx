@@ -482,7 +482,7 @@ export default function AdminDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
           <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground flex items-center gap-4">
              <Shield className="text-primary w-12 h-12" /> Admin Command Center
