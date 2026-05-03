@@ -181,7 +181,15 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) throw new Error(data.error || data.details || 'Agent settings test failed');
+      if (!res.ok || data.success === false) {
+        const details = typeof data.details === 'string'
+          ? data.details
+          : data.details
+            ? JSON.stringify(data.details)
+            : '';
+        const target = data.targetUrl ? ` (${data.targetUrl})` : '';
+        throw new Error([data.error || 'Agent settings test failed', details].filter(Boolean).join(': ') + target);
+      }
       setSettingsTested(true);
       toast.success(data.message || 'Agent settings test passed');
     } catch (error: any) {
@@ -517,28 +525,57 @@ export default function AdminDashboard({
   const pageSize = 8;
 
   useEffect(() => {
-    const unsubSubmissions = onSnapshot(query(collectionGroup(db, 'submissions'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
-    });
-    const unsubAgents = onSnapshot(query(collection(db, 'agents'), orderBy('name')), (snapshot) => {
-      setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
-    });
-    const unsubJobs = onSnapshot(query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
-      setAllJobs(jobs);
-      setStats(current => ({ ...current, totalJobs: jobs.length }));
-    });
-    const unsubLogs = onSnapshot(query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)), (snapshot) => {
-      const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
-      setLogs(nextLogs);
-      setStats(current => ({ ...current, errorCount: nextLogs.filter(log => log.level === 'error' || log.level === 'critical').length }));
-    });
-    const unsubDisputes = onSnapshot(query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
-    });
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)), (snapshot) => {
-      setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
-    });
+    const handleListenerError = (label: string) => (error: unknown) => {
+      console.error(`[AdminDashboard] ${label} listener failed`, error);
+      toast.error(`Could not load admin ${label}. Check admin role and Firestore rules.`);
+    };
+
+    const unsubSubmissions = onSnapshot(
+      query(collectionGroup(db, 'submissions'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
+      },
+      handleListenerError('submissions')
+    );
+    const unsubAgents = onSnapshot(
+      query(collection(db, 'agents'), orderBy('name')),
+      (snapshot) => {
+        setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
+      },
+      handleListenerError('agents')
+    );
+    const unsubJobs = onSnapshot(
+      query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+        setAllJobs(jobs);
+        setStats(current => ({ ...current, totalJobs: jobs.length }));
+      },
+      handleListenerError('jobs')
+    );
+    const unsubLogs = onSnapshot(
+      query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
+      (snapshot) => {
+        const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
+        setLogs(nextLogs);
+        setStats(current => ({ ...current, errorCount: nextLogs.filter(log => log.level === 'error' || log.level === 'critical').length }));
+      },
+      handleListenerError('system logs')
+    );
+    const unsubDisputes = onSnapshot(
+      query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
+      },
+      handleListenerError('disputes')
+    );
+    const unsubUsers = onSnapshot(
+      query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)),
+      (snapshot) => {
+        setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+      },
+      handleListenerError('users')
+    );
     return () => {
       unsubSubmissions();
       unsubAgents();
