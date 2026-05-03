@@ -70,11 +70,12 @@ import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 import OnboardingFlow from "./components/OnboardingFlow";
 
 export default function App() {
+  const isAdminRoute = window.location.pathname === '/admin';
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [roleSelection, setRoleSelection] = useState<UserRole | null>(null);
-  const [showLogin, setShowLogin] = useState(false);
+  const [roleSelection, setRoleSelection] = useState<UserRole | null>(isAdminRoute ? 'admin' : null);
+  const [showLogin, setShowLogin] = useState(isAdminRoute);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -89,13 +90,28 @@ export default function App() {
   const [professionalLabel, setProfessionalLabel] = useState('');
 
   useEffect(() => {
+    if (isAdminRoute) {
+      setRoleSelection('admin');
+      setShowLogin(true);
+      setShowOnboarding(false);
+    }
+  }, [isAdminRoute]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setProfileLoading(true);
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            setUser(userDoc.data() as UserProfile);
+            const profile = userDoc.data() as UserProfile;
+            if (isAdminRoute && profile.role !== 'admin') {
+              await signOut(auth);
+              setUser(null);
+              toast.error('Admin access only. Please use an authorized admin account.');
+            } else {
+              setUser(profile);
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -108,7 +124,7 @@ export default function App() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isAdminRoute]);
 
   const syncServerProfile = async (selectedRole: UserRole | null) => {
     const token = await auth.currentUser?.getIdToken();
@@ -130,6 +146,20 @@ export default function App() {
     return res.json();
   };
 
+  const ensureAdminAccess = async (firebaseUser: any) => {
+    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    const profile = userDoc.exists() ? userDoc.data() as UserProfile : null;
+
+    if (isAdminRoute && profile?.role !== 'admin') {
+      await signOut(auth);
+      setUser(null);
+      toast.error('Admin access only. Please use an authorized admin account.');
+      return null;
+    }
+
+    return profile;
+  };
+
   const handleGoogleLogin = async () => {
     if (!roleSelection) {
       toast.error("Please select a role first");
@@ -142,9 +172,10 @@ export default function App() {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
       await syncServerProfile(roleSelection);
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const profile = await ensureAdminAccess(firebaseUser);
+      if (isAdminRoute && !profile) return;
       
-      if (!userDoc.exists()) {
+      if (!profile) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -157,7 +188,7 @@ export default function App() {
         setUser(newUser);
         
       } else {
-        setUser(userDoc.data() as UserProfile);
+        setUser(profile);
       }
     } catch (error: any) {
       console.error("Login error:", error);
@@ -187,8 +218,9 @@ export default function App() {
       }
 
       await syncServerProfile(roleSelection);
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (!userDoc.exists()) {
+      const profile = await ensureAdminAccess(firebaseUser);
+      if (isAdminRoute && !profile) return;
+      if (!profile) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -200,7 +232,7 @@ export default function App() {
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
         setUser(newUser);
       } else {
-        setUser(userDoc.data() as UserProfile);
+        setUser(profile);
       }
       toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
     } catch (error: any) {
@@ -216,9 +248,9 @@ export default function App() {
     try {
       await signOut(auth);
       setUser(null);
-      setShowLogin(false);
+      setShowLogin(isAdminRoute);
       setAuthMode('selection');
-      setRoleSelection(null);
+      setRoleSelection(isAdminRoute ? 'admin' : null);
       setActiveTab('overview');
       toast.success("Logged out successfully");
     } catch (error) {
@@ -252,6 +284,22 @@ export default function App() {
     );
   }
 
+  if (!user && isAdminRoute) {
+    return (
+      <AdminLoginPage
+        authMode={authMode}
+        email={email}
+        password={password}
+        isLoggingIn={isLoggingIn}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onEmailSubmit={handleEmailAuth}
+        onGoogleLogin={handleGoogleLogin}
+        onAuthModeChange={setAuthMode}
+      />
+    );
+  }
+
   if (!user && !showLogin) {
     return <LandingPage onGetStarted={() => setShowOnboarding(true)} />;
   }
@@ -281,7 +329,6 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-4">
                     <RoleSelectButton data-testid="role-select-client" role="client" label="Client" sub="I want to post jobs" icon={<Users className="w-8 h-8" />} active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
                     <RoleSelectButton data-testid="role-select-architect" role="architect" label="Architect" sub="I want to find work" icon={<Briefcase className="w-8 h-8" />} active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
-                    <RoleSelectButton data-testid="role-select-admin" role="admin" label="Admin" sub="Platform Mgmt" icon={<ShieldCheck className="w-8 h-8" />} active={roleSelection === 'admin'} onClick={() => setRoleSelection('admin')} />
                     <RoleSelectButton data-testid="role-select-freelancer" role="freelancer" label="Freelancer" sub="Specialist" icon={<Sparkles className="w-8 h-8" />} active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
                   </div>
                   <div className="space-y-3">
@@ -473,6 +520,89 @@ export default function App() {
           </div>
         </ScrollArea>
       </main>
+      <Toaster />
+    </div>
+  );
+}
+
+function AdminLoginPage({
+  authMode,
+  email,
+  password,
+  isLoggingIn,
+  onEmailChange,
+  onPasswordChange,
+  onEmailSubmit,
+  onGoogleLogin,
+  onAuthModeChange,
+}: {
+  authMode: 'selection' | 'email-login' | 'email-signup';
+  email: string;
+  password: string;
+  isLoggingIn: boolean;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onEmailSubmit: (event: React.FormEvent) => void;
+  onGoogleLogin: () => void;
+  onAuthModeChange: (mode: 'selection' | 'email-login' | 'email-signup') => void;
+}) {
+  const isEmailLogin = authMode === 'email-login';
+
+  return (
+    <div className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-20">
+        <AnimatedFloorPlan />
+      </div>
+      <div className="max-w-md w-full relative z-10">
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-5 h-20 w-20 rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center shadow-2xl">
+            <ShieldCheck className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-4xl font-heading font-bold mb-2">Admin Portal</h1>
+          <p className="text-sm text-white/60 uppercase tracking-widest">Authorized Architex administrators only</p>
+        </div>
+
+        <Card className="border-white/10 shadow-2xl bg-white/95 text-foreground backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="font-heading text-2xl">Secure Admin Login</CardTitle>
+            <CardDescription>
+              Sign in with an approved administrator account to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {isEmailLogin ? (
+              <form onSubmit={onEmailSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Admin Email</label>
+                  <Input type="email" placeholder="admin@example.com" value={email} onChange={e => onEmailChange(e.target.value)} required className="h-12 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                  <Input type="password" placeholder="••••••••" value={password} onChange={e => onPasswordChange(e.target.value)} required className="h-12 rounded-xl" />
+                </div>
+                <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg" disabled={isLoggingIn}>
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login to Admin Portal'}
+                </Button>
+                <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => onAuthModeChange('selection')}>
+                  Back to admin sign-in options
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <Button onClick={onGoogleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg rounded-xl" disabled={isLoggingIn}>
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                </Button>
+                <Button variant="outline" className="w-full h-12 rounded-xl" onClick={() => onAuthModeChange('email-login')} disabled={isLoggingIn}>
+                  Login with Email
+                </Button>
+              </div>
+            )}
+            <Button variant="link" asChild className="w-full text-muted-foreground">
+              <a href="/">Return to Marketplace</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
       <Toaster />
     </div>
   );
