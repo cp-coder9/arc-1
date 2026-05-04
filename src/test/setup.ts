@@ -78,6 +78,8 @@ globalThis.process = {
     VITE_FIREBASE_PROJECT_ID: 'test-project',
     VITE_BLOB_READ_WRITE_TOKEN: 'test-token',
     GEMINI_API_KEY: 'test-gemini-key',
+    VITE_PAYFAST_MERCHANT_ID: '10000100',
+    VITE_PAYFAST_MERCHANT_KEY: '46f0cd694581a',
   },
 };
 

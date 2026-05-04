@@ -1,22 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory } from '@/types';
-import { safeFormat, safeLocale } from '@/lib/utils';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute } from '../types';
+import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Building2 } from 'lucide-react';
-import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2 } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -25,17 +24,23 @@ import {
 } from "./ui/accordion";
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
+import { JobCard, MunicipalCredential } from '../types';
 import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
+import { pdfGenerationService } from "../services/pdfGenerationService";
 import AdminKnowledgeUploader from './AdminKnowledgeUploader';
-import { Dialog as FullScreenDialog, DialogContent as FullScreenDialogContent } from './ui/dialog';
+import ReviewManagement from "./ReviewManagement";
+import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 
 const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    envApiKey: 'GEMINI_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-pro', label: 'Gemini 2.0 Pro' },
@@ -46,6 +51,9 @@ const PROVIDER_CONFIGS = {
   openai: {
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
+    envApiKey: 'OPENAI_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'gpt-4o', label: 'GPT-4o' },
       { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
@@ -55,6 +63,9 @@ const PROVIDER_CONFIGS = {
   openrouter: {
     label: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',
+    envApiKey: 'OPENROUTER_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'anthropic/claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
       { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus' }
@@ -62,36 +73,152 @@ const PROVIDER_CONFIGS = {
   },
   nvidia: {
     label: 'NVIDIA NIM',
+    // NVIDIA Build / NIM OpenAI-compatible endpoint.
     baseUrl: 'https://integrate.api.nvidia.com/v1',
+    envApiKey: 'NVIDIA_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
-      { value: 'nvidia/nemotron-4-340b-instruct', label: 'Nemotron 4 340B' },
-      { value: 'meta/llama-3.1-70b-instruct', label: 'Llama 3.1 70B' },
-      { value: 'meta/llama-3.1-405b-instruct', label: 'Llama 3.1 405B' },
-      { value: 'mistralai/mistral-large-2-instruct', label: 'Mistral Large 2' }
-    ]
-  },
-  local: {
-    label: 'Local LLM (OpenAI Compatible)',
-    baseUrl: 'http://localhost:11434/v1',
-    models: [
-      { value: 'llama3', label: 'Llama 3' },
-      { value: 'mistral', label: 'Mistral' },
-      { value: 'gemma', label: 'Gemma' }
+      { value: 'mistralai/mistral-large-3-675b-instruct-2512', label: 'Mistral Large 3 675B Instruct' },
+      { value: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B Instruct' },
+      { value: 'meta/llama-3.2-90b-vision-instruct', label: 'Llama 3.2 90B Vision Instruct' },
+      { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B' },
+      { value: 'qwen/qwen3-next-80b-a3b-instruct', label: 'Qwen3 Next 80B Instruct' }
     ]
   }
 } as const;
 
+const providerKeys = Object.keys(PROVIDER_CONFIGS) as LLMProvider[];
+
+function applyProviderDefaults(agent: Agent, provider: LLMProvider | 'global', model?: string): Agent {
+  if (provider === 'global') {
+    return {
+      ...agent,
+      llmProvider: 'global',
+      llmModel: '',
+      llmApiKey: '',
+      llmBaseUrl: '',
+      authorizationType: undefined,
+      authorizationValue: '',
+      authorizationHeader: '',
+    };
+  }
+
+  const config = PROVIDER_CONFIGS[provider];
+  const selectedModel = model || agent.llmModel || config.models[0]?.value || '';
+  return {
+    ...agent,
+    llmProvider: provider,
+    llmModel: selectedModel,
+    llmBaseUrl: config.baseUrl,
+    llmApiKey: `env:${config.envApiKey}`,
+    authorizationType: config.authorizationType as 'bearer',
+    authorizationValue: `env:${config.envApiKey}`,
+    authorizationHeader: config.authorizationHeader,
+  };
+}
+
+function createBlankAgent(): Agent {
+  return applyProviderDefaults({
+    id: '',
+    name: 'New Compliance Agent',
+    role: 'custom_agent',
+    description: 'Describe this agent\'s compliance responsibility.',
+    systemPrompt: 'You are an architectural compliance specialist. Review drawings and return concise, regulation-grounded findings.',
+    temperature: 0.1,
+    status: 'online',
+    lastActive: new Date().toISOString(),
+    llmProvider: 'nvidia',
+  }, 'nvidia');
+}
+
 // Agent Card Component
-function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
-  const [editing, setEditing] = useState(false);
+function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent; key?: React.Key; isNew?: boolean; onCreated?: () => void; onCancel?: () => void }) {
+  const [editing, setEditing] = useState(isNew);
   const [tempAgent, setTempAgent] = useState<Agent>(agent);
+  const [isTesting, setIsTesting] = useState(false);
+  const [settingsTested, setSettingsTested] = useState(false);
+
+  const updateTempAgent = (next: Agent) => {
+    setTempAgent(next);
+    setSettingsTested(false);
+  };
+
+  const handleProviderChange = (provider: LLMProvider | 'global') => {
+    updateTempAgent(applyProviderDefaults(tempAgent, provider));
+  };
+
+  const handleModelChange = (model: string) => {
+    if (tempAgent.llmProvider && tempAgent.llmProvider !== 'global') {
+      updateTempAgent(applyProviderDefaults(tempAgent, tempAgent.llmProvider as LLMProvider, model));
+    } else {
+      updateTempAgent({ ...tempAgent, llmModel: model });
+    }
+  };
+
+  const handleTestSettings = async () => {
+    if (!tempAgent.llmProvider || tempAgent.llmProvider === 'global') {
+      toast.error('Select a concrete LLM provider before testing');
+      return;
+    }
+    setIsTesting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/agent/test-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          provider: tempAgent.llmProvider,
+          model: tempAgent.llmModel,
+          apiKey: tempAgent.llmApiKey,
+          baseUrl: tempAgent.llmBaseUrl,
+          authorizationType: tempAgent.authorizationType,
+          authorizationValue: tempAgent.authorizationValue,
+          authorizationHeader: tempAgent.authorizationHeader,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        const details = typeof data.details === 'string'
+          ? data.details
+          : data.details
+            ? JSON.stringify(data.details)
+            : '';
+        const target = data.targetUrl ? ` (${data.targetUrl})` : '';
+        throw new Error([data.error || 'Agent settings test failed', details].filter(Boolean).join(': ') + target);
+      }
+      setSettingsTested(true);
+      toast.success(data.message || 'Agent settings test passed');
+    } catch (error: any) {
+      setSettingsTested(false);
+      toast.error(error.message || 'Agent settings test failed');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSave = async () => {
+    if (isNew && !settingsTested) {
+      toast.error('Test the agent settings successfully before creating this agent');
+      return;
+    }
     try {
-      await updateDoc(doc(db, 'agents', agent.id), {
+      const payload = {
         ...tempAgent,
-        updatedAt: new Date().toISOString()
-      });
+        id: undefined,
+        updatedAt: new Date().toISOString(),
+        ...(isNew ? { createdAt: new Date().toISOString() } : {}),
+      };
+      if (isNew) {
+        await addDoc(collection(db, 'agents'), payload);
+        onCreated?.();
+        toast.success("Agent created");
+        return;
+      }
+      await updateDoc(doc(db, 'agents', agent.id), payload);
       setEditing(false);
       toast.success("Agent configuration saved");
     } catch (error) {
@@ -101,6 +228,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
 
   const handleReset = () => {
     setTempAgent(agent);
+    setSettingsTested(false);
     setEditing(false);
   };
 
@@ -118,8 +246,8 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
     return (
       <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
         <CardHeader className="bg-primary/5 border-b border-border p-8">
-          <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-            <Cpu size={14} /> {agent.name} (Editing)
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Cpu size={14} /> {isNew ? 'New Agent' : `${agent.name} (Editing)`}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-8 space-y-6">
@@ -128,7 +256,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Name</label>
               <Input 
                 value={tempAgent.name} 
-                onChange={e => setTempAgent({...tempAgent, name: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, name: e.target.value})}
                 className="rounded-xl"
               />
             </div>
@@ -136,7 +264,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
               <Input 
                 value={tempAgent.role} 
-                onChange={e => setTempAgent({...tempAgent, role: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, role: e.target.value})}
                 className="rounded-xl"
               />
             </div>
@@ -144,7 +272,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
               <Textarea 
                 value={tempAgent.description} 
-                onChange={e => setTempAgent({...tempAgent, description: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, description: e.target.value})}
                 className="rounded-xl"
                 rows={3}
               />
@@ -163,7 +291,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     value={tempAgent.llmModel || ''} 
                     onChange={e => {
                       const val = e.target.value;
-                      setTempAgent({...tempAgent, llmModel: val === 'custom' ? '' : val});
+                      handleModelChange(val === 'custom' ? '' : val);
                     }}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
@@ -177,7 +305,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   </select>
                   <Input 
                     value={tempAgent.llmModel || ''}
-                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    onChange={e => handleModelChange(e.target.value)}
                     placeholder="Enter model name (e.g. nvidia/llama-3.1-70b-instruct)"
                     className="h-12 rounded-xl"
                   />
@@ -188,11 +316,11 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Provider</label>
               <select 
                 value={tempAgent.llmProvider || 'global'} 
-                onChange={e => setTempAgent({...tempAgent, llmProvider: e.target.value as LLMProvider | 'global'})}
+                onChange={e => handleProviderChange(e.target.value as LLMProvider | 'global')}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="global">Global (Use System Config)</option>
-                {Object.keys(PROVIDER_CONFIGS).map((key) => (
+                {providerKeys.map((key) => (
                   <option key={key} value={key}>{PROVIDER_CONFIGS[key as LLMProvider].label}</option>
                 ))}
               </select>
@@ -203,7 +331,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Model</label>
                   <select 
                     value={tempAgent.llmModel || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    onChange={e => handleModelChange(e.target.value)}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
                     <option value="">Select a model</option>
@@ -219,7 +347,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <Input 
                     type="password"
                     value={tempAgent.llmApiKey || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmApiKey: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, llmApiKey: e.target.value, authorizationValue: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -227,7 +355,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
                   <Input 
                     value={tempAgent.llmBaseUrl || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -237,7 +365,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authorization Type</label>
               <select 
                 value={tempAgent.authorizationType || ''} 
-                onChange={e => setTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
+                onChange={e => updateTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="">None</option>
@@ -253,7 +381,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <Input 
                     type={tempAgent.authorizationType === 'bearer' ? 'password' : 'text'}
                     value={tempAgent.authorizationValue || ''} 
-                    onChange={e => setTempAgent({...tempAgent, authorizationValue: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, authorizationValue: e.target.value, llmApiKey: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -262,7 +390,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Header Name</label>
                     <Input 
                       value={tempAgent.authorizationHeader || ''} 
-                      onChange={e => setTempAgent({...tempAgent, authorizationHeader: e.target.value})}
+                      onChange={e => updateTempAgent({...tempAgent, authorizationHeader: e.target.value})}
                       className="rounded-xl"
                     />
                   </div>
@@ -271,13 +399,16 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
             )}
           </div>
           <div className="flex gap-2">
+            <Button onClick={handleTestSettings} variant={settingsTested ? 'default' : 'outline'} className="h-12 rounded-xl font-bold gap-2" disabled={isTesting || tempAgent.llmProvider === 'global'}>
+              {isTesting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} {settingsTested ? 'Test Passed' : 'Test Settings'}
+            </Button>
             <Button onClick={handleSave} className="bg-primary text-primary-foreground h-12 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
-              <Save size={16} /> Save Changes
+              <Save size={16} /> {isNew ? 'Create Agent' : 'Save Changes'}
             </Button>
             <Button onClick={handleReset} variant="outline" className="h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
               <RefreshCcw size={16} /> Reset
             </Button>
-            <Button onClick={() => setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
+            <Button onClick={() => isNew ? onCancel?.() : setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
               Cancel
             </Button>
           </div>
@@ -375,7 +506,6 @@ export default function AdminDashboard({
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
-    activeTab === 'municipal' ? 'municipal' :
     'submissions';
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [stats, setStats] = useState({
@@ -388,590 +518,434 @@ export default function AdminDashboard({
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+  const [submissionPage, setSubmissionPage] = useState(1);
+  const [disputePage, setDisputePage] = useState(1);
+  const pageSize = 8;
 
   useEffect(() => {
-    seedAgents();
-    
-    // Submissions
-    const qSub = query(collectionGroup(db, 'submissions'));
-    const unsubSub = onSnapshot(qSub, (snapshot) => {
-      setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'submissions (collectionGroup)');
-    });
+    const handleListenerError = (label: string) => (error: unknown) => {
+      console.error(`[AdminDashboard] ${label} listener failed`, error);
+      toast.error(`Could not load admin ${label}. Check admin role and Firestore rules.`);
+    };
 
-    // Agents
-    const qAgents = query(collection(db, 'agents'));
-    const unsubAgents = onSnapshot(qAgents, (snapshot) => {
-      setAgents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Agent)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'agents');
-    });
-
-    // Logs
-    const qLogs = query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50));
-    const unsubLogs = onSnapshot(qLogs, (snapshot) => {
-      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SystemLog)));
-    }, (error) => {
-      // Don't crash for logs, just warn
-      console.warn('[AdminDashboard] Logs listener:', error);
-    });
-
-    // Stats
-    const unsubStats = onSnapshot(collection(db, 'jobs'), (snap) => {
-      setAllJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
-      setStats(prev => ({
-        ...prev,
-        totalJobs: snap.size
-      }));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'jobs');
-    });
-
-    // Users
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setAllUsers(snap.docs.map(d => {
-        const data = d.data();
-        return {
-          uid: d.id,
-          email: data.email || '',
-          displayName: data.displayName || 'Unnamed User',
-          role: data.role || 'client',
-          createdAt: data.createdAt || new Date().toISOString(),
-          ...data
-        } as UserProfile;
-      }));
-    });
-
-    // Knowledge — may fire a transient permission-denied before auth resolves; suppress that silently.
-    const unsubKnowledge = onSnapshot(
-      query(collection(db, 'agent_knowledge'), where('status', '==', 'pending_review')),
-      (snap) => { setPendingKnowledgeCount(snap.size); },
-      (err) => { if (err.code !== 'permission-denied') console.error('[AdminDashboard] knowledge listener:', err); }
+    const unsubSubmissions = onSnapshot(
+      query(collectionGroup(db, 'submissions'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
+      },
+      handleListenerError('submissions')
     );
-
+    const unsubAgents = onSnapshot(
+      query(collection(db, 'agents'), orderBy('name')),
+      (snapshot) => {
+        setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
+      },
+      handleListenerError('agents')
+    );
+    const unsubJobs = onSnapshot(
+      query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+        setAllJobs(jobs);
+        setStats(current => ({ ...current, totalJobs: jobs.length }));
+      },
+      handleListenerError('jobs')
+    );
+    const unsubLogs = onSnapshot(
+      query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
+      (snapshot) => {
+        const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
+        setLogs(nextLogs);
+        setStats(current => ({ ...current, errorCount: nextLogs.filter(log => log.level === 'error' || log.level === 'critical').length }));
+      },
+      handleListenerError('system logs')
+    );
+    const unsubDisputes = onSnapshot(
+      query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
+      },
+      handleListenerError('disputes')
+    );
+    const unsubUsers = onSnapshot(
+      query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)),
+      (snapshot) => {
+        setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+      },
+      handleListenerError('users')
+    );
     return () => {
-      unsubSub();
+      unsubSubmissions();
       unsubAgents();
+      unsubJobs();
       unsubLogs();
-      unsubStats();
+      unsubDisputes();
       unsubUsers();
-      unsubKnowledge();
     };
   }, []);
 
   useEffect(() => {
-    const approved = submissions.filter(s => s.status === 'approved').length;
-    const activeAgents = agents.filter(a => a.status === 'online').length;
-    const errors = logs.filter(l => l.level === 'error' || l.level === 'critical').length;
-    setStats(prev => ({
-      ...prev,
-      approvedDrawings: approved,
-      activeAgents,
-      errorCount: errors
+    setStats(current => ({
+      ...current,
+      approvedDrawings: submissions.filter(submission => submission.status === 'approved').length,
+      activeAgents: agents.filter(agent => agent.status === 'online').length
     }));
-  }, [submissions, agents, logs]);
+  }, [agents, submissions]);
 
-  const handleApprove = async (sub: Submission) => {
-    try {
-      const subRef = doc(db, `jobs/${sub.jobId}/submissions`, sub.id);
-      await updateDoc(subRef, {
-        status: 'approved',
-        traceability: [
-          ...sub.traceability,
-          {
-            timestamp: new Date().toISOString(),
-            actor: 'Admin',
-            action: 'Final Approval',
-            details: 'Drawing verified and approved for council submission.'
-          }
-        ]
-      });
-      
-      // Notify architect
-      await notificationService.notifyAdminApproval(sub.architectId, sub.drawingName, sub.jobId, sub.id);
-      
-      toast.success("Submission approved");
-    } catch (error) {
-      toast.error("Failed to approve");
-    }
-  };
+  const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
+  const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+  const pendingSubmissionCount = submissions.filter(submission => ['ai_passed', 'admin_reviewing'].includes(submission.status)).length;
+  const failedSubmissionCount = submissions.filter(submission => ['ai_failed', 'admin_rejected'].includes(submission.status)).length;
+  const tabTriggerClass = "min-h-11 w-full rounded-2xl px-3 py-2 gap-2 font-bold text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm";
 
-  const handleReject = async (sub: Submission, feedback: string) => {
+  const updateSubmissionStatus = async (submission: Submission, status: Submission['status']) => {
     try {
-      const subRef = doc(db, `jobs/${sub.jobId}/submissions`, sub.id);
-      await updateDoc(subRef, {
-        status: 'admin_rejected',
-        adminFeedback: feedback,
-        traceability: [
-          ...sub.traceability,
-          {
-            timestamp: new Date().toISOString(),
-            actor: 'Admin',
-            action: 'Rejection',
-            details: `Rejected with feedback: ${feedback}`
-          }
-        ]
-      });
-      
-      // Notify architect
-      await notificationService.notifyAdminRejection(sub.architectId, sub.drawingName, sub.jobId, sub.id);
-      
-      toast.success("Submission rejected and sent back");
-    } catch (error) {
-      toast.error("Failed to reject");
-    }
-  };
-
-  const handleToggleUserStatus = async (userId: string, currentStatus?: string) => {
-    try {
-      const isSuspended = currentStatus === 'suspended';
-      await updateDoc(doc(db, 'users', userId), {
-        status: isSuspended ? 'active' : 'suspended',
-        updatedAt: new Date().toISOString()
-      });
-      toast.success(`User ${isSuspended ? 'activated' : 'suspended'}`);
-    } catch (error) {
-      toast.error("Failed to update user status");
-    }
-  };
-
-  const handleUpdateJobStatus = async (jobId: string, status: Job['status']) => {
-    try {
-      await updateDoc(doc(db, 'jobs', jobId), {
+      await updateDoc(doc(db, `jobs/${submission.jobId}/submissions`, submission.id), {
         status,
+        adminFeedback: status === 'approved' ? 'Approved by admin review.' : 'Rejected by admin review.',
         updatedAt: new Date().toISOString()
       });
-      toast.success(`Job status updated to ${status}`);
-    } catch (error) {
-      toast.error("Failed to update job status");
+      toast.success(status === 'approved' ? 'Submission approved' : 'Submission rejected');
+    } catch {
+      toast.error('Failed to update submission');
     }
-  };
-
-  const handleForceApprove = async (sub: Submission) => {
-    if (!confirm("FORCE APPROVE: This will bypass automated compliance checks. Continue?")) return;
-    await handleApprove(sub);
   };
 
   return (
-    <div className="space-y-8 md:space-y-12">
+    <div className="space-y-12">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
         <div>
-          <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Admin Control</h1>
-            <ProfileEditor user={user} />
-          </div>
-          <p className="text-muted-foreground text-sm md:text-lg max-w-2xl leading-relaxed">Enterprise compliance orchestration and agent management hub.</p>
-        </div>
-        <div className="flex gap-4">
-          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 w-full lg:w-auto">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">System Status</p>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs md:text-sm font-bold">ALL SYSTEMS OPERATIONAL</span>
-            </div>
-          </div>
+          <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground flex items-center gap-4">
+             <Shield className="text-primary w-12 h-12" /> Admin Command Center
+          </h1>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mt-2 leading-relaxed">Platform orchestration and agent supervision.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard label="Total Projects" value={stats.totalJobs.toString()} icon={<Briefcase size={20} />} />
-        <StatCard label="Approved Plans" value={stats.approvedDrawings.toString()} icon={<CheckCircle2 size={20} />} />
-        <StatCard label="Active Agents" value={stats.activeAgents.toString()} icon={<Cpu size={20} />} />
-        <StatCard label="System Alerts" value={stats.errorCount.toString()} icon={<AlertTriangle size={20} />} color={stats.errorCount > 0 ? 'text-destructive' : 'text-primary'} />
-      </div>
-
-      <Tabs 
-        value={internalTab} 
-        onValueChange={(val) => {
-          const tabMap: Record<string, string> = {
-            'agents': 'compliance',
-            'logs': 'audit',
-            'users': 'users',
-            'settings': 'settings',
-            'knowledge': 'knowledge',
-            'jobs': 'projects',
-            'submissions': 'overview'
-          };
-          onTabChange?.(tabMap[val] || 'overview');
-        }} 
-        className="w-full"
-      >
-        <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
-          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <FileText size={16} /> Recompliance Hub
+      <Tabs value={internalTab} onValueChange={(val) => {
+        const reverseMapping: Record<string, string> = {
+          agents: 'compliance',
+          logs: 'audit',
+          users: 'users',
+          settings: 'settings',
+          knowledge: 'knowledge',
+          jobs: 'projects',
+          submissions: 'overview'
+        };
+        onTabChange?.(reverseMapping[val] || val);
+      }} className="w-full">
+        <div className="mb-8 rounded-[2rem] border border-border bg-white/80 p-3 shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-[1.5rem] bg-secondary/40 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <TabsTrigger value="submissions" className={tabTriggerClass}>
+              <FileText size={16} /> Submissions
             </TabsTrigger>
-            <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <Briefcase size={16} /> Projects
+            <TabsTrigger value="agents" className={tabTriggerClass}>
+              <Cpu size={16} /> Agents
             </TabsTrigger>
-            <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <Cpu size={16} /> Agent Management
+            <TabsTrigger value="users" className={tabTriggerClass}>
+              <Users size={16} /> Users
             </TabsTrigger>
-            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <History size={16} /> Audited Logs
+            <TabsTrigger value="jobs" className={tabTriggerClass}>
+              <Briefcase size={16} /> Jobs
             </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <Users size={16} /> User Management
+            <TabsTrigger value="reviews" className={tabTriggerClass}>
+              <Star size={16} /> Moderation
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
+            <TabsTrigger value="knowledge" className={`${tabTriggerClass} relative`}>
+              <Sparkles size={16} /> Brain
+            </TabsTrigger>
+            <TabsTrigger value="disputes" className={tabTriggerClass}>
+              <AlertTriangle size={16} /> Disputes
+            </TabsTrigger>
+            <TabsTrigger value="logs" className={tabTriggerClass}>
+              <History size={16} /> Audit Logs
+            </TabsTrigger>
+            <TabsTrigger value="municipal" className={tabTriggerClass}>
+              <Building2 size={16} /> Municipal
+            </TabsTrigger>
+            <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 relative">
-              <Sparkles size={16} /> Brain
-              {pendingKnowledgeCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse border-2 border-white"></span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2">
-              <Building2 size={16} /> Municipal Settings
+            <TabsTrigger value="analytics" className={tabTriggerClass}>
+              <Activity size={16} /> Analytics
             </TabsTrigger>
           </TabsList>
-        </ScrollArea>
+        </div>
 
         <TabsContent value="submissions">
-          <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
-            <CardHeader className="bg-primary/5 border-b border-border p-8">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <ShieldCheck size={14} /> Pending Admin Review
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea orientation="horizontal" className="w-full">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent border-border">
-                      <TableHead className="font-bold text-[10px] uppercase tracking-widest px-8 min-w-[200px]">Drawing</TableHead>
-                      <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Architect</TableHead>
-                      <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">AI Status</TableHead>
-                      <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Date</TableHead>
-                      <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest px-8 min-w-[120px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                  {submissions.filter(s => s.status === 'admin_reviewing').map(sub => (
-                    <TableRow key={sub.id} className="border-border hover:bg-secondary/20 transition-colors">
-                      <TableCell className="font-heading font-bold px-8">{sub.drawingName}</TableCell>
-                      <TableCell className="text-xs font-mono">{(sub.architectId || '').substring(0, 8)}...</TableCell>
-                      <TableCell>
-                        <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold uppercase tracking-widest">AI PASSED</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{safeFormat(sub.createdAt, 'MMM d, yyyy')}</TableCell>
-                      <TableCell className="text-right px-8">
-                        <Dialog>
-                          <DialogTrigger render={<Button variant="ghost" size="sm" className="gap-2 hover:bg-primary hover:text-primary-foreground rounded-full px-4"><Eye size={14} />Review</Button>} />
-                          <DialogContent className="max-w-6xl border-border bg-white/95 backdrop-blur-md h-[100vh] md:h-[90vh] flex flex-col p-0 overflow-hidden md:rounded-[2rem] shadow-2xl">
-                            <div className="p-6 md:p-10 border-b border-border bg-primary/5">
-                              <DialogHeader>
-                                <DialogTitle className="font-heading font-bold text-2xl md:text-3xl tracking-tighter">Review: {sub.drawingName}</DialogTitle>
-                                <DialogDescription className="text-muted-foreground text-xs md:text-sm mt-1">Verify AI findings and provide final approval.</DialogDescription>
-                              </DialogHeader>
-                            </div>
-                            
-                            <ScrollArea className="flex-1">
-                              <div className="flex flex-col lg:flex-row gap-6 md:gap-8 p-6 md:p-10 bg-secondary/10">
-                                <div className="flex-1 flex flex-col gap-6">
-                                  <div className="flex-1 border border-border rounded-[1.5rem] md:rounded-[2rem] bg-white shadow-sm flex flex-col overflow-hidden min-h-[300px] md:min-h-[500px]">
-                                    <div className="bg-secondary/20 p-4 border-b border-border flex justify-between items-center">
-                                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Technical Drawing View</span>
-                                      <Button variant="outline" size="sm" className="rounded-full h-8 text-[10px] font-bold uppercase tracking-widest">
-                                        <a href={sub.drawingUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">Open Original <ExternalLink size={10} className="ml-1" /></a>
-                                      </Button>
-                                    </div>
-                                    <div className="flex-1 flex items-center justify-center p-4 md:p-8 bg-slate-900 relative">
-                                      {sub.drawingUrl.endsWith('.pdf') ? (
-                                        <iframe src={sub.drawingUrl} title="Submission PDF" className="w-full h-full rounded-lg" />
-                                      ) : (
-                                        <img src={sub.drawingUrl} alt="Submission" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" referrerPolicy="no-referrer" />
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="border border-border rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 bg-white shadow-sm flex flex-col">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-widest mb-4 text-muted-foreground flex items-center gap-2">
-                                      <Sparkles size={12} className="text-primary" /> AI Compliance Orchestrator Feedback
-                                    </h4>
-                                    <div className="mb-4 flex flex-wrap gap-2">
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="rounded-full text-[10px] font-bold uppercase tracking-widest gap-2 bg-primary/5 border-primary/20"
-                                        onClick={() => setReportSubmission(sub)}
-                                      >
-                                        <FileText size={12} /> View Full Report
-                                      </Button>
-                                    </div>
-                                    <div className="max-h-[400px] overflow-y-auto pr-2">
-                                      {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 ? (
-                                        <Accordion multiple={true} type="multiple" className="w-full space-y-2">
-                                          {sub.aiStructuredFeedback.map((cat, i) => (
-                                            <AccordionItem key={i} value={`cat-${i}`} className="border border-border rounded-xl overflow-hidden bg-secondary/5 px-4">
-                                              <AccordionTrigger className="hover:no-underline py-4">
-                                                <div className="flex items-center gap-3">
-                                                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                                                    <Shield size={14} />
-                                                  </div>
-                                                  <div className="text-left">
-                                                    <p className="text-sm font-bold tracking-tight">{cat.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                                                      {cat.issues.length} {cat.issues.length === 1 ? 'Issue' : 'Issues'} Identified
-                                                    </p>
-                                                  </div>
-                                                </div>
-                                              </AccordionTrigger>
-                                              <AccordionContent className="pb-4">
-                                                <div className="space-y-3 pt-2">
-                                                  {cat.issues.map((issue, j) => (
-                                                    <div key={j} className={`p-4 rounded-xl border ${
-                                                      issue.severity === 'high' ? 'bg-red-50/50 border-red-100' :
-                                                      issue.severity === 'medium' ? 'bg-yellow-50/50 border-yellow-100' :
-                                                      'bg-blue-50/50 border-blue-100'
-                                                    }`}>
-                                                      <div className="flex justify-between items-start mb-2">
-                                                        <p className="text-sm font-bold leading-tight">{issue.description}</p>
-                                                        <Badge variant="outline" className={`text-[8px] font-bold uppercase px-2 py-0 h-4 ${
-                                                          issue.severity === 'high' ? 'border-red-200 text-red-700 bg-red-50' :
-                                                          issue.severity === 'medium' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
-                                                          'border-blue-200 text-blue-700 bg-blue-50'
-                                                        }`}>
-                                                          {issue.severity}
-                                                        </Badge>
-                                                      </div>
-                                                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-black/5">
-                                                        <div className="p-1 rounded-full bg-white shadow-sm">
-                                                          <CheckCircle2 size={10} className="text-primary" />
-                                                        </div>
-                                                        <p className="text-[10px] font-bold text-muted-foreground">
-                                                          <span className="text-primary">ACTION:</span> {issue.actionItem}
-                                                        </p>
-                                                      </div>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </AccordionContent>
-                                            </AccordionItem>
-                                          ))}
-                                        </Accordion>
-                                      ) : (
-                                        <div className="text-sm prose prose-sm max-w-none leading-relaxed markdown-body">
-                                          <ReactMarkdown>{sub.aiFeedback || 'No AI feedback available.'}</ReactMarkdown>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="lg:w-96 flex flex-col gap-6">
-                                  <div className="border border-border rounded-[1.5rem] md:rounded-[2rem] p-6 md:p-8 bg-white shadow-sm flex flex-col">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-widest mb-6 text-muted-foreground flex items-center gap-2">
-                                      <History size={12} className="text-primary" /> Audited Traceability
-                                    </h4>
-                                    <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2">
-                                      {sub.traceability.map((log, i) => (
-                                        <div key={i} className="relative pl-6 border-l-2 border-primary/10 pb-6 last:pb-0">
-                                          <div className="absolute left-[-7px] top-0 w-3 h-3 rounded-full bg-primary shadow-sm" />
-                                          <p className="text-[10px] font-mono text-muted-foreground font-bold">{safeFormat(log.timestamp, 'HH:mm:ss')}</p>
-                                          <p className="text-sm font-bold mt-1">{log.actor}: {log.action}</p>
-                                          <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{log.details}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="space-y-3">
-                                    <Button onClick={() => handleApprove(sub)} className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
-                                      <CheckCircle2 size={18} /> Approve for Council
-                                    </Button>
-                                    <Button onClick={() => handleForceApprove(sub)} variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
-                                      <Sparkles size={16} /> AI Override
-                                    </Button>
-                                    <RejectDialog sub={sub} onReject={handleReject} />
-                                  </div>
-                                </div>
-                              </div>
-                            </ScrollArea>
-                          </DialogContent>
-                        </Dialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {submissions.filter(s => s.status === 'admin_reviewing').length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-40 text-center text-muted-foreground italic bg-secondary/10">
-                        No submissions pending review.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="jobs">
-          <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
-            <CardHeader className="bg-secondary/10 border-b border-border p-8 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-heading font-bold tracking-tight">Project Governance</CardTitle>
-                <CardDescription>Monitor project lifecycles and intervention status.</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="rounded-full px-4">{allJobs.length} Total</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea orientation="horizontal" className="w-full">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                       <TableHead className="px-8 font-bold text-[10px] uppercase tracking-widest min-w-[200px]">Title</TableHead>
-                       <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Client</TableHead>
-                       <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Status</TableHead>
-                       <TableHead className="font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Budget</TableHead>
-                       <TableHead className="text-right px-8 font-bold text-[10px] uppercase tracking-widest min-w-[120px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                  {allJobs.map(job => (
-                    <TableRow key={job.id} className="hover:bg-secondary/10">
-                      <TableCell className="px-8 font-bold">{job.title}</TableCell>
-                      <TableCell className="text-sm">{(job.clientId || '').slice(0, 8)}...</TableCell>
-                      <TableCell>
-                        <Badge className={`${
-                          job.status === 'open' ? 'bg-blue-100 text-blue-700' :
-                          job.status === 'in-progress' ? 'bg-orange-100 text-orange-700' :
-                          job.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          'bg-zinc-100 text-zinc-700'
-                        } rounded-full text-[10px] font-bold uppercase`}>
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm font-bold">R {safeLocale(job.budget)}</TableCell>
-                      <TableCell className="text-right px-8">
-                        <div className="flex justify-end gap-2">
-                          <select 
-                            className="bg-secondary/50 rounded-lg text-xs p-1 border border-border"
-                            value={job.status}
-                            onChange={(e) => handleUpdateJobStatus(job.id, e.target.value as any)}
-                          >
-                            <option value="open">Open</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {allJobs.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-40 text-center text-muted-foreground italic bg-secondary/10">
-                        {stats.totalJobs === 0 ? "No projects found in the database." : "Loading project data..."}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-
-        <TabsContent value="agents">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              {agents.map(agent => (
-                <AgentCard key={agent.id} agent={agent} />
-              ))}
-              {agents.length === 0 && (
-                <div className="p-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
-                  <p className="text-muted-foreground italic">No agents configured. Add your first agent to start compliance checks.</p>
-                  <AddAgentDialog />
+           <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-border space-y-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Submissions Review Pipeline</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Review, approve, or reject uploaded drawings from one clear queue.</p>
                 </div>
-              )}
+                <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
+                  <div className="rounded-2xl border border-border bg-secondary/30 p-3">
+                    <p className="text-xl font-bold">{submissions.length}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total</p>
+                  </div>
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-xl font-bold text-primary">{pendingSubmissionCount}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pending</p>
+                  </div>
+                  <div className="rounded-2xl border border-red-100 bg-red-50 p-3">
+                    <p className="text-xl font-bold text-red-700">{failedSubmissionCount}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Issues</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {pagedSubmissions.map(submission => (
+                  <div key={submission.id} className="grid gap-4 rounded-2xl border border-border bg-white p-4 transition-colors hover:border-primary/30 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">{submission.drawingName}</p>
+                      <p className="text-xs text-muted-foreground">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{submission.status.replace('_', ' ')}</Badge>
+                      <Button size="sm" variant="outline" onClick={() => setReportSubmission(submission)}>View Report</Button>
+                      <Button size="sm" onClick={() => updateSubmissionStatus(submission, 'approved')}>Approve</Button>
+                      <Button size="sm" variant="destructive" onClick={() => updateSubmissionStatus(submission, 'admin_rejected')}>Reject</Button>
+                    </div>
+                  </div>
+                ))}
+                {submissions.length === 0 && <p className="text-muted-foreground italic">No submissions awaiting review.</p>}
+              </div>
+              {submissions.length > pageSize && <PaginationControls page={submissionPage} totalPages={totalPages(submissions.length, pageSize)} onPageChange={setSubmissionPage} />}
+           </div>
+        </TabsContent>
+
+        <TabsContent value="disputes">
+          <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
+            <h2 className="text-2xl font-bold">Dispute Mediation</h2>
+            <div className="space-y-3">
+              {pagedDisputes.map(dispute => <div key={dispute.id}><DisputeRow dispute={dispute} /></div>)}
+              {disputes.length === 0 && <p className="text-muted-foreground italic">No open disputes.</p>}
             </div>
-            <div className="space-y-6">
-              <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
-                <CardHeader className="p-8 border-b border-border bg-primary/5">
-                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary">Agent Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="p-8 space-y-4">
-                  <AddAgentDialog />
-                  <TestAgentDialog user={user} />
-                  <Button variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5">
-                    <RefreshCcw size={16} /> Restart All Agents
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            {disputes.length > pageSize && <PaginationControls page={disputePage} totalPages={totalPages(disputes.length, pageSize)} onPageChange={setDisputePage} />}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <StatCard title="Jobs" value={stats.totalJobs} />
+            <StatCard title="Approved Drawings" value={stats.approvedDrawings} />
+            <StatCard title="Active Agents" value={stats.activeAgents} />
+            <StatCard title="Errors" value={stats.errorCount} />
           </div>
         </TabsContent>
 
         <TabsContent value="logs">
-          <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
-            <CardHeader className="bg-primary/5 border-b border-border p-8 flex flex-row items-center justify-between">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <History size={14} /> Audited System Logs
-              </CardTitle>
-              <Button variant="ghost" size="sm" className="rounded-full h-8 text-[10px] font-bold uppercase tracking-widest gap-2">
-                <ListFilter size={12} /> Filter Logs
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
+            <h2 className="text-2xl font-bold mb-8">System Activity Logs</h2>
+            <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border">
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest px-8">Timestamp</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">Level</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">Source</TableHead>
-                    <TableHead className="font-bold text-[10px] uppercase tracking-widest">Message</TableHead>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Timestamp</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {logs.map(log => (
-                    <TableRow key={log.id} className="border-border hover:bg-secondary/20 transition-colors">
-                      <TableCell className="text-xs font-mono px-8">{safeFormat(log.timestamp, 'HH:mm:ss.SSS')}</TableCell>
+                    <TableRow key={log.id}>
                       <TableCell>
-                        <Badge className={`text-[10px] font-bold uppercase tracking-widest ${
-                          log.level === 'error' || log.level === 'critical' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                          log.level === 'warning' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
-                          'bg-blue-50 text-blue-700 border-blue-100'
-                        }`}>
+                        <Badge variant={log.level === 'error' || log.level === 'critical' ? 'destructive' : 'outline'} className="uppercase text-[10px]">
                           {log.level}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs font-bold">{log.source}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{log.message}</TableCell>
+                      <TableCell className="font-mono text-xs">{log.source}</TableCell>
+                      <TableCell className="text-xs">{log.message}</TableCell>
+                      <TableCell className="text-muted-foreground text-[10px]">{safeFormat(log.timestamp, 'MMM d, HH:mm:ss')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users">
-          <UserManagement onToggleStatus={handleToggleUserStatus} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <LLMSettings />
-        </TabsContent>
-
-        <TabsContent value="municipal">
-          <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
-            <MunicipalSettingsAdmin />
+            </div>
           </div>
         </TabsContent>
 
-<TabsContent value="knowledge">
-  <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm space-y-8">
-    <AdminKnowledgeUploader user={user} />
-    <AgentKnowledgeManager user={user} />
-  </div>
-</TabsContent>
+        <TabsContent value="jobs">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
+            <h2 className="text-2xl font-bold mb-8">Platform Jobs</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {allJobs.map(job => (
+                <Card key={job.id} className="border-border shadow-sm rounded-2xl p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <Badge className="bg-primary/5 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
+                    <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status}</Badge>
+                  </div>
+                  <h3 className="font-bold mb-2">{job.title}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
+                    <span>Budget: R {job.budget.toLocaleString()}</span>
+                    <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <div className="bg-white p-8 rounded-[2rem] border border-border">
+            <h2 className="text-2xl font-bold mb-8">System Configuration</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div className="space-y-6">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Cpu size={16} /> Global LLM Strategy
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Active Provider</label>
+                    <select className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-primary">
+                      <option value="gemini">Google Gemini (Recommended)</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="openrouter">OpenRouter</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Default Model</label>
+                    <Input placeholder="gemini-2.0-flash" className="h-12 rounded-xl" />
+                  </div>
+                  <Button className="w-full h-12 rounded-xl font-bold shadow-lg shadow-primary/20">Save Global Settings</Button>
+                </div>
+              </div>
+
+              <div className="space-y-6 p-8 bg-secondary/20 rounded-[2rem] border border-border">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Activity size={16} /> System Health
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">API Latency</span>
+                    <span className="font-bold text-green-600">142ms</span>
+                  </div>
+                  <div className="flex justify-between text-xs py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Database Connectivity</span>
+                    <span className="font-bold text-green-600">Stable</span>
+                  </div>
+                  <div className="flex justify-between text-xs py-2 border-b border-border/50">
+                    <span className="text-muted-foreground">Agent Response Rate</span>
+                    <span className="font-bold">98.4%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="reviews">
+           <div className="bg-white p-8 rounded-[2rem] border border-border">
+              <ReviewManagement />
+           </div>
+        </TabsContent>
+
+        <TabsContent value="agents">
+          <div className="mb-6 flex flex-col gap-3 rounded-[2rem] border border-border bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Agent Configuration</h2>
+              <p className="text-sm text-muted-foreground">Create, test, and tune specialist agents with provider defaults filled automatically.</p>
+            </div>
+            <Button onClick={() => setIsCreatingAgent(true)} className="h-12 rounded-xl font-bold gap-2" disabled={isCreatingAgent}>
+              <Plus size={16} /> New Agent
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {isCreatingAgent && (
+              <AgentCard
+                agent={createBlankAgent()}
+                isNew
+                onCreated={() => setIsCreatingAgent(false)}
+                onCancel={() => setIsCreatingAgent(false)}
+              />
+            )}
+            {agents.map(agent => (
+              <AgentCard key={agent.id} agent={agent} />
+            ))}
+            {agents.length === 0 && !isCreatingAgent && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
+                <p className="text-muted-foreground italic">No agents found in the system.</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold">User Management</h2>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search users..."
+                    className="pl-10 rounded-full w-[300px]"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allUsers
+                    .filter(u => u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map(u => (
+                    <TableRow key={u.uid}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                            {u.displayName[0]}
+                          </div>
+                          <span className="font-medium">{u.displayName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{u.role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{u.email}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Managing user ${u.displayName}`)}>
+                          <Settings2 size={16} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="knowledge">
+           <div className="space-y-8">
+              <AdminKnowledgeUploader user={user} />
+              <AgentKnowledgeManager user={user} />
+           </div>
+        </TabsContent>
+
+        <TabsContent value="municipal">
+           <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
+              <MunicipalSettingsAdmin />
+           </div>
+        </TabsContent>
       </Tabs>
 
       {/* Full Report Modal */}
@@ -990,6 +964,8 @@ export default function AdminDashboard({
                 drawingName={reportSubmission.drawingName}
                 onClose={() => setReportSubmission(null)}
                 userRole={user.role}
+                submissionId={reportSubmission.id}
+                userId={user.uid}
               />
             </div>
           )}
@@ -999,973 +975,62 @@ export default function AdminDashboard({
   );
 }
 
-function UserManagement({ 
-  onToggleStatus, 
-  searchTerm, 
-  setSearchTerm 
-}: { 
-  onToggleStatus?: (uid: string, status?: string) => void,
-  searchTerm?: string,
-  setSearchTerm?: (val: string) => void
-}) {
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isAddingUser, setIsAddingUser] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', displayName: '', role: 'client' as UserRole });
+function DisputeRow({ dispute }: { dispute: Dispute }) {
+  const [adminNotes, setAdminNotes] = useState(dispute.adminNotes || '');
+  const [resolution, setResolution] = useState(dispute.resolution || '');
 
-  useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setUsers(snapshot.docs.map(d => {
-        const data = d.data();
-        return {
-          uid: d.id,
-          email: data.email || '',
-          displayName: data.displayName || 'Unnamed User',
-          role: data.role || 'client',
-          createdAt: data.createdAt || new Date().toISOString(),
-          ...data
-        } as UserProfile;
-      }));
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const updateDispute = async (status: Dispute['status']) => {
     try {
-      const newUserRef = doc(collection(db, 'users'));
-      await setDoc(newUserRef, {
-        uid: newUserRef.id,
-        email: newUser.email,
-        displayName: newUser.displayName,
-        role: newUser.role,
-        createdAt: new Date().toISOString()
-      });
-      setIsAddingUser(false);
-      setNewUser({ email: '', displayName: '', role: 'client' });
-      toast.success("User added successfully");
-    } catch (error) {
-      toast.error("Failed to add user");
-    }
-  };
-
-  const handleUpdateRole = async (userId: string, newRole: UserRole) => {
-    try {
-      await updateDoc(doc(db, 'users', userId), { role: newRole });
-      toast.success(`User role updated to ${newRole}`);
-    } catch (error) {
-      toast.error("Failed to update user role");
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user? This will not delete their Firebase Auth account, only their profile.")) return;
-    try {
-      await deleteDoc(doc(db, 'users', userId));
-      toast.success("User profile deleted");
-    } catch (error) {
-      toast.error("Failed to delete user profile");
-    }
-  };
-
-  return (
-    <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
-      <CardHeader className="bg-primary/5 border-b border-border p-8 flex flex-row items-center justify-between">
-        <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-          <Users size={14} /> Platform User Directory
-        </CardTitle>
-        <div className="flex items-center gap-4">
-          <div className="relative w-64">
-             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-             <Input 
-                placeholder="Search users..." 
-                className="pl-9 h-10 rounded-full bg-white border-border"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm?.(e.target.value)}
-             />
-          </div>
-          <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
-            <DialogTrigger render={
-              <Button size="sm" className="rounded-full h-10 px-6 font-bold uppercase tracking-widest bg-primary shadow-lg shadow-primary/20">
-                <Plus size={16} className="mr-2" /> Add User
-              </Button>
-            } />
-            <DialogContent className="sm:max-w-[425px] border-border bg-white rounded-[2rem] p-0 overflow-hidden">
-              <div className="bg-primary/5 p-8 border-b border-border">
-                <DialogHeader>
-                  <DialogTitle className="font-heading text-2xl font-bold">Add New User</DialogTitle>
-                  <DialogDescription>Create a new user profile manually.</DialogDescription>
-                </DialogHeader>
-              </div>
-              <form onSubmit={handleAddUser} className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Display Name</label>
-                  <Input required value={newUser.displayName} onChange={e => setNewUser({...newUser, displayName: e.target.value})} placeholder="e.g. John Doe" className="rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email</label>
-                  <Input required type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="john@example.com" className="rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
-                  <select 
-                    value={newUser.role} 
-                    onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
-                    className="w-full h-10 px-3 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="client">Client</option>
-                    <option value="architect">Architect</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <Button type="submit" className="w-full h-12 rounded-xl font-bold">Create User</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-border">
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest px-8">User</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest">Email</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest">Role</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center">Status</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest">Joined</TableHead>
-              <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest px-8">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.filter(u => 
-              u.displayName?.toLowerCase().includes((searchTerm || '').toLowerCase()) || 
-              u.email.toLowerCase().includes((searchTerm || '').toLowerCase())
-            ).map(u => (
-              <TableRow key={u.uid} className="border-border hover:bg-secondary/20 transition-colors">
-                <TableCell className="font-bold px-8">
-                  <div className="flex flex-col">
-                    <span>{u.displayName}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">{u.uid.slice(0, 8)}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs font-mono">{u.email}</TableCell>
-                <TableCell>
-                  <select 
-                    value={u.role} 
-                    onChange={(e) => handleUpdateRole(u.uid, e.target.value as UserRole)}
-                    className="bg-secondary/50 border border-border rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest focus:ring-1 focus:ring-primary outline-none"
-                  >
-                    <option value="client">Client</option>
-                    <option value="architect">Architect</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </TableCell>
-                <TableCell className="text-center">
-                   {(u as any).status === 'suspended' ? (
-                      <Badge variant="destructive" className="rounded-full uppercase text-[10px]">Suspended</Badge>
-                   ) : (
-                      <Badge variant="secondary" className="bg-green-100 text-green-700 rounded-full uppercase text-[10px]">Active</Badge>
-                   )}
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
-                <TableCell className="text-right px-8">
-                  <div className="flex justify-end gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className={`rounded-full h-8 text-[10px] font-bold uppercase tracking-widest ${
-                        (u as any).status === 'suspended' ? 'text-green-500 hover:bg-green-50' : 'text-red-500 hover:bg-red-50'
-                      }`}
-                      onClick={() => onToggleStatus?.(u.uid, (u as any).status)}
-                    >
-                      {(u as any).status === 'suspended' ? 'Activate' : 'Suspend'}
-                    </Button>
-                    <ProfileEditor user={u} isAdminEditing={true} />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDeleteUser(u.uid)}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {users.length === 0 && !loading && (
-              <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground italic bg-secondary/10">
-                  No users found matching your criteria.
-                </TableCell>
-              </TableRow>
-            )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-  );
-}
-
-function LLMSettings() {
-  const [config, setConfig] = useState<LLMConfig>({
-    provider: 'gemini',
-    apiKey: '',
-    model: 'gemini-2.0-flash',
-    baseUrl: ''
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const docRef = doc(db, 'system_settings', 'llm_config');
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          setConfig(snap.data() as LLMConfig);
-        }
-      } catch (error) {
-        console.error("Failed to fetch LLM config:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchConfig();
-  }, []);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await setDoc(doc(db, 'system_settings', 'llm_config'), {
-        ...config,
-        id: 'llm_config',
+      await updateDoc(doc(db, 'disputes', dispute.id), {
+        status,
+        adminNotes,
+        resolution,
         updatedAt: new Date().toISOString()
       });
-      toast.success("LLM Configuration saved successfully");
-    } catch (error) {
-      toast.error("Failed to save LLM configuration");
-      console.error(error);
-    } finally {
-      setSaving(false);
+      toast.success('Dispute updated');
+    } catch {
+      toast.error('Failed to update dispute');
     }
   };
 
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-20">
-        <Loader2 className="animate-spin text-primary" size={32} />
-      </div>
-    );
-  }
-
   return (
-    <Card className="border-border shadow-sm bg-white overflow-hidden rounded-[2rem]">
-      <CardHeader className="bg-primary/5 border-b border-border p-8">
-        <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-          <Cpu size={14} /> Orchestration LLM Configuration
-        </CardTitle>
-        <CardDescription>Configure the primary model used for architectural compliance reviews.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-8 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
-              <select 
-                value={config.provider} 
-onChange={(e) => {
-  const provider = e.target.value as LLMProvider;
-  const pConfig = PROVIDER_CONFIGS[provider];
-  setConfig({
-    ...config,
-    provider,
-    baseUrl: pConfig?.baseUrl || '',
-    model: pConfig?.models?.[0]?.value || ''
-  });
-}}
-                className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
-              >
-                {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
-                  <option key={key} value={key}>{p.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key</label>
-              <Input 
-                type="password" 
-                value={config.apiKey} 
-                onChange={e => setConfig({...config, apiKey: e.target.value})}
-                placeholder={config.provider === 'gemini' ? 'Leave empty to use environment key' : 'Enter your API key'}
-                className="rounded-xl h-12"
-              />
-              {config.provider === 'gemini' && !config.apiKey && (
-                <p className="text-[10px] text-muted-foreground italic">Using GEMINI_API_KEY from environment secrets.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
-              <select 
-                value={config.model} 
-                onChange={e => setConfig({...config, model: e.target.value})}
-                className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
-              >
-{PROVIDER_CONFIGS[config.provider]?.models?.map(m => (
-  <option key={m.value} value={m.value}>{m.label}</option>
-))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
-              <Input 
-                value={config.baseUrl} 
-                onChange={e => setConfig({...config, baseUrl: e.target.value})}
-                placeholder="https://api.example.com/v1"
-                className="rounded-xl h-12 bg-secondary/20"
-                readOnly={config.provider === 'gemini'}
-              />
-              {config.provider !== 'gemini' && (
-                <p className="text-[10px] text-muted-foreground italic">Base URL is prefilled for {config.provider}.</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-border flex justify-end">
-          <Button 
-            onClick={handleSave} 
-            disabled={saving}
-            className="rounded-xl h-12 px-8 font-bold gap-2 shadow-lg shadow-primary/20"
-          >
-            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            Save Configuration
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function StatCard({ label, value, icon, color = 'text-primary' }: { label: string, value: string, icon: React.ReactNode, color?: string }) {
-  return (
-    <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
-      <CardContent className="p-6 flex items-center gap-4">
-        <div className={`p-3 rounded-2xl bg-secondary/50 ${color}`}>
-          {icon}
-        </div>
+    <div className="rounded-2xl border border-border p-4 space-y-4">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-          <p className="text-2xl font-heading font-bold tracking-tight">{value}</p>
+          <p className="font-bold">Job {dispute.jobId}</p>
+          <p className="text-sm text-muted-foreground">{dispute.reason}</p>
+          <p className="text-xs text-muted-foreground mt-1">Requested: {dispute.requestedResolution}</p>
         </div>
-      </CardContent>
+        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{dispute.status.replace('_', ' ')}</Badge>
+      </div>
+      <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} placeholder="Admin mediation notes" />
+      <Textarea value={resolution} onChange={e => setResolution(e.target.value)} placeholder="Resolution outcome" />
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => updateDispute('in_mediation')}>Start Mediation</Button>
+        <Button size="sm" onClick={() => updateDispute('resolved')}>Resolve</Button>
+        <Button size="sm" variant="destructive" onClick={() => updateDispute('rejected')}>Reject</Button>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value }: { title: string; value: number }) {
+  return (
+    <Card className="border-border shadow-sm bg-white rounded-3xl">
+      <CardHeader>
+        <CardDescription className="uppercase text-[10px] tracking-widest font-bold">{title}</CardDescription>
+        <CardTitle className="text-3xl font-heading">{value}</CardTitle>
+      </CardHeader>
     </Card>
   );
 }
 
-
-function AddAgentDialog() {
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('sans_compliance');
-  const [prompt, setPrompt] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
-  
-  // LLM Config state
-  const [llmProvider, setLlmProvider] = useState<LLMProvider | 'global'>('global');
-  const [llmModel, setLlmModel] = useState('');
-  const [llmApiKey, setLlmApiKey] = useState('');
-  const [llmBaseUrl, setLlmBaseUrl] = useState('');
-
-  const handleAdd = async () => {
-    if (!name || !prompt) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-    try {
-      await addDoc(collection(db, 'agents'), {
-        name,
-        role,
-        systemPrompt: prompt,
-        description: `Specialized agent for ${role.replace('_', ' ')} tasks.`,
-        temperature: 0.7,
-        status: 'online',
-        llmProvider,
-        llmModel,
-        llmApiKey,
-        llmBaseUrl,
-        lastActive: new Date().toISOString(),
-        currentActivity: 'Idle'
-      });
-      setIsOpen(false);
-      setName('');
-      setPrompt('');
-      toast.success("Agent added successfully");
-    } catch (error) {
-      toast.error("Failed to add agent");
-    }
-  };
-
-  const PRESETS = [
-    { name: "Wall Checker", role: "wall_checker", prompt: "You are a Wall Compliance Specialist. Focus on SANS 10400-K. Check for correct wall thicknesses (e.g., 230mm external, 110mm internal), damp-proof courses (DPC), and structural integrity of masonry." },
-    { name: "Window Checker", role: "window_checker", prompt: "You are a Fenestration Specialist. Focus on SANS 10400-N. Check for natural ventilation requirements (5% of floor area) and natural lighting (10% of floor area). Verify safety glazing where required." },
-    { name: "Door Checker", role: "door_checker", prompt: "You are a Door and Fire Safety Specialist. Focus on SANS 10400-T. Check for fire door ratings, escape route widths, and travel distances to exits." },
-    { name: "Area Checker", role: "area_checker", prompt: "You are an Area and Room Sizing Specialist. Focus on SANS 10400-C. Check for minimum habitable room sizes (6m²), minimum ceiling heights (2.4m), and kitchen/bathroom dimensions." },
-    { name: "Compliance Checker", role: "compliance_checker", prompt: "You are a General Compliance Specialist. Verify overall council readiness, including title blocks, north points, scale bars, and general SANS 10400-A compliance." },
-    { name: "SANS Compliance Specialist", role: "sans_compliance", prompt: "You are a SANS Compliance Specialist. Your primary focus is verifying compliance with SANS 10400 regulations. You must check for basic requirements like minimum room sizes (SANS 10400-C) and fire safety aspects (SANS 10400-T). Ensure all findings are cross-referenced with the relevant SANS 10400 parts." }
-  ];
-
-  const applyPreset = (preset: typeof PRESETS[0]) => {
-    setName(preset.name);
-    setRole(preset.role);
-    setPrompt(preset.prompt);
-  };
-
+function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger render={<Button className="w-full h-12 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20"><Plus size={18} /> Provision New Agent</Button>} />
-      <DialogContent className="max-w-2xl border-border bg-white rounded-[2rem] p-0 overflow-hidden">
-        <div className="bg-primary/5 p-8 border-b border-border">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-3xl font-bold">Provision AI Agent</DialogTitle>
-            <DialogDescription>Configure a new specialized agent for the compliance pipeline.</DialogDescription>
-          </DialogHeader>
-        </div>
-        <div className="p-8 space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Quick Presets</label>
-            <div className="flex flex-wrap gap-2">
-              {PRESETS.map(p => (
-                <Button key={p.role} variant="outline" size="xs" onClick={() => applyPreset(p)} className="rounded-full text-[10px] h-7">
-                  {p.name}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Agent Name</label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fire Safety Expert" className="rounded-xl" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
-              <select 
-                value={role} 
-                onChange={e => setRole(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary"
-              >
-                <option value="orchestrator">Orchestrator</option>
-                <option value="wall_checker">Wall Checker (K)</option>
-                <option value="window_checker">Window Checker (N)</option>
-                <option value="door_checker">Door Checker (T)</option>
-                <option value="area_checker">Area Checker (C)</option>
-                <option value="compliance_checker">Compliance Checker (A)</option>
-                <option value="sans_compliance">SANS Compliance</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-4 border-t border-border pt-4">
-            <h6 className="text-[10px] font-bold uppercase tracking-widest text-primary">LLM Configuration</h6>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</label>
-                <select 
-                  value={llmProvider} 
-                  onChange={e => {
-                    const provider = e.target.value as LLMProvider | 'global';
-                    setLlmProvider(provider);
-if (provider !== 'global') {
-  const pConfig = PROVIDER_CONFIGS[provider];
-  setLlmBaseUrl(pConfig?.baseUrl || '');
-  setLlmModel(pConfig?.models?.[0]?.value || '');
-} else {
-  setLlmBaseUrl('');
-  setLlmModel('');
-}
-                  }}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
-                >
-                  <option value="global">System Default (Global)</option>
-                  {Object.entries(PROVIDER_CONFIGS).map(([key, p]) => (
-                    <option key={key} value={key}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model Name</label>
-                {llmProvider === 'global' ? (
-                  <Input 
-                    value="Inherited from System Settings"
-                    disabled
-                    className="h-10 rounded-xl text-xs bg-secondary/20"
-                  />
-                ) : (
-                  <div className="space-y-2">
-                    <select 
-                      value={llmModel} 
-                      onChange={e => {
-                        setLlmModel(e.target.value);
-                        if (e.target.value === 'custom') {
-                          setLlmModel('');
-                        }
-                      }}
-                      className="w-full h-10 px-3 rounded-xl border border-border bg-white text-xs focus:ring-2 focus:ring-primary outline-none"
-                    >
-{PROVIDER_CONFIGS[llmProvider as LLMProvider]?.models?.map(m => (
-  <option key={m.value} value={m.value}>{m.label}</option>
-))}
-                      <option value="custom">Enter custom model name...</option>
-                    </select>
-                    <Input 
-                      value={llmModel}
-                      onChange={e => setLlmModel(e.target.value)}
-                      placeholder="Enter model name (e.g. nvidia/llama-3.1-70b-instruct)"
-                      className="h-10 rounded-xl text-xs"
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key (Optional)</label>
-                <Input 
-                  type="password"
-                  value={llmApiKey} 
-                  onChange={e => setLlmApiKey(e.target.value)}
-                  className="h-10 rounded-xl text-xs"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
-                <Input 
-                  value={llmBaseUrl} 
-                  onChange={e => setLlmBaseUrl(e.target.value)}
-                  className="h-10 rounded-xl text-xs"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">System Prompt</label>
-            <Textarea 
-              value={prompt} 
-              onChange={e => setPrompt(e.target.value)} 
-              placeholder="Define the agent's behavior and constraints..." 
-              className="min-h-[150px] rounded-xl font-mono text-xs"
-            />
-          </div>
-          <Button onClick={handleAdd} className="w-full h-14 rounded-xl font-bold text-lg">Initialize Agent</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RejectDialog({ sub, onReject }: { sub: Submission, onReject: (sub: Submission, feedback: string) => void }) {
-  const [feedback, setFeedback] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger render={<Button variant="outline" className="w-full h-14 rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5 gap-2 font-bold"><XCircle size={18} /> Reject & Send Back</Button>} />
-      <DialogContent className="max-w-md border-border bg-white rounded-[2rem] p-0 overflow-hidden">
-        <div className="bg-destructive/5 p-8 border-b border-border">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl font-bold text-destructive">Reject Submission</DialogTitle>
-            <DialogDescription>Provide detailed feedback for the architect to correct.</DialogDescription>
-          </DialogHeader>
-        </div>
-        <div className="p-8 space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rejection Feedback</label>
-            <Textarea 
-              value={feedback} 
-              onChange={e => setFeedback(e.target.value)} 
-              placeholder="e.g. Missing Part T fire safety annotations on the ground floor plan..." 
-              className="min-h-[120px] rounded-xl"
-            />
-          </div>
-          <Button 
-            onClick={() => { onReject(sub, feedback); setIsOpen(false); }} 
-            className="w-full h-14 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl font-bold"
-          >
-            Confirm Rejection
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function TestAgentDialog({ user }: { user: UserProfile }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isTesting, setIsTesting] = useState(false);
-  const [aiProgress, setAiProgress] = useState<AIProgress | null>(null);
-  const [testResult, setTestResult] = useState<AIReviewResult | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleSaveReport = async () => {
-    if (!testResult) return;
-    setIsSaving(true);
-    try {
-      await addDoc(collection(db, 'system_reports'), {
-        title: `AI Agent Test Report - ${new Date().toLocaleString()}`,
-        status: testResult.status,
-        result: testResult,
-        createdAt: new Date().toISOString(),
-        createdBy: user.uid
-      });
-      toast.success("Report saved to system");
-    } catch (error) {
-      console.error("Save report error:", error);
-      toast.error("Failed to save report");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const isPdf = file.type === 'application/pdf';
-    const isDwg = file.name.toLowerCase().endsWith('.dwg');
-    const isImg = file.type.startsWith('image/');
-
-    if (!isPdf && !isDwg && !isImg) {
-      toast.error("Please upload a PDF, DWG, or Image file.");
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
-    setTestResult(null);
-
-    const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 90) return prev;
-        return prev + 5;
-      });
-    }, 200);
-
-    try {
-      const url = await uploadAndTrackFile(file, {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        uploadedBy: user.uid,
-        context: 'test'
-      });
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setIsUploading(false);
-      setIsTesting(true);
-      
-      try {
-        const result = await reviewDrawing(url, file.name, (prog) => {
-          setAiProgress(prog);
-        });
-        setTestResult(result);
-        toast.success("AI Test completed successfully.");
-      } catch (error) {
-        console.error("AI Test error:", error);
-        toast.error("AI Test failed.");
-      } finally {
-        setIsTesting(false);
-      }
-    } catch (error) {
-      clearInterval(progressInterval);
-      console.error("Upload error:", error);
-      toast.error("Failed to upload drawing.");
-      setIsUploading(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger render={<Button variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5"><Upload size={16} /> Test Agents (Upload Plan)</Button>} />
-      <DialogContent className="sm:max-w-[800px] border-border bg-white/95 backdrop-blur-md p-0 overflow-hidden rounded-[2rem] max-h-[90vh] flex flex-col">
-        <div className="bg-primary/5 p-8 border-b border-border shrink-0">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-2xl font-bold">Test AI Agents</DialogTitle>
-            <DialogDescription>Upload a plan to run a live test of the AI compliance orchestrator.</DialogDescription>
-          </DialogHeader>
-        </div>
-        <div className="p-8 overflow-y-auto flex-1 space-y-6">
-          {!isUploading && !isTesting && !testResult && (
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-primary/20 rounded-[2rem] p-12 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-primary/5 transition-colors"
-            >
-              <Upload className="w-12 h-12 text-primary/40 mb-4" />
-              <h3 className="font-heading font-bold text-lg mb-2">Upload Plan for Testing</h3>
-              <p className="text-sm text-muted-foreground mb-6">Drag and drop or click to browse (PDF, DWG, Image)</p>
-              <Button variant="outline" className="rounded-full px-8">Select File</Button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileSelect} 
-                className="hidden" 
-                accept=".pdf,.dwg,image/*"
-              />
-            </div>
-          )}
-
-          {isUploading && (
-            <div className="text-center py-12">
-              <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-              <h3 className="font-bold text-lg mb-2">Uploading Plan...</h3>
-              <div className="w-full max-w-md mx-auto bg-secondary rounded-full h-2 overflow-hidden">
-                <div className="bg-primary h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">{uploadProgress}%</p>
-            </div>
-          )}
-
-          {isTesting && (
-            <div className="py-20 relative flex flex-col items-center justify-center min-h-[500px] overflow-hidden">
-              {/* Background ambient effect */}
-              <div className="absolute inset-0 bg-primary/2 opacity-20 pointer-events-none" />
-              
-              <div className="relative w-80 h-80 flex items-center justify-center">
-                {/* SVG Connections Layer */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
-                  <defs>
-                    <filter id="glow">
-                      <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.8" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Lines to agents */}
-                  {[0, 60, 120, 180, 240, 300].map((angle, i) => {
-                    const agentNames = [
-                      "Orchestrator", // Indexing match workaround
-                      "Wall Compliance Agent",
-                      "Fenestration Agent",
-                      "Door & Fire Safety Agent",
-                      "Area Sizing Agent",
-                      "General Compliance Agent",
-                      "SANS Specialist"
-                    ];
-                    // Skip index 0 as it's orchestrator
-                    const agentName = agentNames[i + 1];
-                    const isActive = aiProgress?.agentName === agentName;
-                    const isDone = aiProgress?.completedAgents.includes(agentName);
-                    
-                    const rad = (angle - 90) * (Math.PI / 180);
-                    const x2 = 160 + Math.cos(rad) * 140;
-                    const y2 = 160 + Math.sin(rad) * 140;
-                    
-                    return (
-                      <g key={angle}>
-                         <line 
-                           x1="160" y1="160" x2={x2} y2={y2} 
-                           stroke={isDone ? "var(--primary)" : "var(--primary)"}
-                           strokeOpacity={isDone ? 0.6 : 0.15}
-                           strokeWidth={isActive ? "3" : "1.5"}
-                           className={isActive ? "animate-pulse" : ""}
-                         />
-                         {isActive && (
-                           <circle r="4" fill="var(--primary)">
-                             <animateMotion 
-                               path={`M 160 160 L ${x2} ${y2}`} 
-                               dur="1s" 
-                               repeatCount="indefinite" 
-                             />
-                           </circle>
-                         )}
-                      </g>
-                    );
-                  })}
-                </svg>
-
-                {/* Central Orchestrator Node */}
-                <div className="relative z-10 w-28 h-28 bg-white border-4 border-primary rounded-full flex flex-col items-center justify-center shadow-[0_0_40px_rgba(var(--primary),0.2)]">
-                  <Cpu className={`w-12 h-12 text-primary ${aiProgress?.percentage ? "animate-spin-slow" : "animate-pulse"}`} />
-                  <div className="absolute -bottom-8 bg-primary/10 px-3 py-1 rounded-full border border-primary/20 backdrop-blur-sm">
-                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase">Orchestrator</span>
-                  </div>
-                </div>
-                
-                {/* Orbiting Agents Nodes */}
-                {[0, 60, 120, 180, 240, 300].map((angle, i) => {
-                    const agents = [
-                        { name: "Wall Compliance Agent", icon: <ShieldCheck className="w-5 h-5" /> },
-                        { name: "Fenestration Agent", icon: <Eye className="w-5 h-5" /> },
-                        { name: "Door & Fire Safety Agent", icon: <Activity className="w-5 h-5" /> },
-                        { name: "Area Sizing Agent", icon: <Maximize2 className="w-5 h-5" /> },
-                        { name: "General Compliance Agent", icon: <Settings2 className="w-5 h-5" /> },
-                        { name: "SANS Specialist", icon: <Search className="w-5 h-5" /> }
-                    ];
-                    const agent = agents[i];
-                    const isActive = aiProgress?.agentName === agent.name;
-                    const isDone = aiProgress?.completedAgents.includes(agent.name);
-                    
-                    const rad = (angle - 90) * (Math.PI / 180);
-                    const x = Math.cos(rad) * 140;
-                    const y = Math.sin(rad) * 140;
-                    
-                    return (
-                      <div 
-                        key={angle} 
-                        className={`absolute w-14 h-14 bg-white border-2 rounded-full flex items-center justify-center shadow-lg transition-all duration-500 z-20 ${
-                          isActive ? "border-primary scale-125 shadow-primary/30" : 
-                          isDone ? "border-primary/60 bg-primary/5 shadow-none" : "border-primary/20"
-                        }`}
-                        style={{ transform: `translate(${x}px, ${y}px)` }}
-                      >
-                        <div className={isDone ? "text-primary" : isActive ? "text-primary" : "text-muted-foreground"}>
-                          {agent.icon}
-                        </div>
-                        
-                        {/* Thought Bubble */}
-                        {isActive && aiProgress.thought && (
-                          <div className="absolute left-16 bottom-16 w-60 bg-white border-2 border-primary/20 rounded-2xl p-4 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-300 z-30">
-                            <div className="absolute bottom-[-10px] left-2 w-4 h-4 bg-white border-b-2 border-l-2 border-primary/20 rotate-[-45deg]" />
-                            <p className="text-xs font-medium text-foreground leading-relaxed italic">
-                              "{aiProgress.thought}"
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Status Checkmark */}
-                        {isDone && (
-                           <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5 animate-in zoom-in duration-300">
-                             <CheckCircle2 className="w-3 h-3" />
-                           </div>
-                        )}
-                      </div>
-                    );
-                })}
-              </div>
-
-              <div className="text-center mt-20 space-y-4 max-w-md">
-                <div className="flex items-center justify-center gap-3">
-                    <h3 className="font-bold text-2xl tracking-tight">{aiProgress?.agentName || "System"}</h3>
-                    <Badge variant="outline" className="animate-pulse bg-primary/5 text-primary border-primary/20">
-                        {aiProgress?.percentage || 20}%
-                    </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {aiProgress?.activity || "Preparing specialized analysis agents..."}
-                </p>
-                <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
-                    <div 
-                        className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(var(--primary),0.4)]"
-                        style={{ width: `${aiProgress?.percentage || 20}%` }}
-                    />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {testResult && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-xl">System Testing Report</h3>
-                <div className="flex gap-2">
-                  <Badge className={testResult.status === 'passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                    {testResult.status === 'passed' ? 'PASSED' : 'FAILED'}
-                  </Badge>
-                  <Button variant="outline" size="sm" onClick={handleSaveReport} disabled={isSaving} className="gap-2">
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Save Report
-                  </Button>
-                </div>
-              </div>
-              
-              <ScrollArea className="h-[500px] pr-4">
-                <div className="space-y-6">
-                  {/* Summary Box */}
-                  <div className="p-6 bg-primary/5 border border-primary/20 rounded-2xl">
-                    <h4 className="font-bold text-lg mb-2 flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary"/> AI Orchestrator Summary</h4>
-                    <div className="prose prose-sm max-w-none text-foreground">
-                      <ReactMarkdown>{testResult.feedback}</ReactMarkdown>
-                    </div>
-                  </div>
-
-                  {/* Agent Categories */}
-                  <div className="space-y-4">
-                    <h4 className="font-bold text-lg border-b pb-2">Agent Findings</h4>
-                    {testResult.categories && testResult.categories.length > 0 ? testResult.categories.map((cat, idx) => (
-                      <div key={idx} className="border border-border bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                         <div className="flex items-center justify-between mb-4">
-                           <div className="flex items-center gap-2">
-                             <Cpu className="text-primary w-5 h-5" />
-                             <h5 className="font-bold text-md tracking-tight">{cat.name}</h5>
-                           </div>
-                           <Badge variant="outline" className="bg-secondary/50 font-mono">
-                             {cat.issues.length} {cat.issues.length === 1 ? 'finding' : 'findings'}
-                           </Badge>
-                         </div>
-                         
-                         {cat.issues.length > 0 ? (
-                           <div className="grid gap-3">
-                             {cat.issues.map((issue, i) => (
-                               <div key={i} className="flex gap-3 p-3 rounded-xl bg-secondary/20 border border-secondary/50">
-                                 <div className="shrink-0 pt-0.5">
-                                   {issue.severity === 'high' ? <AlertCircle className="w-4 h-4 text-red-500" /> : 
-                                    issue.severity === 'medium' ? <AlertCircle className="w-4 h-4 text-orange-500" /> : 
-                                    <CheckCircle2 className="w-4 h-4 text-blue-500" />}
-                                 </div>
-                                 <div className="space-y-1">
-                                   <p className="text-sm font-medium">{issue.description}</p>
-                                   {issue.actionItem && (
-                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                       <ArrowRight className="w-3 h-3" /> {issue.actionItem}
-                                     </p>
-                                   )}
-                                 </div>
-                               </div>
-                             ))}
-                           </div>
-                         ) : (
-                           <div className="p-4 bg-green-50 text-green-700 rounded-xl flex items-center gap-2 text-sm font-medium border border-green-100">
-                             <CheckCircle2 className="w-5 h-5" /> No compliance issues found by this agent.
-                           </div>
-                         )}
-                      </div>
-                    )) : (
-                      <div className="p-6 text-center border-2 border-dashed rounded-2xl text-muted-foreground">
-                        No categorized agent findings available.
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Trace Log */}
-                  <div className="p-5 bg-secondary/30 border border-border rounded-2xl">
-                    <h4 className="font-bold text-sm text-muted-foreground mb-2 flex items-center gap-2 uppercase tracking-widest"><History className="w-4 h-4" /> Trace Log</h4>
-                    <p className="text-xs font-mono text-muted-foreground leading-relaxed whitespace-pre-wrap flex-1 min-w-0 break-words">{testResult.traceLog}</p>
-                  </div>
-                </div>
-              </ScrollArea>
-              
-              <Button onClick={() => setTestResult(null)} className="w-full h-14 rounded-xl font-bold bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors">Test Another Plan</Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+      <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
+      <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+    </div>
   );
 }

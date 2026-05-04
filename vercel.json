@@ -11,30 +11,18 @@
     "api/notifications/worker.ts": {
       "maxDuration": 60,
       "memory": 256
-    },
-    "api/municipal/worker.ts": {
-      "maxDuration": 300,
-      "memory": 1024
     }
   },
   "crons": [
     {
       "path": "/api/notifications/worker",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/municipal/worker",
-      "schedule": "0 1 * * *"
+      "schedule": "0 2 * * *"
     }
   ],
   "routes": [
     {
       "src": "/api/notifications/worker",
       "dest": "/api/notifications/worker.ts"
-    },
-    {
-      "src": "/api/municipal/worker",
-      "dest": "/api/municipal/worker.ts"
     },
     {
       "src": "/api/(.*)",

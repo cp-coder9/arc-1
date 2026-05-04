@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   orderBy,
   deleteDoc,
-  Timestamp
+  Timestamp,
+  increment
 } from "firebase/firestore";
 import { AgentKnowledge, KnowledgeStatus } from "../types";
 
@@ -143,7 +144,7 @@ export const incrementKnowledgeUsage = async (entryId: string) => {
   try {
     const entryRef = doc(db, KNOWLEDGE_COLLECTION, entryId);
     await updateDoc(entryRef, {
-      usageCount: Timestamp.now(),
+      usageCount: increment(1),
       lastUsedAt: new Date().toISOString()
     });
   } catch (error) {

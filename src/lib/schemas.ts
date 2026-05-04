@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
 export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected']);
@@ -30,7 +30,9 @@ export const NotificationTypeEnum = z.enum([
   'payment_released',
   'message',
   'milestone_due',
-  'council_update'
+  'council_update',
+  'invoice_sent',
+  'invoice_paid'
 ]);
 export const PaymentTypeEnum = z.enum([
   'escrow_deposit',
@@ -162,7 +164,7 @@ export const ReviewSchema = z.object({
     professionalism: z.number().min(1).max(5).optional(),
   }).optional(),
   comment: z.string().min(10, 'Comment must be at least 10 characters').max(2000),
-  type: z.enum(['client_to_architect', 'architect_to_client']),
+  type: z.enum(['client_to_architect', 'architect_to_client', 'to_bep', 'from_bep', 'to_freelancer']),
   isPublic: z.boolean().default(true),
   createdAt: z.string().datetime().optional(),
 });
@@ -304,19 +306,13 @@ export const ArchitectProfileSchema = z.object({
 });
 
 // Council submission schemas
-export const MunicipalityTypeEnum = z.enum(['COJ', 'COCT', 'Tshwane', 'Ekurhuleni', 'Mangaung', 'eThekwini', 'Other']);
-
 export const CouncilSubmissionSchema = z.object({
   id: z.string().optional(),
-  jobId: z.string().optional(),
-  userId: z.string().min(1),
-  municipality: MunicipalityTypeEnum,
-  municipalityName: z.string().optional(),
+  jobId: z.string().min(1),
+  municipality: z.string().min(1),
   referenceNumber: z.string().optional(),
-  status: z.string().min(1),
-  rawStatus: z.string().optional(),
+  status: z.enum(['preparing', 'submitted', 'under_review', 'approved', 'rejected', 'queries_raised']),
   submittedAt: z.string().datetime().optional(),
-  lastCheckedAt: z.string().datetime().optional(),
   documents: z.array(z.object({
     name: z.string(),
     url: z.string().url(),
@@ -325,19 +321,12 @@ export const CouncilSubmissionSchema = z.object({
     status: z.string(),
     timestamp: z.string().datetime(),
     notes: z.string().optional(),
-    source: z.enum(['scraper', 'ocr', 'crowdsource', 'shadow_tracker', 'manual']),
-    actorId: z.string().optional(),
   })).default([]),
   queries: z.array(z.object({
     raisedAt: z.string().datetime(),
     description: z.string(),
     response: z.string().optional(),
-    respondedAt: z.string().datetime().optional(),
-    attachments: z.array(z.object({ name: z.string(), url: z.string().url() })).optional(),
   })).optional(),
-  erfNumber: z.string().optional(),
-  projectDescription: z.string().optional(),
-  source: z.enum(['manual', 'ocr', 'scraper', 'shadow_tracker']),
 });
 
 // Search and filter schemas

@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep';
 
 export interface UserProfile {
   uid: string;
@@ -6,8 +6,19 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   bio?: string;
+  nhbrcNumber?: string;
+  cidbGrading?: string;
+  hasPIInsurance?: boolean;
+  tradeLicense?: string;
+  professionalLabels?: string[]; // e.g. ['Engineer', 'Builder', 'Construction Worker']
+  professionalLabel?: string;
+  region?: string;
+  averageRating?: number;
+  totalReviews?: number;
+  completedJobs?: number;
   createdAt: string;
   updatedAt?: string;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -25,6 +36,17 @@ export interface Job {
   status: 'open' | 'in-progress' | 'completed' | 'cancelled';
   selectedArchitectId?: string;
   createdAt: string;
+  updatedAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  statusHistory?: JobStatusHistory[];
+}
+
+export interface JobStatusHistory {
+  status: Job['status'];
+  timestamp: string;
+  actorId: string;
+  note?: string;
 }
 
 export interface Application {
@@ -35,8 +57,11 @@ export interface Application {
   proposal: string;
   portfolioUrl?: string;
   documents?: string[];
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   createdAt: string;
+  updatedAt?: string;
+  withdrawnAt?: string;
+  notes?: string;
   
   // Denormalized profile fields
   sacapNumber?: string;
@@ -53,7 +78,8 @@ export interface Review {
   toId: string;
   rating: number;
   comment: string;
-  type: 'client_to_architect' | 'architect_to_client';
+  status: 'pending_admin' | 'approved';
+  type: 'client_to_architect' | 'architect_to_client' | 'to_bep' | 'from_bep' | 'to_freelancer';
   createdAt: string;
 }
 
@@ -76,6 +102,7 @@ export interface TraceLog {
 
 export interface AIIssue {
   description: string;
+  regulationStipulation: string;
   severity: 'low' | 'medium' | 'high';
   actionItem: string;
   boundingBox?: { x: number; y: number; width: number; height: number };
@@ -88,12 +115,21 @@ export interface AICategory {
 }
 
 export interface AIReviewResult {
-  status: 'passed' | 'failed';
-  feedback: string;
-  categories: AICategory[];
-  traceLog: string;
-  citations?: KnowledgeCitation[];
-  knowledgeSources?: string[];
+ status: 'passed' | 'failed';
+ feedback: string;
+ categories: AICategory[];
+ visualReportUrl?: string;
+ traceLog: string;
+ citations?: KnowledgeCitation[];
+ knowledgeSources?: string[];
+}
+
+export interface AIProgress {
+ percentage: number;
+ agentName: string;
+ activity: string;
+ completedAgents: string[];
+ thought?: string;
 }
 
 export interface Submission {
@@ -105,8 +141,11 @@ export interface Submission {
   status: SubmissionStatus;
   aiFeedback?: string;
   aiStructuredFeedback?: AICategory[];
+  architectComment?: string;
   annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
+
   adminFeedback?: string;
+  visualReportUrl?: string;
   traceability: TraceLog[];
   createdAt: string;
 }
@@ -143,6 +182,7 @@ export interface DelegatedTask {
   id: string;
   jobId: string;
   architectId: string;
+  assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
   assigneeRole: string;
   deadline: string;
@@ -156,9 +196,10 @@ export interface JobCard extends DelegatedTask {
   priority: 'low' | 'medium' | 'high';
   estimatedHours?: number;
   attachments?: { name: string; url: string }[];
+  requirements?: string[];
 }
 
-export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
+export type LLMProvider = 'gemini' | 'openai' | 'openrouter' | 'nvidia';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -199,6 +240,26 @@ export interface Notification {
   createdAt: string;
   readAt?: string;
   deliveryStatus?: 'pending' | 'processing' | 'delivered' | 'failed';
+}
+
+export interface Dispute {
+  id: string;
+  jobId: string;
+  filedBy: string;
+  filedAgainst?: string;
+  reason: string;
+  requestedResolution: string;
+  status: 'open' | 'in_mediation' | 'resolved' | 'rejected';
+  adminNotes?: string;
+  resolution?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface NotificationPreferences {
+  in_app: boolean;
+  email: boolean;
+  push: boolean;
 }
 
 // Message types
@@ -298,33 +359,33 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
-export type MunicipalityType = 'COJ' | 'COCT' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'eThekwini' | 'Other';
+export type MunicipalityType = 'COJ' | 'COCT' | 'ETH' | 'NMB' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'Other';
+
+export interface TrackingEvent {
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  timestamp: string;
+  notes?: string;
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow' | string;
+  actorId?: string;
+}
 
 export interface CouncilSubmission {
   id: string;
-  jobId?: string;
+  jobId: string;
+  municipality: MunicipalityType | string;
+  municipalityName?: string;
   userId: string;
-  municipality: MunicipalityType;
-  municipalityName?: string; // For 'Other'
   referenceNumber?: string;
-  status: string; // Unified status
-  rawStatus?: string; // Status as reported by the municipality
-  submittedAt?: string;
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  rawStatus?: string;
   lastCheckedAt?: string;
+  submittedAt?: string;
   documents: { name: string; url: string }[];
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow_tracker';
   trackingHistory: TrackingEvent[];
   queries?: CouncilQuery[];
   erfNumber?: string;
   projectDescription?: string;
-  source: 'manual' | 'ocr' | 'scraper' | 'shadow_tracker';
-}
-
-export interface TrackingEvent {
-  status: string;
-  timestamp: string;
-  notes?: string;
-  source: 'scraper' | 'ocr' | 'crowdsource' | 'shadow_tracker' | 'manual';
-  actorId?: string;
 }
 
 export interface CouncilQuery {
@@ -338,14 +399,16 @@ export interface CouncilQuery {
 export interface MunicipalCredential {
   id: string;
   userId: string;
-  municipality: MunicipalityType;
+  municipality: MunicipalityType | string;
   username: string;
-  encryptedPassword: string;
-  iv: string;
+  encryptedPassword?: string;
+  password?: string; // Obfuscated base64 for demo
+  iv?: string;
   authTag?: string; // For GCM
   lastUsed?: string;
   status: 'valid' | 'invalid' | 'unchecked';
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CrowdsourceUpdate {
@@ -404,14 +467,6 @@ export type UploadedFile = {
 export type KnowledgeSource = 'documentation' | 'human_feedback' | 'self_improvement' | 'web_search';
 export type KnowledgeStatus = 'active' | 'pending_review' | 'rejected' | 'archived';
 
-export interface SystemSettings {
-  municipalTrackerEnabled: boolean;
-  nvidiaApiKey?: string;
-  nvidiaOcrModel?: string;
-  xeroConnected?: boolean;
-  lastScraperRun?: string;
-}
-
 export interface AgentKnowledge {
   id: string;
   agentId: string;
@@ -421,7 +476,7 @@ export interface AgentKnowledge {
   source: KnowledgeSource;
   status: KnowledgeStatus;
   submittedBy: string; // userId
-  submittedByRole: 'admin' | 'architect' | 'client' | 'system';
+  submittedByRole: UserRole | 'system';
   reviewedBy?: string; // admin userId
   reviewedAt?: string;
   relatedSubmissionId?: string;

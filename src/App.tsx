@@ -12,9 +12,10 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendEmailVerification
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { UserProfile, UserRole, Job, JobCategory } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
@@ -22,7 +23,7 @@ import { Badge } from './components/ui/badge';
 import { ScrollArea } from './components/ui/scroll-area';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Input } from './components/ui/input';
 import { 
   LayoutDashboard, 
@@ -49,29 +50,46 @@ import {
   UserCircle,
   HardDrive,
   Sparkles,
-  Send
+  Send,
+  Building2,
+  BookOpen,
+  Bot,
+  Workflow,
+  Files,
+  ClipboardCheck,
+  Network,
+  Hammer,
+  Download,
+  Lightbulb,
+  Database,
+  Construction,
+  ArrowLeft
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
-import { Building2 } from 'lucide-react';
 
 // Sub-components
 import ClientDashboard from './components/ClientDashboard';
 import ArchitectDashboard from './components/ArchitectDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import FreelancerDashboard from './components/FreelancerDashboard';
+import BEPDashboard from './components/BEPDashboard';
 import UserSettings from './components/UserSettings';
 import InvoiceManagement from './components/InvoiceManagement';
 import FileManager from './components/FileManager';
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
+import OnboardingFlow from "./components/OnboardingFlow";
 
 export default function App() {
+  const isAdminRoute = window.location.pathname === '/admin';
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [roleSelection, setRoleSelection] = useState<UserRole | null>(null);
-  const [showLogin, setShowLogin] = useState(false);
+  const [roleSelection, setRoleSelection] = useState<UserRole | null>(isAdminRoute ? 'admin' : null);
+  const [showLogin, setShowLogin] = useState(isAdminRoute);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -79,124 +97,119 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>('selection');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
+  const [professionalLabel, setProfessionalLabel] = useState('');
 
   useEffect(() => {
-    // Seed admin user if requested
-    const seedAdmin = async () => {
-      try {
-        // We can't directly create the auth user without a trigger, 
-        // but we can ensure the firestore record exists if they ever log in.
-        // However, the user asked to "add" them, which usually implies creating the account.
-        // Since I can't run a script to create auth users without a session, 
-        // I will implement the login logic to handle this specific user as admin.
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    seedAdmin();
-  }, []);
+    if (isAdminRoute) {
+      setRoleSelection('admin');
+      setShowLogin(true);
+      setShowOnboarding(false);
+    }
+  }, [isAdminRoute]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
-      try {
-        if (firebaseUser) {
-          setProfileLoading(true);
+      if (firebaseUser) {
+        setProfileLoading(true);
+        try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            setUser(userDoc.data() as UserProfile);
-          } else {
-            // New user, need role selection
-            setUser(null);
-            setRoleSelection('client'); 
-            setShowLogin(true);
+            const profile = userDoc.data() as UserProfile;
+            if (isAdminRoute && profile.role !== 'admin') {
+              await signOut(auth);
+              setUser(null);
+              toast.error('Admin access only. Please use an authorized admin account.');
+            } else {
+              setUser(profile);
+            }
           }
-        } else {
-          setUser(null);
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        } finally {
+          setProfileLoading(false);
         }
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
+      } else {
         setUser(null);
-      } finally {
-        setLoading(false);
-        setProfileLoading(false);
       }
-    }, (error) => {
-      console.error("Auth state listener error:", error);
       setLoading(false);
-      setProfileLoading(false);
+    });
+    return () => unsubscribe();
+  }, [isAdminRoute]);
+
+  const syncServerProfile = async (selectedRole: UserRole | null) => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return null;
+
+    const res = await fetch('/api/auth/check-admin', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role: selectedRole || 'client', displayName, profileData: formData }),
     });
 
-    return () => unsubscribe();
-  }, []);
+    if (!res.ok) {
+      throw new Error('Failed to sync Firebase profile');
+    }
 
-const handleLogin = async () => {
-    if (isLoggingIn || profileLoading) return;
+    return res.json();
+  };
+
+  const ensureAdminAccess = async (firebaseUser: any) => {
+    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    const profile = userDoc.exists() ? userDoc.data() as UserProfile : null;
+
+    if (isAdminRoute && profile?.role !== 'admin') {
+      await signOut(auth);
+      setUser(null);
+      toast.error('Admin access only. Please use an authorized admin account.');
+      return null;
+    }
+
+    return profile;
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!roleSelection) {
+      toast.error("Please select a role first");
+      return;
+    }
     setIsLoggingIn(true);
     setProfileLoading(true);
+    const provider = new GoogleAuthProvider();
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      await syncServerProfile(roleSelection);
+      const profile = await ensureAdminAccess(firebaseUser);
+      if (isAdminRoute && !profile) return;
       
-      // Hardcoded admin check
-      const adminEmails = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
-      const isAdmin = adminEmails.includes(firebaseUser.email || '');
-      
-      if (!userDoc.exists()) {
+      if (!profile) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
           displayName: firebaseUser.displayName || 'Anonymous',
-          role: isAdmin ? 'admin' : (roleSelection || 'client'),
+          role: roleSelection || 'client',
+          ...formData,
           createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
         setUser(newUser);
         
-        if (isAdmin) {
-          toast.success('Logged in as Administrator');
-        }
       } else {
-        const existingUser = userDoc.data() as UserProfile;
-        // Ensure admin role is set for hardcoded admins
-        if (isAdmin && existingUser.role !== 'admin') {
-          await updateDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' });
-          existingUser.role = 'admin';
-          toast.success('Admin privileges restored');
-        }
-        setUser(existingUser);
+        setUser(profile);
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      if (error.code === 'auth/cancelled-popup-request') {
-        toast.error("Login popup was closed. Please try again.");
-      } else if (error.code === 'auth/popup-blocked') {
-        toast.error("Login popup was blocked by your browser. Please allow popups for this site.");
-      } else {
-        toast.error("Failed to login");
-      }
+      toast.error("Failed to login");
     } finally {
       setIsLoggingIn(false);
       setProfileLoading(false);
     }
   };
-
-// Hardcoded accounts configuration
-  const HARDCODED_ACCOUNTS: Record<string, { role: 'admin' | 'client' | 'architect'; displayName: string }> = {
-    'gm.tarb@gmail.com': { role: 'admin', displayName: 'Admin User' },
-    'leor@slutzkin.co.za': { role: 'admin', displayName: 'Admin User' },
-    'client@architex.co.za': { role: 'client', displayName: 'Demo Client' },
-    'architect@architex.co.za': { role: 'architect', displayName: 'Demo Architect' },
-  };
-
-  const HARDCODED_PASSWORD = '12345678';
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,112 +219,60 @@ const handleLogin = async () => {
 
     try {
       let firebaseUser;
-      
-      // Check if using hardcoded account
-      const hardcodedAccount = HARDCODED_ACCOUNTS[email.toLowerCase()];
-      
-      if (hardcodedAccount) {
-        // Validate hardcoded password
-        if (password !== HARDCODED_PASSWORD) {
-          toast.error('Invalid password for demo account. Use: 12345678');
-          setIsLoggingIn(false);
-          return;
-        }
-        
-        // Try to sign in with hardcoded credentials
-        try {
-          const result = await signInWithEmailAndPassword(auth, email, HARDCODED_PASSWORD);
-          firebaseUser = result.user;
-        } catch (signInError: any) {
-          // If user doesn't exist, create them
-          if (signInError.code === 'auth/invalid-credential' || signInError.code === 'auth/user-not-found') {
-            const result = await createUserWithEmailAndPassword(auth, email, HARDCODED_PASSWORD);
-            firebaseUser = result.user;
-            await updateProfile(firebaseUser, { displayName: hardcodedAccount.displayName });
-          } else {
-            throw signInError;
-          }
-        }
-        
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        
-        if (!userDoc.exists()) {
-          const newUser: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: hardcodedAccount.displayName,
-            role: hardcodedAccount.role,
-            createdAt: new Date().toISOString(),
-          };
-          await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-          setUser(newUser);
-          toast.success(`Welcome, ${hardcodedAccount.displayName}! Logged in as ${hardcodedAccount.role}`);
-        } else {
-          const existingUser = userDoc.data() as UserProfile;
-          // Ensure correct role
-          if (existingUser.role !== hardcodedAccount.role) {
-            await updateDoc(doc(db, 'users', firebaseUser.uid), { role: hardcodedAccount.role });
-            existingUser.role = hardcodedAccount.role;
-          }
-          setUser(existingUser);
-          toast.success(`Welcome back, ${existingUser.displayName}!`);
-        }
-        
-        setIsLoggingIn(false);
-        return;
-      }
-      
-      // Regular auth flow for non-hardcoded accounts
       if (authMode === 'email-signup') {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         firebaseUser = result.user;
-        if (displayName) {
-          await updateProfile(firebaseUser, { displayName });
-        }
+        if (displayName) await updateProfile(firebaseUser, { displayName });
+        await sendEmailVerification(firebaseUser);
       } else {
         const result = await signInWithEmailAndPassword(auth, email, password);
         firebaseUser = result.user;
       }
 
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      
-      if (!userDoc.exists()) {
+      await syncServerProfile(roleSelection);
+      const profile = await ensureAdminAccess(firebaseUser);
+      if (isAdminRoute && !profile) return;
+      if (!profile) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')?.[0] || 'Anonymous',
+          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
           role: roleSelection || 'client',
+          ...formData,
           createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
         setUser(newUser);
       } else {
-        const existingUser = userDoc.data() as UserProfile;
-        setUser(existingUser);
+        setUser(profile);
       }
-      toast.success(authMode === 'email-signup' ? "Account created!" : "Welcome back!");
+      toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
     } catch (error: any) {
       console.error("Auth error:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        toast.error("Email already in use.");
-      } else if (error.code === 'auth/invalid-credential') {
-        toast.error("Invalid email or password.");
-      } else if (error.code === 'auth/weak-password') {
-        toast.error("Password is too weak.");
-      } else {
-        toast.error("Authentication failed.");
-      }
+      toast.error("Authentication failed.");
     } finally {
       setIsLoggingIn(false);
       setProfileLoading(false);
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setShowLogin(isAdminRoute);
+      setAuthMode('selection');
+      setRoleSelection(isAdminRoute ? 'admin' : null);
+      setActiveTab('overview');
+      toast.success("Logged out successfully");
+    } catch (error) {
+      toast.error("Failed to logout");
+    }
+  };
 
   if (loading || profileLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="rounded-full h-12 w-12 border-b-2 border-primary animate-spin"></div>
           <p className="text-sm text-muted-foreground animate-pulse font-medium">Securing session...</p>
@@ -320,408 +281,284 @@ const handleLogin = async () => {
     );
   }
 
+  if (!user && showOnboarding) {
+    return (
+      <OnboardingFlow
+        onComplete={(data) => {
+          setRoleSelection(data.role);
+          setFormData(data);
+          setShowOnboarding(false);
+          setShowLogin(true);
+          setAuthMode("email-signup");
+        }}
+        onCancel={() => setShowOnboarding(false)}
+      />
+    );
+  }
+
+  if (!user && isAdminRoute) {
+    return (
+      <AdminLoginPage
+        authMode={authMode}
+        email={email}
+        password={password}
+        isLoggingIn={isLoggingIn}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onEmailSubmit={handleEmailAuth}
+        onGoogleLogin={handleGoogleLogin}
+        onAuthModeChange={setAuthMode}
+      />
+    );
+  }
+
   if (!user && !showLogin) {
-    return <LandingPage onGetStarted={() => setShowLogin(true)} />;
+    return <LandingPage onGetStarted={() => setShowOnboarding(true)} onLogin={() => setShowLogin(true)} />;
   }
 
   if (!user && showLogin) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <div>
-              <Logo iconClassName="w-20 h-20 mx-auto mb-4 text-primary" />
-            </div>
-            <h1 className="text-4xl font-heading font-bold mb-2">Architex</h1>
-            <p className="text-sm text-muted-foreground uppercase tracking-widest">Join the premier architectural marketplace</p>
-          </div>
-
-          <Card className="border-border shadow-xl bg-white/80 backdrop-blur-md">
-            <CardHeader>
-              <CardTitle className="font-heading text-2xl">
-                {authMode === 'selection' ? 'Create Account' : authMode === 'email-login' ? 'Welcome Back' : 'Join Architex'}
+      <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 backdrop-blur-sm fixed inset-0 z-50 overflow-y-auto">
+        <AnimatedFloorPlan />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-2xl w-full my-8 relative z-10"
+        >
+          <Card className="border-border shadow-2xl bg-white/95 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="text-center bg-primary/5 pb-10 pt-12 relative">
+              <div className="flex justify-between items-center mb-6 absolute top-6 left-6 right-6">
+                {authMode !== 'selection' ? (
+                  <Button variant="ghost" size="sm" onClick={() => setAuthMode('selection')} className="rounded-full hover:bg-white">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                  </Button>
+                ) : (
+                  <div />
+                )}
+                <Button variant="ghost" size="sm" onClick={() => { setShowLogin(false); setAuthMode('selection'); }} className="rounded-full hover:bg-white">
+                  Cancel
+                </Button>
+              </div>
+              <div className="flex justify-center mb-5">
+                <Logo iconClassName="w-16 h-16 text-primary" />
+              </div>
+              <CardTitle className="text-4xl font-heading font-bold tracking-tight">
+                {authMode === 'selection' ? 'Join Architex' : authMode === 'email-login' ? 'Welcome Back' : 'Create your account'}
               </CardTitle>
-              <CardDescription>
-                {authMode === 'selection' ? 'Select your role to join the Architex community' : 'Enter your details to continue'}
+              <CardDescription className="text-base mt-2">
+                {authMode === 'selection' ? 'Select your role to access the marketplace' : 'Enter your details to continue'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {authMode === 'selection' ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button 
-                      variant={roleSelection === 'client' ? 'default' : 'outline'}
-                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'client' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
-                      onClick={() => setRoleSelection('client')}
-                    >
-                      <Users className="w-8 h-8" />
-                      <div className="text-center">
-                        <p className="font-bold">Client</p>
-                        <p className="text-[10px] opacity-70">I want to post jobs</p>
-                      </div>
-                    </Button>
-                    <Button 
-                      variant={roleSelection === 'architect' ? 'default' : 'outline'}
-                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'architect' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
-                      onClick={() => setRoleSelection('architect')}
-                    >
-                      <Briefcase className="w-8 h-8" />
-                      <div className="text-center">
-                        <p className="font-bold">Architect</p>
-                        <p className="text-[10px] opacity-70">I want to find work</p>
-                      </div>
-                    </Button>
-                    <Button 
-                      variant={roleSelection === 'admin' ? 'default' : 'outline'}
-                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'admin' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
-                      onClick={() => setRoleSelection('admin')}
-                    >
-                      <ShieldCheck className="w-8 h-8" />
-                      <div className="text-center">
-                        <p className="font-bold">Admin</p>
-                        <p className="text-[10px] opacity-70">Platform Management</p>
-                      </div>
-                    </Button>
-                    <Button
-                      variant={roleSelection === 'freelancer' ? 'default' : 'outline'}
-                      className={`h-32 flex flex-col gap-3 transition-all duration-300 ${roleSelection === 'freelancer' ? 'bg-primary text-primary-foreground border-primary scale-105' : 'hover:border-primary/50'}`}
-                      onClick={() => setRoleSelection('freelancer')}
-                    >
-                      <UserCircle className="w-8 h-8" />
-                      <div className="text-center">
-                        <p className="font-bold">Freelancer</p>
-                        <p className="text-[10px] opacity-70">I want to help architects</p>
-                      </div>
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    <Button 
-                      onClick={handleLogin}
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-lg font-medium shadow-lg shadow-primary/20"
-                      disabled={!roleSelection || isLoggingIn}
-                    >
-                      {isLoggingIn ? (
-                        <span className="flex items-center gap-2">
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Signing in...
-                        </span>
-                      ) : (
-                        'Sign in with Google'
-                      )}
-                    </Button>
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-border" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button 
-                        variant="outline" 
-                        className="h-12 rounded-xl"
-                        onClick={() => setAuthMode('email-login')}
-                        disabled={!roleSelection}
-                      >
-                        Login
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="h-12 rounded-xl"
-                        onClick={() => setAuthMode('email-signup')}
-                        disabled={!roleSelection}
-                      >
-                        Sign Up
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <form onSubmit={handleEmailAuth} className="space-y-4">
-                  {authMode === 'email-signup' && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                      <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          placeholder="John Doe" 
-                          className="pl-10 h-12 rounded-xl"
-                          value={displayName}
-                          onChange={e => setDisplayName(e.target.value)}
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        type="email"
-                        placeholder="name@example.com" 
-                        className="pl-10 h-12 rounded-xl"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        type="password"
-                        placeholder="••••••••" 
-                        className="pl-10 h-12 rounded-xl"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Button 
-                    type="submit"
-                    className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg shadow-primary/20 mt-4"
-                    disabled={isLoggingIn}
+            <CardContent className="p-6 sm:p-10">
+              <AnimatePresence mode="wait">
+                {authMode === 'selection' ? (
+                  <motion.div
+                    key="auth-selection"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-6"
                   >
-                    {isLoggingIn ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      authMode === 'email-login' ? 'Login' : 'Create Account'
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
+                      <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
+                      <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
+                      <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP" description="Built Environment Professional (Builder, Tiler, etc.)" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                    </div>
+                    <div className="space-y-3">
+                      <Button onClick={handleGoogleLogin} className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={!roleSelection || isLoggingIn}>
+                        {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                      </Button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.form
+                    key={authMode}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleEmailAuth}
+                    className="space-y-4"
+                  >
+                    {authMode === 'email-signup' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
+                      </div>
                     )}
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    className="w-full text-muted-foreground"
-                    onClick={() => setAuthMode('selection')}
-                  >
-                    Back to Options
-                  </Button>
-                </form>
-              )}
-              <Button 
-                variant="ghost" 
-                onClick={() => setShowLogin(false)}
-                className="w-full text-muted-foreground"
-              >
-                Back to Marketplace
-              </Button>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
+                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
+                    </div>
+                    <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg mt-6" disabled={isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
+                    </Button>
+                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl font-bold" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                    </Button>
+                    <Button type="button" variant="ghost" className="w-full text-muted-foreground rounded-full" onClick={() => setAuthMode('selection')}>Back to Options</Button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
         <Toaster />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex relative">
-      {/* Sidebar Overlay for Mobile */}
-      {isSidebarOpen && (
-        <div 
-          onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 border-r border-border flex flex-col bg-white/95 backdrop-blur-xl shadow-2xl transition-transform duration-300 lg:translate-x-0 lg:static lg:inset-auto lg:z-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        m-4 rounded-[2rem] lg:m-0 lg:rounded-none
-      `}>
-        <div className="p-8 lg:p-10 flex items-center justify-between">
-          <Logo showText iconClassName="w-12 h-12 text-primary" />
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(false)}>
-            <X size={24} />
-          </Button>
-        </div>
-        
-        <div className="px-10 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 text-[10px] uppercase tracking-widest px-3 py-1 rounded-full font-bold">
-              {user!.role} Portal
-            </Badge>
+    <div className="min-h-screen bg-[#FDFDFD] flex flex-col md:flex-row relative overflow-hidden">
+      <AnimatedFloorPlan />
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-full flex flex-col p-6 overflow-y-auto">
+          <div className="flex items-center justify-between mb-10 shrink-0">
+            <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}><X size={20} /></Button>
           </div>
-        </div>
 
-        <nav className="flex-1 px-6 space-y-2">
-          <NavItem 
-            icon={<LayoutDashboard size={18} />} 
-            label="Overview" 
-            active={activeTab === 'overview'} 
-            onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }} 
-          />
-          {user!.role === 'client' && (
+          <nav className="flex-1 space-y-2">
             <NavItem 
-              icon={<Plus size={18} />} 
-              label="Post a Job" 
-              active={activeTab === 'post-job'} 
-              onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }} 
+              icon={<LayoutDashboard size={18} />}
+              label="Overview"
+              active={activeTab === 'overview'}
+              onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
             />
-          )}
-          {user!.role === 'architect' && (
+            {user!.role === 'client' && (
+              <NavItem 
+                icon={<Plus size={18} />}
+                label="Post a Job"
+                active={activeTab === 'post-job'}
+                onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {user!.role === 'architect' && (
+              <NavItem 
+                icon={<Search size={18} />}
+                label="Marketplace"
+                active={activeTab === 'marketplace'}
+                onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {user!.role === 'architect' && (
+              <NavItem 
+                icon={<Send size={18} />}
+                label="My Applications"
+                active={activeTab === 'applications'}
+                onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {user!.role === 'architect' && (
+              <NavItem
+                icon={<Users size={18} />}
+                label="Team & Freelancers"
+                active={activeTab === 'team'}
+                onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
+              />
+            )}
             <NavItem 
-              icon={<Search size={18} />} 
-              label="Marketplace" 
-              active={activeTab === 'marketplace'} 
-              onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }} 
+              icon={<FileText size={18} />}
+              label="Active Projects"
+              active={activeTab === 'projects'}
+              onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }}
             />
-          )}
-          {user!.role === 'architect' && (
+            {user!.role === 'admin' && (
+              <>
+                <NavItem
+                  icon={<ShieldCheck size={18} />}
+                  label="Compliance Hub"
+                  active={activeTab === 'compliance'}
+                  onClick={() => { setActiveTab('compliance'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Users size={18} />}
+                  label="User Management"
+                  active={activeTab === 'users'}
+                  onClick={() => { setActiveTab('users'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Settings2 size={18} />}
+                  label="LLM Settings"
+                  active={activeTab === 'settings'}
+                  onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Sparkles size={18} />}
+                  label="Knowledge Base"
+                  active={activeTab === 'knowledge'}
+                  onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }}
+                />
+              </>
+            )}
             <NavItem 
-              icon={<Send size={18} />} 
-              label="My Applications" 
-              active={activeTab === 'applications'} 
-              onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }} 
+              icon={<History size={18} />}
+              label="Audit Logs"
+              active={activeTab === 'audit'}
+              onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }}
             />
-          )}
-          {user!.role === 'architect' && (
-            <NavItem
-              icon={<Users size={18} />}
-              label="Team & Freelancers"
-              active={activeTab === 'team'}
-              onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
-            />
-          )}
-          <NavItem 
-            icon={<FileText size={18} />} 
-            label="Active Projects" 
-            active={activeTab === 'projects'} 
-            onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }} 
-          />
-          <NavItem
-            icon={<Building2 size={18} />}
-            label="Municipal Tracker"
-            active={activeTab === 'municipal'}
-            onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
-          />
-          {user!.role === 'admin' && (
-            <>
-              <NavItem 
-                icon={<ShieldCheck size={18} />} 
-                label="Compliance Hub" 
-                active={activeTab === 'compliance'} 
-                onClick={() => { setActiveTab('compliance'); setIsSidebarOpen(false); }} 
-              />
-              <NavItem 
-                icon={<Users size={18} />} 
-                label="User Management" 
-                active={activeTab === 'users'} 
-                onClick={() => { setActiveTab('users'); setIsSidebarOpen(false); }} 
-              />
-              <NavItem 
-                icon={<Settings2 size={18} />} 
-                label="LLM Settings" 
-                active={activeTab === 'settings'} 
-                onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} 
-              />
-              <NavItem 
-                icon={<Sparkles size={18} />} 
-                label="Knowledge Base" 
-                active={activeTab === 'knowledge'} 
-                onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }} 
+            <div className="pt-4 mt-4 border-t border-border">
+              <NavItem
+                icon={<CreditCard size={18} />}
+                label="Invoices"
+                active={activeTab === 'invoices'}
+                onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }}
               />
               <NavItem
-                icon={<Building2 size={18} />}
-                label="Municipal Settings"
-                active={activeTab === 'municipal'}
-                onClick={() => { setActiveTab('municipal'); setIsSidebarOpen(false); }}
+                icon={<HardDrive size={18} />}
+                label="Files"
+                active={activeTab === 'files'}
+                onClick={() => { setActiveTab('files'); setIsSidebarOpen(false); }}
               />
-            </>
-          )}
-          <NavItem 
-            icon={<History size={18} />} 
-            label="Audit Logs" 
-            active={activeTab === 'audit'} 
-            onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }} 
-          />
-          <div className="pt-4 mt-4 border-t border-border">
-            <NavItem 
-              icon={<CreditCard size={18} />} 
-              label="Invoices" 
-              active={activeTab === 'invoices'} 
-              onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }} 
-            />
-            <NavItem 
-              icon={<HardDrive size={18} />} 
-              label="Files" 
-              active={activeTab === 'files'} 
-              onClick={() => { setActiveTab('files'); setIsSidebarOpen(false); }} 
-            />
-            <NavItem 
-              icon={<UserCircle size={18} />} 
-              label="My Settings" 
-              active={activeTab === 'profile-settings'} 
-              onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }} 
-            />
-          </div>
-        </nav>
+              <NavItem
+                icon={<UserCircle size={18} />}
+                label="My Settings"
+                active={activeTab === 'profile-settings'}
+                onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }}
+              />
+            </div>
+          </nav>
 
-        <div className="p-8 border-t border-border bg-secondary/10 m-4 rounded-[1.5rem]">
-          <div className="flex items-center gap-4 mb-8 px-2">
-            <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-xl shadow-lg shadow-primary/20">
-              {user?.displayName?.[0] || '?'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate text-foreground">{user?.displayName || 'Unknown User'}</p>
-              <p className="text-[10px] text-muted-foreground truncate font-mono">{user?.email || 'no-email'}</p>
-            </div>
+          <div className="pt-6 mt-auto border-t border-border shrink-0">
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl h-12" onClick={handleLogout}>
+              <LogOut size={20} /> <span className="font-bold">Logout</span>
+            </Button>
           </div>
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10 h-12 rounded-xl transition-all"
-            onClick={handleLogout}
-          >
-            <LogOut size={18} />
-            <span className="font-bold text-xs uppercase tracking-widest">Sign Out</span>
-          </Button>
         </div>
       </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
-        <header className="h-24 border-b border-border bg-white/60 backdrop-blur-md flex items-center justify-between px-6 lg:px-12 z-10">
+      <main className="flex-1 flex flex-col min-w-0 relative z-10">
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-40">
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></Button>
+          <div className="flex-1" />
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
-              <Menu size={24} />
-            </Button>
-            <div>
-              <h2 className="font-heading font-bold text-xl lg:text-3xl tracking-tighter text-foreground">
-                {user!.role === 'client' ? 'Client Workspace' : user!.role === 'architect' ? 'Architect Studio' : 'Admin Control Center'}
-              </h2>
-              <p className="hidden sm:block text-[10px] text-muted-foreground uppercase tracking-widest font-bold mt-1">
-                {user!.role === 'admin' ? 'Monitoring Platform Integrity' : 'Managing Architectural Excellence'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <NotificationBell userId={user!.uid} />
-            <div className="flex flex-col items-end">
-              <div className="text-[10px] text-primary uppercase tracking-widest font-bold bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
-                {new Date().toLocaleDateString('en-ZA', { dateStyle: 'medium' })}
-              </div>
+            <NotificationBell userId={user.uid} />
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm">
+              <UserIcon size={20} />
             </div>
           </div>
         </header>
-
         <ScrollArea className="flex-1">
-          <div className="p-6 lg:p-12 max-w-7xl mx-auto">
-            {activeTab === 'invoices' && <InvoiceManagement user={user!} />}
-            {activeTab === 'files' && <FileManager user={user!} />}
-            {activeTab === 'profile-settings' && <UserSettings user={user!} />}
-            
+          <div className="p-8 max-w-7xl mx-auto w-full">
+            {activeTab === 'invoices' && <InvoiceManagement user={user} />}
+            {activeTab === 'files' && <FileManager user={user} />}
+            {activeTab === 'profile-settings' && <UserSettings user={user} />}
             {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings') && (
               <>
-                {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
-                {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
-                {user!.role === 'admin' && <AdminDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
-                {user!.role === 'freelancer' && <FreelancerDashboard user={user!} />}
+                {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
+                {user.role === 'bep' && <BEPDashboard user={user} />}
               </>
             )}
           </div>
@@ -732,240 +569,487 @@ const handleLogin = async () => {
   );
 }
 
-function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
-  const [jobs, setJobs] = useState<Job[]>([]);
+function AdminLoginPage({
+  authMode,
+  email,
+  password,
+  isLoggingIn,
+  onEmailChange,
+  onPasswordChange,
+  onEmailSubmit,
+  onGoogleLogin,
+  onAuthModeChange,
+}: {
+  authMode: 'selection' | 'email-login' | 'email-signup';
+  email: string;
+  password: string;
+  isLoggingIn: boolean;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onEmailSubmit: (event: React.FormEvent) => void;
+  onGoogleLogin: () => void;
+  onAuthModeChange: (mode: 'selection' | 'email-login' | 'email-signup') => void;
+}) {
+  const isEmailLogin = authMode === 'email-login';
+
+  return (
+    <div className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-20">
+        <AnimatedFloorPlan />
+      </div>
+      <div className="max-w-md w-full relative z-10">
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-5 h-20 w-20 rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center shadow-2xl">
+            <ShieldCheck className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-4xl font-heading font-bold mb-2">Admin Portal</h1>
+          <p className="text-sm text-white/60 uppercase tracking-widest">Authorized Architex administrators only</p>
+        </div>
+
+        <Card className="border-white/10 shadow-2xl bg-white/95 text-foreground backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="font-heading text-2xl">Secure Admin Login</CardTitle>
+            <CardDescription>
+              Sign in with an approved administrator account to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {isEmailLogin ? (
+              <form onSubmit={onEmailSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Admin Email</label>
+                  <Input type="email" placeholder="admin@example.com" value={email} onChange={e => onEmailChange(e.target.value)} required className="h-12 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                  <Input type="password" placeholder="••••••••" value={password} onChange={e => onPasswordChange(e.target.value)} required className="h-12 rounded-xl" />
+                </div>
+                <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg" disabled={isLoggingIn}>
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login to Admin Portal'}
+                </Button>
+                <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => onAuthModeChange('selection')}>
+                  Back to admin sign-in options
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <Button onClick={onGoogleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg rounded-xl" disabled={isLoggingIn}>
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                </Button>
+                <Button variant="outline" className="w-full h-12 rounded-xl" onClick={() => onAuthModeChange('email-login')} disabled={isLoggingIn}>
+                  Login with Email
+                </Button>
+              </div>
+            )}
+            <Button variant="link" asChild className="w-full text-muted-foreground">
+              <a href="/">Return to Marketplace</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+      <Toaster />
+    </div>
+  );
+}
+
+function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }: any) {
+  return (
+    <Button variant={active ? 'default' : 'outline'} className={`h-32 flex flex-col gap-3 transition-all ${active ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg' : 'hover:border-primary/50'}`} onClick={onClick} {...props}>
+      {icon}
+      <div className="text-center">
+        <p className="font-bold">{label}</p>
+        <p className="text-[10px] opacity-70">{sub}</p>
+      </div>
+    </Button>
+  );
+}
+
+function AuthRoleCard({ icon, title, description, active, onClick, ...props }: { icon: React.ReactNode; title: string; description: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group p-6 sm:p-8 text-left border rounded-3xl transition-all duration-300 flex flex-col gap-6 shadow-sm hover:shadow-xl ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
+      {...props}
+    >
+      <div className={`p-4 rounded-2xl transition-all group-hover:scale-110 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
+        {icon}
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-heading font-bold text-2xl">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+      </div>
+      <div className="mt-auto pt-4 border-t border-border/50 w-full">
+        <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
+          {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all ${active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'}`}>
+      {icon} <span className="font-bold">{label}</span>
+    </button>
+  );
+}
+
+function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLogin: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [landingTab, setLandingTab] = useState<'home' | 'resources'>('home');
+  const [liveJobs, setLiveJobs] = useState<Job[]>([]);
+  const prefersReducedMotion = useReducedMotion();
+  const fadeUp = prefersReducedMotion ? {} : { opacity: 0, y: 24 };
+  const visible = { opacity: 1, y: 0 };
+
+  const goToTab = (tab: 'home' | 'resources') => {
+    setLandingTab(tab);
+    setIsMobileMenuOpen(false);
+  };
 
   useEffect(() => {
-    const q = query(collection(db, 'jobs'), where('status', '==', 'open'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+    const q = query(
+      collection(db, 'jobs'),
+      where('status', '==', 'open'),
+      orderBy('createdAt', 'desc'),
+      limit(3)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLiveJobs(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job)));
     }, (error) => {
-      console.error("Landing page jobs query failed:", error);
-      setJobs([]);
+      console.error('Error loading live marketplace preview:', error);
+      setLiveJobs([]);
     });
-    return () => unsub();
+
+    return () => unsubscribe();
   }, []);
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden relative text-foreground">
       <AnimatedFloorPlan />
-      
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-border h-24 flex items-center justify-between px-6 lg:px-20">
-        <Logo showText iconClassName="w-12 h-12 text-primary" />
-        
-        {/* Desktop Nav */}
+      <nav className="h-20 sm:h-24 lg:h-28 border-b border-border px-4 sm:px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-card/95 backdrop-blur-md z-50 shadow-sm">
+        <Logo showText iconClassName="w-16 h-16 sm:w-20 sm:h-20 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-2xl sm:text-3xl lg:text-5xl tracking-tighter text-foreground" />
         <div className="hidden lg:flex items-center gap-6">
-          <button onClick={onGetStarted} className="text-sm font-medium hover:text-primary transition-colors">Marketplace</button>
-          <button onClick={() => {
-            const el = document.getElementById('how-it-works');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }} className="text-sm font-medium hover:text-primary transition-colors">How it Works</button>
-          <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">
-            Get Started
-          </Button>
+          <button onClick={() => goToTab('home')} className={`text-sm font-bold underline-offset-4 hover:underline ${landingTab === 'home' ? 'text-primary' : 'text-foreground/80 hover:text-primary'}`}>Home</button>
+          <button onClick={() => goToTab('resources')} className={`text-sm font-bold underline-offset-4 hover:underline ${landingTab === 'resources' ? 'text-primary' : 'text-foreground/80 hover:text-primary'}`}>Resources</button>
+          <button onClick={onGetStarted} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
+          <button onClick={onLogin} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Login</button>
+          <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
         </div>
-
-        {/* Mobile Nav Toggle */}
-        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </Button>
-
-        {/* Mobile Menu */}
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
         {isMobileMenuOpen && (
-          <div
-            className="absolute top-20 left-4 right-4 bg-white border border-border rounded-[2rem] shadow-2xl p-8 flex flex-col gap-6 lg:hidden"
-          >
-            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary transition-colors text-left">Marketplace</button>
-            <button onClick={() => {
-              const el = document.getElementById('how-it-works');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-              setIsMobileMenuOpen(false);
-            }} className="text-lg font-bold hover:text-primary transition-colors text-left">How it Works</button>
-            <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="bg-primary text-primary-foreground h-14 rounded-full font-bold text-lg">
-              Get Started
-            </Button>
+          <div className="absolute top-20 left-3 right-3 bg-card border border-border rounded-[1.5rem] shadow-2xl p-5 sm:p-8 flex flex-col gap-5 sm:gap-6 lg:hidden">
+            <button onClick={() => goToTab('home')} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Home</button>
+            <button onClick={() => goToTab('resources')} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Resources</button>
+            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
+            <button onClick={() => { onLogin(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Login</button>
+            <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="bg-primary text-primary-foreground h-14 rounded-full font-bold">Get Started</Button>
           </div>
         )}
       </nav>
 
+      <AnimatePresence mode="wait">
+        {landingTab === 'resources' ? (
+          <motion.div
+            key="resources"
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -18 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
+            <ResourcesLanding onGetStarted={onGetStarted} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="home"
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -18 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
+
       {/* Hero Section */}
-      <section className="pt-40 pb-20 px-6 lg:px-20 relative z-10">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <Badge className="bg-primary/10 text-primary border-primary/20 mb-6 px-4 py-1 text-xs uppercase tracking-widest">
-              The Future of Architecture
-            </Badge>
-            <h1 className="text-5xl md:text-7xl lg:text-9xl font-heading font-bold leading-[0.85] tracking-tighter mb-8">
-              Design. <br />
-              Verify. <br />
-              <span className="text-primary">Build.</span>
-            </h1>
-            <p className="text-lg lg:text-xl text-muted-foreground mb-10 max-w-lg leading-relaxed">
-              Architex connects clients with elite architects through an AI-powered marketplace that ensures every drawing is SANS 10400 compliant and council-ready.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-16 px-10 rounded-full text-lg font-bold shadow-xl shadow-primary/20 group">
-                Post a Job <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-16 px-10 rounded-full text-lg font-bold border-primary/20 hover:bg-primary/5">
-                Browse Talent
-              </Button>
+      <section className="pt-16 sm:pt-24 lg:pt-32 pb-14 sm:pb-20 px-4 sm:px-6 lg:px-20 relative z-10 overflow-hidden bg-card">
+        <div className="max-w-7xl mx-auto min-h-[auto] lg:min-h-[680px] relative">
+          <motion.div
+            initial={fadeUp}
+            animate={visible}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+            className="pb-16 relative z-20 max-w-4xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+            >
+              <Badge className="bg-primary/10 text-primary border-primary/20 mb-6 sm:mb-8 px-3 sm:px-4 py-1 text-[10px] sm:text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
+            </motion.div>
+            <div className="space-y-2 sm:space-y-3 mb-8 sm:mb-10">
+              {[
+                { word: 'Discover', icon: <Search size={42} /> },
+                { word: 'Verify', icon: <ShieldCheck size={42} /> },
+                { word: 'Collaborate', icon: <Users size={42} /> }
+              ].map((item, index) => (
+                <motion.div
+                  key={item.word}
+                  initial={{ opacity: 0, x: -40 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.15 }}
+                  viewport={{ once: true }}
+                  className="hero-word-row flex items-center gap-3 sm:gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible"
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className="h-12 w-12 sm:h-16 sm:w-16 lg:h-20 lg:w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-8 sm:[&>svg]:w-8 lg:[&>svg]:h-[42px] lg:[&>svg]:w-[42px]"
+                  >
+                    {item.icon}
+                  </motion.div>
+                  <h1 className={`relative text-4xl min-[380px]:text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm break-words ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
+                    <span className="relative z-10">{item.word}</span>
+                  </h1>
+                </motion.div>
+              ))}
             </div>
-          </div>
-          <div className="relative">
-            <div className="aspect-square rounded-3xl overflow-hidden shadow-2xl border border-border bg-secondary/20 p-8">
-              <div className="w-full h-full border border-primary/20 rounded-2xl relative overflow-hidden">
-                {/* Architectural Grid Pattern */}
-                <div className="absolute inset-0 grid grid-cols-12 grid-rows-12 opacity-10">
-                  {Array.from({ length: 144 }).map((_, i) => (
-                    <div key={i} className="border border-primary/20" />
-                  ))}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-64 h-64 border-2 border-primary/30 rounded-full flex items-center justify-center">
-                    <Logo iconClassName="w-40 h-40 text-primary/40" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Floating Stats */}
-            <div className="absolute -top-6 -right-6 bg-white p-6 rounded-2xl shadow-xl border border-border">
-              <p className="text-3xl font-bold text-primary">100%</p>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">SANS Compliant</p>
-            </div>
-          </div>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              viewport={{ once: true }}
+              className="text-base sm:text-xl lg:text-2xl text-muted-foreground mb-8 sm:mb-10 max-w-2xl leading-relaxed font-medium"
+            >
+              Architex connects clients with elite professionals and contractors through an AI-powered marketplace for the built environment. Providing tailored management and resource sharing tools to deliver projects end-to-end.
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              viewport={{ once: true }}
+              className="flex flex-wrap gap-3 sm:gap-4"
+            >
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-14 sm:h-16 px-8 sm:px-10 rounded-full text-base sm:text-lg font-bold shadow-xl hover:bg-primary-dark transition-colors">Post a Job <ArrowRight className="ml-2" /></Button>
+              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-full text-base sm:text-lg font-bold bg-card text-foreground border-border hover:bg-accent transition-colors">Browse Talent</Button>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
+
+      <ServicesInfographic prefersReducedMotion={Boolean(prefersReducedMotion)} onGetStarted={onGetStarted} />
 
       {/* Marketplace Preview */}
-      <section className="py-20 bg-secondary/20 px-8 lg:px-20 relative z-10 border-y border-border">
+      <section className="py-12 bg-secondary px-4 sm:px-8 lg:px-20 relative z-10 border-y border-border">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row justify-between items-end mb-12 gap-6">
+          <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="text-4xl font-heading font-bold mb-4">Live Marketplace</h2>
-              <p className="text-muted-foreground">Explore active architectural opportunities across South Africa.</p>
+              <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 uppercase tracking-widest">Live Marketplace</Badge>
+              <h2 className="text-3xl md:text-5xl font-heading font-black tracking-tight text-foreground">Current open projects</h2>
+              <p className="mt-3 max-w-2xl text-muted-foreground font-medium">Browse live opportunities from clients looking for built-environment professionals.</p>
             </div>
-            <div className="flex gap-4">
-              <div className="bg-white px-6 py-3 rounded-full border border-border flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm font-medium">{jobs.length} Active Jobs</span>
-              </div>
-            </div>
+            <Button onClick={onGetStarted} variant="outline" className="rounded-full font-bold">View Marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {jobs.map((job, index) => (
-              <div key={job.id}>
-                <Card className="h-full border-border hover:border-primary/50 transition-all duration-300 group bg-white/50 backdrop-blur-sm hover:shadow-2xl hover:-translate-y-2">
-                  <CardHeader>
-                    <div className="flex justify-between items-start mb-4">
-                      <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest">
-                        {job.category}
-                      </Badge>
-                      <span className="text-lg font-bold text-primary font-mono">R {job.budget.toLocaleString()}</span>
-                    </div>
-                    <CardTitle className="font-heading text-xl group-hover:text-primary transition-colors">{job.title}</CardTitle>
-                    <CardDescription className="line-clamp-3 leading-relaxed">{job.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-4 text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
-                      <div className="flex items-center gap-1">
-                        <MapPin size={12} className="text-primary" />
-                        {job.location || 'South Africa'}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock size={12} className="text-primary" />
-                        Posted {new Date(job.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-0">
-                    <Button onClick={onGetStarted} variant="ghost" className="w-full justify-between group/btn hover:bg-primary hover:text-primary-foreground">
-                      View Details <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {(liveJobs.length > 0 ? liveJobs : [
+              { id: 'sample-1', title: 'Residential renovation concept', category: 'Residential', location: 'Cape Town', budget: 85000, deadline: 'Open brief', description: 'Kitchen and living area redesign with council-ready documentation.' },
+              { id: 'sample-2', title: 'Retail fit-out documentation', category: 'Commercial', location: 'Johannesburg', budget: 140000, deadline: 'Open brief', description: 'Technical drawing package for a small retail interior fit-out.' },
+              { id: 'sample-3', title: 'New home compliance review', category: 'Residential', location: 'Pretoria', budget: 65000, deadline: 'Open brief', description: 'Plan review and compliance support before municipal submission.' }
+            ] as Partial<Job>[]).map((job) => (
+              <motion.div
+                key={job.id}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                viewport={{ once: true }}
+                className="rounded-3xl border border-border bg-card p-6 shadow-sm hover:shadow-lg transition-shadow flex flex-col min-h-[260px]"
+              >
+                <div className="flex items-center justify-between gap-3 mb-5">
+                  <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">{job.category || 'Project'}</Badge>
+                  <span className="text-sm font-bold text-primary font-mono">R {(job.budget || 0).toLocaleString()}</span>
+                </div>
+                <h3 className="text-xl font-heading font-black text-foreground mb-3">{job.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-6">{job.description}</p>
+                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-[10px] uppercase font-bold text-muted-foreground">
+                  <span className="flex items-center gap-1"><MapPin size={12} /> {job.location || 'South Africa'}</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> {job.deadline || 'Open'}</span>
+                </div>
+              </motion.div>
             ))}
           </div>
-
-          {jobs.length === 0 && (
-            <div className="text-center py-20 border-2 border-dashed border-border rounded-3xl">
-              <p className="text-muted-foreground italic">No active jobs found. Be the first to post!</p>
-              <Button onClick={onGetStarted} className="mt-6 bg-primary text-primary-foreground rounded-full px-8">
-                Post a Job Now
-              </Button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Trust Section */}
-      <section id="how-it-works" className="py-20 px-8 lg:px-20 relative z-10 bg-background">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-heading font-bold mb-4">How Architex Works</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">Our platform streamlines the architectural process from concept to council approval.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-12">
-            <TrustCard 
-              icon={<ShieldCheck className="w-10 h-10 text-primary" />}
-              title="AI Compliance"
-              description="Every drawing is automatically checked against SANS 10400 regulations by our specialized AI agents."
-            />
-            <TrustCard 
-              icon={<CheckCircle2 className="w-10 h-10 text-primary" />}
-              title="Council Ready"
-              description="We guarantee that approved drawings are ready for municipal submission, saving you months of back-and-forth."
-            />
-            <TrustCard 
-              icon={<Users className="w-10 h-10 text-primary" />}
-              title="Vetted Talent"
-              description="Only SACAP registered professionals can apply for jobs, ensuring the highest standards of architectural excellence."
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              ['AI-Powered Intelligence', 'SANS 10400 compliance checks for drawings and collaborative design workflows.'],
+              ['Built for the Built Environment', 'Purpose-built tools for every project stage.'],
+              ['Connected Ecosystem', 'Clients, professionals, and contractors working as one.']
+            ].map(([title, copy], idx) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: idx * 0.1 }}
+                viewport={{ once: true }}
+                className="rounded-3xl border border-border bg-card p-8 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <h2 className="text-lg font-black uppercase tracking-wide mb-3 text-foreground">{title}</h2>
+                <p className="text-muted-foreground leading-relaxed max-w-sm font-medium">{copy}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-secondary/50 py-20 px-8 lg:px-20 border-t border-border relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl lg:text-3xl tracking-tighter" />
-          <p className="text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
-          <div className="flex gap-6">
-            <button className="text-xs uppercase tracking-widest hover:text-primary transition-colors">Terms</button>
-            <button className="text-xs uppercase tracking-widest hover:text-primary transition-colors">Privacy</button>
-          </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <footer className="bg-card py-12 sm:py-16 lg:py-20 px-4 sm:px-8 lg:px-20 border-t border-border relative z-10 text-foreground">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-6 sm:gap-8">
+          <Logo showText iconClassName="w-14 h-14 sm:w-16 sm:h-16 object-contain" textClassName="font-heading font-bold text-xl sm:text-2xl lg:text-3xl" />
+          <p className="text-xs sm:text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
         </div>
       </footer>
     </div>
   );
 }
 
-function TrustCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function ServicesInfographic({ prefersReducedMotion, onGetStarted }: { prefersReducedMotion: boolean; onGetStarted: () => void }) {
+  const services = [
+    { title: 'Client Brief', copy: 'Capture scope, budget, site context, and project goals.', icon: <FileText size={22} /> },
+    { title: 'Smart Matching', copy: 'Connect with architects, freelancers, and contractors.', icon: <Network size={22} /> },
+    { title: 'AI Automation', copy: 'Orchestrated agents review drawings, risks, and next actions.', icon: <Bot size={22} /> },
+    { title: 'SANS Compliance', copy: 'Automated checks for walls, fenestration, fire, and area rules.', icon: <ClipboardCheck size={22} /> },
+    { title: 'Resource Sharing', copy: 'Centralise documents, knowledge, files, and project evidence.', icon: <Files size={22} /> },
+    { title: 'Delivery', copy: 'Move from concept to municipal-ready submission workflows.', icon: <Hammer size={22} /> },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="p-4 bg-primary/5 rounded-2xl w-fit">
-        {icon}
+    <section className="py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-20 relative z-10 bg-[linear-gradient(135deg,#021817_0%,#04302c_54%,#0f6b62_100%)] text-primary-foreground overflow-hidden">
+      <div aria-hidden="true" className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,white,transparent_24%),radial-gradient(circle_at_80%_70%,white,transparent_20%)]" />
+      <div className="max-w-7xl mx-auto relative z-10">
+        <div className="mb-10 sm:mb-14 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <Badge className="mb-5 bg-white/10 text-white border-white/20 uppercase tracking-widest text-[10px] sm:text-xs">Animated platform map</Badge>
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-heading font-black tracking-tight max-w-3xl">All services, AI automation, and delivery workflows in one connected hub.</h2>
+          </div>
+          <Button onClick={onGetStarted} variant="outline" className="w-full sm:w-auto rounded-full h-14 px-8 bg-white/10 border-white/25 text-white hover:bg-white hover:text-primary font-bold">
+            Start a project <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-5 sm:gap-6 items-center">
+          <div className="grid gap-5">
+            {services.slice(0, 3).map((service, index) => <ServiceNode key={service.title} service={service} index={index} />)}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            animate={prefersReducedMotion ? undefined : { boxShadow: ['0 0 0 rgba(255,255,255,0.10)', '0 0 70px rgba(255,255,255,0.28)', '0 0 0 rgba(255,255,255,0.10)'] }}
+            transition={{ duration: 2.8, repeat: prefersReducedMotion ? 0 : Infinity, ease: 'easeInOut' }}
+            viewport={{ once: true }}
+            className="relative mx-auto my-4 sm:my-6 lg:my-0 h-64 w-64 sm:h-80 sm:w-80 rounded-full border border-white/20 bg-white/10 backdrop-blur-md flex items-center justify-center shadow-2xl"
+          >
+            <div className="absolute inset-8 rounded-full border border-dashed border-white/30 animate-spin-slow" />
+            <div className="absolute inset-16 rounded-full bg-primary-dark/80 border border-white/20" />
+            <div className="relative z-10 text-center px-10">
+              <div className="mx-auto mb-4 h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-white text-primary flex items-center justify-center shadow-xl">
+                <Workflow className="h-8 w-8 sm:h-[34px] sm:w-[34px]" />
+              </div>
+              <h3 className="font-heading text-2xl sm:text-3xl font-black">Architex AI</h3>
+              <p className="mt-2 text-xs sm:text-sm text-white/75 font-medium">Multi-agent automation coordinates compliance, marketplace, files, teams, and project intelligence.</p>
+            </div>
+          </motion.div>
+
+          <div className="grid gap-5">
+            {services.slice(3).map((service, index) => <ServiceNode key={service.title} service={service} index={index + 3} />)}
+          </div>
+        </div>
       </div>
-      <h3 className="text-xl font-heading font-bold">{title}</h3>
-      <p className="text-muted-foreground leading-relaxed">{description}</p>
-    </div>
+    </section>
   );
 }
 
-function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
+type ServiceNodeProps = {
+  service: { title: string; copy: string; icon: React.ReactNode };
+  index: number;
+};
+
+function ServiceNode({ service, index }: React.PropsWithChildren<ServiceNodeProps>) {
   return (
-    <button 
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all duration-200 ${
-        active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'
-      }`}
+    <motion.div
+      initial={{ opacity: 0, y: 22 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, delay: index * 0.08 }}
+      viewport={{ once: true }}
+      className="group rounded-[1.5rem] sm:rounded-[2rem] border border-white/15 bg-white/10 p-4 sm:p-5 backdrop-blur-md hover:bg-white/15 transition-colors"
     >
-      {icon}
-      <span className="font-bold">{label}</span>
-    </button>
+      <div className="flex gap-3 sm:gap-4">
+        <div className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 rounded-2xl bg-white text-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+          {service.icon}
+        </div>
+        <div>
+          <h3 className="font-heading text-lg sm:text-xl font-black">{service.title}</h3>
+          <p className="mt-1 text-xs sm:text-sm text-white/75 leading-relaxed font-medium">{service.copy}</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ResourcesLanding({ onGetStarted }: { onGetStarted: () => void }) {
+  const resources = [
+    { title: 'SANS 10400 Readiness Guide', copy: 'Understand the checks Architex AI performs across walls, fire, fenestration, area sizing, and documentation.', icon: <BookOpen size={24} />, tag: 'Compliance' },
+    { title: 'Client Briefing Template', copy: 'Prepare scope, site details, inspiration, budget, and timeline before posting your project.', icon: <FileText size={24} />, tag: 'Clients' },
+    { title: 'AI Review Checklist', copy: 'A practical list for title blocks, north points, scale bars, room schedules, and municipal submission basics.', icon: <ClipboardCheck size={24} />, tag: 'AI Automation' },
+    { title: 'Professional Onboarding', copy: 'Guidance for architects and freelancers setting up verified marketplace profiles.', icon: <Users size={24} />, tag: 'Professionals' },
+    { title: 'Resource Library Workflow', copy: 'Learn how shared files, knowledge sources, and project evidence support faster decisions.', icon: <Database size={24} />, tag: 'Knowledge' },
+    { title: 'Project Delivery Playbook', copy: 'Coordinate teams from concept to approval using payments, files, reviews, and audit trails.', icon: <Lightbulb size={24} />, tag: 'Delivery' },
+  ];
+
+  return (
+    <main className="relative z-10 bg-background">
+      <section className="px-4 sm:px-6 lg:px-20 py-16 sm:py-20 lg:py-24 bg-card border-b border-border overflow-hidden relative">
+        <div aria-hidden="true" className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-12 items-center">
+          <div>
+            <Badge className="mb-5 sm:mb-6 bg-primary/10 text-primary border-primary/20 uppercase tracking-widest text-[10px] sm:text-xs">Resources</Badge>
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-heading font-black tracking-[-0.06em] leading-none">Practical tools for smarter built-environment projects.</h1>
+            <p className="mt-6 sm:mt-8 text-base sm:text-xl text-muted-foreground leading-relaxed font-medium max-w-2xl">Use these guides and templates to brief clearly, prepare compliant drawings, understand AI automation, and move faster from idea to approved project.</p>
+            <div className="mt-8 sm:mt-10 flex flex-wrap gap-3 sm:gap-4">
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full bg-primary text-primary-foreground font-bold">Use the marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              <Button variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full font-bold">Browse guides</Button>
+            </div>
+          </div>
+          <div className="rounded-[2rem] sm:rounded-[2.5rem] border border-primary/15 bg-primary/5 p-4 sm:p-8 shadow-xl">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {['Brief', 'Match', 'Review', 'Submit'].map((step, index) => (
+                <motion.div key={step} initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.08 }} viewport={{ once: true }} className="rounded-2xl sm:rounded-3xl bg-card border border-border p-4 sm:p-6">
+                  <span className="text-xs font-black text-primary font-mono">0{index + 1}</span>
+                  <p className="mt-6 sm:mt-8 font-heading text-xl sm:text-2xl font-black">{step}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 sm:px-6 lg:px-20 py-14 sm:py-20 bg-secondary border-b border-border">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {resources.map((resource, index) => (
+            <motion.article key={resource.title} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: index * 0.06 }} viewport={{ once: true }} className="rounded-[1.5rem] sm:rounded-[2rem] border border-border bg-card p-5 sm:p-7 shadow-sm hover:shadow-lg hover:border-primary/25 transition-all">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">{resource.icon}</div>
+                <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">{resource.tag}</Badge>
+              </div>
+              <h2 className="text-2xl font-heading font-black mb-3">{resource.title}</h2>
+              <p className="text-muted-foreground leading-relaxed font-medium mb-6">{resource.copy}</p>
+              <button className="inline-flex items-center gap-2 text-sm font-black text-primary hover:underline underline-offset-4">
+                View resource <Download size={14} />
+              </button>
+            </motion.article>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }

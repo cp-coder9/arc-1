@@ -23,11 +23,21 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "jest"
     ],
     "typeRoots": [
       "./types",
       "./node_modules/@types"
     ]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test/**",
+    "e2e/**"
+  ]
 }

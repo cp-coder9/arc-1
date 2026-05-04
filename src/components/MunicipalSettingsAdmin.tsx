@@ -59,7 +59,7 @@ export default function MunicipalSettingsAdmin() {
       <div>
         <h2 className="text-3xl font-heading font-bold tracking-tight text-foreground">Municipal Tracker Settings</h2>
         <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold mt-1">
-          Configure hybrid aggregator modules and vision AI keys
+          Configure official-access automation, shadow tracking, and vision AI keys
         </p>
       </div>
 
@@ -84,8 +84,8 @@ export default function MunicipalSettingsAdmin() {
 
             <div className="flex items-center justify-between p-4 bg-secondary/20 rounded-2xl border border-border">
               <div>
-                <p className="text-sm font-bold">Xero Integration (Tier 4)</p>
-                <p className="text-[10px] text-muted-foreground italic">Enable shadow tracking via invoice monitoring</p>
+                <p className="text-sm font-bold">Shadow Tracking (Tier 4)</p>
+                <p className="text-[10px] text-muted-foreground italic">Enable invoice-signal monitoring alongside official portal automation</p>
               </div>
               <Switch
                 checked={settings.xeroConnected}

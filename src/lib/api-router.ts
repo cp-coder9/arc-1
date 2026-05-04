@@ -1,25 +1,31 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
+// import csrf from "csurf"; // TODO: Install csurf package when enabling CSRF protection
 import { del, put } from "@vercel/blob";
 import multer from "multer";
-import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin.js";
-import { extractCadData } from "./cadProcessor.js";
-import { encrypt, decrypt } from "./encryption.js";
-import { runMunicipalScraper } from "../services/scraperService.js";
-import { processReceiptOCR } from "../services/ocrService.js";
-import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService.js";
-import { verifySACAPByName } from "../services/sacapVerificationService.js";
+import { admin, adminDb, auth, firebaseConfig } from "./firebase-admin";
+import { extractCadData } from "./cadProcessor";
+import { encrypt, decrypt } from "./encryption";
+import { processReceiptOCR } from "../services/ocrService";
+import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService";
+import { verifySACAPByName } from "../services/sacapVerificationService";
+import { runMunicipalBrowserAutomation, trackMunicipalityStatus } from "./municipalAutomation";
+import { notificationService } from "../services/notificationService";
 
-import { UserRole, MunicipalityType } from "../types.js";
+import { UserRole, MunicipalityType } from "../types";
 
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const PAYFAST_PASSPHRASE = process.env.VITE_PAYFAST_PASSPHRASE || "";
 const BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.VITE_BLOB_READ_WRITE_TOKEN || "";
 const GOOGLE_SEARCH_API_KEY = process.env.GOOGLE_SEARCH_API_KEY || "";
 const PLATFORM_FEE_PERCENTAGE = 0.05;
+const PAYFAST_SANDBOX = process.env.VITE_PAYFAST_SANDBOX === "true";
 
 // ── Rate Limiters ─────────────────────────────────────────────────────────────
 const reviewLimiter = rateLimit({
@@ -38,6 +44,32 @@ const apiLimiter = rateLimit({
 
 const router = express.Router();
 router.use(apiLimiter);
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function sameOriginGuard(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (SAFE_METHODS.has(req.method)) return next();
+
+  const origin = req.get("origin");
+  if (!origin) return next();
+
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const protocol = req.get("x-forwarded-proto") || req.protocol;
+  if (!host) return res.status(403).json({ error: "Missing host header" });
+
+  try {
+    const requestOrigin = `${protocol}://${host}`;
+    if (new URL(origin).origin !== new URL(requestOrigin).origin) {
+      return res.status(403).json({ error: "Cross-origin state-changing request blocked" });
+    }
+  } catch {
+    return res.status(403).json({ error: "Invalid origin header" });
+  }
+
+  return next();
+}
+
+router.use(sameOriginGuard);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ALLOWED_BLOB_HOSTS = ["public.blob.vercel-storage.com"];
@@ -62,13 +94,93 @@ async function getAdminLLMConfig() {
   return null;
 }
 
+function getProviderApiKey(provider?: string, configuredApiKey?: string): string {
+  if (configuredApiKey && !configuredApiKey.startsWith("env:")) return configuredApiKey;
+  const envKey = configuredApiKey?.replace(/^env:/, "");
+  if (envKey && process.env[envKey]) return process.env[envKey] || "";
+  if (provider === "nvidia") return NVIDIA_API_KEY;
+  if (provider === "gemini") return GEMINI_API_KEY;
+  if (provider === "openai") return OPENAI_API_KEY;
+  if (provider === "openrouter") return OPENROUTER_API_KEY;
+  return "";
+}
+
+// PayFast helpers
+function computePayFastSignature(data: Record<string, string>, passphrase: string): string {
+  const sortedKeys = Object.keys(data).sort();
+  let paramString = '';
+  sortedKeys.forEach(key => {
+    const value = data[key];
+    if (value !== undefined && value !== '') {
+      paramString += `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}&`;
+    }
+  });
+  paramString = paramString.slice(0, -1);
+  if (passphrase) {
+    paramString += `&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, '+')}`;
+  }
+  return crypto.createHash('md5').update(paramString).digest('hex');
+}
+
+function isPayFastIP(ip: string): boolean {
+  if (PAYFAST_SANDBOX) return true; // allow any IP in sandbox
+  const whitelist = [
+    '196.35.144.10',
+    '196.35.144.11',
+    '196.35.144.12',
+    '196.35.144.13',
+    '196.35.144.14',
+    '196.35.144.15'
+  ];
+  return whitelist.includes(ip);
+}
+
+async function validateWithPayFast(pfData: Record<string, any>): Promise<boolean> {
+  const validateUrl = PAYFAST_SANDBOX
+    ? 'https://sandbox.payfast.co.za/eng/query/validate'
+    : 'https://www.payfast.co.za/eng/query/validate';
+
+  // Reconstruct URL-encoded string with sorted keys
+  const sortedKeys = Object.keys(pfData).sort();
+  const body = sortedKeys.map(k => `${k}=${encodeURIComponent(pfData[k])}`).join('&');
+
+  try {
+    const response = await fetch(validateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    const text = await response.text();
+    return text.trim() === 'VALID';
+  } catch (error) {
+    console.error('PayFast validation error:', error);
+    return false;
+  }
+}
+
 async function verifyAuth(headers: Record<string, any>) {
   const authHeader = headers.authorization as string | undefined;
   const directApiKey = headers['api-key'] || headers['x-agent-key'];
 
+  // Helper to validate API key against configured AGENT_API_KEY
+  const validateAgentApiKey = (providedKey: string): boolean => {
+    const expectedKey = process.env.AGENT_API_KEY;
+    if (!expectedKey) {
+      // Refuse if AGENT_API_KEY is not set
+      throw Object.assign(new Error("Server configuration error: AGENT_API_KEY not set"), { status: 500 });
+    }
+    // Use timingSafeEqual to prevent timing attacks
+    const expectedBuf = Buffer.from(expectedKey);
+    const providedBuf = Buffer.from(providedKey);
+    if (expectedBuf.length !== providedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, providedBuf);
+  };
+
   // Handle direct API Key header (preferred for agents)
   if (directApiKey) {
-    // Return a mock agent user
+    if (!validateAgentApiKey(directApiKey)) {
+      throw Object.assign(new Error("Invalid API key"), { status: 401 });
+    }
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
       email: 'agent@architex.co.za',
@@ -112,6 +224,9 @@ async function verifyAuth(headers: Record<string, any>) {
     if (!apiKey) {
       throw Object.assign(new Error("Missing API key value"), { status: 401 });
     }
+    if (!validateAgentApiKey(apiKey)) {
+      throw Object.assign(new Error("Invalid API key"), { status: 401 });
+    }
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
       email: 'agent@architex.co.za',
@@ -127,6 +242,10 @@ async function verifyAuth(headers: Record<string, any>) {
     const customAuth = authHeader.split("Custom-Auth ")[1];
     if (!customAuth) {
       throw Object.assign(new Error("Missing custom auth value"), { status: 401 });
+    }
+    // Custom-Auth also requires AGENT_API_KEY validation
+    if (!validateAgentApiKey(customAuth)) {
+      throw Object.assign(new Error("Invalid custom auth token"), { status: 401 });
     }
     return {
       uid: `agent_${crypto.randomBytes(8).toString('hex')}`,
@@ -170,6 +289,8 @@ const upload = multer({
   },
 });
 
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // Health check
@@ -177,21 +298,262 @@ router.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// 3. SECURED AI Review (authenticated + proxy)
-router.post("/review", reviewLimiter, async (req, res) => {
-  // --- COMMENT 4 IMPLEMENTATION: Add Firebase auth verification ---
+// Server-side admin role assignment
+// Replaces client-side admin assignment in App.tsx for security
+const ADMIN_EMAILS = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
+const USER_PROFILE_FIELDS = [
+  'bio',
+  'budgetRange',
+  'cidbGrading',
+  'experienceYears',
+  'hasPIInsurance',
+  'mainSpecialization',
+  'nhbrcNumber',
+  'professionalLabel',
+  'projectType',
+  'region',
+  'sacapNumber',
+  'tradeLicense',
+];
+
+function sanitizeUserProfileData(profileData: unknown) {
+  if (!profileData || typeof profileData !== 'object') return {};
+
+  return USER_PROFILE_FIELDS.reduce<Record<string, unknown>>((safeData, field) => {
+    if (Object.prototype.hasOwnProperty.call(profileData, field)) {
+      safeData[field] = (profileData as Record<string, unknown>)[field];
+    }
+    return safeData;
+  }, {});
+}
+
+router.post("/auth/check-admin", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
 
-    // Admin whitelist check (log but allow for now to prevent blocking architects)
-    const adminEmails = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
-    const userEmail = decoded.email?.toLowerCase();
-    const isAdmin = userEmail && adminEmails.includes(userEmail);
+  try {
+    const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
+    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const userDoc = await userRef.get();
+    const profileData = sanitizeUserProfileData(req.body.profileData);
+    const requestedRole = ['client', 'architect', 'freelancer', 'bep'].includes(req.body.role)
+      ? req.body.role
+      : 'client';
 
-    if (userEmail && !isAdmin) {
-      console.log(`[API] AI Review requested by non-admin: ${userEmail}. Allowing as standard user.`);
+    if (!userDoc.exists) {
+      // Create user with admin role if applicable
+      const newUser = {
+        uid: decoded.uid,
+        email: decoded.email || '',
+        displayName: req.body.displayName || decoded.displayName || decoded.name || 'Anonymous',
+        role: isAdminEmail ? 'admin' : requestedRole,
+        ...profileData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await userRef.set(newUser);
+      return res.json({ role: newUser.role, isAdmin: isAdminEmail, created: true });
     }
+
+    const userData = userDoc.data()!;
+    const currentRole = userData.role;
+    if (Object.keys(profileData).length > 0) {
+      await userRef.set({
+        ...profileData,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    }
+
+    // If user is in admin list but doesn't have admin role, upgrade them
+    if (isAdminEmail && currentRole !== 'admin') {
+      await userRef.update({
+        role: 'admin',
+        updatedAt: new Date().toISOString(),
+      });
+      return res.json({ role: 'admin', isAdmin: true, upgraded: true });
+    }
+
+    // If user is not in admin list but has admin role, don't downgrade (manual admin assignment support)
+    res.json({ role: currentRole, isAdmin: currentRole === 'admin', existing: true });
+  } catch (err: any) {
+    console.error("Admin check error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.post("/jobs/:jobId/applications", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const { jobId } = req.params;
+    const proposal = String(req.body.proposal || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    if (!proposal) {
+      return res.status(400).json({ error: 'Proposal is required' });
+    }
+
+    const [userDoc, jobDoc] = await Promise.all([
+      adminDb.collection('users').doc(decoded.uid).get(),
+      adminDb.collection('jobs').doc(jobId).get(),
+    ]);
+
+    if (!userDoc.exists) return res.status(404).json({ error: 'User profile not found' });
+    if (!jobDoc.exists) return res.status(404).json({ error: 'Job not found' });
+
+    const userData = userDoc.data()!;
+    const jobData = jobDoc.data()!;
+
+    if (userData.role !== 'architect') {
+      return res.status(403).json({ error: 'Only architects can apply for marketplace jobs' });
+    }
+    if (jobData.status !== 'open') {
+      return res.status(400).json({ error: 'This job is not open for applications' });
+    }
+    if (jobData.clientId === decoded.uid) {
+      return res.status(400).json({ error: 'You cannot apply to your own job' });
+    }
+
+    const existing = await adminDb
+      .collection('jobs').doc(jobId).collection('applications')
+      .where('architectId', '==', decoded.uid)
+      .where('status', 'in', ['pending', 'accepted'])
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      return res.status(409).json({ error: 'You have already applied for this job' });
+    }
+
+    const now = new Date().toISOString();
+    const applicationRef = await adminDb.collection('jobs').doc(jobId).collection('applications').add({
+      jobId,
+      architectId: decoded.uid,
+      architectName: userData.displayName || decoded.email || 'Architect',
+      proposal,
+      notes,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+      sacapNumber: userData.sacapNumber || '',
+      specializations: userData.mainSpecialization ? [userData.mainSpecialization] : [],
+      completedJobs: userData.completedJobs || 0,
+      averageRating: userData.averageRating || 5,
+    });
+
+    try {
+      await adminDb.collection('notifications').add({
+        userId: jobData.clientId,
+        type: 'job_application',
+        title: 'New Application',
+        body: `${userData.displayName || 'An architect'} applied for "${jobData.title}"`,
+        data: { jobId, applicationId: applicationRef.id, senderId: decoded.uid },
+        isRead: false,
+        channels: ['in_app', 'email'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    } catch (notificationError) {
+      console.error('Failed to create job application notification:', notificationError);
+    }
+
+    res.status(201).json({ id: applicationRef.id, jobId, status: 'pending' });
+  } catch (err: any) {
+    console.error('Application create error:', err);
+    res.status(500).json({ error: 'Failed to submit application', details: err.message });
+  }
+});
+
+router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const { jobId, applicationId } = req.params;
+    const jobRef = adminDb.collection('jobs').doc(jobId);
+    const applicationRef = jobRef.collection('applications').doc(applicationId);
+    const now = new Date().toISOString();
+
+    await adminDb.runTransaction(async (tx) => {
+      const [jobDoc, applicationDoc] = await Promise.all([tx.get(jobRef), tx.get(applicationRef)]);
+      if (!jobDoc.exists) throw Object.assign(new Error('Job not found'), { status: 404 });
+      if (!applicationDoc.exists) throw Object.assign(new Error('Application not found'), { status: 404 });
+
+      const jobData = jobDoc.data()!;
+      const applicationData = applicationDoc.data()!;
+
+      if (jobData.clientId !== decoded.uid) {
+        throw Object.assign(new Error('Only the job owner can accept applications'), { status: 403 });
+      }
+      if (jobData.status !== 'open') {
+        throw Object.assign(new Error('This job is no longer open'), { status: 400 });
+      }
+      if (applicationData.status !== 'pending') {
+        throw Object.assign(new Error('Only pending applications can be accepted'), { status: 400 });
+      }
+
+      tx.update(applicationRef, { status: 'accepted', updatedAt: now });
+      tx.update(jobRef, {
+        selectedArchitectId: applicationData.architectId,
+        status: 'in-progress',
+        updatedAt: now,
+        statusHistory: [
+          ...(jobData.statusHistory || []),
+          { status: 'in-progress', timestamp: now, actorId: decoded.uid, note: `Accepted ${applicationData.architectName}` },
+        ],
+      });
+    });
+
+    const acceptedApplication = (await applicationRef.get()).data()!;
+    const job = (await jobRef.get()).data()!;
+    const otherApplications = await jobRef.collection('applications').where('status', '==', 'pending').get();
+    const batch = adminDb.batch();
+    otherApplications.docs.forEach((docSnap) => {
+      if (docSnap.id !== applicationId) batch.update(docSnap.ref, { status: 'rejected', updatedAt: now });
+    });
+    await batch.commit();
+
+    try {
+      await adminDb.collection('notifications').add({
+        userId: acceptedApplication.architectId,
+        type: 'application_accepted',
+        title: 'Application Accepted',
+        body: `Your application for "${job.title}" was accepted!`,
+        data: { jobId, applicationId, senderId: decoded.uid },
+        isRead: false,
+        channels: ['in_app', 'email', 'push'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    } catch (notificationError) {
+      console.error('Failed to create acceptance notification:', notificationError);
+    }
+
+    res.json({ jobId, applicationId, selectedArchitectId: acceptedApplication.architectId, status: 'in-progress' });
+  } catch (err: any) {
+    console.error('Application accept error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'Failed to accept application' });
+  }
+});
+
+// 3. SECURED AI Review (authenticated + proxy)
+router.post("/review", reviewLimiter, async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -215,7 +577,7 @@ router.post("/review", reviewLimiter, async (req, res) => {
     });
   }
 
-  const activeApiKey = config.apiKey || "";
+  const activeApiKey = getProviderApiKey(config.provider, config.apiKey);
   const activeModel = config.model || "";
   // Deep-clean the baseUrl to prevent double-pathing (e.g. /v1/chat/completions/chat/completions)
   let cleanBaseUrl = (config.baseUrl || (config.provider === 'nvidia' ? 'https://integrate.api.nvidia.com/v1' : '')).replace(/\/$/, "");
@@ -535,6 +897,92 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
   }
 });
 
+// Test provider/model settings before saving an agent configuration.
+router.post("/agent/test-settings", apiLimiter, async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  if (!(await isAdmin(decoded.uid))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  const { provider, model, apiKey, baseUrl, authorizationType, authorizationValue, authorizationHeader } = req.body || {};
+  if (!provider || provider === "global") return res.status(400).json({ error: "Select a concrete LLM provider before testing" });
+  if (!model) return res.status(400).json({ error: "Select an LLM model before testing" });
+
+  const activeApiKey = getProviderApiKey(provider, apiKey || authorizationValue);
+  if (!activeApiKey) {
+    return res.status(400).json({ error: `No API key configured for ${provider}. Set the mapped environment variable or enter a key.` });
+  }
+
+  try {
+    if (provider === "gemini") {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "Reply with exactly: agent settings ok" }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 32 },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const details = await response.text();
+        return res.status(response.status).json({ success: false, error: "Gemini test failed", details: details.substring(0, 500) });
+      }
+
+      return res.json({ success: true, message: "Gemini settings test passed" });
+    }
+
+    let cleanBaseUrl = (baseUrl || (provider === "nvidia" ? "https://integrate.api.nvidia.com/v1" : provider === "openai" ? "https://api.openai.com/v1" : "https://openrouter.ai/api/v1")).replace(/\/$/, "");
+    if (cleanBaseUrl.endsWith("/chat/completions")) cleanBaseUrl = cleanBaseUrl.replace(/\/chat\/completions$/, "");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+    if (authorizationType === "custom" && authorizationHeader) {
+      headers[authorizationHeader] = activeApiKey;
+    } else if (authorizationType === "api_key") {
+      headers["api-key"] = activeApiKey;
+    } else {
+      headers.Authorization = `Bearer ${activeApiKey}`;
+    }
+    if (provider === "openrouter") {
+      headers["HTTP-Referer"] = process.env.APP_BASE_URL || "https://architex.co.za";
+      headers["X-Title"] = "Architex";
+    }
+
+    const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "Reply with exactly: agent settings ok" }],
+        temperature: 0,
+        max_tokens: 32,
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      return res.status(response.status).json({ success: false, error: "Provider settings test failed", details: details.substring(0, 500), targetUrl: `${cleanBaseUrl}/chat/completions` });
+    }
+
+    res.json({ success: true, message: "Provider settings test passed", targetUrl: `${cleanBaseUrl}/chat/completions` });
+  } catch (error: any) {
+    console.error("Agent settings test failed:", error);
+    res.status(500).json({ success: false, error: "Agent settings test failed", details: error.message });
+  }
+});
+
 // Agent web search (Now using standard LLM instead of Google Search)
 router.post("/agent/search", apiLimiter, async (req, res) => {
   const { query, agentRole } = req.body;
@@ -553,7 +1001,7 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
     }
 
     const provider = dbConfig.provider;
-    const activeApiKey = dbConfig.apiKey || GEMINI_API_KEY;
+    const activeApiKey = getProviderApiKey(provider, dbConfig.apiKey);
     const activeModel = dbConfig.model || (provider === 'gemini' ? "gemini-1.5-flash" : "");
     const searchPrompt = `You are a compliance research assistant. Research the following topic for agent '${agentRole}': ${query}. Provide a concise, factual summary with regulatory references based on your training data.`;
 
@@ -638,9 +1086,32 @@ router.post("/files/upload", async (req, res) => {
   if (!fileBase64) return res.status(400).json({ error: "No file provided" });
   if (!context) return res.status(400).json({ error: "context field is required" });
 
+  if (Number(fileSize || 0) > MAX_UPLOAD_BYTES) {
+    return res.status(413).json({ error: "File is too large", details: "Maximum upload size is 20 MB" });
+  }
+
   try {
+    if (jobId) {
+      const jobDoc = await adminDb.collection("jobs").doc(String(jobId)).get();
+      if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+
+      const job = jobDoc.data()!;
+      const authorizedForJob =
+        job.clientId === decoded.uid ||
+        job.selectedArchitectId === decoded.uid ||
+        (await isAdmin(decoded.uid));
+
+      if (!authorizedForJob) {
+        return res.status(403).json({ error: "You don't have permission to upload files for this job" });
+      }
+    }
+
     const safeFileName = fileName || `upload-${Date.now()}`;
     const fileBuffer = Buffer.from(fileBase64, 'base64');
+
+    if (fileBuffer.byteLength > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ error: "File is too large", details: "Maximum upload size is 20 MB" });
+    }
 
     console.log(`[API] Uploading ${safeFileName} (${fileBuffer.byteLength} bytes) for context: ${context}`);
 
@@ -754,7 +1225,7 @@ router.post("/notifications/token", async (req, res) => {
 });
 
 // Payment – initialize escrow
-router.post("/payment/initialize-escrow", async (req, res) => {
+router.post("/payment/escrow/init", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -847,7 +1318,7 @@ router.post("/payment/initialize-escrow", async (req, res) => {
 });
 
 // Payment – release milestone
-router.post("/payment/release-milestone", async (req, res) => {
+router.post("/payment/milestone/release", async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -905,49 +1376,412 @@ router.post("/payment/release-milestone", async (req, res) => {
     });
 
     await batch.commit();
-    res.json({ success: true, releasedAmount: architectAmount });
+     res.json({ success: true, architectAmount });
   } catch (err: any) {
     console.error("Release milestone error:", err);
     res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 
-// Payment – confirm
+// Payment – confirm (client return from PayFast)
 router.post("/payment/confirm", async (req, res) => {
   const { paymentId, pfData } = req.body;
-  if (!paymentId || !pfData) return res.status(400).json({ error: "Missing paymentId or pfData" });
+  if (!paymentId || !pfData) return res.status(400).json({ error: "paymentId and pfData are required" });
 
   try {
+    // Validate PfData signature and PayFast integrity
+    const receivedSignature = pfData.signature as string | undefined;
+    if (!receivedSignature) {
+      return res.status(400).json({ error: "Missing signature" });
+    }
+    const { signature: _, ...dataForSig } = pfData;
+    const expectedSignature = computePayFastSignature(dataForSig as Record<string, string>, PAYFAST_PASSPHRASE);
+    if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(receivedSignature))) {
+      return res.status(400).json({ error: "Invalid signature" });
+    }
+
+    const isValid = await validateWithPayFast(pfData);
+    if (!isValid) {
+      return res.status(400).json({ error: "PayFast validation failed" });
+    }
+
+    // Check payment status only; do not mutate based on client-supplied data
     const paymentRef = adminDb.collection("payments").doc(paymentId);
     const paymentDoc = await paymentRef.get();
     if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
 
     const payment = paymentDoc.data()!;
-    if (payment.status === "completed") return res.json({ success: true, message: "Payment already processed" });
+    if (payment.status === "completed") {
+      return res.json({ success: true, message: "Payment completed" });
+    } else {
+      // Payment not yet marked complete (ITN not received yet)
+      return res.status(202).json({ success: false, message: "Payment not yet completed" });
+    }
+} catch (err: any) {
+    console.error("Payment confirmation error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
-    if (pfData["amount_gross"] !== (payment.amount / 100).toFixed(2)) return res.status(400).json({ error: "Amount mismatch" });
+// Payment – milestone request (architect initiates)
+router.post("/payment/milestone/request", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
 
-    await paymentRef.update({
-      status: "completed",
-      transactionId: pfData["pf_payment_id"],
-      processedAt: new Date().toISOString(),
+  const { jobId, milestone } = req.body;
+  if (!jobId || !milestone) return res.status(400).json({ error: "jobId and milestone are required" });
+
+  try {
+    const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+    const job = jobDoc.data()!;
+
+    if (job.selectedArchitectId !== decoded.uid) {
+      return res.status(403).json({ error: "Only the assigned architect can request milestone release" });
+    }
+
+    const escrowRef = adminDb.collection("escrow").doc(jobId);
+    const escrowDoc = await escrowRef.get();
+    if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+    const escrow = escrowDoc.data()!;
+
+    if (!["funded", "partially_released"].includes(escrow.status)) {
+      return res.status(400).json({ error: "Escrow is not funded" });
+    }
+    if (escrow.milestones?.[milestone]?.released) {
+      return res.status(400).json({ error: "Milestone already released" });
+    }
+
+// Server-side notification emitted here (single source of truth).
+// JSDoc: This handler emits notifyMilestoneRequest to notify the client of the architect's release request.
+ res.json({ success: true });
+  } catch (err: any) {
+    console.error("Milestone request error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – request refund (creates pending refund request)
+router.post("/payment/refund/request", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { jobId, amount, reason } = req.body;
+  if (!jobId || !amount) return res.status(400).json({ error: "jobId and amount are required" });
+
+  try {
+    const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+    const job = jobDoc.data()!;
+
+    // Only client can request refund
+    if (job.clientId !== decoded.uid) {
+      return res.status(403).json({ error: "Only the job client can request a refund" });
+    }
+
+    const escrowRef = adminDb.collection("escrow").doc(jobId);
+    const escrowDoc = await escrowRef.get();
+    if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+    const escrow = escrowDoc.data()!;
+
+    const refundAmount = Math.round(amount);
+    if (refundAmount > (escrow.heldAmount || 0)) {
+      return res.status(400).json({ error: "Refund amount exceeds held amount" });
+    }
+
+    // Create refund request (pending admin approval)
+    const refundRequestRef = await adminDb.collection("refund_requests").add({
+      jobId,
+      clientId: job.clientId,
+      architectId: job.selectedArchitectId || "",
+      amount: refundAmount,
+      reason,
+      status: "pending",
+      requestedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      metadata: { ...(payment.metadata || {}), payfastData: pfData },
     });
 
-    if (payment.jobId) {
-      await adminDb.collection("escrow").doc(payment.jobId).update({
-        status: "funded",
-        heldAmount: payment.amount,
-        fundedAt: new Date().toISOString(),
+    // Notify admins about the refund request
+    const adminsSnapshot = await adminDb.collection("users").where("role", "==", "admin").get();
+    const adminNotifications = adminsSnapshot.docs.map(adminDoc => {
+      return adminDb.collection("notifications").add({
+        userId: adminDoc.id,
+        type: "refund_request",
+        title: "New Refund Request",
+        body: `Client requested a refund of R${(refundAmount / 100).toFixed(2)} for job "${job.title}"`,
+        data: { refundRequestId: refundRequestRef.id, jobId },
+        isRead: false,
+        channels: ["in_app", "email"],
+        createdAt: new Date().toISOString(),
+      });
+    });
+    await Promise.all(adminNotifications);
+
+    res.json({ success: true, refundRequestId: refundRequestRef.id, status: "pending" });
+  } catch (err: any) {
+    console.error("Refund request error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – get pending refund requests (admin only)
+router.get("/payment/refund/requests", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  // Only admins can view refund requests
+  if (!(await isAdmin(decoded.uid))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  try {
+    const { status = "pending" } = req.query;
+    let query = adminDb.collection("refund_requests").orderBy("requestedAt", "desc");
+    
+    if (status !== "all") {
+      query = query.where("status", "==", status);
+    }
+    
+    const snapshot = await query.limit(50).get();
+    const requests = await Promise.all(snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+      // Fetch job details
+      const jobDoc = await adminDb.collection("jobs").doc(data.jobId).get();
+      const jobData = jobDoc.exists ? jobDoc.data() : null;
+      
+      return {
+        id: doc.id,
+        ...data,
+        jobTitle: jobData?.title || "Unknown Job",
+        jobBudget: jobData?.budget || 0,
+      };
+    }));
+
+    res.json({ requests });
+  } catch (err: any) {
+    console.error("Get refund requests error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – approve/reject refund (admin only)
+router.post("/payment/refund/:requestId/process", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  // Only admins can process refunds
+  if (!(await isAdmin(decoded.uid))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  const { requestId } = req.params;
+  const { action, adminNote } = req.body; // action: "approve" or "reject"
+  
+  if (!action || !["approve", "reject"].includes(action)) {
+    return res.status(400).json({ error: "action must be 'approve' or 'reject'" });
+  }
+
+  try {
+    const requestRef = adminDb.collection("refund_requests").doc(requestId);
+    const requestDoc = await requestRef.get();
+    
+    if (!requestDoc.exists) return res.status(404).json({ error: "Refund request not found" });
+    
+    const request = requestDoc.data()!;
+    if (request.status !== "pending") {
+      return res.status(400).json({ error: "Refund request has already been processed" });
+    }
+
+    if (action === "reject") {
+      // Update request as rejected
+      await requestRef.update({
+        status: "rejected",
+        adminNote,
+        processedBy: decoded.uid,
+        processedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+      });
+
+      // Notify client
+      await adminDb.collection("notifications").add({
+        userId: request.clientId,
+        type: "refund_rejected",
+        title: "Refund Request Rejected",
+        body: `Your refund request of R${(request.amount / 100).toFixed(2)} has been rejected.`,
+        data: { refundRequestId: requestId, jobId: request.jobId },
+        isRead: false,
+        channels: ["in_app", "email"],
+        createdAt: new Date().toISOString(),
+      });
+
+      return res.json({ success: true, status: "rejected" });
+    }
+
+    // Approve refund - process the actual refund
+    const jobDoc = await adminDb.collection("jobs").doc(request.jobId).get();
+    const job = jobDoc.data()!;
+    
+    const escrowRef = adminDb.collection("escrow").doc(request.jobId);
+    const escrowDoc = await escrowRef.get();
+    const escrow = escrowDoc.data()!;
+
+    // Use transaction to update escrow and create refund payment record
+    const refundPaymentId = adminDb.collection("payments").doc().id;
+    await adminDb.runTransaction(async (transaction) => {
+      const escrowSnap = await transaction.get(escrowRef);
+      const current = escrowSnap.data()!;
+      const newHeld = (current.heldAmount || 0) - request.amount;
+      const newRefunded = (current.refundedAmount || 0) + request.amount;
+      const newStatus = newHeld <= 0 ? 'refunded' : 'partially_refunded';
+
+      transaction.update(escrowRef, {
+        heldAmount: newHeld,
+        refundedAmount: newRefunded,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+
+      transaction.set(adminDb.collection("payments").doc(refundPaymentId), {
+        jobId: request.jobId,
+        payerId: request.clientId,
+        payeeId: request.architectId,
+        amount: request.amount,
+        type: "refund",
+        status: "completed",
+        metadata: { 
+          reason: request.reason, 
+          originalEscrow: request.jobId,
+          approvedBy: decoded.uid,
+          adminNote,
+          refundRequestId: requestId,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      transaction.update(requestRef, {
+        status: "approved",
+        adminNote,
+        processedBy: decoded.uid,
+        processedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        paymentId: refundPaymentId,
+      });
+    });
+
+    // Notify client and architect
+    await adminDb.collection("notifications").add({
+      userId: request.clientId,
+      type: "refund_approved",
+      title: "Refund Approved",
+      body: `Your refund of R${(request.amount / 100).toFixed(2)} has been approved and processed.`,
+      data: { refundRequestId: requestId, jobId: request.jobId, paymentId: refundPaymentId },
+      isRead: false,
+      channels: ["in_app", "email"],
+      createdAt: new Date().toISOString(),
+    });
+
+    if (request.architectId) {
+      await adminDb.collection("notifications").add({
+        userId: request.architectId,
+        type: "refund_processed",
+        title: "Refund Processed",
+        body: `A refund of R${(request.amount / 100).toFixed(2)} has been processed for job "${job.title}".`,
+        data: { refundRequestId: requestId, jobId: request.jobId },
+        isRead: false,
+        channels: ["in_app", "email"],
+        createdAt: new Date().toISOString(),
       });
     }
 
-    res.json({ success: true });
+    res.json({ success: true, status: "approved", refundAmount: request.amount, paymentId: refundPaymentId });
   } catch (err: any) {
-    console.error("Payment confirmation error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Process refund error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Legacy Payment – refund (admin only, direct refund without approval flow)
+router.post("/payment/refund", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { jobId, amount, reason } = req.body;
+  if (!jobId || !amount) return res.status(400).json({ error: "jobId and amount are required" });
+
+  try {
+    // Only admins can do direct refunds
+    if (!(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Admin access required. Use /payment/refund/request for client refunds." });
+    }
+
+    const jobDoc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+    const job = jobDoc.data()!;
+
+    const escrowRef = adminDb.collection("escrow").doc(jobId);
+    const escrowDoc = await escrowRef.get();
+    if (!escrowDoc.exists) return res.status(404).json({ error: "Escrow not found" });
+    const escrow = escrowDoc.data()!;
+
+    const refundAmount = Math.round(amount);
+    if (refundAmount > (escrow.heldAmount || 0)) {
+      return res.status(400).json({ error: "Refund amount exceeds held amount" });
+    }
+
+    // Use transaction to update escrow and create refund payment record
+    const refundPaymentId = adminDb.collection("payments").doc().id;
+    await adminDb.runTransaction(async (transaction) => {
+      const escrowSnap = await transaction.get(escrowRef);
+      const current = escrowSnap.data()!;
+      const newHeld = (current.heldAmount || 0) - refundAmount;
+      const newRefunded = (current.refundedAmount || 0) + refundAmount;
+      const newStatus = newHeld <= 0 ? 'refunded' : 'partially_refunded';
+
+      transaction.update(escrowRef, {
+        heldAmount: newHeld,
+        refundedAmount: newRefunded,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+
+      transaction.set(adminDb.collection("payments").doc(refundPaymentId), {
+        jobId,
+        payerId: job.clientId,
+        payeeId: job.selectedArchitectId || "",
+        amount: refundAmount,
+        type: "refund",
+        status: "completed",
+        metadata: { reason, originalEscrow: jobId, processedBy: decoded.uid },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    });
+
+    res.json({ success: true, refundAmount });
+  } catch (err: any) {
+    console.error("Refund error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 
@@ -958,26 +1792,55 @@ router.post("/payment/notify", async (req, res) => {
     const paymentId = pfData["m_payment_id"];
     if (!paymentId) return res.status(400).send("No payment ID provided");
 
+    // IP validation: ensure request originates from PayFast
+    const clientIp = req.ip || (req.connection && (req.connection as any).remoteAddress) || '';
+    if (!isPayFastIP(clientIp)) {
+      console.warn(`ITN from unauthorized IP: ${clientIp}`);
+      return res.status(403).send("Unauthorized IP");
+    }
+
+    // Signature validation
+    const receivedSignature = pfData.signature as string | undefined;
+    if (!receivedSignature) {
+      return res.status(400).send("Missing signature");
+    }
+    const { signature: _, ...dataForSig } = pfData;
+    const expectedSignature = computePayFastSignature(dataForSig as Record<string, string>, PAYFAST_PASSPHRASE);
+    if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(receivedSignature))) {
+      console.warn(`ITN signature mismatch for payment ${paymentId}`);
+      return res.status(400).send("Invalid signature");
+    }
+
+    // PayFast server-side validation
+    const isValid = await validateWithPayFast(pfData);
+    if (!isValid) {
+      console.warn(`ITN validation failed for payment ${paymentId}`);
+      return res.status(400).send("PayFast validation failed");
+    }
+
     const paymentRef = adminDb.collection("payments").doc(paymentId);
     const paymentDoc = await paymentRef.get();
     if (!paymentDoc.exists) return res.status(404).send("Payment not found");
 
     if (pfData["payment_status"] === "COMPLETE") {
-      // Similar logic to /confirm
-      await paymentRef.update({
-        status: "completed",
-        transactionId: pfData["pf_payment_id"],
-        processedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        metadata: { ...(paymentDoc.data()?.metadata || {}), payfastData: pfData, itn: true },
-      });
-      if (paymentDoc.data()?.jobId) {
-        await adminDb.collection("escrow").doc(paymentDoc.data()!.jobId).update({
-          status: "funded",
-          heldAmount: paymentDoc.data()!.amount,
-          fundedAt: new Date().toISOString(),
+      const payment = paymentDoc.data()!;
+      // Only update if not already completed to ensure idempotency
+      if (payment.status !== "completed") {
+        await paymentRef.update({
+          status: "completed",
+          transactionId: pfData["pf_payment_id"],
+          processedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          metadata: { ...(payment.metadata || {}), payfastData: pfData, itn: true },
         });
+        if (payment.jobId) {
+          await adminDb.collection("escrow").doc(payment.jobId).update({
+            status: "funded",
+            heldAmount: payment.amount,
+            fundedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     }
     res.status(200).send("OK");
@@ -989,78 +1852,185 @@ router.post("/payment/notify", async (req, res) => {
 
 // ── Municipal Tracker Routes ───────────────────────────────────────────────
 
-// Get Municipal Settings
-router.get("/municipal/settings", async (req, res) => {
+// Municipal tracking endpoint (scaffolded)
+router.post("/track-municipality", async (req, res) => {
+  let decoded;
   try {
-    await verifyAuth(req.headers);
-    const doc = await adminDb.collection("system_settings").doc("municipal_tracker").get();
-    res.json(doc.exists ? doc.data() : { municipalTrackerEnabled: false });
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    return res.status(err.status || 401).json({ error: err.message });
   }
-});
 
-// Update Municipal Settings (Admin Only)
-router.post("/municipal/settings", async (req, res) => {
+  const { credentialId } = req.body;
+  if (!credentialId) return res.status(400).json({ error: "credentialId is required" });
+
   try {
-    const decoded = await verifyAuth(req.headers);
-    if (!(await isAdmin(decoded.uid))) {
-      return res.status(403).json({ error: "Admin access required" });
+    // Ownership verification
+    const credDoc = await adminDb.collection("municipal_credentials").doc(credentialId).get();
+    if (!credDoc.exists) {
+      return res.status(404).json({ error: "Credentials not found" });
     }
 
-    const settings = req.body;
-    await adminDb.collection("system_settings").doc("municipal_tracker").set({
-      ...settings,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    const credData = credDoc.data();
+    if (credData?.userId !== decoded.uid && !(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Unauthorized access to credentials" });
+    }
 
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    const result = await trackMunicipalityStatus(credentialId);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Municipal tracking error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Save Municipal Credentials
+// Official-access municipal portal sync. This uses stored portal credentials and
+// server-side browser automation instead of relying on unavailable municipal APIs.
+router.post("/municipal/scrape", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { municipality } = req.body;
+  if (!municipality) {
+    return res.status(400).json({ error: "municipality is required" });
+  }
+
+  try {
+    const result = await runMunicipalBrowserAutomation(decoded.uid, municipality as MunicipalityType);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Municipal portal automation error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Store official council portal credentials for browser automation.
 router.post("/municipal/credentials", async (req, res) => {
+  let decoded;
   try {
-    const decoded = await verifyAuth(req.headers);
-    const { municipality, username, password } = req.body;
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
 
-    if (!municipality || !username || !password) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+  const { municipality, username, password, referenceNumber, erfNumber, projectDescription } = req.body;
 
-    const { encrypted, iv, authTag } = encrypt(password);
+  if (!municipality || !username || !password) {
+    return res.status(400).json({ error: "municipality, username, and password are required" });
+  }
 
-    const credRef = adminDb.collection("municipal_credentials").doc(`${decoded.uid}_${municipality}`);
-    await credRef.set({
+  if (typeof password !== "string" || password.length < 4) {
+    return res.status(400).json({ error: "password is too short" });
+  }
+
+  try {
+    const encrypted = encrypt(password);
+    const credentialId = `${decoded.uid}_${municipality}`;
+    const now = new Date().toISOString();
+
+    await adminDb.collection("municipal_credentials").doc(credentialId).set({
       userId: decoded.uid,
       municipality,
       username,
-      encryptedPassword: encrypted,
-      iv,
-      authTag,
-      status: 'unchecked',
-      createdAt: new Date().toISOString()
-    });
+      encryptedPassword: encrypted.encrypted,
+      iv: encrypted.iv,
+      authTag: encrypted.authTag,
+      salt: encrypted.salt,
+      status: "unchecked",
+      updatedAt: now,
+      createdAt: now,
+      projectReference: referenceNumber || null,
+      erfNumber: erfNumber || null,
+      projectDescription: projectDescription || null,
+    }, { merge: true });
 
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
+    if (referenceNumber) {
+      const existingSubmission = await adminDb.collection("council_submissions")
+        .where("userId", "==", decoded.uid)
+        .where("municipality", "==", municipality)
+        .where("referenceNumber", "==", referenceNumber)
+        .limit(1)
+        .get();
+
+      if (existingSubmission.empty) {
+        await adminDb.collection("council_submissions").add({
+          userId: decoded.uid,
+          municipality,
+          referenceNumber,
+          erfNumber: erfNumber || null,
+          projectDescription: projectDescription || `Council portal project ${referenceNumber}`,
+          status: "Portal access configured",
+          rawStatus: "PORTAL_ACCESS_CONFIGURED",
+          source: "manual",
+          documents: [],
+          createdAt: now,
+          lastCheckedAt: now,
+          trackingHistory: [
+            {
+              status: "Portal access configured",
+              timestamp: now,
+              notes: "Architect added official council portal credentials for browser automation",
+              source: "manual",
+              actorId: decoded.uid,
+            }
+          ]
+        });
+      }
+    }
+
+    res.json({ success: true, credentialId });
+  } catch (error: any) {
+    console.error("Municipal credential save error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Trigger Scraper
-router.post("/municipal/scrape", async (req, res) => {
+// Get Municipal Settings (read-only)
+router.get("/municipal/settings", async (req, res) => {
+  let decoded: any;
   try {
-    const decoded = await verifyAuth(req.headers);
-    const { municipality } = req.body;
-
-    if (!municipality) return res.status(400).json({ error: "Municipality is required" });
-
-    const result = await runMunicipalScraper(decoded.uid, municipality as MunicipalityType);
-    res.json(result);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { credentialId } = req.query;
+  if (!credentialId || typeof credentialId !== 'string') {
+    return res.status(400).json({ error: "credentialId query parameter is required" });
+  }
+
+  try {
+    // Ownership verification
+    const credDoc = await adminDb.collection("municipal_credentials").doc(credentialId as string).get();
+    if (!credDoc.exists) {
+      return res.status(404).json({ error: "Credentials not found" });
+    }
+
+    const credData = credDoc.data();
+    if (credData?.userId !== decoded.uid && !(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Unauthorized access to credentials" });
+    }
+
+    // Return stored credential and associated council submissions
+    const submissionsSnapshot = await adminDb.collection("council_submissions")
+      .where("userId", "==", decoded.uid)
+      .where("municipality", "==", credData.municipality)
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+
+    const submissions = submissionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    res.json({
+      credential: { id: credDoc.id, ...credData },
+      submissions
+    });
+  } catch (err: any) {
+    console.error("Municipal settings error:", err);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -1197,6 +2167,319 @@ router.post("/municipal/crowdsource", async (req, res) => {
     res.json({ id: docRef.id });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Payment – generate receipt/invoice
+router.get("/payment/:paymentId/receipt", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { paymentId } = req.params;
+
+  try {
+    const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
+    if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
+
+    const payment = paymentDoc.data()!;
+
+    // Check authorization - client, architect involved, or admin
+    const jobDoc = await adminDb.collection("jobs").doc(payment.jobId).get();
+    const job = jobDoc.exists ? jobDoc.data() : null;
+
+    const isAuthorized = 
+      payment.payerId === decoded.uid ||
+      payment.payeeId === decoded.uid ||
+      (job && (job.clientId === decoded.uid || job.selectedArchitectId === decoded.uid)) ||
+      (await isAdmin(decoded.uid));
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Not authorized to view this receipt" });
+    }
+
+    // Get user details
+    const [payerDoc, payeeDoc] = await Promise.all([
+      adminDb.collection("users").doc(payment.payerId).get(),
+      payment.payeeId ? adminDb.collection("users").doc(payment.payeeId).get() : null,
+    ]);
+
+    const payer = payerDoc.exists ? payerDoc.data() : null;
+    const payee = payeeDoc && payeeDoc.exists ? payeeDoc.data() : null;
+
+    // Generate receipt data
+    const receiptData = {
+      receiptId: `RCP-${paymentId.substring(0, 8).toUpperCase()}`,
+      invoiceId: `INV-${paymentId.substring(0, 8).toUpperCase()}`,
+      paymentId,
+      type: payment.type,
+      status: payment.status,
+      amount: payment.amount,
+      currency: "ZAR",
+      date: payment.createdAt,
+      processedAt: payment.updatedAt,
+      payer: {
+        id: payment.payerId,
+        name: payer?.displayName || "Unknown",
+        email: payer?.email || "",
+      },
+      payee: payee ? {
+        id: payment.payeeId,
+        name: payee.displayName || "Unknown",
+        email: payee.email || "",
+      } : null,
+      job: job ? {
+        id: payment.jobId,
+        title: job.title,
+      } : null,
+      milestone: payment.milestone || null,
+      metadata: payment.metadata || {},
+      platform: {
+        name: "Architex",
+        url: "https://architex.co.za",
+        supportEmail: "support@architex.co.za",
+      },
+    };
+
+    res.json(receiptData);
+  } catch (err: any) {
+    console.error("Generate receipt error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – generate PDF receipt
+router.post("/payment/:paymentId/receipt/pdf", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  const { paymentId } = req.params;
+
+  try {
+    const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
+    if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
+
+    const payment = paymentDoc.data()!;
+
+    // Check authorization
+    const jobDoc = await adminDb.collection("jobs").doc(payment.jobId).get();
+    const job = jobDoc.exists ? jobDoc.data() : null;
+
+    const isAuthorized = 
+      payment.payerId === decoded.uid ||
+      payment.payeeId === decoded.uid ||
+      (job && (job.clientId === decoded.uid || job.selectedArchitectId === decoded.uid)) ||
+      (await isAdmin(decoded.uid));
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Not authorized to generate this receipt" });
+    }
+
+    // Get user details
+    const [payerDoc, payeeDoc] = await Promise.all([
+      adminDb.collection("users").doc(payment.payerId).get(),
+      payment.payeeId ? adminDb.collection("users").doc(payment.payeeId).get() : null,
+    ]);
+
+    const payer = payerDoc.exists ? payerDoc.data() : null;
+    const payee = payeeDoc && payeeDoc.exists ? payeeDoc.data() : null;
+
+    // Generate PDF content (HTML template)
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Payment Receipt - Architex</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #2563eb; margin: 0; }
+    .header p { color: #666; margin: 5px 0; }
+    .receipt-box { border: 2px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 8px; }
+    .receipt-id { font-size: 24px; font-weight: bold; color: #2563eb; }
+    .status { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+    .status.completed { background: #dcfce7; color: #166534; }
+    .status.pending { background: #fef3c7; color: #92400e; }
+    .status.refunded { background: #fee2e2; color: #991b1b; }
+    .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+    .row:last-child { border-bottom: none; }
+    .label { color: #6b7280; font-weight: 500; }
+    .value { font-weight: 600; }
+    .amount { font-size: 28px; font-weight: bold; color: #2563eb; text-align: center; margin: 20px 0; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb; color: #6b7280; font-size: 12px; }
+    .section { margin: 20px 0; }
+    .section h3 { color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>ARCHITEX</h1>
+    <p>Premium Architectural Marketplace</p>
+    <p>support@architex.co.za | www.architex.co.za</p>
+  </div>
+
+  <div class="receipt-box">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <span class="receipt-id">RECEIPT #RCP-${paymentId.substring(0, 8).toUpperCase()}</span>
+    </div>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+      <span class="status ${payment.status}">${payment.status}</span>
+    </div>
+
+    <div class="amount">
+      R${(payment.amount / 100).toFixed(2)} ZAR
+    </div>
+
+    <div class="section">
+      <h3>Payment Details</h3>
+      <div class="row">
+        <span class="label">Payment Type:</span>
+        <span class="value">${payment.type.replace(/_/g, ' ').toUpperCase()}</span>
+      </div>
+      <div class="row">
+        <span class="label">Payment ID:</span>
+        <span class="value">${paymentId}</span>
+      </div>
+      <div class="row">
+        <span class="label">Date:</span>
+        <span class="value">${new Date(payment.createdAt).toLocaleString('en-ZA')}</span>
+      </div>
+      ${payment.milestone ? `
+      <div class="row">
+        <span class="label">Milestone:</span>
+        <span class="value">${payment.milestone.toUpperCase()}</span>
+      </div>
+      ` : ''}
+    </div>
+
+    <div class="section">
+      <h3>From (Payer)</h3>
+      <div class="row">
+        <span class="label">Name:</span>
+        <span class="value">${payer?.displayName || 'Unknown'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Email:</span>
+        <span class="value">${payer?.email || 'N/A'}</span>
+      </div>
+    </div>
+
+    ${payee ? `
+    <div class="section">
+      <h3>To (Payee)</h3>
+      <div class="row">
+        <span class="label">Name:</span>
+        <span class="value">${payee.displayName || 'Unknown'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Email:</span>
+        <span class="value">${payee.email || 'N/A'}</span>
+      </div>
+    </div>
+    ` : ''}
+
+    ${job ? `
+    <div class="section">
+      <h3>Job Details</h3>
+      <div class="row">
+        <span class="label">Job Title:</span>
+        <span class="value">${job.title}</span>
+      </div>
+      <div class="row">
+        <span class="label">Job ID:</span>
+        <span class="value">${payment.jobId}</span>
+      </div>
+    </div>
+    ` : ''}
+
+    ${payment.metadata?.platformFee ? `
+    <div class="section">
+      <h3>Fee Breakdown</h3>
+      <div class="row">
+        <span class="label">Platform Fee:</span>
+        <span class="value">R${(payment.metadata.platformFee / 100).toFixed(2)}</span>
+      </div>
+      <div class="row">
+        <span class="label">Net Amount:</span>
+        <span class="value">R${(payment.metadata.architectAmount / 100).toFixed(2)}</span>
+      </div>
+    </div>
+    ` : ''}
+  </div>
+
+  <div class="footer">
+    <p>This is an official receipt from Architex.</p>
+    <p>For any queries, please contact support@architex.co.za</p>
+    <p>© ${new Date().getFullYear()} Architex. All rights reserved.</p>
+  </div>
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', `inline; filename="receipt-${paymentId}.html"`);
+    res.send(htmlContent);
+  } catch (err: any) {
+    console.error("Generate PDF receipt error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Payment – get all receipts for user
+router.get("/payment/receipts", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+
+    // Get payments where user is payer or payee
+    const [payerSnapshot, payeeSnapshot] = await Promise.all([
+      adminDb.collection("payments")
+        .where("payerId", "==", decoded.uid)
+        .orderBy("createdAt", "desc")
+        .limit(Number(limit))
+        .get(),
+      adminDb.collection("payments")
+        .where("payeeId", "==", decoded.uid)
+        .orderBy("createdAt", "desc")
+        .limit(Number(limit))
+        .get(),
+    ]);
+
+    const paymentMap = new Map();
+    
+    payerSnapshot.docs.forEach(doc => {
+      paymentMap.set(doc.id, { id: doc.id, ...doc.data(), role: 'payer' });
+    });
+    
+    payeeSnapshot.docs.forEach(doc => {
+      if (!paymentMap.has(doc.id)) {
+        paymentMap.set(doc.id, { id: doc.id, ...doc.data(), role: 'payee' });
+      }
+    });
+
+    const receipts = Array.from(paymentMap.values())
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(Number(offset), Number(offset) + Number(limit));
+
+    res.json({ receipts, total: paymentMap.size });
+  } catch (err: any) {
+    console.error("Get receipts error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 

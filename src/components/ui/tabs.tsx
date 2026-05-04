@@ -76,6 +76,7 @@ function TabsTrigger({ className, value, ...props }: React.ButtonHTMLAttributes<
       role="tab"
       aria-selected={isActive}
       data-active={isActive}
+      data-state={isActive ? "active" : "inactive"}
       onClick={() => onValueChange?.(value)}
       className={cn(
         "relative inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",

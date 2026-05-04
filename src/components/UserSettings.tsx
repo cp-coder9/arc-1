@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { auth, db } from '../lib/firebase';
-import { updateProfile, updateEmail, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { updateProfile, updateEmail, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail, sendEmailVerification, reload } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { UserProfile } from '../types';
+import { NotificationPreferences, UserProfile } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { User, Mail, Shield, AlertCircle, Loader2, Save, Key, UserCircle } from 'lucide-react';
+import { User, Mail, Shield, AlertCircle, Loader2, Save, Key, UserCircle, Bell } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 
 interface UserSettingsProps {
@@ -23,6 +23,12 @@ export default function UserSettings({ user }: UserSettingsProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isReauthModalOpen, setIsReauthModalOpen] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
+    in_app: user.notificationPreferences?.in_app ?? true,
+    email: user.notificationPreferences?.email ?? true,
+    push: user.notificationPreferences?.push ?? true,
+  });
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +62,54 @@ export default function UserSettings({ user }: UserSettingsProps) {
     if (email === user.email) return;
     setPendingEmail(email);
     setIsReauthModalOpen(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!user.email) return;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      toast.success('Password reset email sent to ' + user.email);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      toast.error('Failed to send password reset email');
+    }
+  };
+
+  const handleSendVerificationEmail = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
+
+    setIsSendingVerification(true);
+    try {
+      await reload(firebaseUser);
+      if (firebaseUser.emailVerified) {
+        toast.success('Your email is already verified');
+        return;
+      }
+      await sendEmailVerification(firebaseUser);
+      toast.success('Verification email sent to ' + firebaseUser.email);
+    } catch (error) {
+      console.error('Email verification error:', error);
+      toast.error('Failed to send verification email');
+    } finally {
+      setIsSendingVerification(false);
+    }
+  };
+
+  const handleNotificationPreferenceChange = async (channel: keyof NotificationPreferences, enabled: boolean) => {
+    const nextPreferences = { ...notificationPreferences, [channel]: enabled };
+    setNotificationPreferences(nextPreferences);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        notificationPreferences: nextPreferences,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success('Notification preferences updated');
+    } catch (error) {
+      setNotificationPreferences(notificationPreferences);
+      console.error('Notification preference error:', error);
+      toast.error('Failed to update notification preferences');
+    }
   };
 
   const handleReauthAndEmailUpdate = async () => {
@@ -160,6 +214,69 @@ export default function UserSettings({ user }: UserSettingsProps) {
                   <Shield size={12} className="text-green-500" /> 
                   Changing your email requires re-authentication for security.
                 </p>
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-border bg-secondary/20 p-4">
+                  <div>
+                    <p className="font-bold">Email verification</p>
+                    <p className="text-sm text-muted-foreground">
+                      {auth.currentUser?.emailVerified ? 'Your email address is verified.' : 'Verify your email to improve account security.'}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleSendVerificationEmail}
+                    disabled={isSendingVerification || auth.currentUser?.emailVerified}
+                    className="rounded-full px-6 font-bold border-primary/20 hover:bg-primary/5"
+                  >
+                    {isSendingVerification ? <Loader2 className="mr-2 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                    {auth.currentUser?.emailVerified ? 'Verified' : 'Send Link'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="pt-4 space-y-4">
+                <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Account Password</label>
+                <div className="flex items-center justify-between p-6 bg-secondary/20 rounded-2xl border border-border">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-xl">
+                      <Key className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Password Management</p>
+                      <p className="text-sm text-muted-foreground">Update your password via a secure reset link.</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleChangePassword}
+                    className="rounded-full px-6 font-bold border-primary/20 hover:bg-primary/5"
+                  >
+                    Change Password
+                  </Button>
+                </div>
+              </div>
+
+              <div className="pt-8 border-t border-border space-y-4">
+                <h3 className="text-2xl font-heading font-bold flex items-center gap-3">
+                  <Bell className="text-primary w-6 h-6" /> Notification Preferences
+                </h3>
+                <NotificationToggle
+                  label="In-app notifications"
+                  description="Show notifications in the dashboard and notification bell."
+                  checked={notificationPreferences.in_app}
+                  onChange={(checked) => handleNotificationPreferenceChange('in_app', checked)}
+                />
+                <NotificationToggle
+                  label="Email notifications"
+                  description="Queue important updates for email delivery when configured."
+                  checked={notificationPreferences.email}
+                  onChange={(checked) => handleNotificationPreferenceChange('email', checked)}
+                />
+                <NotificationToggle
+                  label="Push notifications"
+                  description="Allow browser or device push notifications after token registration."
+                  checked={notificationPreferences.push}
+                  onChange={(checked) => handleNotificationPreferenceChange('push', checked)}
+                />
               </div>
             </div>
           </div>
@@ -236,5 +353,32 @@ function DetailItem({ label, value }: { label: string, value: string }) {
       <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">{label}</p>
       <p className="font-bold text-foreground">{value}</p>
     </div>
+  );
+}
+
+function NotificationToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-secondary/20 p-4">
+      <span>
+        <span className="block font-bold">{label}</span>
+        <span className="block text-sm text-muted-foreground">{description}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-5 w-5 accent-primary"
+      />
+    </label>
   );
 }

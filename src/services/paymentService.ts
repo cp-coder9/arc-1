@@ -17,6 +17,17 @@ import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
 const md5 = (jsMd5 as any).default || jsMd5;
 
+type PayFastEnv = {
+  VITE_PAYFAST_MERCHANT_ID?: string;
+  VITE_PAYFAST_MERCHANT_KEY?: string;
+  VITE_PAYFAST_PASSPHRASE?: string;
+  VITE_PAYFAST_SANDBOX?: string;
+};
+
+function getPayFastEnv(): PayFastEnv {
+  return typeof process !== 'undefined' ? (process.env as PayFastEnv) : {};
+}
+
 /** Fetch a fresh Firebase ID token for the current user, or throw if not signed in. */
 async function requireIdToken(): Promise<string> {
   const user = auth.currentUser;
@@ -41,12 +52,13 @@ async function apiFetch(path: string, body: object): Promise<any> {
 }
 
 // PayFast configuration
+const payFastEnv = getPayFastEnv();
 const PAYFAST_CONFIG = {
-  merchantId: import.meta.env.VITE_PAYFAST_MERCHANT_ID || '',
-  merchantKey: import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '',
-  passphrase: import.meta.env.VITE_PAYFAST_PASSPHRASE || '',
-  sandbox: import.meta.env.VITE_PAYFAST_SANDBOX === 'true',
-  url: import.meta.env.VITE_PAYFAST_SANDBOX === 'true'
+  merchantId: String(payFastEnv.VITE_PAYFAST_MERCHANT_ID || ''),
+  merchantKey: String(payFastEnv.VITE_PAYFAST_MERCHANT_KEY || ''),
+  passphrase: String(payFastEnv.VITE_PAYFAST_PASSPHRASE || ''),
+  sandbox: payFastEnv.VITE_PAYFAST_SANDBOX === 'true',
+  url: payFastEnv.VITE_PAYFAST_SANDBOX === 'true'
     ? 'https://sandbox.payfast.co.za/eng/process'
     : 'https://www.payfast.co.za/eng/process',
 };
@@ -96,6 +108,19 @@ class PaymentService {
     return expectedSignature === signature;
   }
 
+  calculateEscrowAmounts(budget: number, platformFeePercentage = PLATFORM_FEE_PERCENTAGE): {
+    total: number;
+    platformFee: number;
+    architectAmount: number;
+  } {
+    const platformFee = Math.round(budget * platformFeePercentage);
+    return {
+      total: budget + platformFee,
+      platformFee,
+      architectAmount: budget,
+    };
+  }
+
   /**
    * Initialize escrow for a job — delegates to server for privileged write.
    */
@@ -105,13 +130,18 @@ class PaymentService {
     return { paymentUrl, paymentId: data.paymentId };
   }
 
-  /**
-   * Confirm payment received (manual trigger — delegates to server).
-   */
-  async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
-    await apiFetch('/api/payment/confirm', { paymentId, pfData });
-    toast.success('Escrow funded successfully!');
-  }
+/**
+ * Confirm payment received (manual trigger — delegates to server).
+ * The server handles notification; we only toast based on response.
+ */
+async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
+ const data = await apiFetch('/api/payment/confirm', { paymentId, pfData });
+ if (data.success === true) {
+ toast.success('Escrow funded successfully!');
+ } else {
+ toast.info(data.message || 'Payment confirmed');
+ }
+}
 
   /**
    * Release milestone payment — delegates to server for privileged write.
@@ -133,42 +163,32 @@ class PaymentService {
     toast.success(`R${data.architectAmount.toLocaleString()} released successfully`);
   }
 
-  /**
-   * Request milestone release (architect initiates) — delegates to server.
-   */
-  async requestMilestoneRelease(
-    job: Job,
-    milestone: 'initial' | 'draft' | 'final',
-    architectId: string
-  ): Promise<void> {
-    await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
-    await notificationService.notifyMilestoneRequest(
-      job.clientId,
-      job.title,
-      milestone,
-      job.id
-    );
-    toast.success('Payment release requested');
-  }
+/**
+ * Request milestone release (architect initiates) — delegates to server.
+ * Server emits notification; client does not duplicate.
+ */
+async requestMilestoneRelease(
+ job: Job,
+ milestone: 'initial' | 'draft' | 'final',
+ architectId: string
+): Promise<void> {
+ await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
+ toast.success('Payment release requested');
+}
 
-  /**
-   * Process refund — delegates to server for privileged write.
-   */
-  async processRefund(
-    job: Job,
-    amount: number,
-    reason: string,
-    requestingUserId: string
-  ): Promise<void> {
-    const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
-    await notificationService.notifyRefundProcessed(
-      job.clientId,
-      data.refundAmount,
-      reason,
-      job.id
-    );
-    toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
-  }
+/**
+ * Process refund — delegates to server for privileged write.
+ * Server emits notification; client does not duplicate.
+ */
+async processRefund(
+ job: Job,
+ amount: number,
+ reason: string,
+ requestingUserId: string
+): Promise<void> {
+ const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
+ toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
+}
 
   /**
    * Generate PayFast payment URL
@@ -187,8 +207,8 @@ class PaymentService {
     const notifyUrl = `${window.location.origin}/api/payment/notify`;
 
     const data: Record<string, string> = {
-      merchant_id: PAYFAST_CONFIG.merchantId,
-      merchant_key: PAYFAST_CONFIG.merchantKey,
+      merchant_id: PAYFAST_CONFIG.merchantId as string,
+      merchant_key: PAYFAST_CONFIG.merchantKey as string,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,
