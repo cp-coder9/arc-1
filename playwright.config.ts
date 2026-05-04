@@ -35,7 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'cmd /c "set ENCRYPTION_KEY=0123456789abcdef0123456789abcdef&& node -r dotenv/config node_modules/tsx/dist/cli.mjs server.ts dotenv_config_path=.env"',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
   },

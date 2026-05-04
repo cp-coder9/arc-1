@@ -141,6 +141,7 @@ export interface Submission {
   status: SubmissionStatus;
   aiFeedback?: string;
   aiStructuredFeedback?: AICategory[];
+  architectComment?: string;
   annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
 
   adminFeedback?: string;

@@ -61,7 +61,9 @@ import {
   Hammer,
   Download,
   Lightbulb,
-  Database
+  Database,
+  Construction,
+  ArrowLeft
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -316,70 +318,102 @@ export default function App() {
 
   if (!user && showLogin) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <Logo iconClassName="w-20 h-20 mx-auto mb-4 text-primary" />
-            <h1 className="text-4xl font-heading font-bold mb-2">Architex</h1>
-            <p className="text-sm text-muted-foreground uppercase tracking-widest">Join the premier architectural marketplace</p>
-          </div>
-
-          <Card className="border-border shadow-xl bg-white/80 backdrop-blur-md">
-            <CardHeader>
-              <CardTitle className="font-heading text-2xl">
-                {authMode === 'selection' ? 'Create Account' : authMode === 'email-login' ? 'Welcome Back' : 'Join Architex'}
+      <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 backdrop-blur-sm fixed inset-0 z-50 overflow-y-auto">
+        <AnimatedFloorPlan />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-2xl w-full my-8 relative z-10"
+        >
+          <Card className="border-border shadow-2xl bg-white/95 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="text-center bg-primary/5 pb-10 pt-12 relative">
+              <div className="flex justify-between items-center mb-6 absolute top-6 left-6 right-6">
+                {authMode !== 'selection' ? (
+                  <Button variant="ghost" size="sm" onClick={() => setAuthMode('selection')} className="rounded-full hover:bg-white">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                  </Button>
+                ) : (
+                  <div />
+                )}
+                <Button variant="ghost" size="sm" onClick={() => { setShowLogin(false); setAuthMode('selection'); }} className="rounded-full hover:bg-white">
+                  Cancel
+                </Button>
+              </div>
+              <div className="flex justify-center mb-5">
+                <Logo iconClassName="w-16 h-16 text-primary" />
+              </div>
+              <CardTitle className="text-4xl font-heading font-bold tracking-tight">
+                {authMode === 'selection' ? 'Join Architex' : authMode === 'email-login' ? 'Welcome Back' : 'Create your account'}
               </CardTitle>
-              <CardDescription>
-                {authMode === 'selection' ? 'Select your role to join the Architex community' : 'Enter your details to continue'}
+              <CardDescription className="text-base mt-2">
+                {authMode === 'selection' ? 'Select your role to access the marketplace' : 'Enter your details to continue'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {authMode === 'selection' ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <RoleSelectButton data-testid="role-select-client" role="client" label="Client" sub="I want to post jobs" icon={<Users className="w-8 h-8" />} active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
-                    <RoleSelectButton data-testid="role-select-architect" role="architect" label="Architect" sub="I want to find work" icon={<Briefcase className="w-8 h-8" />} active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
-                    <RoleSelectButton data-testid="role-select-freelancer" role="freelancer" label="Freelancer" sub="Specialist" icon={<Sparkles className="w-8 h-8" />} active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
-                  </div>
-                  <div className="space-y-3">
-                    <Button onClick={handleGoogleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg" disabled={!roleSelection || isLoggingIn}>
+            <CardContent className="p-6 sm:p-10">
+              <AnimatePresence mode="wait">
+                {authMode === 'selection' ? (
+                  <motion.div
+                    key="auth-selection"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
+                      <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
+                      <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
+                      <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP" description="Built Environment Professional (Builder, Tiler, etc.)" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                    </div>
+                    <div className="space-y-3">
+                      <Button onClick={handleGoogleLogin} className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={!roleSelection || isLoggingIn}>
+                        {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                      </Button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.form
+                    key={authMode}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleEmailAuth}
+                    className="space-y-4"
+                  >
+                    {authMode === 'email-signup' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
+                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
+                    </div>
+                    <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg mt-6" disabled={isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
+                    </Button>
+                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl font-bold" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                     </Button>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button variant="outline" className="h-12 rounded-xl" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login</Button>
-                      <Button variant="outline" className="h-12 rounded-xl" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up</Button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <form onSubmit={handleEmailAuth} className="space-y-4">
-                  {authMode === 'email-signup' && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                      <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
-                    <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
-                    <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
-                  </div>
-                  <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg mt-4" disabled={isLoggingIn}>
-                    {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
-                  </Button>
-                  <Button type="button" variant="outline" className="w-full h-12 rounded-xl" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
-                    {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
-                  </Button>
-                  <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => setAuthMode('selection')}>Back to Options</Button>
-                </form>
-              )}
-              <Button variant="ghost" onClick={() => setShowLogin(false)} className="w-full text-muted-foreground">Back to Marketplace</Button>
+                    <Button type="button" variant="ghost" className="w-full text-muted-foreground rounded-full" onClick={() => setAuthMode('selection')}>Back to Options</Button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
+        <Toaster />
       </div>
     );
   }
@@ -627,6 +661,29 @@ function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }:
         <p className="text-[10px] opacity-70">{sub}</p>
       </div>
     </Button>
+  );
+}
+
+function AuthRoleCard({ icon, title, description, active, onClick, ...props }: { icon: React.ReactNode; title: string; description: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group p-6 sm:p-8 text-left border rounded-3xl transition-all duration-300 flex flex-col gap-6 shadow-sm hover:shadow-xl ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
+      {...props}
+    >
+      <div className={`p-4 rounded-2xl transition-all group-hover:scale-110 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
+        {icon}
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-heading font-bold text-2xl">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+      </div>
+      <div className="mt-auto pt-4 border-t border-border/50 w-full">
+        <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
+          {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
+        </span>
+      </div>
+    </button>
   );
 }
 

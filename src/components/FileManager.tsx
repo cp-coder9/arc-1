@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, deleteDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, orderBy, getDoc, addDoc, updateDoc, getDocs } from 'firebase/firestore';
 
-import { UserProfile, UploadedFile } from '../types';
+import { UserProfile, UploadedFile, Job, AIProgress } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { badgeVariants } from './ui/badge';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
+import { reviewDrawing } from '../services/geminiService';
+import { notificationService } from '../services/notificationService';
+import { MAX_UPLOAD_SIZE_LABEL, uploadAndTrackFile } from '../lib/uploadService';
 import { 
   File, 
   FileText, 
@@ -35,26 +38,99 @@ export default function FileManager({ user }: FileManagerProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [scanningId, setScanningId] = useState<string | null>(null);
+  const [scanProgress, setScanProgress] = useState<AIProgress | null>(null);
+  const [uploadJobId, setUploadJobId] = useState('');
+  const [newPlanFile, setNewPlanFile] = useState<File | null>(null);
+  const [isUploadingPlan, setIsUploadingPlan] = useState(false);
 
   useEffect(() => {
-    const q = user.role === 'admin'
-      ? query(collection(db, 'uploaded_files'), orderBy('uploadedAt', 'desc'))
-      : query(
-          collection(db, 'uploaded_files'), 
-          where('uploadedBy', '==', user.uid),
-          orderBy('uploadedAt', 'desc')
-        );
+    let cancelled = false;
+    const fileMap = new Map<string, UploadedFile>();
+    const unsubscribes: Array<() => void> = [];
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setFiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UploadedFile)));
+    const publish = () => {
+      if (cancelled) return;
+      setFiles(
+        Array.from(fileMap.values()).sort((a, b) =>
+          String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || ''))
+        )
+      );
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching files:", error);
-      toast.error("Failed to load files");
+    };
+
+    const applySnapshot = (snapshot: any) => {
+      if (typeof snapshot.docChanges === 'function') {
+        snapshot.docChanges().forEach((change: any) => {
+          if (change.type === 'removed') {
+            fileMap.delete(change.doc.id);
+          } else {
+            fileMap.set(change.doc.id, { id: change.doc.id, ...change.doc.data() } as UploadedFile);
+          }
+        });
+      } else {
+        snapshot.docs.forEach((fileDoc: any) => {
+          fileMap.set(fileDoc.id, { id: fileDoc.id, ...fileDoc.data() } as UploadedFile);
+        });
+      }
+      publish();
+    };
+
+    const subscribeToFiles = (fileQuery: ReturnType<typeof query>) => {
+      const unsubscribe = onSnapshot(fileQuery, applySnapshot, (error) => {
+        console.error("Error fetching files:", error);
+        toast.error(
+          error.code === 'permission-denied'
+            ? "You don't have permission to view one or more project file lists. Ask an admin to deploy the latest Firestore rules."
+            : "Failed to load files"
+        );
+        setLoading(false);
+      });
+      unsubscribes.push(unsubscribe);
+    };
+
+    const subscribe = async () => {
+      if (user.role === 'admin') {
+        subscribeToFiles(query(collection(db, 'uploaded_files'), orderBy('uploadedAt', 'desc')));
+        return;
+      }
+
+      // Always show files uploaded by this user.
+      subscribeToFiles(query(collection(db, 'uploaded_files'), where('uploadedBy', '==', user.uid), orderBy('uploadedAt', 'desc')));
+
+      // Also show files linked to projects this user participates in. This fixes
+      // the File Manager hiding project files uploaded by a client, architect, or
+      // admin when the current user did not personally upload the file.
+      const jobIds = new Set<string>();
+      const jobQueries = user.role === 'client'
+        ? [query(collection(db, 'jobs'), where('clientId', '==', user.uid))]
+        : user.role === 'architect'
+          ? [query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid))]
+          : [];
+
+      for (const jobQuery of jobQueries) {
+        const snapshot = await getDocs(jobQuery);
+        snapshot.docs.forEach(jobDoc => jobIds.add(jobDoc.id));
+      }
+
+      const ids = Array.from(jobIds);
+      for (let i = 0; i < ids.length; i += 10) {
+        subscribeToFiles(query(collection(db, 'uploaded_files'), where('jobId', 'in', ids.slice(i, i + 10))));
+      }
+
+      if (ids.length === 0) publish();
+    };
+
+    subscribe().catch((error) => {
+      console.error("Error preparing file subscriptions:", error);
+      toast.error("Failed to load project files");
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribes.forEach(unsubscribe => unsubscribe());
+    };
   }, [user.uid, user.role]);
 
   const handleDelete = async (file: UploadedFile) => {
@@ -90,6 +166,156 @@ export default function FileManager({ user }: FileManagerProps) {
       toast.error(error.message || "Failed to delete file");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleQuickScan = async (file: UploadedFile) => {
+    if (!file.jobId) {
+      toast.error('This file is not linked to a job. Upload or choose a project-linked plan before scanning.');
+      return;
+    }
+
+    setScanningId(file.id);
+    setScanProgress({
+      percentage: 0,
+      agentName: 'Orchestrator',
+      activity: 'Preparing quick scan...',
+      completedAgents: [],
+    });
+
+    let submissionRef: Awaited<ReturnType<typeof addDoc>> | null = null;
+
+    try {
+      const jobSnap = await getDoc(doc(db, 'jobs', file.jobId));
+      if (!jobSnap.exists()) throw new Error(`Job ${file.jobId} could not be found.`);
+
+      const job = { id: jobSnap.id, ...jobSnap.data() } as Job;
+      const architectId = job.selectedArchitectId || user.uid;
+
+      submissionRef = await addDoc(collection(db, `jobs/${file.jobId}/submissions`), {
+        jobId: file.jobId,
+        architectId,
+        drawingUrl: file.url,
+        drawingName: file.fileName,
+        status: 'ai_reviewing',
+        traceability: [{
+          timestamp: new Date().toISOString(),
+          actor: user.uid,
+          action: 'quickscan_started',
+          details: `Architect started AR orchestration quick scan for ${file.fileName}`,
+        }],
+        sourceFileId: file.id,
+        createdAt: new Date().toISOString(),
+      });
+
+      await notificationService.notifyDrawingSubmitted(job.clientId, file.fileName, file.jobId, submissionRef.id);
+
+      const aiReview = await reviewDrawing(
+        file.url,
+        file.fileName,
+        (progress) => setScanProgress(progress),
+        submissionRef.id
+      );
+
+      const architectComment = window.prompt(
+        `AI quick scan ${aiReview.status}. Add your comment for the client before sending the notification:`,
+        aiReview.feedback
+      )?.trim();
+
+      if (!architectComment) {
+        throw new Error('Architect comment is required before notifying the client.');
+      }
+
+      await updateDoc(doc(db, `jobs/${file.jobId}/submissions`, submissionRef.id), {
+        status: aiReview.status === 'passed' ? 'ai_passed' : 'ai_failed',
+        aiFeedback: aiReview.feedback,
+        aiStructuredFeedback: aiReview.categories,
+        visualReportUrl: aiReview.visualReportUrl || null,
+        architectComment,
+        traceability: [
+          {
+            timestamp: new Date().toISOString(),
+            actor: user.uid,
+            action: 'quickscan_started',
+            details: `Architect started AR orchestration quick scan for ${file.fileName}`,
+          },
+          {
+            timestamp: new Date().toISOString(),
+            actor: 'ai_orchestrator',
+            action: `ai_${aiReview.status}`,
+            details: aiReview.traceLog || aiReview.feedback,
+          },
+          {
+            timestamp: new Date().toISOString(),
+            actor: user.uid,
+            action: 'architect_comment_added',
+            details: architectComment,
+          },
+        ],
+      });
+
+      await notificationService.notifyAIReviewComplete(
+        job.clientId,
+        architectId,
+        file.fileName,
+        aiReview.status,
+        file.jobId,
+        submissionRef.id
+      );
+
+      toast.success('Quick scan complete. Client notification sent.');
+    } catch (error: any) {
+      if (submissionRef && file.jobId) {
+        await updateDoc(doc(db, `jobs/${file.jobId}/submissions`, submissionRef.id), {
+          status: 'ai_failed',
+          aiFeedback: error.message || 'Quick scan failed',
+        }).catch(() => undefined);
+      }
+      toast.error(error.message || 'Quick scan failed');
+    } finally {
+      setScanningId(null);
+      setScanProgress(null);
+    }
+  };
+
+  const handleUploadNewPlan = async () => {
+    if (!newPlanFile) {
+      toast.error('Choose a PDF or image plan to upload.');
+      return;
+    }
+
+    if (!uploadJobId.trim()) {
+      toast.error('Enter the job ID before uploading the plan.');
+      return;
+    }
+
+    if (newPlanFile.type !== 'application/pdf' && !newPlanFile.type.startsWith('image/')) {
+      toast.error('Only PDF or image floor plans can be quickscanned.');
+      return;
+    }
+
+    if (newPlanFile.size > 20 * 1024 * 1024) {
+      toast.error(`Plan is too large. Maximum upload size is ${MAX_UPLOAD_SIZE_LABEL}.`);
+      return;
+    }
+
+    setIsUploadingPlan(true);
+    try {
+      await uploadAndTrackFile(newPlanFile, {
+        fileName: newPlanFile.name,
+        fileType: newPlanFile.type,
+        fileSize: newPlanFile.size,
+        uploadedBy: user.uid,
+        context: 'submission',
+        jobId: uploadJobId.trim(),
+      });
+
+      setNewPlanFile(null);
+      toast.success('Plan uploaded. Use Scan on the file card to start AR orchestration.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload plan');
+    } finally {
+      setIsUploadingPlan(false);
     }
   };
 
@@ -151,6 +377,32 @@ export default function FileManager({ user }: FileManagerProps) {
         </div>
       </div>
 
+      {user.role === 'architect' && (
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle>Upload New Plan for Quick Scan</CardTitle>
+            <CardDescription>Attach a completed floor plan to an active job, then scan it with the AR orchestration agents.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.4fr_auto] md:items-center">
+            <Input
+              aria-label="Job ID for plan upload"
+              placeholder="Job ID, e.g. 177847582"
+              value={uploadJobId}
+              onChange={(event) => setUploadJobId(event.target.value)}
+            />
+            <Input
+              aria-label="New plan file"
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={(event) => setNewPlanFile(event.target.files?.[0] || null)}
+            />
+            <Button onClick={handleUploadNewPlan} disabled={isUploadingPlan} className="rounded-full font-bold">
+              {isUploadingPlan ? 'Uploading...' : 'Upload Plan'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredFiles.map((file) => (
           <Card key={file.id} className="group overflow-hidden rounded-[1.5rem] border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white">
@@ -176,15 +428,17 @@ export default function FileManager({ user }: FileManagerProps) {
                 >
                   <Download className="w-4 h-4" />
                 </Button>
-                <Button 
-                  variant="destructive" 
-                  size="icon" 
-                  className="w-8 h-8 rounded-full shadow-sm"
-                  onClick={() => handleDelete(file)}
-                  disabled={deletingId === file.id}
-                >
-                  {deletingId === file.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                </Button>
+                {(user.role === 'admin' || file.uploadedBy === user.uid) && (
+                  <Button 
+                    variant="destructive" 
+                    size="icon" 
+                    className="w-8 h-8 rounded-full shadow-sm"
+                    onClick={() => handleDelete(file)}
+                    disabled={deletingId === file.id}
+                  >
+                    {deletingId === file.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </Button>
+                )}
               </div>
               <div className="absolute bottom-3 left-3">
                 <div className={cn(
@@ -216,13 +470,10 @@ export default function FileManager({ user }: FileManagerProps) {
                       variant="ghost"
                       size="sm"
                       className="h-8 text-[9px] font-bold uppercase tracking-widest text-primary hover:bg-primary/5"
-                      onClick={() => {
-                        toast.info("Scanning drawing for SANS 10400 compliance...");
-                        // Trigger general scan logic or redirect to dashboard with this file
-                        window.location.hash = "#quick-scan";
-                      }}
+                      onClick={() => handleQuickScan(file)}
+                      disabled={scanningId === file.id}
                     >
-                      Scan
+                      {scanningId === file.id ? 'Scanning...' : 'Scan'}
                     </Button>
                   )}
                   {user.role === 'admin' && (
@@ -249,6 +500,16 @@ export default function FileManager({ user }: FileManagerProps) {
           </div>
         )}
       </div>
+      {scanProgress && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl border border-border bg-white p-4 shadow-xl">
+          <p className="text-xs font-black uppercase tracking-widest text-primary">AR Orchestration Automated Process</p>
+          <p className="mt-2 text-sm font-bold text-foreground">{scanProgress.agentName}</p>
+          <p className="text-xs text-muted-foreground">{scanProgress.activity}</p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+            <div className="h-full bg-primary transition-all" style={{ width: `${scanProgress.percentage}%` }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

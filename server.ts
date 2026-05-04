@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -12,9 +13,14 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
+  const BODY_LIMIT = "50mb";
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  // File uploads are transported as base64 JSON to /api/files/upload.
+  // Keep the local Express dev server aligned with api/index.ts so uploads
+  // that work in production do not fail locally with Express's default 100 KB
+  // "Payload Too Large" limit.
+  app.use(express.json({ limit: BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
   // Apply CORS
   app.use(cors({

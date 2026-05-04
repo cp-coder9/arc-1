@@ -289,6 +289,8 @@ const upload = multer({
   },
 });
 
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // Health check
@@ -380,6 +382,170 @@ router.post("/auth/check-admin", async (req, res) => {
   } catch (err: any) {
     console.error("Admin check error:", err);
     res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.post("/jobs/:jobId/applications", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const { jobId } = req.params;
+    const proposal = String(req.body.proposal || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    if (!proposal) {
+      return res.status(400).json({ error: 'Proposal is required' });
+    }
+
+    const [userDoc, jobDoc] = await Promise.all([
+      adminDb.collection('users').doc(decoded.uid).get(),
+      adminDb.collection('jobs').doc(jobId).get(),
+    ]);
+
+    if (!userDoc.exists) return res.status(404).json({ error: 'User profile not found' });
+    if (!jobDoc.exists) return res.status(404).json({ error: 'Job not found' });
+
+    const userData = userDoc.data()!;
+    const jobData = jobDoc.data()!;
+
+    if (userData.role !== 'architect') {
+      return res.status(403).json({ error: 'Only architects can apply for marketplace jobs' });
+    }
+    if (jobData.status !== 'open') {
+      return res.status(400).json({ error: 'This job is not open for applications' });
+    }
+    if (jobData.clientId === decoded.uid) {
+      return res.status(400).json({ error: 'You cannot apply to your own job' });
+    }
+
+    const existing = await adminDb
+      .collection('jobs').doc(jobId).collection('applications')
+      .where('architectId', '==', decoded.uid)
+      .where('status', 'in', ['pending', 'accepted'])
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      return res.status(409).json({ error: 'You have already applied for this job' });
+    }
+
+    const now = new Date().toISOString();
+    const applicationRef = await adminDb.collection('jobs').doc(jobId).collection('applications').add({
+      jobId,
+      architectId: decoded.uid,
+      architectName: userData.displayName || decoded.email || 'Architect',
+      proposal,
+      notes,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+      sacapNumber: userData.sacapNumber || '',
+      specializations: userData.mainSpecialization ? [userData.mainSpecialization] : [],
+      completedJobs: userData.completedJobs || 0,
+      averageRating: userData.averageRating || 5,
+    });
+
+    try {
+      await adminDb.collection('notifications').add({
+        userId: jobData.clientId,
+        type: 'job_application',
+        title: 'New Application',
+        body: `${userData.displayName || 'An architect'} applied for "${jobData.title}"`,
+        data: { jobId, applicationId: applicationRef.id, senderId: decoded.uid },
+        isRead: false,
+        channels: ['in_app', 'email'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    } catch (notificationError) {
+      console.error('Failed to create job application notification:', notificationError);
+    }
+
+    res.status(201).json({ id: applicationRef.id, jobId, status: 'pending' });
+  } catch (err: any) {
+    console.error('Application create error:', err);
+    res.status(500).json({ error: 'Failed to submit application', details: err.message });
+  }
+});
+
+router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const { jobId, applicationId } = req.params;
+    const jobRef = adminDb.collection('jobs').doc(jobId);
+    const applicationRef = jobRef.collection('applications').doc(applicationId);
+    const now = new Date().toISOString();
+
+    await adminDb.runTransaction(async (tx) => {
+      const [jobDoc, applicationDoc] = await Promise.all([tx.get(jobRef), tx.get(applicationRef)]);
+      if (!jobDoc.exists) throw Object.assign(new Error('Job not found'), { status: 404 });
+      if (!applicationDoc.exists) throw Object.assign(new Error('Application not found'), { status: 404 });
+
+      const jobData = jobDoc.data()!;
+      const applicationData = applicationDoc.data()!;
+
+      if (jobData.clientId !== decoded.uid) {
+        throw Object.assign(new Error('Only the job owner can accept applications'), { status: 403 });
+      }
+      if (jobData.status !== 'open') {
+        throw Object.assign(new Error('This job is no longer open'), { status: 400 });
+      }
+      if (applicationData.status !== 'pending') {
+        throw Object.assign(new Error('Only pending applications can be accepted'), { status: 400 });
+      }
+
+      tx.update(applicationRef, { status: 'accepted', updatedAt: now });
+      tx.update(jobRef, {
+        selectedArchitectId: applicationData.architectId,
+        status: 'in-progress',
+        updatedAt: now,
+        statusHistory: [
+          ...(jobData.statusHistory || []),
+          { status: 'in-progress', timestamp: now, actorId: decoded.uid, note: `Accepted ${applicationData.architectName}` },
+        ],
+      });
+    });
+
+    const acceptedApplication = (await applicationRef.get()).data()!;
+    const job = (await jobRef.get()).data()!;
+    const otherApplications = await jobRef.collection('applications').where('status', '==', 'pending').get();
+    const batch = adminDb.batch();
+    otherApplications.docs.forEach((docSnap) => {
+      if (docSnap.id !== applicationId) batch.update(docSnap.ref, { status: 'rejected', updatedAt: now });
+    });
+    await batch.commit();
+
+    try {
+      await adminDb.collection('notifications').add({
+        userId: acceptedApplication.architectId,
+        type: 'application_accepted',
+        title: 'Application Accepted',
+        body: `Your application for "${job.title}" was accepted!`,
+        data: { jobId, applicationId, senderId: decoded.uid },
+        isRead: false,
+        channels: ['in_app', 'email', 'push'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    } catch (notificationError) {
+      console.error('Failed to create acceptance notification:', notificationError);
+    }
+
+    res.json({ jobId, applicationId, selectedArchitectId: acceptedApplication.architectId, status: 'in-progress' });
+  } catch (err: any) {
+    console.error('Application accept error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'Failed to accept application' });
   }
 });
 
@@ -920,9 +1086,32 @@ router.post("/files/upload", async (req, res) => {
   if (!fileBase64) return res.status(400).json({ error: "No file provided" });
   if (!context) return res.status(400).json({ error: "context field is required" });
 
+  if (Number(fileSize || 0) > MAX_UPLOAD_BYTES) {
+    return res.status(413).json({ error: "File is too large", details: "Maximum upload size is 20 MB" });
+  }
+
   try {
+    if (jobId) {
+      const jobDoc = await adminDb.collection("jobs").doc(String(jobId)).get();
+      if (!jobDoc.exists) return res.status(404).json({ error: "Job not found" });
+
+      const job = jobDoc.data()!;
+      const authorizedForJob =
+        job.clientId === decoded.uid ||
+        job.selectedArchitectId === decoded.uid ||
+        (await isAdmin(decoded.uid));
+
+      if (!authorizedForJob) {
+        return res.status(403).json({ error: "You don't have permission to upload files for this job" });
+      }
+    }
+
     const safeFileName = fileName || `upload-${Date.now()}`;
     const fileBuffer = Buffer.from(fileBase64, 'base64');
+
+    if (fileBuffer.byteLength > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ error: "File is too large", details: "Maximum upload size is 20 MB" });
+    }
 
     console.log(`[API] Uploading ${safeFileName} (${fileBuffer.byteLength} bytes) for context: ${context}`);
 
