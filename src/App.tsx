@@ -50,6 +50,7 @@ import {
   User as UserIcon,
   Settings2,
   CreditCard,
+  Calculator,
   UserCircle,
   HardDrive,
   Sparkles,
@@ -64,7 +65,9 @@ import {
   Hammer,
   Download,
   Lightbulb,
-  Database
+  Database,
+  Construction,
+  ArrowLeft
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -84,11 +87,12 @@ const OnboardingFlow = lazy(() => import('./components/OnboardingFlow'));
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
+  const isAdminRoute = window.location.pathname === '/admin';
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [roleSelection, setRoleSelection] = useState<UserRole | null>(null);
-  const [showLogin, setShowLogin] = useState(false);
+  const [roleSelection, setRoleSelection] = useState<UserRole | null>(isAdminRoute ? 'admin' : null);
+  const [showLogin, setShowLogin] = useState(isAdminRoute);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -107,6 +111,14 @@ export default function App() {
       console.warn('Unable to enable persistent Firebase auth session:', error);
     });
   }, []);
+
+  useEffect(() => {
+    if (isAdminRoute) {
+      setRoleSelection('admin');
+      setShowLogin(true);
+      setShowOnboarding(false);
+    }
+  }, [isAdminRoute]);
 
   const getAuthErrorMessage = (error: unknown) => {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code) : '';
@@ -146,7 +158,14 @@ export default function App() {
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            setUser(userDoc.data() as UserProfile);
+            const profile = userDoc.data() as UserProfile;
+            if (isAdminRoute && profile.role !== 'admin') {
+              await signOut(auth);
+              setUser(null);
+              toast.error('Admin access only. Please use an authorized admin account.');
+            } else {
+              setUser(profile);
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -159,7 +178,7 @@ export default function App() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isAdminRoute]);
 
   const syncServerProfile = async (selectedRole: UserRole | null, firebaseUser: FirebaseUser = auth.currentUser!) => {
     const token = await firebaseUser?.getIdToken();
@@ -182,7 +201,26 @@ export default function App() {
     return res.json();
   };
 
+  const ensureAdminAccess = async (firebaseUser: any) => {
+    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    const profile = userDoc.exists() ? userDoc.data() as UserProfile : null;
+
+    if (isAdminRoute && profile?.role !== 'admin') {
+      await signOut(auth);
+      setUser(null);
+      toast.error('Admin access only. Please use an authorized admin account.');
+      return null;
+    }
+
+    return profile;
+  };
+
   const handleGoogleLogin = async () => {
+    if (!roleSelection) {
+      toast.error("Please select a role first");
+      return;
+    }
+
     setIsLoggingIn(true);
     setProfileLoading(true);
     const provider = new GoogleAuthProvider();
@@ -191,9 +229,10 @@ export default function App() {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
       await syncServerProfile(roleSelection || 'client', firebaseUser);
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const profile = await ensureAdminAccess(firebaseUser);
+      if (isAdminRoute && !profile) return;
       
-      if (!userDoc.exists()) {
+      if (!profile) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -206,7 +245,7 @@ export default function App() {
         setUser(newUser);
         
       } else {
-        setUser(userDoc.data() as UserProfile);
+        setUser(profile);
       }
     } catch (error: any) {
       console.error("Login error:", error);
@@ -236,8 +275,9 @@ export default function App() {
       }
 
       await syncServerProfile(roleSelection, firebaseUser);
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (!userDoc.exists()) {
+      const profile = await ensureAdminAccess(firebaseUser);
+      if (isAdminRoute && !profile) return;
+      if (!profile) {
         const newUser: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -249,7 +289,7 @@ export default function App() {
         await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
         setUser(newUser);
       } else {
-        setUser(userDoc.data() as UserProfile);
+        setUser(profile);
       }
       toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
     } catch (error: any) {
@@ -265,9 +305,9 @@ export default function App() {
     try {
       await signOut(auth);
       setUser(null);
-      setShowLogin(false);
+      setShowLogin(isAdminRoute);
       setAuthMode('selection');
-      setRoleSelection(null);
+      setRoleSelection(isAdminRoute ? 'admin' : null);
       setActiveTab('overview');
       toast.success("Logged out successfully");
     } catch (error) {
@@ -303,96 +343,124 @@ export default function App() {
     );
   }
 
-  if (!user && !showLogin) {
+  if (!user && isAdminRoute) {
     return (
-      <LandingPage
-        onGetStarted={() => setShowOnboarding(true)}
-        onLogin={() => {
-          setRoleSelection(null);
-          setAuthMode('selection');
-          setShowLogin(true);
-        }}
+      <AdminLoginPage
+        authMode={authMode}
+        email={email}
+        password={password}
+        isLoggingIn={isLoggingIn}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onEmailSubmit={handleEmailAuth}
+        onGoogleLogin={handleGoogleLogin}
+        onAuthModeChange={setAuthMode}
       />
     );
+  }
+
+  if (!user && !showLogin) {
+    return <LandingPage onGetStarted={() => setShowOnboarding(true)} onLogin={() => setShowLogin(true)} />;
   }
 
   if (!user && showLogin) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 backdrop-blur-sm fixed inset-0 z-50 overflow-y-auto">
+        <AnimatedFloorPlan />
         <motion.div
           initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-2xl w-full my-8"
+          className="max-w-2xl w-full my-8 relative z-10"
         >
           <Card className="border-border shadow-2xl bg-white/95 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="text-center bg-primary/5 pb-8 pt-12 relative">
+            <CardHeader className="text-center bg-primary/5 pb-10 pt-12 relative">
               <div className="flex justify-between items-center mb-6 absolute top-6 left-6 right-6">
-                {authMode !== 'selection' && (
+                {authMode !== 'selection' ? (
                   <Button variant="ghost" size="sm" onClick={() => setAuthMode('selection')} className="rounded-full hover:bg-white">
-                    Back
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
                   </Button>
+                ) : (
+                  <div />
                 )}
-                <div className="flex-1" />
-                <Button variant="ghost" size="sm" onClick={() => setShowLogin(false)} className="rounded-full hover:bg-white">
+                <Button variant="ghost" size="sm" onClick={() => { setShowLogin(false); setAuthMode('selection'); }} className="rounded-full hover:bg-white">
                   Cancel
                 </Button>
               </div>
-              <div className="mx-auto mb-5 h-20 w-20 rounded-3xl bg-white border border-border shadow-sm flex items-center justify-center">
+              <div className="flex justify-center mb-5">
                 <Logo iconClassName="w-16 h-16 text-primary" />
               </div>
               <CardTitle className="text-4xl font-heading font-bold tracking-tight">
-                {authMode === 'selection' ? 'Welcome Back' : authMode === 'email-login' ? 'Login to Architex' : 'Create Account'}
+                {authMode === 'selection' ? 'Join Architex' : authMode === 'email-login' ? 'Welcome Back' : 'Create your account'}
               </CardTitle>
               <CardDescription className="text-base mt-2">
-                {authMode === 'selection' ? 'Choose how you want to access the marketplace' : 'Enter your details to continue'}
+                {authMode === 'selection' ? 'Select your role to access the marketplace' : 'Enter your details to continue'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-6 sm:p-10 space-y-6">
-              {authMode === 'selection' ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <RoleSelectButton data-testid="role-select-client" role="client" label="Client" sub="I want to post jobs" icon={<Users className="w-8 h-8" />} active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
-                    <RoleSelectButton data-testid="role-select-architect" role="architect" label="Architect" sub="I want to find work" icon={<Briefcase className="w-8 h-8" />} active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
-                    <RoleSelectButton data-testid="role-select-admin" role="admin" label="Admin" sub="Platform Mgmt" icon={<ShieldCheck className="w-8 h-8" />} active={roleSelection === 'admin'} onClick={() => setRoleSelection('admin')} />
-                    <RoleSelectButton data-testid="role-select-freelancer" role="freelancer" label="Freelancer" sub="Specialist" icon={<Sparkles className="w-8 h-8" />} active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
-                  </div>
-                  <div className="space-y-3">
-                    <Button onClick={handleGoogleLogin} className="w-full bg-primary text-primary-foreground h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={isLoggingIn}>
-                      {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue with Google'}
-                    </Button>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setAuthMode('email-login')}>Login</Button>
-                      <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setAuthMode('email-signup')}>Sign Up</Button>
+            <CardContent className="p-6 sm:p-10">
+              <AnimatePresence mode="wait">
+                {authMode === 'selection' ? (
+                  <motion.div
+                    key="auth-selection"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
+                      <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
+                      <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
+                      <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP" description="Built Environment Professional (Builder, Tiler, etc.)" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
                     </div>
-                  </div>
-                </>
-              ) : (
-                <form onSubmit={handleEmailAuth} className="space-y-4">
-                  {authMode === 'email-signup' && (
+                    <div className="space-y-3">
+                      <Button onClick={handleGoogleLogin} className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={!roleSelection || isLoggingIn}>
+                        {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                      </Button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.form
+                    key={authMode}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleEmailAuth}
+                    className="space-y-4"
+                  >
+                    {authMode === 'email-signup' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
+                      </div>
+                    )}
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                      <Input autoComplete="name" placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
+                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
                     </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
-                    <Input type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
-                    <Input type="password" autoComplete={authMode === 'email-login' ? 'current-password' : 'new-password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
-                  </div>
-                  <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-bold rounded-2xl shadow-lg mt-4" disabled={isLoggingIn}>
-                    {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
-                  </Button>
-                  <Button type="button" variant="outline" className="w-full h-12 rounded-xl" onClick={handleGoogleLogin} disabled={isLoggingIn}>
-                    {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue with Google'}
-                  </Button>
-                </form>
-              )}
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
+                    </div>
+                    <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg mt-6" disabled={isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
+                    </Button>
+                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl font-bold" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                    </Button>
+                    <Button type="button" variant="ghost" className="w-full text-muted-foreground rounded-full" onClick={() => setAuthMode('selection')}>Back to Options</Button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
             </CardContent>
           </Card>
         </motion.div>
+        <Toaster />
       </div>
     );
   }
@@ -400,7 +468,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row relative overflow-hidden">
       <AnimatedFloorPlan />
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-card/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-10 shrink-0">
             <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
@@ -446,6 +514,14 @@ export default function App() {
                 onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
               />
             )}
+            {(user!.role === 'client' || user!.role === 'architect') && (
+              <NavItem
+                icon={<Calculator size={18} />}
+                label="Fee Estimator"
+                active={activeTab === 'fees'}
+                onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
+              />
+            )}
             <NavItem 
               icon={<FileText size={18} />}
               label="Active Projects"
@@ -477,6 +553,12 @@ export default function App() {
                   label="Knowledge Base"
                   active={activeTab === 'knowledge'}
                   onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Calculator size={18} />}
+                  label="Fees"
+                  active={activeTab === 'fees'}
+                  onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
                 />
               </>
             )}
@@ -579,6 +661,89 @@ function DashboardFallback() {
   );
 }
 
+function AdminLoginPage({
+  authMode,
+  email,
+  password,
+  isLoggingIn,
+  onEmailChange,
+  onPasswordChange,
+  onEmailSubmit,
+  onGoogleLogin,
+  onAuthModeChange,
+}: {
+  authMode: 'selection' | 'email-login' | 'email-signup';
+  email: string;
+  password: string;
+  isLoggingIn: boolean;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onEmailSubmit: (event: React.FormEvent) => void;
+  onGoogleLogin: () => void;
+  onAuthModeChange: (mode: 'selection' | 'email-login' | 'email-signup') => void;
+}) {
+  const isEmailLogin = authMode === 'email-login';
+
+  return (
+    <div className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-20">
+        <AnimatedFloorPlan />
+      </div>
+      <div className="max-w-md w-full relative z-10">
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-5 h-20 w-20 rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center shadow-2xl">
+            <ShieldCheck className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-4xl font-heading font-bold mb-2">Admin Portal</h1>
+          <p className="text-sm text-white/60 uppercase tracking-widest">Authorized Architex administrators only</p>
+        </div>
+
+        <Card className="border-white/10 shadow-2xl bg-white/95 text-foreground backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="font-heading text-2xl">Secure Admin Login</CardTitle>
+            <CardDescription>
+              Sign in with an approved administrator account to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {isEmailLogin ? (
+              <form onSubmit={onEmailSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Admin Email</label>
+                  <Input type="email" placeholder="admin@example.com" value={email} onChange={e => onEmailChange(e.target.value)} required className="h-12 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                  <Input type="password" placeholder="••••••••" value={password} onChange={e => onPasswordChange(e.target.value)} required className="h-12 rounded-xl" />
+                </div>
+                <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium rounded-xl shadow-lg" disabled={isLoggingIn}>
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login to Admin Portal'}
+                </Button>
+                <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => onAuthModeChange('selection')}>
+                  Back to admin sign-in options
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <Button onClick={onGoogleLogin} className="w-full bg-primary text-primary-foreground h-14 text-lg font-medium shadow-lg rounded-xl" disabled={isLoggingIn}>
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
+                </Button>
+                <Button variant="outline" className="w-full h-12 rounded-xl" onClick={() => onAuthModeChange('email-login')} disabled={isLoggingIn}>
+                  Login with Email
+                </Button>
+              </div>
+            )}
+            <Button variant="link" asChild className="w-full text-muted-foreground">
+              <a href="/">Return to Marketplace</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+      <Toaster />
+    </div>
+  );
+}
+
 function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }: any) {
   return (
     <Button
@@ -595,6 +760,29 @@ function RoleSelectButton({ role, label, sub, icon, active, onClick, ...props }:
         <p className="text-[10px] opacity-70">{sub}</p>
       </div>
     </Button>
+  );
+}
+
+function AuthRoleCard({ icon, title, description, active, onClick, ...props }: { icon: React.ReactNode; title: string; description: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group p-6 sm:p-8 text-left border rounded-3xl transition-all duration-300 flex flex-col gap-6 shadow-sm hover:shadow-xl ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
+      {...props}
+    >
+      <div className={`p-4 rounded-2xl transition-all group-hover:scale-110 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
+        {icon}
+      </div>
+      <div className="space-y-2">
+        <h3 className="font-heading font-bold text-2xl">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+      </div>
+      <div className="mt-auto pt-4 border-t border-border/50 w-full">
+        <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
+          {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
+        </span>
+      </div>
+    </button>
   );
 }
 

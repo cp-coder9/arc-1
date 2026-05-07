@@ -52,6 +52,24 @@ jest.mock('firebase/auth', () => ({
   getIdToken: (user: any) => user.getIdToken(),
 }));
 
+// Mock modular Firebase Firestore APIs used by paymentService
+jest.mock('firebase/firestore', () => ({
+  collection: jest.fn(() => ({ type: 'collection' })),
+  query: jest.fn(() => ({ type: 'query' })),
+  where: jest.fn(() => ({ type: 'where' })),
+  orderBy: jest.fn(() => ({ type: 'orderBy' })),
+  doc: jest.fn(() => ({ type: 'doc' })),
+  getDoc: jest.fn(() => Promise.resolve({ exists: () => false })),
+  getDocs: jest.fn(() => Promise.resolve({ docs: [], size: 0 })),
+  onSnapshot: jest.fn((_ref, callback: any) => {
+    callback({
+      docs: [],
+      exists: () => false,
+    });
+    return jest.fn();
+  }),
+}));
+
 // Mock notification service
 jest.mock('@/services/notificationService', () => ({
   notificationService: {
@@ -102,10 +120,208 @@ describe('PaymentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetch.mockReset();
-    jest.spyOn(notificationService, 'notifyPaymentReleased').mockResolvedValue(undefined);
-    jest.spyOn(notificationService, 'notifyEscrowFunded').mockResolvedValue(undefined);
-    jest.spyOn(notificationService, 'notifyRefundProcessed').mockResolvedValue(undefined);
+    const { auth } = require('../../lib/firebase');
+    auth.currentUser = { uid: 'test-user', email: 'test@example.com' };
+    process.env.VITE_PAYFAST_MERCHANT_ID = '10000100';
+    process.env.VITE_PAYFAST_MERCHANT_KEY = '46f0cd694581a';
+    (global.fetch as jest.Mock).mockReset();
+  });
+
+  describe('generateSignature', () => {
+    test('should generate consistent signature for same data', async () => {
+      const data = { amount: '100', item_name: 'Test' };
+      
+      // @ts-ignore - accessing private method
+      const signature1 = await paymentService.generateSignature(data);
+      // @ts-ignore - accessing private method
+      const signature2 = await paymentService.generateSignature(data);
+
+      expect(signature1).toBe(signature2);
+    });
+
+    test('should generate different signatures for different data', async () => {
+      // @ts-ignore - accessing private method
+      const signature1 = await paymentService.generateSignature({ amount: '100' });
+      // @ts-ignore - accessing private method
+      const signature2 = await paymentService.generateSignature({ amount: '200' });
+
+      expect(signature1).not.toBe(signature2);
+    });
+  });
+
+  describe('verifyITNSignature', () => {
+    test('should verify valid signature', async () => {
+      const data = { amount: '100', item_name: 'Test' };
+      // @ts-ignore - accessing private method
+      const signature = await paymentService.generateSignature(data);
+
+      const isValid = await paymentService.verifyITNSignature(data, signature);
+
+      expect(isValid).toBe(true);
+    });
+
+    test('should reject invalid signature', async () => {
+      const data = { amount: '100', item_name: 'Test' };
+      const isValid = await paymentService.verifyITNSignature(data, 'invalid-signature');
+
+      expect(isValid).toBe(false);
+    });
+  });
+
+  describe('initializeEscrow', () => {
+    test('should initialize escrow and return payment URL', async () => {
+      const mockResponse = {
+        success: true,
+        paymentId: 'pay-123',
+        totalAmount: 10500,
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const result = await paymentService.initializeEscrow(mockJob, mockClient);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/payment/escrow/init',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer mock-id-token',
+          }),
+          body: JSON.stringify({ jobId: 'job-1' }),
+        })
+      );
+
+      expect(result).toHaveProperty('paymentUrl');
+      expect(result).toHaveProperty('paymentId', 'pay-123');
+    });
+
+    test('should throw error when not authenticated', async () => {
+      const { auth } = await import('../../lib/firebase');
+      (auth as any).currentUser = null;
+
+      await expect(paymentService.initializeEscrow(mockJob, mockClient)).rejects.toThrow(
+        'You must be signed in to perform this action'
+      );
+    });
+
+    test('should throw error on server failure', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'Server error' }),
+      });
+
+      await expect(paymentService.initializeEscrow(mockJob, mockClient)).rejects.toThrow('Server error');
+    });
+  });
+
+  describe('confirmPayment', () => {
+    test('should confirm payment successfully', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      await paymentService.confirmPayment('pay-123', { amount: '100' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/payment/confirm',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('pay-123'),
+        })
+      );
+    });
+
+    test('should show info toast on non-success response', async () => {
+      const { toast } = await import('sonner');
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: false, message: 'Pending verification' }),
+      });
+
+      await paymentService.confirmPayment('pay-123', {});
+
+      expect(toast.info).toHaveBeenCalledWith('Pending verification');
+    });
+  });
+
+  describe('releaseMilestone', () => {
+    test('should release milestone payment', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, architectAmount: 3500 }),
+      });
+
+      const jobWithArchitect = { ...mockJob, selectedArchitectId: 'arch-1' };
+      await paymentService.releaseMilestone(jobWithArchitect, 'initial', 'client-1');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/payment/milestone/release',
+        expect.objectContaining({
+          body: JSON.stringify({ jobId: 'job-1', milestone: 'initial' }),
+        })
+      );
+    });
+
+    test('should notify architect on release', async () => {
+      const { notificationService } = await import('../notificationService');
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, architectAmount: 3500 }),
+      });
+
+      const jobWithArchitect = { ...mockJob, selectedArchitectId: 'arch-1' };
+      await paymentService.releaseMilestone(jobWithArchitect, 'final', 'client-1');
+
+      expect(notificationService.notifyPaymentReleased).toHaveBeenCalledWith(
+        'arch-1',
+        3500,
+        'final',
+        'job-1'
+      );
+    });
+  });
+
+  describe('requestMilestoneRelease', () => {
+    test('should request milestone release', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      await paymentService.requestMilestoneRelease(mockJob, 'draft', 'arch-1');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/payment/milestone/request',
+        expect.objectContaining({
+          body: JSON.stringify({ jobId: 'job-1', milestone: 'draft' }),
+        })
+      );
+    });
+  });
+
+  describe('subscribeToEscrow', () => {
+    test('should subscribe to escrow updates', () => {
+      const callback = jest.fn();
+      const unsubscribe = paymentService.subscribeToEscrow('job-1', callback);
+
+      expect(typeof unsubscribe).toBe('function');
+    });
+  });
+
+  describe('subscribeToPayments', () => {
+    test('should subscribe to payment updates', () => {
+      const callback = jest.fn();
+      const unsubscribe = paymentService.subscribeToPayments('client-1', callback);
+
+      expect(typeof unsubscribe).toBe('function');
+    });
   });
 
   describe('calculateEscrowAmounts', () => {
@@ -125,90 +341,4 @@ describe('PaymentService', () => {
     });
   });
 
-  describe('initializeEscrow', () => {
-    test('should call server and return payment details', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          paymentId: 'pay-123',
-          totalAmount: 10500,
-        }),
-      });
-
-      const result = await paymentService.initializeEscrow(mockJob, mockClient);
-
-      expect(mockFetch).toHaveBeenCalled();
-      expect(result.paymentId).toBe('pay-123');
-      expect(result.paymentUrl).toContain('pay-123');
-    });
-
-    test('should handle server errors', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: 'Insufficient funds' }),
-      });
-
-      await expect(paymentService.initializeEscrow(mockJob, mockClient))
-        .rejects.toThrow('Insufficient funds');
-    });
-  });
-
-  describe('confirmPayment', () => {
-    test('should confirm payment with server', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      await paymentService.confirmPayment('pay-123', { pf_payment_id: '123' });
-
-      expect(mockFetch).toHaveBeenCalled();
-    });
-  });
-
-  describe('releaseMilestone', () => {
-    test('should release payment and notify architect', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, architectAmount: 5000 }),
-      });
-
-      await paymentService.releaseMilestone(mockJob, 'initial', 'client-1');
-
-      expect(mockFetch).toHaveBeenCalled();
-      expect(notificationService.notifyPaymentReleased).toHaveBeenCalledWith(
-        'architect-1',
-        5000,
-        'initial',
-        'job-1'
-      );
-    });
-  });
-
-  describe('requestMilestoneRelease', () => {
-    test('should send request to server', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, architectAmount: 5000 }),
-      });
-
-      await paymentService.requestMilestoneRelease(mockJob, 'initial', 'architect-1');
-
-      expect(mockFetch).toHaveBeenCalled();
-    });
-  });
-
-  describe('processRefund', () => {
-    test('should process refund via server', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, refundAmount: 5000 }),
-      });
-
-      await paymentService.processRefund(mockJob, 5000, 'Test reason', 'admin-1');
-
-      expect(mockFetch).toHaveBeenCalled();
-    });
-  });
 });

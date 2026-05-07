@@ -8,11 +8,29 @@ import { reviewDrawing } from '@/services/geminiService';
 import { db } from '@/lib/firebase';
 
 // Mock fetch for LLM API calls
-const mockFetch = jest.fn() as jest.Mock<any>;
+const mockFetch = jest.fn() as jest.Mock;
 (global as any).fetch = mockFetch;
 
-// Mock Firebase — use @/ alias so Jest resolves correctly
-jest.mock('@/lib/firebase', () => ({
+const geminiTextResponse = (payload: unknown) => ({
+  ok: true,
+  json: async () => ({
+    candidates: [{
+      content: {
+        parts: [{ text: typeof payload === 'string' ? payload : JSON.stringify(payload) }],
+      },
+    }],
+  }),
+});
+
+const successfulReviewPayload = (feedback = 'Compliant') => ({
+  status: 'passed',
+  feedback,
+  categories: [],
+  traceLog: 'Complete',
+});
+
+// Mock Firebase
+jest.mock('../../lib/firebase', () => ({
   db: {
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({
@@ -21,6 +39,12 @@ jest.mock('@/lib/firebase', () => ({
         update: jest.fn(),
       })),
     })),
+  },
+  auth: {
+    currentUser: {
+      uid: 'integration-test-user',
+      getIdToken: jest.fn(() => Promise.resolve('mock-firebase-id-token')),
+    },
   },
 }));
 
@@ -84,76 +108,7 @@ describe('AI Review Flow Integration', () => {
 
   test('should complete full AI review workflow', async () => {
     // Mock successful LLM responses for orchestrator and agents
-    const successResponse = {
-      choices: [{
-        message: {
-          content: JSON.stringify({
-            status: 'passed',
-            riskStatus: 'ready_for_admin_review',
-            feedback: 'AI review passed',
-            findings: [],
-            signOffChecklist: [],
-            categories: [],
-            traceLog: 'Reviewed successfully',
-          }),
-        },
-      }],
-    };
-
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-                content: JSON.stringify({
-                  agents: ['wall_compliance_specialist', 'fenestration_specialist'],
-                  priority: 'high',
-                }),
-            },
-          }],
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-                content: JSON.stringify({
-                  status: 'passed',
-                  feedback: 'Wall thickness complies with SANS 10400-K',
-                  categories: [{
-                    name: 'Wall Compliance',
-                    issues: [],
-                  }],
-                  traceLog: 'Reviewed wall specifications',
-                }),
-            },
-          }],
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-                content: JSON.stringify({
-                  status: 'passed',
-                  feedback: 'Fenestration meets ventilation requirements',
-                  categories: [{
-                    name: 'Fenestration',
-                    issues: [],
-                  }],
-                  traceLog: 'Reviewed window specifications',
-                }),
-            },
-          }],
-        }),
-      })
-      .mockResolvedValue({
-        ok: true,
-        json: async () => successResponse,
-      });
+    (mockFetch as any).mockResolvedValue(geminiTextResponse(successfulReviewPayload('Integrated AI review passed')));
 
     const result = await reviewDrawing(
       'https://example.com/drawing.pdf',
@@ -170,23 +125,14 @@ describe('AI Review Flow Integration', () => {
 
   test('should handle partial failures gracefully', async () => {
     // Mock orchestrator success but agent failure
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
-                  agents: ['wall_compliance_specialist'],
-                  priority: 'high',
-                }),
-              }],
-            },
-          }],
-        }),
-      })
-      .mockRejectedValueOnce(new Error('Agent timeout'));
+    (mockFetch as any)
+      .mockRejectedValueOnce(new Error('Agent timeout'))
+      .mockResolvedValue(geminiTextResponse({
+        status: 'failed',
+        feedback: 'Partial agent failure handled',
+        categories: [],
+        traceLog: 'Recovered after one failed agent',
+      }));
 
     const result = await reviewDrawing(
       'https://example.com/drawing.pdf',
@@ -199,7 +145,7 @@ describe('AI Review Flow Integration', () => {
   });
 
   test('should handle all agents failing', async () => {
-    mockFetch.mockRejectedValue(new Error('Service unavailable'));
+    (mockFetch as any).mockRejectedValue(new Error('Service unavailable'));
 
     const result = await reviewDrawing(
       'https://example.com/drawing.pdf',
@@ -215,34 +161,8 @@ describe('AI Review Flow Integration', () => {
   test('should progress through review stages', async () => {
     const progressCallback = jest.fn();
 
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{ text: JSON.stringify({ agents: ['specialist'] }) }],
-            },
-          }],
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
-                  status: 'passed',
-                  feedback: 'Compliant',
-                  categories: [],
-                  traceLog: 'Complete',
-                }),
-              }],
-            },
-          }],
-        }),
-      });
+    (mockFetch as any)
+      .mockResolvedValue(geminiTextResponse(successfulReviewPayload('Progress flow complete')));
 
     await reviewDrawing(
       'https://example.com/drawing.pdf',

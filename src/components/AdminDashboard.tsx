@@ -9,14 +9,13 @@ import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2 } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -35,12 +34,15 @@ import AdminKnowledgeUploader from './AdminKnowledgeUploader';
 import ReviewManagement from "./ReviewManagement";
 import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 import ExecutionModePicker from './ExecutionModePicker';
+import FeeEstimator from './FeeEstimator';
 
 const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-// Removed
+    envApiKey: 'GEMINI_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-pro', label: 'Gemini 2.0 Pro' },
@@ -51,6 +53,9 @@ const PROVIDER_CONFIGS = {
   openai: {
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
+    envApiKey: 'OPENAI_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'gpt-4o', label: 'GPT-4o' },
       { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
@@ -60,6 +65,9 @@ const PROVIDER_CONFIGS = {
   openrouter: {
     label: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',
+    envApiKey: 'OPENROUTER_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'anthropic/claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
       { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus' }
@@ -67,7 +75,11 @@ const PROVIDER_CONFIGS = {
   },
   nvidia: {
     label: 'NVIDIA NIM',
+    // NVIDIA Build / NIM OpenAI-compatible endpoint.
     baseUrl: 'https://integrate.api.nvidia.com/v1',
+    envApiKey: 'NVIDIA_API_KEY',
+    authorizationType: 'bearer',
+    authorizationHeader: '',
     models: [
       { value: 'mistralai/mistral-large-3-675b-instruct-2512', label: 'Mistral Large 3 675B Instruct' },
       { value: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B Instruct' },
@@ -78,17 +90,137 @@ const PROVIDER_CONFIGS = {
   }
 } as const;
 
+const providerKeys = Object.keys(PROVIDER_CONFIGS) as LLMProvider[];
+
+function applyProviderDefaults(agent: Agent, provider: LLMProvider | 'global', model?: string): Agent {
+  if (provider === 'global') {
+    return {
+      ...agent,
+      llmProvider: 'global',
+      llmModel: '',
+      llmApiKey: '',
+      llmBaseUrl: '',
+      authorizationType: undefined,
+      authorizationValue: '',
+      authorizationHeader: '',
+    };
+  }
+
+  const config = PROVIDER_CONFIGS[provider];
+  const selectedModel = model || agent.llmModel || config.models[0]?.value || '';
+  return {
+    ...agent,
+    llmProvider: provider,
+    llmModel: selectedModel,
+    llmBaseUrl: config.baseUrl,
+    llmApiKey: `env:${config.envApiKey}`,
+    authorizationType: config.authorizationType as 'bearer',
+    authorizationValue: `env:${config.envApiKey}`,
+    authorizationHeader: config.authorizationHeader,
+  };
+}
+
+function createBlankAgent(): Agent {
+  return applyProviderDefaults({
+    id: '',
+    name: 'New Compliance Agent',
+    role: 'custom_agent',
+    description: 'Describe this agent\'s compliance responsibility.',
+    systemPrompt: 'You are an architectural compliance specialist. Review drawings and return concise, regulation-grounded findings.',
+    temperature: 0.1,
+    status: 'online',
+    lastActive: new Date().toISOString(),
+    llmProvider: 'nvidia',
+  }, 'nvidia');
+}
+
 // Agent Card Component
-function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
-  const [editing, setEditing] = useState(false);
+function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent; key?: React.Key; isNew?: boolean; onCreated?: () => void; onCancel?: () => void }) {
+  const [editing, setEditing] = useState(isNew);
   const [tempAgent, setTempAgent] = useState<Agent>(agent);
+  const [isTesting, setIsTesting] = useState(false);
+  const [settingsTested, setSettingsTested] = useState(false);
+
+  const updateTempAgent = (next: Agent) => {
+    setTempAgent(next);
+    setSettingsTested(false);
+  };
+
+  const handleProviderChange = (provider: LLMProvider | 'global') => {
+    updateTempAgent(applyProviderDefaults(tempAgent, provider));
+  };
+
+  const handleModelChange = (model: string) => {
+    if (tempAgent.llmProvider && tempAgent.llmProvider !== 'global') {
+      updateTempAgent(applyProviderDefaults(tempAgent, tempAgent.llmProvider as LLMProvider, model));
+    } else {
+      updateTempAgent({ ...tempAgent, llmModel: model });
+    }
+  };
+
+  const handleTestSettings = async () => {
+    if (!tempAgent.llmProvider || tempAgent.llmProvider === 'global') {
+      toast.error('Select a concrete LLM provider before testing');
+      return;
+    }
+    setIsTesting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/agent/test-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          provider: tempAgent.llmProvider,
+          model: tempAgent.llmModel,
+          apiKey: tempAgent.llmApiKey,
+          baseUrl: tempAgent.llmBaseUrl,
+          authorizationType: tempAgent.authorizationType,
+          authorizationValue: tempAgent.authorizationValue,
+          authorizationHeader: tempAgent.authorizationHeader,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        const details = typeof data.details === 'string'
+          ? data.details
+          : data.details
+            ? JSON.stringify(data.details)
+            : '';
+        const target = data.targetUrl ? ` (${data.targetUrl})` : '';
+        throw new Error([data.error || 'Agent settings test failed', details].filter(Boolean).join(': ') + target);
+      }
+      setSettingsTested(true);
+      toast.success(data.message || 'Agent settings test passed');
+    } catch (error: any) {
+      setSettingsTested(false);
+      toast.error(error.message || 'Agent settings test failed');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSave = async () => {
+    if (isNew && !settingsTested) {
+      toast.error('Test the agent settings successfully before creating this agent');
+      return;
+    }
     try {
-      await updateDoc(doc(db, 'agents', agent.id), {
+      const payload = {
         ...tempAgent,
-        updatedAt: new Date().toISOString()
-      });
+        id: undefined,
+        updatedAt: new Date().toISOString(),
+        ...(isNew ? { createdAt: new Date().toISOString() } : {}),
+      };
+      if (isNew) {
+        await addDoc(collection(db, 'agents'), payload);
+        onCreated?.();
+        toast.success("Agent created");
+        return;
+      }
+      await updateDoc(doc(db, 'agents', agent.id), payload);
       setEditing(false);
       toast.success("Agent configuration saved");
     } catch (error) {
@@ -98,6 +230,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
 
   const handleReset = () => {
     setTempAgent(agent);
+    setSettingsTested(false);
     setEditing(false);
   };
 
@@ -115,8 +248,8 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
     return (
       <Card className="border-border shadow-sm bg-white rounded-[2rem] overflow-hidden">
         <CardHeader className="bg-primary/5 border-b border-border p-8">
-          <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-            <Cpu size={14} /> {agent.name} (Editing)
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Cpu size={14} /> {isNew ? 'New Agent' : `${agent.name} (Editing)`}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-8 space-y-6">
@@ -125,7 +258,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Name</label>
               <Input 
                 value={tempAgent.name} 
-                onChange={e => setTempAgent({...tempAgent, name: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, name: e.target.value})}
                 className="rounded-xl"
               />
             </div>
@@ -133,7 +266,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Role</label>
               <Input 
                 value={tempAgent.role} 
-                onChange={e => setTempAgent({...tempAgent, role: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, role: e.target.value})}
                 className="rounded-xl"
               />
             </div>
@@ -141,7 +274,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
               <Textarea 
                 value={tempAgent.description} 
-                onChange={e => setTempAgent({...tempAgent, description: e.target.value})}
+                onChange={e => updateTempAgent({...tempAgent, description: e.target.value})}
                 className="rounded-xl"
                 rows={3}
               />
@@ -160,7 +293,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     value={tempAgent.llmModel || ''} 
                     onChange={e => {
                       const val = e.target.value;
-                      setTempAgent({...tempAgent, llmModel: val === 'custom' ? '' : val});
+                      handleModelChange(val === 'custom' ? '' : val);
                     }}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
@@ -174,7 +307,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   </select>
                   <Input 
                     value={tempAgent.llmModel || ''}
-                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    onChange={e => handleModelChange(e.target.value)}
                     placeholder="Enter model name (e.g. nvidia/llama-3.1-70b-instruct)"
                     className="h-12 rounded-xl"
                   />
@@ -185,11 +318,11 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Provider</label>
               <select 
                 value={tempAgent.llmProvider || 'global'} 
-                onChange={e => setTempAgent({...tempAgent, llmProvider: e.target.value as LLMProvider | 'global'})}
+                onChange={e => handleProviderChange(e.target.value as LLMProvider | 'global')}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="global">Global (Use System Config)</option>
-                {Object.keys(PROVIDER_CONFIGS).map((key) => (
+                {providerKeys.map((key) => (
                   <option key={key} value={key}>{PROVIDER_CONFIGS[key as LLMProvider].label}</option>
                 ))}
               </select>
@@ -200,7 +333,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">LLM Model</label>
                   <select 
                     value={tempAgent.llmModel || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmModel: e.target.value})}
+                    onChange={e => handleModelChange(e.target.value)}
                     className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
                   >
                     <option value="">Select a model</option>
@@ -216,7 +349,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <Input 
                     type="password"
                     value={tempAgent.llmApiKey || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmApiKey: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, llmApiKey: e.target.value, authorizationValue: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -224,7 +357,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Base URL</label>
                   <Input 
                     value={tempAgent.llmBaseUrl || ''} 
-                    onChange={e => setTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, llmBaseUrl: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -234,7 +367,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Authorization Type</label>
               <select 
                 value={tempAgent.authorizationType || ''} 
-                onChange={e => setTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
+                onChange={e => updateTempAgent({...tempAgent, authorizationType: e.target.value as 'bearer' | 'api_key' | 'custom'})}
                 className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="">None</option>
@@ -250,7 +383,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                   <Input 
                     type={tempAgent.authorizationType === 'bearer' ? 'password' : 'text'}
                     value={tempAgent.authorizationValue || ''} 
-                    onChange={e => setTempAgent({...tempAgent, authorizationValue: e.target.value})}
+                    onChange={e => updateTempAgent({...tempAgent, authorizationValue: e.target.value, llmApiKey: e.target.value})}
                     className="rounded-xl"
                   />
                 </div>
@@ -259,7 +392,7 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Header Name</label>
                     <Input 
                       value={tempAgent.authorizationHeader || ''} 
-                      onChange={e => setTempAgent({...tempAgent, authorizationHeader: e.target.value})}
+                      onChange={e => updateTempAgent({...tempAgent, authorizationHeader: e.target.value})}
                       className="rounded-xl"
                     />
                   </div>
@@ -268,13 +401,16 @@ function AgentCard({ agent }: { agent: Agent; key?: React.Key }) {
             )}
           </div>
           <div className="flex gap-2">
+            <Button onClick={handleTestSettings} variant={settingsTested ? 'default' : 'outline'} className="h-12 rounded-xl font-bold gap-2" disabled={isTesting || tempAgent.llmProvider === 'global'}>
+              {isTesting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} {settingsTested ? 'Test Passed' : 'Test Settings'}
+            </Button>
             <Button onClick={handleSave} className="bg-primary text-primary-foreground h-12 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
-              <Save size={16} /> Save Changes
+              <Save size={16} /> {isNew ? 'Create Agent' : 'Save Changes'}
             </Button>
             <Button onClick={handleReset} variant="outline" className="h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary">
               <RefreshCcw size={16} /> Reset
             </Button>
-            <Button onClick={() => setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
+            <Button onClick={() => isNew ? onCancel?.() : setEditing(false)} variant="ghost" className="h-12 rounded-xl font-bold gap-2">
               Cancel
             </Button>
           </div>
@@ -386,6 +522,7 @@ export default function AdminDashboard({
     activeTab === 'audit' ? 'logs' : 
     activeTab === 'users' ? 'users' : 
     activeTab === 'settings' ? 'settings' : 
+    activeTab === 'fees' ? 'fees' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
     'submissions';
@@ -401,6 +538,7 @@ export default function AdminDashboard({
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
   const [submissionModes, setSubmissionModes] = useState<Record<string, ExecutionMode | ''>>({});
@@ -408,28 +546,57 @@ export default function AdminDashboard({
   const pageSize = 8;
 
   useEffect(() => {
-    const unsubSubmissions = onSnapshot(query(collectionGroup(db, 'submissions'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
-    });
-    const unsubAgents = onSnapshot(query(collection(db, 'agents'), orderBy('name')), (snapshot) => {
-      setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
-    });
-    const unsubJobs = onSnapshot(query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
-      setAllJobs(jobs);
-      setStats(current => ({ ...current, totalJobs: jobs.length }));
-    });
-    const unsubLogs = onSnapshot(query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)), (snapshot) => {
-      const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
-      setLogs(nextLogs);
-      setStats(current => ({ ...current, errorCount: nextLogs.filter(log => log.level === 'error' || log.level === 'critical').length }));
-    });
-    const unsubDisputes = onSnapshot(query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
-      setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
-    });
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)), (snapshot) => {
-      setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
-    });
+    const handleListenerError = (label: string) => (error: unknown) => {
+      console.error(`[AdminDashboard] ${label} listener failed`, error);
+      toast.error(`Could not load admin ${label}. Check admin role and Firestore rules.`);
+    };
+
+    const unsubSubmissions = onSnapshot(
+      query(collectionGroup(db, 'submissions'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        setSubmissions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
+      },
+      handleListenerError('submissions')
+    );
+    const unsubAgents = onSnapshot(
+      query(collection(db, 'agents'), orderBy('name')),
+      (snapshot) => {
+        setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
+      },
+      handleListenerError('agents')
+    );
+    const unsubJobs = onSnapshot(
+      query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+        setAllJobs(jobs);
+        setStats(current => ({ ...current, totalJobs: jobs.length }));
+      },
+      handleListenerError('jobs')
+    );
+    const unsubLogs = onSnapshot(
+      query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
+      (snapshot) => {
+        const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
+        setLogs(nextLogs);
+        setStats(current => ({ ...current, errorCount: nextLogs.filter(log => log.level === 'error' || log.level === 'critical').length }));
+      },
+      handleListenerError('system logs')
+    );
+    const unsubDisputes = onSnapshot(
+      query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => {
+        setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
+      },
+      handleListenerError('disputes')
+    );
+    const unsubUsers = onSnapshot(
+      query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)),
+      (snapshot) => {
+        setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+      },
+      handleListenerError('users')
+    );
     return () => {
       unsubSubmissions();
       unsubAgents();
@@ -450,6 +617,9 @@ export default function AdminDashboard({
 
   const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
   const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+  const pendingSubmissionCount = submissions.filter(submission => ['ai_passed', 'admin_reviewing'].includes(submission.status)).length;
+  const failedSubmissionCount = submissions.filter(submission => ['ai_failed', 'admin_rejected'].includes(submission.status)).length;
+  const tabTriggerClass = "min-h-11 w-full rounded-2xl px-3 py-2 gap-2 font-bold text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm";
 
   const updateSubmissionStatus = async (submission: Submission, status: Submission['status']) => {
     try {
@@ -571,64 +741,83 @@ export default function AdminDashboard({
           settings: 'settings',
           knowledge: 'knowledge',
           jobs: 'projects',
+          fees: 'fees',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
       }} className="w-full">
-        <ScrollArea className="w-full whitespace-nowrap mb-8" orientation="horizontal">
-          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
-            <TabsTrigger value="submissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+        <div className="mb-8 rounded-[2rem] border border-border bg-white/80 p-3 shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-[1.5rem] bg-secondary/40 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <TabsTrigger value="submissions" className={tabTriggerClass}>
               <FileText size={16} /> Submissions
             </TabsTrigger>
-            <TabsTrigger value="agents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="agents" className={tabTriggerClass}>
               <Cpu size={16} /> Agents
             </TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="users" className={tabTriggerClass}>
               <Users size={16} /> Users
             </TabsTrigger>
-            <TabsTrigger value="jobs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="jobs" className={tabTriggerClass}>
               <Briefcase size={16} /> Jobs
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="reviews" className={tabTriggerClass}>
               <Star size={16} /> Moderation
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest relative">
+            <TabsTrigger value="knowledge" className={`${tabTriggerClass} relative`}>
               <Sparkles size={16} /> Brain
             </TabsTrigger>
-            <TabsTrigger value="disputes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="disputes" className={tabTriggerClass}>
               <AlertTriangle size={16} /> Disputes
             </TabsTrigger>
-            <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="logs" className={tabTriggerClass}>
               <History size={16} /> Audit Logs
             </TabsTrigger>
-            <TabsTrigger value="municipal" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="municipal" className={tabTriggerClass}>
               <Building2 size={16} /> Municipal
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="fees" className={tabTriggerClass}>
+              <CreditCard size={16} /> Fees
+            </TabsTrigger>
+            <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+            <TabsTrigger value="analytics" className={tabTriggerClass}>
               <Activity size={16} /> Analytics
             </TabsTrigger>
           </TabsList>
-        </ScrollArea>
+        </div>
 
         <TabsContent value="submissions">
-           <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
-              <h2 className="text-2xl font-bold">Review Pipeline</h2>
-              <div className="space-y-3">
+           <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-border space-y-6 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Submissions Review Pipeline</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Review, approve, or reject uploaded drawings from one clear queue.</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
+                  <div className="rounded-2xl border border-border bg-secondary/30 p-3">
+                    <p className="text-xl font-bold">{submissions.length}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total</p>
+                  </div>
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-xl font-bold text-primary">{pendingSubmissionCount}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pending</p>
+                  </div>
+                  <div className="rounded-2xl border border-red-100 bg-red-50 p-3">
+                    <p className="text-xl font-bold text-red-700">{failedSubmissionCount}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Issues</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 {pagedSubmissions.map(submission => (
-                  <div key={submission.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-border p-4">
-                    <div>
-                      <p className="font-bold">{submission.drawingName}</p>
+                  <div key={submission.id} className="grid gap-4 rounded-2xl border border-border bg-white p-4 transition-colors hover:border-primary/30 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">{submission.drawingName}</p>
                       <p className="text-xs text-muted-foreground">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{(submission.status || 'processing').replace('_', ' ')}</Badge>
-                      <ExecutionModePicker value={(submissionModes[submission.id] || submission.executionMode || 'basic_ai_screen') as ExecutionMode} onChange={(mode) => setSubmissionModes(current => ({ ...current, [submission.id]: mode }))} className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
-                      <Button size="sm" variant="outline" disabled={reviewingSubmissionId === submission.id} onClick={() => rerunAIReview(submission)}>
-                        {reviewingSubmissionId === submission.id ? <Loader2 size={14} className="animate-spin" /> : 'Run AI'}
-                      </Button>
                       <Button size="sm" variant="outline" onClick={() => setReportSubmission(submission)}>View Report</Button>
                       <Button size="sm" onClick={() => updateSubmissionStatus(submission, 'approved')}>Approve</Button>
                       <Button size="sm" variant="destructive" onClick={() => updateSubmissionStatus(submission, 'admin_rejected')}>Reject</Button>
@@ -695,41 +884,22 @@ export default function AdminDashboard({
 
         <TabsContent value="jobs">
           <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
-              <div>
-                <h2 className="text-2xl font-bold">Platform Jobs</h2>
-                <p className="text-sm text-muted-foreground mt-1">Click any project to inspect the full brief, stakeholders, compliance activity, and lifecycle history.</p>
-              </div>
-              <Badge variant="outline" className="w-fit rounded-full px-4 py-2 text-[10px] uppercase tracking-widest">{allJobs.length} projects tracked</Badge>
-            </div>
+            <h2 className="text-2xl font-bold mb-8">Platform Jobs</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {allJobs.map(job => (
-                <button key={job.id} onClick={() => setSelectedJob(job)} className="text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-2xl">
-                <Card className="h-full border-border shadow-sm rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer group">
+                <Card key={job.id} className="border-border shadow-sm rounded-2xl p-6">
                   <div className="flex justify-between items-start mb-4">
                     <Badge className="bg-primary/5 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
-                    <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status || 'open'}</Badge>
+                    <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status}</Badge>
                   </div>
-                  <h3 className="font-bold mb-2 group-hover:text-primary transition-colors">{job.title}</h3>
+                  <h3 className="font-bold mb-2">{job.title}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
-                  <div className="grid grid-cols-2 gap-3 text-[10px] font-bold text-muted-foreground uppercase mb-5">
-                    <span>Budget: R {(job.budget || 0).toLocaleString()}</span>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
+                    <span>Budget: R {job.budget.toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
-                    <span>Deadline: {safeFormat(job.deadline, 'MMM d, yyyy')}</span>
-                    <span>{submissions.filter(submission => submission.jobId === job.id).length} submissions</span>
-                  </div>
-                  <div className="pt-4 border-t border-border flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary">
-                    <span>View in-depth details</span>
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                   </div>
                 </Card>
-                </button>
               ))}
-              {allJobs.length === 0 && (
-                <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
-                  <p className="text-muted-foreground italic">No platform jobs found.</p>
-                </div>
-              )}
             </div>
           </div>
         </TabsContent>
@@ -789,96 +959,32 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="agents">
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 rounded-[2rem] border border-border bg-white p-6 shadow-sm">
-              <div>
-                <h2 className="text-2xl font-heading font-bold tracking-tight">AI Agents</h2>
-                <p className="text-sm text-muted-foreground mt-1">Manage specialist compliance agents or add a custom agent to the platform workflow.</p>
-              </div>
-              <Dialog open={isAddingAgent} onOpenChange={setIsAddingAgent}>
-                <DialogTrigger render={
-                  <Button className="h-12 rounded-2xl font-bold gap-2 shadow-lg shadow-primary/20">
-                    <Plus size={16} /> Add Agent
-                  </Button>
-                } />
-                <DialogContent className="sm:max-w-[720px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="font-heading text-2xl">Add New Agent</DialogTitle>
-                    <DialogDescription>Create a custom AI specialist agent for admin-managed compliance workflows.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateAgent} className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Agent Name</label>
-                        <Input value={newAgent.name || ''} onChange={e => setNewAgent(current => ({ ...current, name: e.target.value }))} placeholder="e.g. Roof Compliance Agent" className="h-12 rounded-xl" required />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Role Key</label>
-                        <Input value={newAgent.role || ''} onChange={e => setNewAgent(current => ({ ...current, role: e.target.value }))} placeholder="roof_compliance" className="h-12 rounded-xl" required />
-                        <p className="text-[10px] text-muted-foreground">Spaces will be converted to underscores.</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</label>
-                      <Textarea value={newAgent.description || ''} onChange={e => setNewAgent(current => ({ ...current, description: e.target.value }))} placeholder="What this agent reviews and when it should be used." className="rounded-xl" rows={3} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">System Prompt</label>
-                      <Textarea value={newAgent.systemPrompt || ''} onChange={e => setNewAgent(current => ({ ...current, systemPrompt: e.target.value }))} placeholder="Define the agent's review instructions, expected evidence, and output format." className="rounded-xl min-h-[160px]" required />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</label>
-                        <select value={newAgent.status || 'online'} onChange={e => setNewAgent(current => ({ ...current, status: e.target.value as Agent['status'] }))} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
-                          <option value="online">Online</option>
-                          <option value="offline">Offline</option>
-                          <option value="maintenance">Maintenance</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Risk Level</label>
-                        <select value={newAgent.riskLevel || 'medium'} onChange={e => setNewAgent(current => ({ ...current, riskLevel: e.target.value as Agent['riskLevel'] }))} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                          <option value="critical">Critical</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Temperature</label>
-                        <Input type="number" min="0" max="1" step="0.1" value={newAgent.temperature ?? 0.1} onChange={e => setNewAgent(current => ({ ...current, temperature: Number(e.target.value) }))} className="h-12 rounded-xl" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Standards Coverage</label>
-                      <Input value={(newAgent.standardsCoverage || []).join(', ')} onChange={e => setNewAgent(current => ({ ...current, standardsCoverage: e.target.value.split(',').map(item => item.trim()).filter(Boolean) }))} placeholder="SANS 10400-L, SANS 10400-K, MunicipalBylaw" className="h-12 rounded-xl" />
-                    </div>
-
-                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
-                      <Button type="button" variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setIsAddingAgent(false)}>Cancel</Button>
-                      <Button type="submit" className="h-12 rounded-xl font-bold gap-2">
-                        <Plus size={16} /> Create Agent
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+          <div className="mb-6 flex flex-col gap-3 rounded-[2rem] border border-border bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Agent Configuration</h2>
+              <p className="text-sm text-muted-foreground">Create, test, and tune specialist agents with provider defaults filled automatically.</p>
             </div>
-
+            <Button onClick={() => setIsCreatingAgent(true)} className="h-12 rounded-xl font-bold gap-2" disabled={isCreatingAgent}>
+              <Plus size={16} /> New Agent
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {isCreatingAgent && (
+              <AgentCard
+                agent={createBlankAgent()}
+                isNew
+                onCreated={() => setIsCreatingAgent(false)}
+                onCancel={() => setIsCreatingAgent(false)}
+              />
+            )}
             {agents.map(agent => (
               <AgentCard key={agent.id} agent={agent} />
             ))}
-            {agents.length === 0 && (
+            {agents.length === 0 && !isCreatingAgent && (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
                 <p className="text-muted-foreground italic">No agents found in the system.</p>
               </div>
             )}
-          </div>
           </div>
         </TabsContent>
 
@@ -952,6 +1058,10 @@ export default function AdminDashboard({
            <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
               <MunicipalSettingsAdmin />
            </div>
+        </TabsContent>
+
+        <TabsContent value="fees">
+          <FeeEstimator role="admin" />
         </TabsContent>
       </Tabs>
 

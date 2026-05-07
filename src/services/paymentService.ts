@@ -17,6 +17,17 @@ import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
 const md5 = (jsMd5 as any).default || jsMd5;
 
+type PayFastEnv = {
+  VITE_PAYFAST_MERCHANT_ID?: string;
+  VITE_PAYFAST_MERCHANT_KEY?: string;
+  VITE_PAYFAST_PASSPHRASE?: string;
+  VITE_PAYFAST_SANDBOX?: string;
+};
+
+function getPayFastEnv(): PayFastEnv {
+  return typeof process !== 'undefined' ? (process.env as PayFastEnv) : {};
+}
+
 /** Fetch a fresh Firebase ID token for the current user, or throw if not signed in. */
 async function requireIdToken(): Promise<string> {
   const user = auth.currentUser;
@@ -48,6 +59,7 @@ const getEnv = (key: string) => {
 };
 
 // PayFast configuration
+const payFastEnv = getPayFastEnv();
 const PAYFAST_CONFIG = {
   merchantId: String(getEnv('VITE_PAYFAST_MERCHANT_ID')),
   merchantKey: String(getEnv('VITE_PAYFAST_MERCHANT_KEY')),
@@ -116,6 +128,7 @@ class PaymentService {
     const expectedSignature = await this.generateSignature(pfData);
     return expectedSignature === signature;
   }
+
 
   /**
    * Initialize escrow for a job — delegates to server for privileged write.

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, orderBy, deleteField } from 'firebase/firestore';
 import { UserProfile, Job, Submission, Application, JobCategory, Review } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -44,6 +44,7 @@ import { safeLocale } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import MunicipalTracker from './MunicipalTracker';
 import { paginateItems, totalPages } from '@/lib/utils';
+import FeeEstimator from './FeeEstimator';
 // import { motion } from 'framer-motion';
 
 export default function ClientDashboard({ 
@@ -115,6 +116,7 @@ export default function ClientDashboard({
 
   const showOverview = !activeTab || activeTab === 'overview' || activeTab === 'post-job';
   const showProjects = activeTab === 'projects';
+  const showFees = activeTab === 'fees';
 
   return (
     <div className="space-y-12">
@@ -131,6 +133,7 @@ export default function ClientDashboard({
           <DialogContent className="sm:max-w-[500px] rounded-3xl">
              <DialogHeader>
                 <DialogTitle>Post a New Job</DialogTitle>
+                <DialogDescription>Use the fee estimator first if you want a professional-fee budget guide before posting.</DialogDescription>
              </DialogHeader>
              <form onSubmit={handlePostJob} className="space-y-4">
                 <Input placeholder="Job Title" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} required />
@@ -146,6 +149,7 @@ export default function ClientDashboard({
       {showOverview && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
+            <FeeEstimator role="client" compact onEstimateBudget={(amount) => setNewJob(current => ({ ...current, budget: amount }))} />
             <h2 className="text-2xl font-heading font-bold">Your Active Jobs</h2>
             <div className="grid grid-cols-1 gap-6">
                 {pagedJobs.map(job => (
@@ -202,15 +206,21 @@ export default function ClientDashboard({
           </div>
         </div>
       )}
+
+      {showFees && (
+        <FeeEstimator role="client" onEstimateBudget={(amount) => setNewJob(current => ({ ...current, budget: amount }))} />
+      )}
     </div>
   );
 }
 
 function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const [architect, setArchitect] = useState<UserProfile | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDisputing, setIsDisputing] = useState(false);
+  const [acceptingApplicationId, setAcceptingApplicationId] = useState<string | null>(null);
   const [editJob, setEditJob] = useState<Partial<Job>>(job);
   const [disputeReason, setDisputeReason] = useState('');
   const [requestedResolution, setRequestedResolution] = useState('');
@@ -224,6 +234,15 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
       fetchArchitect();
     }
   }, [job.selectedArchitectId]);
+
+  useEffect(() => {
+    const q = query(collection(db, `jobs/${job.id}/applications`), where('status', '==', 'pending'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application)));
+    });
+
+    return () => unsubscribe();
+  }, [job.id]);
 
   const appendHistory = (status: Job['status'], note?: string) => [
     ...(job.statusHistory || []),
@@ -275,6 +294,33 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
       toast.success('Architect unassigned');
     } catch {
       toast.error('Failed to unassign architect');
+    }
+  };
+
+  const handleAcceptApplication = async (application: Application) => {
+    setAcceptingApplicationId(application.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be logged in to accept an application');
+
+      const response = await fetch(`/api/jobs/${job.id}/applications/${application.id}/accept`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to accept application');
+      }
+
+      toast.success(`${application.architectName} accepted for this job`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to accept application');
+    } finally {
+      setAcceptingApplicationId(null);
     }
   };
 
@@ -349,6 +395,35 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Status History</p>
             {job.statusHistory.slice(-3).map((entry, index) => (
               <p key={`${entry.timestamp}-${index}`} className="text-xs text-muted-foreground">{entry.status.replace('-', ' ')} · {new Date(entry.timestamp).toLocaleDateString()} {entry.note ? `· ${entry.note}` : ''}</p>
+            ))}
+          </div>
+        )}
+        {job.status === 'open' && applications.length > 0 && (
+          <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Users size={12} /> Architect Applications
+            </p>
+            {applications.map(application => (
+              <div key={application.id} className="rounded-xl bg-white border border-border p-4 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-foreground">{application.architectName}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Applied {new Date(application.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{application.status}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{application.proposal}</p>
+                {application.notes && <p className="text-[10px] text-muted-foreground italic">Notes: {application.notes}</p>}
+                <Button
+                  size="sm"
+                  className="rounded-full font-bold"
+                  disabled={acceptingApplicationId === application.id}
+                  onClick={() => handleAcceptApplication(application)}
+                >
+                  {acceptingApplicationId === application.id ? <Loader2 size={14} className="mr-2 animate-spin" /> : <CheckCircle2 size={14} className="mr-2" />}
+                  Accept Architect
+                </Button>
+              </div>
             ))}
           </div>
         )}

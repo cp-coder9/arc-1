@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, orderBy } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review } from '../types';
 import ProfileEditor from './ProfileEditor';
@@ -28,6 +28,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 // import { motion } from 'framer-motion';
 import MunicipalTracker from './MunicipalTracker';
+import FeeEstimator from './FeeEstimator';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -74,11 +75,6 @@ export default function ArchitectDashboard({
       setMyJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
     });
 
-    const qApps = query(collectionGroup(db, 'applications'), where('architectId', '==', user.uid));
-    const unsubApps = onSnapshot(qApps, (snap) => {
-      setMyApplications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Application)));
-    });
-
     const qReviews = query(collection(db, 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
     const unsubReviews = onSnapshot(qReviews, (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
@@ -87,10 +83,31 @@ export default function ArchitectDashboard({
     return () => {
       unsubJobs();
       unsubMyJobs();
-      unsubApps();
       unsubReviews();
     };
   }, [user.uid]);
+
+  useEffect(() => {
+    const trackedJobs = [...availableJobs, ...myJobs];
+    if (trackedJobs.length === 0) {
+      setMyApplications([]);
+      return;
+    }
+
+    const applicationMap = new Map<string, Application>();
+    const unsubscribes = trackedJobs.map((job) => {
+      const q = query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid));
+      return onSnapshot(q, (snap) => {
+        [...applicationMap.keys()]
+          .filter(key => applicationMap.get(key)?.jobId === job.id)
+          .forEach(key => applicationMap.delete(key));
+        snap.docs.forEach(d => applicationMap.set(`${job.id}:${d.id}`, { id: d.id, ...d.data() } as Application));
+        setMyApplications(Array.from(applicationMap.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      });
+    });
+
+    return () => unsubscribes.forEach(unsub => unsub());
+  }, [availableJobs, myJobs, user.uid]);
 
   return (
     <div className="space-y-12">
@@ -134,6 +151,9 @@ export default function ArchitectDashboard({
             </TabsTrigger>
             <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Users size={16} /> Team & Match
+            </TabsTrigger>
+            <TabsTrigger value="fees" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <CreditCard size={16} /> Fee Estimator
             </TabsTrigger>
             <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Send size={16} /> Applications
@@ -227,6 +247,10 @@ export default function ArchitectDashboard({
 
         <TabsContent value="team" className="mt-8">
           <TeamManager user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="fees" className="mt-8">
+          <FeeEstimator role="architect" />
         </TabsContent>
 
 <TabsContent value="municipal" className="mt-8">
@@ -428,11 +452,14 @@ function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
               <Card key={job.id} className="border-border shadow-sm bg-white rounded-3xl p-6">
                 <Badge variant="secondary" className="mb-2 uppercase text-[10px] tracking-widest">{job.category}</Badge>
                 <h3 className="font-bold text-lg mb-4">{job.title}</h3>
-                <Button className="w-full rounded-xl gap-2 font-bold" variant="outline">
-                   <Plus size={16} /> Manage Team
-                </Button>
+                <DelegatedTasksList job={job} user={user} />
               </Card>
             ))}
+             {myJobs.length === 0 && !loading && (
+               <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                 <p className="text-sm text-muted-foreground italic">No active projects available for team assignment.</p>
+               </div>
+             )}
           </div>
        </div>
        <div className="space-y-6">
@@ -482,21 +509,29 @@ function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, `jobs/${job.id}/applications`), {
-        jobId: job.id,
-        architectId: user.uid,
-        architectName: user.displayName,
-        proposal,
-        notes,
-        status: 'pending',
-        createdAt: new Date().toISOString()
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be logged in to apply');
+
+      const response = await fetch(`/api/jobs/${job.id}/applications`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ proposal, notes }),
       });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to submit application');
+      }
+
       setIsApplying(false);
       setProposal('');
       setNotes('');
       toast.success('Application submitted');
-    } catch {
-      toast.error('Failed to submit application');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit application');
     }
   };
 

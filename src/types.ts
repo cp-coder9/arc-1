@@ -265,6 +265,7 @@ export interface Submission {
   signOffChecklist?: SignOffRequirement[];
   riskStatus?: RiskStatus;
   executionMode?: ExecutionMode;
+  architectComment?: string;
   annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
 
   adminFeedback?: string;
@@ -329,7 +330,7 @@ export interface JobCard extends DelegatedTask {
   requirements?: string[];
 }
 
-export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
+export type LLMProvider = 'gemini' | 'openai' | 'openrouter' | 'nvidia';
 
 export interface LLMConfig {
   provider: LLMProvider;

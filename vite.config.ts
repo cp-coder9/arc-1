@@ -25,13 +25,19 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules/firebase')) return 'firebase';
-            if (id.includes('node_modules/react')) return 'react';
+         manualChunks(id) {
+            if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'firebase';
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/scheduler')) return 'react';
             if (id.includes('node_modules/framer-motion')) return 'framer';
-          },
-        },
-      },
+            if (id.includes('node_modules/@radix-ui') || id.includes('node_modules/@base-ui')) return 'ui-vendor';
+            if (id.includes('node_modules/@google/genai')) return 'ai-vendor';
+            if (id.includes('node_modules/pdf-lib')) return 'pdf-vendor';
+            if (id.includes('node_modules/lucide-react')) return 'icons';
+            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark') || id.includes('node_modules/unist') || id.includes('node_modules/mdast') || id.includes('node_modules/hast') || id.includes('node_modules/micromark')) return 'markdown-vendor';
+            if (id.includes('node_modules/date-fns')) return 'date-vendor';
+         },
+       },
+     },
     },
   };
 });

@@ -143,8 +143,8 @@ jest.mock('@/components/ui/table', () => ({
   Table: ({ children }: { children: React.ReactNode }) => <table data-testid="table">{children}</table>,
   TableBody: ({ children }: { children: React.ReactNode }) => <tbody data-testid="table-body">{children}</tbody>,
   TableCell: ({ children }: { children: React.ReactNode }) => <td data-testid="table-cell">{children}</td>,
-  TableHead: ({ children }: { children: React.ReactNode }) => <thead data-testid="table-head">{children}</thead>,
-  TableHeader: ({ children }: { children: React.ReactNode }) => <tr data-testid="table-header">{children}</tr>,
+  TableHead: ({ children }: { children: React.ReactNode }) => <th data-testid="table-head">{children}</th>,
+  TableHeader: ({ children }: { children: React.ReactNode }) => <thead data-testid="table-header">{children}</thead>,
   TableRow: ({ children }: { children: React.ReactNode }) => <tr data-testid="table-row">{children}</tr>,
 }));
 
@@ -210,12 +210,12 @@ jest.mock('@/lib/uploadService', () => ({
 }));
 
 // Mock child components
-jest.mock('@/components/ProfileEditor', () => () => <div data-testid="profile-editor">Profile Editor</div>);
-jest.mock('@/components/ComplianceReport', () => () => <div data-testid="compliance-report">Compliance Report</div>);
-jest.mock('@/components/AgentKnowledgeManager', () => () => <div data-testid="agent-knowledge">Agent Knowledge</div>);
-jest.mock('@/components/AdminKnowledgeUploader', () => () => <div data-testid="knowledge-uploader">Knowledge Uploader</div>);
-jest.mock('@/components/ReviewManagement', () => () => <div data-testid="review-management">Review Management</div>);
-jest.mock('@/components/MunicipalSettingsAdmin', () => () => <div data-testid="municipal-settings">Municipal Settings</div>);
+jest.mock('../ProfileEditor', () => ({ __esModule: true, default: () => <div data-testid="profile-editor">Profile Editor</div> }));
+jest.mock('../ComplianceReport', () => ({ __esModule: true, default: () => <div data-testid="compliance-report">Compliance Report</div> }));
+jest.mock('../AgentKnowledgeManager', () => ({ __esModule: true, default: () => <div data-testid="agent-knowledge">Agent Knowledge</div> }));
+jest.mock('../AdminKnowledgeUploader', () => ({ __esModule: true, default: () => <div data-testid="knowledge-uploader">Knowledge Uploader</div> }));
+jest.mock('../ReviewManagement', () => ({ __esModule: true, default: () => <div data-testid="review-management">Review Management</div> }));
+jest.mock('../MunicipalSettingsAdmin', () => ({ __esModule: true, default: () => <div data-testid="municipal-settings">Municipal Settings</div> }));
 
 // Mock sonner toast
 jest.mock('sonner', () => ({
@@ -259,10 +259,11 @@ jest.mock('lucide-react', () => ({
   AlertCircle: () => <span data-testid="icon">Alert Circle</span>,
   ArrowRight: () => <span data-testid="icon">Arrow</span>,
   Star: () => <span data-testid="icon">Star</span>,
+  Building2: () => <span data-testid="icon">Building</span>,
 }));
 
 // Mock ReactMarkdown
-jest.mock('react-markdown', () => ({ children }: { children: string }) => <div>{children}</div>);
+jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: { children: string }) => <div>{children}</div> }));
 
 // Mock date-fns
 jest.mock('date-fns', () => ({
@@ -285,7 +286,8 @@ describe('AdminDashboard', () => {
 
   test('should render admin dashboard', () => {
     render(<AdminDashboard user={mockUser} />);
-    expect(screen.getByText(/Admin/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/Admin Command Center/i)).toBeInTheDocument();
   });
 
   test('should render tabs', () => {
@@ -300,6 +302,8 @@ describe('AdminDashboard', () => {
 
   test('should render agent configuration section', () => {
     render(<AdminDashboard user={mockUser} />);
+
+    // Agent configuration should be present in the component
     expect(screen.getByText(/Admin Command Center/i)).toBeInTheDocument();
   });
 

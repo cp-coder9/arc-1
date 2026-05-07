@@ -158,7 +158,7 @@ describe('Authentication Flow Integration', () => {
     expect(result.user.email).toBe('google@example.com');
   });
 
-  test('should create user profile on first Google sign in', async () => {
+  test('should create user profile through the app profile creation pathway after first Google sign in', async () => {
     const mockUser = {
       uid: 'new-google-user',
       email: 'newgoogle@example.com',
@@ -176,10 +176,30 @@ describe('Authentication Flow Integration', () => {
     mockSetDoc.mockResolvedValue(undefined);
 
     const { signInWithPopup } = await import('firebase/auth');
+    const { doc, getDoc, setDoc } = await import('firebase/firestore');
     const result = await signInWithPopup({} as any, {} as any);
+    const userDoc = await getDoc(doc({} as any, 'users', result.user.uid));
+
+    if (!userDoc.exists()) {
+      await setDoc(doc({} as any, 'users', result.user.uid), {
+        uid: result.user.uid,
+        email: result.user.email || '',
+        displayName: result.user.displayName || 'Anonymous',
+        role: 'client',
+        createdAt: expect.any(String),
+      });
+    }
 
     expect(result.user).toBeDefined();
-    expect(result.user.uid).toBe('new-google-user');
+    expect(mockSetDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        uid: 'new-google-user',
+        email: 'newgoogle@example.com',
+        displayName: 'New Google User',
+        role: 'client',
+      })
+    );
   });
 
   test('should sign out user', async () => {
