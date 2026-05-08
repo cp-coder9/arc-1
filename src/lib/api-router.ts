@@ -518,6 +518,30 @@ router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) 
         throw Object.assign(new Error('Only pending applications can be accepted'), { status: 400 });
       }
 
+      const projectRef = adminDb.collection('projects').doc(jobId);
+      const projectDoc = await tx.get(projectRef);
+      const initialStageHistory = [{
+        stage: 'intake',
+        enteredAt: now,
+        actorId: decoded.uid,
+        note: `Project created when ${applicationData.architectName} was accepted`,
+      }];
+      const teamMembers = [
+        {
+          userId: jobData.clientId,
+          role: 'client',
+          joinedAt: now,
+          status: 'active',
+        },
+        {
+          userId: applicationData.architectId,
+          role: 'architect',
+          discipline: 'architecture',
+          joinedAt: now,
+          status: 'active',
+        },
+      ];
+
       tx.update(applicationRef, { status: 'accepted', updatedAt: now });
       tx.update(jobRef, {
         selectedArchitectId: applicationData.architectId,
@@ -528,6 +552,24 @@ router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) 
           { status: 'in-progress', timestamp: now, actorId: decoded.uid, note: `Accepted ${applicationData.architectName}` },
         ],
       });
+      if (!projectDoc.exists) {
+        tx.set(projectRef, {
+          id: projectRef.id,
+          jobId,
+          clientId: jobData.clientId,
+          leadArchitectId: applicationData.architectId,
+          currentStage: 'intake',
+          stageHistory: initialStageHistory,
+          teamMembers,
+          createdAt: now,
+        });
+      } else {
+        tx.update(projectRef, {
+          leadArchitectId: applicationData.architectId,
+          teamMembers,
+          updatedAt: now,
+        });
+      }
     });
 
     const acceptedApplication = (await applicationRef.get()).data()!;

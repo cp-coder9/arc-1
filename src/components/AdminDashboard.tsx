@@ -3,7 +3,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project } from '../types';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -35,6 +35,9 @@ import ReviewManagement from "./ReviewManagement";
 import MunicipalSettingsAdmin from './MunicipalSettingsAdmin';
 import ExecutionModePicker from './ExecutionModePicker';
 import FeeEstimator from './FeeEstimator';
+import StageProgressTracker from './StageProgressTracker';
+import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
+import AdvanceStageButton from './AdvanceStageButton';
 
 const PROVIDER_CONFIGS = {
   gemini: {
@@ -500,6 +503,7 @@ export default function AdminDashboard({
   const [agents, setAgents] = useState<Agent[]>([]);
   const [reportSubmission, setReportSubmission] = useState<Submission | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [newAgent, setNewAgent] = useState<Partial<Agent>>({
     name: '',
@@ -538,6 +542,7 @@ export default function AdminDashboard({
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [projectsByJobId, setProjectsByJobId] = useState<Record<string, Project>>({});
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
@@ -597,6 +602,18 @@ export default function AdminDashboard({
       },
       handleListenerError('users')
     );
+    const unsubProjects = onSnapshot(
+      query(collection(db, 'projects'), limit(200)),
+      (snapshot) => {
+        const nextProjects: Record<string, Project> = {};
+        snapshot.docs.forEach(d => {
+          const project = { id: d.id, ...d.data() } as Project;
+          nextProjects[project.jobId] = project;
+        });
+        setProjectsByJobId(nextProjects);
+      },
+      handleListenerError('projects')
+    );
     return () => {
       unsubSubmissions();
       unsubAgents();
@@ -604,6 +621,7 @@ export default function AdminDashboard({
       unsubLogs();
       unsubDisputes();
       unsubUsers();
+      unsubProjects();
     };
   }, []);
 
@@ -614,6 +632,16 @@ export default function AdminDashboard({
       activeAgents: agents.filter(agent => agent.status === 'online').length
     }));
   }, [agents, submissions]);
+
+  useEffect(() => {
+    if (!selectedJob) {
+      setSelectedProject(null);
+      return;
+    }
+
+    const unsubscribe = subscribeToProjectByJobId(selectedJob.id, setSelectedProject);
+    return () => unsubscribe();
+  }, [selectedJob?.id]);
 
   const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
   const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
@@ -898,6 +926,12 @@ export default function AdminDashboard({
                     <span>Budget: R {job.budget.toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
                   </div>
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setSelectedJob(job)}>View Details</Button>
+                    {projectsByJobId[job.id] && (
+                      <AdvanceStageButton project={projectsByJobId[job.id]} actorId={user.uid} size="sm" />
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -1124,6 +1158,14 @@ export default function AdminDashboard({
                 </DialogHeader>
 
                 <div className="p-8 space-y-8">
+                  {selectedProject && (
+                    <div className="space-y-3">
+                      <StageProgressTracker currentStage={selectedProject.currentStage} stageHistory={selectedProject.stageHistory} />
+                      <div className="flex justify-end">
+                        <AdvanceStageButton project={selectedProject} actorId={user.uid} />
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <DetailPanel title="Project Brief" className="lg:col-span-2">
                       <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{selectedJob.description || 'No description provided.'}</p>

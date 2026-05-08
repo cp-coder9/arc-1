@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, orderBy } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review, Project } from '../types';
 import ProfileEditor from './ProfileEditor';
 import RatingSystem from './RatingSystem';
 import { Chat, ChatButton } from './Chat';
@@ -29,6 +29,9 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 // import { motion } from 'framer-motion';
 import MunicipalTracker from './MunicipalTracker';
 import FeeEstimator from './FeeEstimator';
+import StageProgressTracker from './StageProgressTracker';
+import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
+import AdvanceStageButton from './AdvanceStageButton';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -263,6 +266,7 @@ export default function ArchitectDashboard({
 
 function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
   const [client, setClient] = useState<UserProfile | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
@@ -275,6 +279,11 @@ function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
     }
   }, [job.clientId]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeToProjectByJobId(job.id, setProject);
+    return () => unsubscribe();
+  }, [job.id]);
+
   return (
     <Card className="border-border shadow-sm bg-white overflow-hidden rounded-3xl hover:border-primary/30 transition-all group">
       <div className="p-8 space-y-6">
@@ -285,6 +294,16 @@ function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
            <Badge variant="outline" className="rounded-full px-3 uppercase text-[10px] font-bold tracking-widest">In Progress</Badge>
         </div>
         <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
+        {project && (
+          <div className="space-y-3">
+            <StageProgressTracker currentStage={project.currentStage} stageHistory={project.stageHistory} />
+            {project.leadArchitectId === user.uid && (
+              <div className="flex justify-end">
+                <AdvanceStageButton project={project} actorId={user.uid} />
+              </div>
+            )}
+          </div>
+        )}
         {client && (
           <div className="flex items-center justify-between pt-4 border-t border-border/50">
             <div className="flex items-center gap-3">

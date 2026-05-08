@@ -1,11 +1,10 @@
-import { describe, expect, test } from 'vitest';
 import {
   DEFAULT_FEE_ESTIMATOR_INPUT,
   DEFAULT_FEE_ESTIMATOR_SETTINGS,
   estimateArchitecturalFee,
   mergeFeeEstimatorSettings,
   sanitizeFeeEstimatorSettings,
-} from '@/services/feeEstimatorService';
+} from '../feeEstimatorService';
 
 describe('feeEstimatorService', () => {
   test('calculates an itemized estimate with VAT, platform and council fees', () => {
