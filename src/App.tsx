@@ -514,6 +514,14 @@ export default function App() {
                 onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
               />
             )}
+            {user!.role === 'architect' && (
+              <NavItem
+                icon={<Users size={18} />}
+                label="Coordination"
+                active={activeTab === 'coordination'}
+                onClick={() => { setActiveTab('coordination'); setIsSidebarOpen(false); }}
+              />
+            )}
             {(user!.role === 'client' || user!.role === 'architect') && (
               <NavItem
                 icon={<Calculator size={18} />}

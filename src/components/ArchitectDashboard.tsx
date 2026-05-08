@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, orderBy } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review, Project } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review, Project, ProjectTeamMember, DISCIPLINE_REGISTRY } from '../types';
 import ProfileEditor from './ProfileEditor';
 import RatingSystem from './RatingSystem';
 import { Chat, ChatButton } from './Chat';
@@ -32,6 +32,9 @@ import FeeEstimator from './FeeEstimator';
 import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import AdvanceStageButton from './AdvanceStageButton';
+import ResponsibilityMatrix from './ResponsibilityMatrix';
+import TeamBuilder from './TeamBuilder';
+import { getDisciplineCoverage, subscribeToTeam } from '../services/teamService';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -155,6 +158,9 @@ export default function ArchitectDashboard({
             <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Users size={16} /> Team & Match
             </TabsTrigger>
+            <TabsTrigger value="coordination" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Users size={16} /> Coordination
+            </TabsTrigger>
             <TabsTrigger value="fees" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <CreditCard size={16} /> Fee Estimator
             </TabsTrigger>
@@ -250,6 +256,10 @@ export default function ArchitectDashboard({
 
         <TabsContent value="team" className="mt-8">
           <TeamManager user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="coordination" className="mt-8">
+          <CoordinationDashboard user={user} myJobs={myJobs} />
         </TabsContent>
 
         <TabsContent value="fees" className="mt-8">
@@ -506,6 +516,109 @@ function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
             </CardContent>
           </Card>
        </div>
+    </div>
+  );
+}
+
+function CoordinationDashboard({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([]);
+  const [professionals, setProfessionals] = useState<UserProfile[]>([]);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), where('role', 'in', ['architect', 'freelancer', 'bep']));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setProfessionals(snapshot.docs.map((document) => ({ uid: document.id, ...document.data() } as UserProfile)));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  useEffect(() => {
+    if (!project?.id) {
+      setTeamMembers([]);
+      return;
+    }
+    return subscribeToTeam(project.id, setTeamMembers);
+  }, [project?.id]);
+
+  if (myJobs.length === 0 || !selectedJob) {
+    return (
+      <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+        <p className="text-muted-foreground italic">No active projects available for coordination.</p>
+      </div>
+    );
+  }
+
+  const coverageProject = project ? { ...project, category: selectedJob.category, teamMembers } : null;
+  const coverage = coverageProject ? getDisciplineCoverage(coverageProject) : { filled: [], missing: DISCIPLINE_REGISTRY.filter((discipline) => discipline.requiredFor.includes(selectedJob.category)).map((discipline) => discipline.key) };
+  const labelFor = (key: string) => DISCIPLINE_REGISTRY.find((discipline) => discipline.key === key)?.label || key;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><Users className="text-primary" /> Coordination</h2>
+          <p className="text-sm text-muted-foreground">Manage discipline coverage, responsibility, and project team invitations.</p>
+        </div>
+        <select
+          value={selectedJob.id}
+          onChange={(event) => setSelectedJobId(event.target.value)}
+          className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none"
+          aria-label="Select project for coordination"
+        >
+          {myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="rounded-3xl bg-white border-border shadow-sm">
+          <CardContent className="p-6">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Filled disciplines</p>
+            <p className="text-4xl font-heading font-black text-primary mt-2">{coverage.filled.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-3xl bg-white border-border shadow-sm">
+          <CardContent className="p-6">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Missing disciplines</p>
+            <p className="text-4xl font-heading font-black text-destructive mt-2">{coverage.missing.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-3xl bg-white border-border shadow-sm md:col-span-1">
+          <CardContent className="p-6">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-3">Outstanding</p>
+            <div className="flex flex-wrap gap-2">
+              {coverage.missing.map((discipline) => <Badge key={discipline} variant="outline" className="border-dashed">{labelFor(discipline)}</Badge>)}
+              {coverage.missing.length === 0 && <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Complete</Badge>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {!project && (
+        <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900">
+          <CardContent className="p-6">
+            <p className="font-bold">Project lifecycle record not found.</p>
+            <p className="text-sm">Coordination tools become active once this job has an associated project record.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <ResponsibilityMatrix job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
+      <TeamBuilder job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
     </div>
   );
 }
