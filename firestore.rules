@@ -95,6 +95,17 @@ service cloud.firestore {
       ]);
     }
 
+    function isLeadArchitect(projectData) {
+      return isAuthenticated() && projectData.leadArchitectId == request.auth.uid;
+    }
+
+    function isTeamRosterUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'teamMembers',
+        'updatedAt'
+      ]);
+    }
+
     // Users collection
     match /users/{userId} {
       // Allow reading user profiles if authenticated
@@ -229,7 +240,8 @@ service cloud.firestore {
       );
       allow update: if isAuthenticated() && (
         isAdmin() ||
-        (isProjectParticipantByData(resource.data) && isParticipantLifecycleUpdate())
+        (isProjectParticipantByData(resource.data) && isParticipantLifecycleUpdate()) ||
+        (isLeadArchitect(resource.data) && isTeamRosterUpdate())
       );
       allow delete: if isAdmin();
     }
