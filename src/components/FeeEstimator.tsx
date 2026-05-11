@@ -27,6 +27,15 @@ import {
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
+const escrowMilestoneBreakdown = [
+  { stage: 'Intake', percentage: 10 },
+  { stage: 'Appointment', percentage: 15 },
+  { stage: 'Compliance', percentage: 25 },
+  { stage: 'Tender', percentage: 20 },
+  { stage: 'Delivery', percentage: 20 },
+  { stage: 'Close-out', percentage: 10 },
+];
+
 const projectTypes = Object.keys(feeProjectTypeLabels) as FeeProjectType[];
 const complexities = Object.keys(feeComplexityLabels) as FeeComplexity[];
 const deliverables = Object.keys(feeDeliverableLabels) as FeeDeliverable[];
@@ -57,6 +66,16 @@ export default function FeeEstimator({ role, compact = false, onEstimateBudget }
 
   const estimate = useMemo(() => estimateArchitecturalFee(input, settings), [input, settings]);
   const activeStageSettings = settings.stageWeightings;
+  const milestoneAmounts = useMemo(() => {
+    let allocated = 0;
+    return escrowMilestoneBreakdown.map((milestone, index) => {
+      const amount = index === escrowMilestoneBreakdown.length - 1
+        ? Math.round(estimate.total) - allocated
+        : Math.round(estimate.total * (milestone.percentage / 100));
+      allocated += amount;
+      return { ...milestone, amount };
+    });
+  }, [estimate.total]);
 
   const roleCopy = {
     architect: {
@@ -241,6 +260,19 @@ export default function FeeEstimator({ role, compact = false, onEstimateBudget }
                     <span>{currency.format(item.amount)}</span>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">{item.note}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary">Milestone Breakdown</p>
+                <p className="text-xs text-muted-foreground mt-1">Stage-linked escrow estimate. Amounts reconcile to {currency.format(estimate.total)}.</p>
+              </div>
+              {milestoneAmounts.map((milestone) => (
+                <div key={milestone.stage} className="flex items-center justify-between gap-4 rounded-xl bg-white border border-border p-3 text-sm">
+                  <span className="font-bold">{milestone.stage}</span>
+                  <span className="text-muted-foreground">{milestone.percentage}%</span>
+                  <span className="font-black text-primary">{currency.format(milestone.amount)}</span>
                 </div>
               ))}
             </div>

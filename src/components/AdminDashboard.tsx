@@ -3,7 +3,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, TenderPackage } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project } from '../types';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard, Landmark } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -38,7 +38,7 @@ import FeeEstimator from './FeeEstimator';
 import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import AdvanceStageButton from './AdvanceStageButton';
-import BidEvaluation from './BidEvaluation';
+import FinancialDashboard from './FinancialDashboard';
 
 const PROVIDER_CONFIGS = {
   gemini: {
@@ -528,9 +528,9 @@ export default function AdminDashboard({
     activeTab === 'users' ? 'users' : 
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'fees' ? 'fees' :
+    activeTab === 'financial' ? 'financial' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
-    activeTab === 'tenders' ? 'tenders' :
     'submissions';
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [stats, setStats] = useState({
@@ -545,7 +545,6 @@ export default function AdminDashboard({
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [projectsByJobId, setProjectsByJobId] = useState<Record<string, Project>>({});
-  const [tenders, setTenders] = useState<TenderPackage[]>([]);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
@@ -617,11 +616,6 @@ export default function AdminDashboard({
       },
       handleListenerError('projects')
     );
-    const unsubTenders = onSnapshot(
-      query(collection(db, 'tender_packages'), limit(200)),
-      (snapshot) => setTenders(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as TenderPackage))),
-      handleListenerError('tenders')
-    );
     return () => {
       unsubSubmissions();
       unsubAgents();
@@ -630,7 +624,6 @@ export default function AdminDashboard({
       unsubDisputes();
       unsubUsers();
       unsubProjects();
-      unsubTenders();
     };
   }, []);
 
@@ -779,7 +772,7 @@ export default function AdminDashboard({
           knowledge: 'knowledge',
           jobs: 'projects',
           fees: 'fees',
-          tenders: 'tenders',
+          financial: 'financial',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
@@ -798,9 +791,6 @@ export default function AdminDashboard({
             <TabsTrigger value="jobs" className={tabTriggerClass}>
               <Briefcase size={16} /> Jobs
             </TabsTrigger>
-            <TabsTrigger value="tenders" className={tabTriggerClass}>
-              <FileText size={16} /> Tenders
-            </TabsTrigger>
             <TabsTrigger value="reviews" className={tabTriggerClass}>
               <Star size={16} /> Moderation
             </TabsTrigger>
@@ -818,6 +808,9 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="fees" className={tabTriggerClass}>
               <CreditCard size={16} /> Fees
+            </TabsTrigger>
+            <TabsTrigger value="financial" className={tabTriggerClass}>
+              <Landmark size={16} /> Financial
             </TabsTrigger>
             <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
@@ -948,17 +941,6 @@ export default function AdminDashboard({
                 </Card>
               ))}
             </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="tenders">
-          <div className="space-y-6 bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
-            <div>
-              <h2 className="text-2xl font-bold">Tender Oversight</h2>
-              <p className="text-sm text-muted-foreground">Monitor active procurement packages, AI bid comparisons, and awards.</p>
-            </div>
-            {tenders.map(tender => <div key={tender.id}><BidEvaluation tender={tender} /></div>)}
-            {tenders.length === 0 && <p className="text-muted-foreground italic">No tender packages found.</p>}
           </div>
         </TabsContent>
 
@@ -1120,6 +1102,10 @@ export default function AdminDashboard({
 
         <TabsContent value="fees">
           <FeeEstimator role="admin" />
+        </TabsContent>
+
+        <TabsContent value="financial">
+          <FinancialDashboard />
         </TabsContent>
       </Tabs>
 
