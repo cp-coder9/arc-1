@@ -38,6 +38,7 @@ import { getDisciplineCoverage, subscribeToTeam } from '../services/teamService'
 import GanttChart from './GanttChart';
 import SiteLogManager from './SiteLogManager';
 import RFIManager from './RFIManager';
+import CloseoutWizard from './CloseoutWizard';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -167,6 +168,9 @@ export default function ArchitectDashboard({
             <TabsTrigger value="construction" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <HardHat size={16} /> Construction
             </TabsTrigger>
+            <TabsTrigger value="closeout" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <CheckCircle2 size={16} /> Close-out
+            </TabsTrigger>
             <TabsTrigger value="fees" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <CreditCard size={16} /> Fee Estimator
             </TabsTrigger>
@@ -270,6 +274,10 @@ export default function ArchitectDashboard({
 
         <TabsContent value="construction" className="mt-8">
           <ConstructionDashboard user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="closeout" className="mt-8">
+          <CloseoutDashboard myJobs={myJobs} />
         </TabsContent>
 
         <TabsContent value="fees" className="mt-8">
@@ -706,6 +714,43 @@ function ConstructionDashboard({ user, myJobs }: { user: UserProfile; myJobs: Jo
           <Badge variant="outline" className="rounded-full px-4 py-2">Phase 4 summary</Badge>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function CloseoutDashboard({ myJobs }: { myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  if (myJobs.length === 0 || !selectedJob) {
+    return <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50"><p className="text-muted-foreground italic">No projects available for close-out.</p></div>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><CheckCircle2 className="text-primary" /> Project Close-out</h2>
+          <p className="text-sm text-muted-foreground">Generate completion artifacts and archive lifecycle records.</p>
+        </div>
+        <select value={selectedJob.id} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none" aria-label="Select close-out project">
+          {myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
+        </select>
+      </div>
+      {project ? <CloseoutWizard projectId={project.id} /> : <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900"><CardContent className="p-8">Project lifecycle record not found.</CardContent></Card>}
     </div>
   );
 }
