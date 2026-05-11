@@ -14,7 +14,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin, Upload } from 'lucide-react';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin, Upload, FileText } from 'lucide-react';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -35,6 +35,10 @@ import AdvanceStageButton from './AdvanceStageButton';
 import ResponsibilityMatrix from './ResponsibilityMatrix';
 import TeamBuilder from './TeamBuilder';
 import { getDisciplineCoverage, subscribeToTeam } from '../services/teamService';
+import TenderWizard from './TenderWizard';
+import BidEvaluation from './BidEvaluation';
+import { subscribeToTendersByProject } from '@/services/tenderService';
+import type { TenderPackage } from '@/types';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -161,6 +165,9 @@ export default function ArchitectDashboard({
             <TabsTrigger value="coordination" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Users size={16} /> Coordination
             </TabsTrigger>
+            <TabsTrigger value="tenders" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <FileText size={16} /> Tender
+            </TabsTrigger>
             <TabsTrigger value="fees" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <CreditCard size={16} /> Fee Estimator
             </TabsTrigger>
@@ -260,6 +267,10 @@ export default function ArchitectDashboard({
 
         <TabsContent value="coordination" className="mt-8">
           <CoordinationDashboard user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="tenders" className="mt-8">
+          <TenderDashboard user={user} myJobs={myJobs} />
         </TabsContent>
 
         <TabsContent value="fees" className="mt-8">
@@ -621,6 +632,31 @@ function CoordinationDashboard({ user, myJobs }: { user: UserProfile, myJobs: Jo
       <TeamBuilder job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
     </div>
   );
+}
+
+function TenderDashboard({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const [tenders, setTenders] = useState<TenderPackage[]>([]);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJob?.id) { setProject(null); return; }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  useEffect(() => {
+    if (!project?.id) { setTenders([]); return; }
+    return subscribeToTendersByProject(project.id, setTenders);
+  }, [project?.id]);
+
+  if (!selectedJob) return <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50"><p className="text-muted-foreground italic">No active projects available for tendering.</p></div>;
+
+  return <div className="space-y-8"><div className="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><h2 className="text-2xl font-heading font-bold flex items-center gap-2"><FileText className="text-primary" /> Tender & Procurement</h2><p className="text-sm text-muted-foreground">Create tender packages, compare bids, and award contractors.</p></div><select value={selectedJob.id} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none">{myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}</select></div>{project ? <TenderWizard user={user} job={selectedJob} project={project} /> : <Card className="rounded-3xl border-amber-200 bg-amber-50"><CardContent className="p-6 text-amber-900">Project lifecycle record not found for this job.</CardContent></Card>}<div className="space-y-6">{tenders.map((tender) => <div key={tender.id}><BidEvaluation tender={tender} /></div>)}{tenders.length === 0 && <div className="rounded-3xl border border-dashed border-border bg-white/50 py-12 text-center text-muted-foreground">No tender packages created for this project yet.</div>}</div></div>;
 }
 
 function StatPill({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number }) {
