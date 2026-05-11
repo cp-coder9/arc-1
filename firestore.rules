@@ -106,6 +106,102 @@ service cloud.firestore {
       ]);
     }
 
+    function getTender(tenderId) {
+      return get(/databases/$(database)/documents/tender_packages/$(tenderId));
+    }
+
+    function isTenderOwner(tenderId) {
+      return isAuthenticated() && getTender(tenderId).data.createdBy == request.auth.uid;
+    }
+
+    function getProject(projectId) {
+      return get(/databases/$(database)/documents/projects/$(projectId));
+    }
+
+    function projectExists(projectId) {
+      return exists(/databases/$(database)/documents/projects/$(projectId));
+    }
+
+    function jobExists(jobId) {
+      return exists(/databases/$(database)/documents/jobs/$(jobId));
+    }
+
+    function canManageTenderFor(projectId, jobId) {
+      return isAuthenticated() && projectExists(projectId) && jobExists(jobId) &&
+        getProject(projectId).data.jobId == jobId && (
+          isAdmin() ||
+          getProject(projectId).data.clientId == request.auth.uid ||
+          getProject(projectId).data.leadArchitectId == request.auth.uid ||
+          isProjectTeamMember(getProject(projectId).data) ||
+          getJob(jobId).data.clientId == request.auth.uid ||
+          getJob(jobId).data.selectedArchitectId == request.auth.uid
+        );
+    }
+
+    function isTenderParticipant(tenderData) {
+      return canManageTenderFor(tenderData.projectId, tenderData.jobId);
+    }
+
+    function isEligibleContractorForTender(tenderData) {
+      return isAuthenticated() && tenderData.status == 'published' && !isTenderParticipant(tenderData) && (
+        hasRole('freelancer') || hasRole('bep') || hasRole('architect')
+      );
+    }
+
+    function isValidBidId(bidId) {
+      return bidId == 'contractor_' + request.auth.uid;
+    }
+
+    function unchangedBidIdentityAndFinancials() {
+      return request.resource.data.tenderPackageId == resource.data.tenderPackageId &&
+        request.resource.data.contractorId == resource.data.contractorId &&
+        request.resource.data.contractorName == resource.data.contractorName &&
+        request.resource.data.totalAmount == resource.data.totalAmount &&
+        request.resource.data.lineItems == resource.data.lineItems &&
+        request.resource.data.proposedTimeline == resource.data.proposedTimeline &&
+        request.resource.data.proposedStartDate == resource.data.proposedStartDate &&
+        request.resource.data.methodology == resource.data.methodology &&
+        request.resource.data.qualifications == resource.data.qualifications &&
+        request.resource.data.attachments == resource.data.attachments &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function isContractorBidWithdrawal() {
+      return request.auth.uid == resource.data.contractorId &&
+        resource.data.status in ['submitted', 'shortlisted'] &&
+        request.resource.data.status == 'withdrawn' &&
+        request.resource.data.aiScore == resource.data.aiScore &&
+        request.resource.data.aiNotes == resource.data.aiNotes &&
+        unchangedBidIdentityAndFinancials() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+    }
+
+    function isTenderReviewBidStatusUpdate(tenderId) {
+      return (isTenderOwner(tenderId) || isAdmin()) &&
+        request.resource.data.status in ['submitted', 'shortlisted', 'rejected', 'awarded', 'withdrawn'] &&
+        resource.data.status != 'withdrawn' &&
+        unchangedBidIdentityAndFinancials() &&
+        request.resource.data.aiScore == resource.data.aiScore &&
+        request.resource.data.aiNotes == resource.data.aiNotes &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+    }
+
+    function isAdminBidAiUpdate() {
+      return isAdmin() &&
+        request.resource.data.status == resource.data.status &&
+        unchangedBidIdentityAndFinancials() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['aiScore', 'aiNotes', 'updatedAt']);
+    }
+
+    function isTenderAiUpdate() {
+      return isAdmin() &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.projectId == resource.data.projectId &&
+        request.resource.data.jobId == resource.data.jobId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'aiComparisonReport', 'updatedAt']);
+    }
+
     // Users collection
     match /users/{userId} {
       // Allow reading user profiles if authenticated
@@ -244,6 +340,55 @@ service cloud.firestore {
         (isLeadArchitect(resource.data) && isTeamRosterUpdate())
       );
       allow delete: if isAdmin();
+    }
+
+    // Tender packages and contractor bids
+    match /tender_packages/{tenderId} {
+      allow read: if isAuthenticated() && (
+        isTenderParticipant(resource.data) ||
+        isEligibleContractorForTender(resource.data)
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        canManageTenderFor(request.resource.data.projectId, request.resource.data.jobId) &&
+        request.resource.data.status in ['draft', 'published'] &&
+        request.resource.data.keys().hasOnly(['projectId', 'jobId', 'title', 'description', 'scope', 'documents', 'deadline', 'estimatedBudget', 'requiredDisciplines', 'requiredCertifications', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        request.resource.data.keys().hasAll(['projectId', 'jobId', 'title', 'description', 'scope', 'documents', 'deadline', 'requiredDisciplines', 'status', 'createdBy', 'createdAt']);
+      allow update: if isAuthenticated() &&
+        (
+          (isTenderParticipant(resource.data) &&
+            request.resource.data.createdBy == resource.data.createdBy &&
+            request.resource.data.projectId == resource.data.projectId &&
+            request.resource.data.jobId == resource.data.jobId &&
+            request.resource.data.createdAt == resource.data.createdAt &&
+            request.resource.data.aiComparisonReport == resource.data.aiComparisonReport &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'scope', 'documents', 'deadline', 'estimatedBudget', 'requiredDisciplines', 'requiredCertifications', 'status', 'awardedBidId', 'awardedContractorId', 'updatedAt'])) ||
+          isTenderAiUpdate()
+        );
+      allow delete: if isAdmin();
+
+      match /bids/{bidId} {
+        allow read: if isAuthenticated() && (
+          resource.data.contractorId == request.auth.uid ||
+          isTenderParticipant(getTender(tenderId).data)
+        );
+        allow create: if isAuthenticated() &&
+          isValidBidId(bidId) &&
+          request.resource.data.contractorId == request.auth.uid &&
+          request.resource.data.tenderPackageId == tenderId &&
+          isEligibleContractorForTender(getTender(tenderId).data) &&
+          request.resource.data.status == 'submitted' &&
+          !('aiScore' in request.resource.data) &&
+          !('aiNotes' in request.resource.data) &&
+          request.resource.data.keys().hasOnly(['tenderPackageId', 'contractorId', 'contractorName', 'totalAmount', 'lineItems', 'proposedTimeline', 'proposedStartDate', 'methodology', 'qualifications', 'attachments', 'status', 'createdAt', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['tenderPackageId', 'contractorId', 'contractorName', 'totalAmount', 'lineItems', 'proposedTimeline', 'proposedStartDate', 'methodology', 'qualifications', 'attachments', 'status', 'createdAt']);
+        allow update: if isAuthenticated() && (
+          isContractorBidWithdrawal() ||
+          isTenderReviewBidStatusUpdate(tenderId) ||
+          isAdminBidAiUpdate()
+        );
+        allow delete: if isAdmin();
+      }
     }
 
     // Collection Group matches for Admin Dashboard

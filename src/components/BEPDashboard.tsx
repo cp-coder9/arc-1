@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import ProfileEditor from './ProfileEditor';
 import { safeFormat } from '../lib/utils';
 import { Chat } from './Chat';
+import BidSubmission from './BidSubmission';
 
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
@@ -42,7 +43,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'overview' | 'marketplace'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'marketplace' | 'tenders'>('overview');
 
   useEffect(() => {
     const qTasks = query(collectionGroup(db, 'tasks'), where('assigneeId', '==', user.uid));
@@ -138,6 +139,13 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
             onClick={() => setActiveView('marketplace')}
           >
             Marketplace
+          </Button>
+          <Button
+            variant={activeView === 'tenders' ? 'default' : 'outline'}
+            className="rounded-full px-6 h-12 font-bold shadow-sm"
+            onClick={() => setActiveView('tenders')}
+          >
+            Open Tenders
           </Button>
         </div>
       </div>
@@ -271,6 +279,16 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
               <MarketplaceJobCard key={job.id} {...({job, user} as any)} job={job} user={user} />
             ))}
           </div>
+        </div>
+      )}
+
+      {activeView === 'tenders' && (
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-2xl font-heading font-bold tracking-tight">Open Tenders</h2>
+            <p className="text-muted-foreground">Submit contractor bids for published tender packages.</p>
+          </div>
+          <BidSubmission user={user} />
         </div>
       )}
     </div>

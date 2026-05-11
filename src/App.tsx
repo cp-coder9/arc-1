@@ -68,7 +68,8 @@ import {
   Lightbulb,
   Database,
   Construction,
-  ArrowLeft
+  ArrowLeft,
+  ClipboardList
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -544,6 +545,14 @@ export default function App() {
             )}
             {user!.role === 'architect' && (
               <NavItem
+                icon={<ClipboardList size={18} />}
+                label="Tenders"
+                active={activeTab === 'tenders'}
+                onClick={() => { setActiveTab('tenders'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {user!.role === 'architect' && (
+              <NavItem
                 icon={<Users size={18} />}
                 label="Coordination"
                 active={activeTab === 'coordination'}
@@ -595,6 +604,12 @@ export default function App() {
                   label="Fees"
                   active={activeTab === 'fees'}
                   onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<ClipboardList size={18} />}
+                  label="Tenders"
+                  active={activeTab === 'tenders'}
+                  onClick={() => { setActiveTab('tenders'); setIsSidebarOpen(false); }}
                 />
               </>
             )}

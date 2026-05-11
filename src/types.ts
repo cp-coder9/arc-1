@@ -614,7 +614,7 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'tender';
   jobId?: string;
   submissionId?: string;
 };
@@ -756,4 +756,62 @@ export interface ProjectTeamMember {
   discipline?: Discipline;
   joinedAt: string;
   status: 'invited' | 'active' | 'removed';
+}
+
+// --- Contractor Procurement & Tender Types ----------------------------------
+
+export type TenderStatus = 'draft' | 'published' | 'closed' | 'evaluating' | 'awarded' | 'cancelled';
+
+export interface TenderDocument {
+  name: string;
+  url: string;
+}
+
+export interface TenderPackage {
+  id: string;
+  projectId: string;
+  jobId: string;
+  title: string;
+  description: string;
+  scope: string[];
+  documents: TenderDocument[];
+  deadline: string;
+  estimatedBudget?: number;
+  requiredDisciplines: Discipline[];
+  requiredCertifications?: string[];
+  status: TenderStatus;
+  createdBy: string;
+  awardedBidId?: string;
+  awardedContractorId?: string;
+  aiComparisonReport?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type BidStatus = 'submitted' | 'shortlisted' | 'rejected' | 'awarded' | 'withdrawn';
+
+export interface BidLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Bid {
+  id: string;
+  tenderPackageId: string;
+  contractorId: string;
+  contractorName: string;
+  totalAmount: number;
+  lineItems: BidLineItem[];
+  proposedTimeline: string;
+  proposedStartDate: string;
+  methodology: string;
+  qualifications: string;
+  attachments: TenderDocument[];
+  status: BidStatus;
+  aiScore?: number;
+  aiNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
