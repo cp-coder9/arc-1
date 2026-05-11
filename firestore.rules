@@ -46,6 +46,55 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/jobs/$(jobId));
     }
 
+    function isProjectTeamMemberAt(projectData, index) {
+      return projectData.teamMembers is list &&
+        projectData.teamMembers.size() > index &&
+        projectData.teamMembers[index].userId == request.auth.uid &&
+        projectData.teamMembers[index].status == 'active';
+    }
+
+    function isProjectTeamMember(projectData) {
+      return isAuthenticated() && (
+        isProjectTeamMemberAt(projectData, 0) ||
+        isProjectTeamMemberAt(projectData, 1) ||
+        isProjectTeamMemberAt(projectData, 2) ||
+        isProjectTeamMemberAt(projectData, 3) ||
+        isProjectTeamMemberAt(projectData, 4) ||
+        isProjectTeamMemberAt(projectData, 5) ||
+        isProjectTeamMemberAt(projectData, 6) ||
+        isProjectTeamMemberAt(projectData, 7) ||
+        isProjectTeamMemberAt(projectData, 8) ||
+        isProjectTeamMemberAt(projectData, 9) ||
+        isProjectTeamMemberAt(projectData, 10) ||
+        isProjectTeamMemberAt(projectData, 11) ||
+        isProjectTeamMemberAt(projectData, 12) ||
+        isProjectTeamMemberAt(projectData, 13) ||
+        isProjectTeamMemberAt(projectData, 14) ||
+        isProjectTeamMemberAt(projectData, 15) ||
+        isProjectTeamMemberAt(projectData, 16) ||
+        isProjectTeamMemberAt(projectData, 17) ||
+        isProjectTeamMemberAt(projectData, 18) ||
+        isProjectTeamMemberAt(projectData, 19)
+      );
+    }
+
+    function isProjectParticipantByData(projectData) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        projectData.clientId == request.auth.uid ||
+        projectData.leadArchitectId == request.auth.uid ||
+        isProjectTeamMember(projectData)
+      );
+    }
+
+    function isParticipantLifecycleUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'currentStage',
+        'stageHistory',
+        'updatedAt'
+      ]);
+    }
+
     // Users collection
     match /users/{userId} {
       // Allow reading user profiles if authenticated
@@ -150,7 +199,14 @@ service cloud.firestore {
 
     // Disputes collection
     match /disputes/{disputeId} {
-      allow read: if isAuthenticated() && (
+      // Admin collection queries cannot safely call isAdmin() when that helper
+      // reads the queried collection via getUserData(); use token/email checks
+      // for list reads and keep owner/participant checks for document reads.
+      allow list: if isAuthenticated() && (
+        (request.auth.token.email != null && request.auth.token.email.matches('gm\\.tarb@gmail\\.com|leor@slutzkin\\.co\\.za')) ||
+        request.auth.token.admin == true
+      );
+      allow get: if isAuthenticated() && (
         isAdmin() ||
         resource.data.filedBy == request.auth.uid ||
         resource.data.filedAgainst == request.auth.uid ||
@@ -163,6 +219,19 @@ service cloud.firestore {
         request.resource.data.status == 'open';
       allow update: if isAdmin();
       allow delete: if false;
+    }
+
+    // Projects collection
+    match /projects/{projectId} {
+      allow read: if isProjectParticipantByData(resource.data);
+      allow create: if isAuthenticated() && (
+        isAdmin() || request.resource.data.clientId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (isProjectParticipantByData(resource.data) && isParticipantLifecycleUpdate())
+      );
+      allow delete: if isAdmin();
     }
 
     // Collection Group matches for Admin Dashboard

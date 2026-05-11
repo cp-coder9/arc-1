@@ -1,5 +1,5 @@
+import type { Firestore } from 'firebase/firestore';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 export type FeeEstimatorRole = 'architect' | 'client' | 'admin';
 export type FeeProjectType = 'residential' | 'commercial' | 'industrial' | 'renovation' | 'interior' | 'landscape';
@@ -287,8 +287,14 @@ export function estimateArchitecturalFee(input: FeeEstimatorInput, settings = DE
   };
 }
 
+async function getFeeEstimatorDb(): Promise<Firestore> {
+  const { db } = await import('../lib/firebase');
+  return db;
+}
+
 export async function loadFeeEstimatorSettings(): Promise<FeeEstimatorSettings> {
   try {
+    const db = await getFeeEstimatorDb();
     const snapshot = await getDoc(doc(db, ...SETTINGS_DOC_PATH));
     if (!snapshot.exists()) return DEFAULT_FEE_ESTIMATOR_SETTINGS;
     return sanitizeFeeEstimatorSettings(snapshot.data() as Partial<FeeEstimatorSettings>);
@@ -299,6 +305,7 @@ export async function loadFeeEstimatorSettings(): Promise<FeeEstimatorSettings> 
 }
 
 export async function saveFeeEstimatorSettings(settings: FeeEstimatorSettings): Promise<void> {
+  const db = await getFeeEstimatorDb();
   await setDoc(doc(db, ...SETTINGS_DOC_PATH), {
     ...sanitizeFeeEstimatorSettings(settings),
     updatedAt: new Date().toISOString(),

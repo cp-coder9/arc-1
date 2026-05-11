@@ -8,6 +8,41 @@ import firebaseAppletConfig from "../../firebase-applet-config.json";
 const projectId = process.env.VITE_FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId;
 const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || firebaseAppletConfig.firestoreDatabaseId;
 
+type ServiceAccountInput = {
+  project_id?: string;
+  client_email?: string;
+  private_key?: string;
+};
+
+function trimWrappingQuotes(value: string) {
+  const trimmed = value.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function parseServiceAccount(value: string): ServiceAccountInput {
+  const raw = trimWrappingQuotes(value);
+  const candidates = [
+    raw,
+    raw.replace(/\\n/g, '\n'),
+    Buffer.from(raw, 'base64').toString('utf8'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as ServiceAccountInput;
+      if (parsed.private_key) parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+      return parsed;
+    } catch {
+      // Try the next representation.
+    }
+  }
+
+  throw new Error('Unable to parse Firebase service account JSON from environment variable');
+}
+
 let app;
 if (getApps().length === 0) {
   if (!projectId) {
@@ -18,23 +53,24 @@ if (getApps().length === 0) {
     projectId: projectId,
   };
 
-  // Check for service account in environment variables
+  // Check for service account in environment variables. Production hosts often
+  // store this as raw JSON, quoted JSON, escaped JSON, or base64-encoded JSON.
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT;
   
   if (serviceAccountKey) {
     try {
-      const serviceAccount = JSON.parse(serviceAccountKey);
-      adminConfig.credential = cert(serviceAccount);
+      const serviceAccount = parseServiceAccount(serviceAccountKey);
+      adminConfig.credential = cert(serviceAccount as any);
       console.log("Firebase Admin initialized with service account.");
     } catch (err) {
-      console.error("Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:", err);
+      console.error("Error parsing Firebase service account credentials:", err);
       throw err;
     }
   } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     adminConfig.credential = cert({
       projectId: projectId,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      privateKey: trimWrappingQuotes(process.env.FIREBASE_PRIVATE_KEY).replace(/\\n/g, '\n'),
     });
     console.log("Firebase Admin initialized with individual credentials.");
   } else {

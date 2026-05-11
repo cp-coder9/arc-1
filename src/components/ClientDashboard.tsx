@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, orderBy, deleteField } from 'firebase/firestore';
-import { UserProfile, Job, Submission, Application, JobCategory, Review } from '../types';
+import { UserProfile, Job, Submission, Application, JobCategory, Review, Project } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -45,6 +45,8 @@ import ReactMarkdown from 'react-markdown';
 import MunicipalTracker from './MunicipalTracker';
 import { paginateItems, totalPages } from '@/lib/utils';
 import FeeEstimator from './FeeEstimator';
+import StageProgressTracker from './StageProgressTracker';
+import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 // import { motion } from 'framer-motion';
 
 export default function ClientDashboard({ 
@@ -217,6 +219,7 @@ export default function ClientDashboard({
 function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const [architect, setArchitect] = useState<UserProfile | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDisputing, setIsDisputing] = useState(false);
@@ -241,6 +244,11 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
       setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application)));
     });
 
+    return () => unsubscribe();
+  }, [job.id]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToProjectByJobId(job.id, setProject);
     return () => unsubscribe();
   }, [job.id]);
 
@@ -362,6 +370,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
         </div>
         <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
         <p className="text-sm text-muted-foreground line-clamp-2">{job.description}</p>
+        {project && <StageProgressTracker currentStage={project.currentStage} stageHistory={project.stageHistory} />}
         <div className="flex flex-wrap gap-2">
           <Dialog open={isEditing} onOpenChange={setIsEditing}>
             <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full">Edit</Button>} />

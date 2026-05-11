@@ -643,3 +643,93 @@ export interface KnowledgeCitation {
   pdfPageNumber?: number;
   tags: string[];
 }
+
+// --- Project Lifecycle Types ------------------------------------------------
+
+/**
+ * The 9-stage project lifecycle from Intake to Close-out.
+ * Each stage represents a major phase in the architectural project delivery process.
+ */
+export type ProjectStage =
+  | 'intake'
+  | 'scoping'
+  | 'appointment'
+  | 'coordination'
+  | 'compliance'
+  | 'tender'
+  | 'delivery'
+  | 'payments'
+  | 'closeout';
+
+/** Canonical ordering of project stages (forward-only transitions). */
+export const PROJECT_STAGE_ORDER: ProjectStage[] = [
+  'intake',
+  'scoping',
+  'appointment',
+  'coordination',
+  'compliance',
+  'tender',
+  'delivery',
+  'payments',
+  'closeout',
+];
+
+/** Human-readable labels for each project stage. */
+export const PROJECT_STAGE_LABELS: Record<ProjectStage, string> = {
+  intake: 'Intake',
+  scoping: 'Scoping & Briefing',
+  appointment: 'Appointment',
+  coordination: 'Design Coordination',
+  compliance: 'Compliance Review',
+  tender: 'Tender & Procurement',
+  delivery: 'Construction Delivery',
+  payments: 'Payments & Escrow',
+  closeout: 'Close-out',
+};
+
+/** Icon names (lucide-react) for each project stage. */
+export const PROJECT_STAGE_ICONS: Record<ProjectStage, string> = {
+  intake: 'ClipboardList',
+  scoping: 'Search',
+  appointment: 'UserCheck',
+  coordination: 'Users',
+  compliance: 'ShieldCheck',
+  tender: 'FileText',
+  delivery: 'HardHat',
+  payments: 'CreditCard',
+  closeout: 'CheckCircle2',
+};
+
+/** A record of a stage transition in the project's history. */
+export interface StageHistoryEntry {
+  stage: ProjectStage;
+  enteredAt: string;
+  exitedAt?: string;
+  actorId: string;
+  note?: string;
+}
+
+/**
+ * A Project wraps a Job with lifecycle tracking, stage metadata, and a team roster.
+ * Created when a client accepts an architect's application.
+ */
+export interface Project {
+  id: string;
+  jobId: string;
+  clientId: string;
+  leadArchitectId?: string;
+  currentStage: ProjectStage;
+  stageHistory: StageHistoryEntry[];
+  teamMembers: ProjectTeamMember[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/** A member of the project team, tracked by discipline and status. */
+export interface ProjectTeamMember {
+  userId: string;
+  role: UserRole | string;
+  discipline?: Discipline;
+  joinedAt: string;
+  status: 'invited' | 'active' | 'removed';
+}
