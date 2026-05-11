@@ -1,119 +1,153 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
+import React, { ChangeEvent, FormEvent, useMemo, useState } from 'react';
+import { FileText, Loader2, Plus, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { Plus, Trash2, UploadCloud } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { BidLineItem, TenderPackage } from '@/types';
+import { submitBid } from '@/services/tenderService';
 import { uploadAndTrackFile } from '@/lib/uploadService';
-import { getContractorBidId, submitBid } from '@/services/tenderService';
-import type { Bid, BidLineItem, TenderDocument, TenderPackage, UserProfile } from '@/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 
-const CERTIFICATION_ALIASES: Record<string, string[]> = {
-  nhbrc: ['nhbrc', 'nhbrc enrolment', 'nhbrc registered builder', 'registered builder'],
-  structure: ['structure', 'structural', 'structural engineering', 'pr eng structural', 'engineer'],
-  electrical: ['electrical', 'electrician', 'pr eng electrical'],
-  mechanical: ['mechanical', 'pr eng mechanical'],
-  fire: ['fire', 'fire engineering', 'fire consultant'],
-  drainage: ['drainage', 'civil', 'civil engineering'],
-  energy: ['energy', 'energy compliance'],
-  documentation: ['documentation', 'draughtsperson', 'drafting'],
-};
-
-function normalizeToken(value: string): string {
-  return value.trim().toLowerCase();
+interface BidSubmissionProps {
+  tenders: TenderPackage[];
+  contractorId: string;
+  contractorName: string;
+  onSubmitted?: (tenderId: string, bidId: string) => void;
 }
 
-function userCapabilityTokens(user: UserProfile): Set<string> {
-  const values = [
-    user.professionalLabel,
-    user.tradeLicense,
-    user.cidbGrading ? 'cidb' : undefined,
-    user.cidbGrading,
-    user.nhbrcNumber ? 'nhbrc' : undefined,
-    user.nhbrcNumber ? 'nhbrc registered builder' : undefined,
-    ...(user.professionalLabels ?? []),
-  ];
-
-  const tokens = new Set<string>();
-  values.filter((value): value is string => Boolean(value?.trim())).forEach((value) => {
-    const normalized = normalizeToken(value);
-    tokens.add(normalized);
-    normalized.split(/[^a-z0-9]+/).filter(Boolean).forEach((part) => tokens.add(part));
-  });
-  return tokens;
+interface AttachmentDraft {
+  name: string;
+  url: string;
 }
 
-function matchesRequirement(requirement: string, capabilities: Set<string>): boolean {
-  const normalized = normalizeToken(requirement);
-  const aliases = CERTIFICATION_ALIASES[normalized] ?? [];
-  const candidates = [normalized, ...aliases];
-  return candidates.some((candidate) => capabilities.has(candidate) || Array.from(capabilities).some((capability) => capability.includes(candidate) || candidate.includes(capability)));
-}
+const emptyLineItem = (): BidLineItem => ({ description: '', quantity: 1, unitPrice: 0, total: 0 });
 
-export default function BidSubmission({ user }: { user: UserProfile }) {
-  const [tenders, setTenders] = useState<TenderPackage[]>([]);
-
-  useEffect(() => {
-    const q = query(collection(db, 'tender_packages'), where('status', '==', 'published'));
-    return onSnapshot(q, (snapshot) => setTenders(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as TenderPackage))));
-  }, []);
-
-  const matchingTenders = useMemo(() => tenders.filter((tender) => {
-    const capabilities = userCapabilityTokens(user);
-    if (capabilities.size === 0) return true;
-    return tender.requiredDisciplines.some((discipline) => matchesRequirement(discipline, capabilities)) || tender.requiredCertifications?.some((cert) => matchesRequirement(cert, capabilities));
-  }), [tenders, user]);
-
-  return <div className="space-y-6">{matchingTenders.map((tender) => <div key={tender.id}><TenderBidCard tender={tender} user={user} /></div>)}{matchingTenders.length === 0 && <div className="rounded-3xl border-2 border-dashed border-border bg-white/50 py-16 text-center text-muted-foreground">No open tenders currently match your profile.</div>}</div>;
-}
-
-function TenderBidCard({ tender, user }: { tender: TenderPackage; user: UserProfile }) {
-  const [lineItems, setLineItems] = useState<BidLineItem[]>([{ description: '', quantity: 1, unitPrice: 0, total: 0 }]);
+export default function BidSubmission({ tenders, contractorId, contractorName, onSubmitted }: BidSubmissionProps) {
+  const openTenders = useMemo(() => tenders.filter((tender) => tender.status === 'published'), [tenders]);
+  const [selectedTenderId, setSelectedTenderId] = useState(openTenders[0]?.id ?? '');
+  const [lineItems, setLineItems] = useState<BidLineItem[]>([emptyLineItem()]);
+  const [proposedTimeline, setProposedTimeline] = useState('');
+  const [proposedStartDate, setProposedStartDate] = useState('');
   const [methodology, setMethodology] = useState('');
-  const [timeline, setTimeline] = useState('');
-  const [startDate, setStartDate] = useState('');
   const [qualifications, setQualifications] = useState('');
-  const [attachments, setAttachments] = useState<TenderDocument[]>([]);
-  const [existingBid, setExistingBid] = useState<Bid | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const total = lineItems.reduce((sum, item) => sum + Number(item.total || item.quantity * item.unitPrice || 0), 0);
-  const hasActiveBid = existingBid != null && existingBid.status !== 'withdrawn';
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    const bidRef = doc(db, 'tender_packages', tender.id, 'bids', getContractorBidId(user.uid));
-    return onSnapshot(bidRef, (snapshot) => setExistingBid(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as Bid : null));
-  }, [tender.id, user.uid]);
+  const selectedTender = openTenders.find((tender) => tender.id === selectedTenderId);
+  const normalizedLineItems = useMemo(() => lineItems.map((item) => ({ ...item, total: Number(item.quantity) * Number(item.unitPrice) })), [lineItems]);
+  const totalAmount = normalizedLineItems.reduce((total, item) => total + item.total, 0);
+  const canSubmit = Boolean(selectedTenderId && totalAmount > 0 && proposedTimeline.trim() && proposedStartDate && methodology.trim() && qualifications.trim());
 
-  const updateLine = (index: number, patch: Partial<BidLineItem>) => setLineItems((current) => current.map((item, i) => {
-    if (i !== index) return item;
-    const next = { ...item, ...patch };
-    return { ...next, total: Number(next.quantity || 0) * Number(next.unitPrice || 0) };
-  }));
+  const updateLineItem = (index: number, field: keyof BidLineItem, value: string) => {
+    setLineItems((items) => items.map((item, itemIndex) => {
+      if (itemIndex !== index) return item;
+      const next = { ...item, [field]: field === 'description' ? value : Number(value) };
+      return { ...next, total: Number(next.quantity) * Number(next.unitPrice) };
+    }));
+  };
 
-  const uploadAttachments = async (files: FileList | null) => {
-    if (!files?.length) return;
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = Array.from(event.target.files ?? []);
+    if (!selectedTender || files.length === 0) return;
+    setIsUploading(true);
     try {
-      const uploaded = await Promise.all(Array.from(files).map(async (file) => ({ name: file.name, url: await uploadAndTrackFile(file, { fileName: file.name, fileType: file.type || 'application/octet-stream', fileSize: file.size, uploadedBy: user.uid, context: 'tender', jobId: tender.jobId }) })));
+      const uploaded = await Promise.all(files.map(async (file: File) => ({
+        name: file.name,
+        url: await uploadAndTrackFile(file, {
+          fileName: file.name,
+          fileType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          uploadedBy: contractorId,
+          context: 'submission',
+          jobId: selectedTender.jobId,
+        }),
+      })));
       setAttachments((current) => [...current, ...uploaded]);
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Attachment upload failed'); }
-  };
-
-  const handleSubmit = async () => {
-    if (hasActiveBid) {
-      toast.error('You already have an active bid for this tender');
-      return;
+      toast.success('Bid attachment uploaded');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to upload attachment');
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
     }
-    setSubmitting(true);
-    try {
-      await submitBid(tender.id, { contractorId: user.uid, contractorName: user.displayName || user.email, lineItems, proposedTimeline: timeline, proposedStartDate: startDate, methodology, qualifications, attachments });
-      toast.success('Bid submitted');
-      setMethodology(''); setTimeline(''); setStartDate(''); setQualifications(''); setAttachments([]); setLineItems([{ description: '', quantity: 1, unitPrice: 0, total: 0 }]);
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Bid submission failed'); } finally { setSubmitting(false); }
   };
 
-  return <Card className="rounded-[2rem] border-border bg-white shadow-sm"><CardHeader><div className="flex items-start justify-between gap-4"><div><CardTitle>{tender.title}</CardTitle><CardDescription>{tender.description}</CardDescription></div><Badge>Due {tender.deadline}</Badge></div></CardHeader><CardContent className="space-y-5"><div className="flex flex-wrap gap-2">{tender.scope.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}</div><div className="space-y-3">{lineItems.map((item, index) => <div key={index} className="grid grid-cols-12 gap-2"><Input className="col-span-5" placeholder="Line item" value={item.description} onChange={(e) => updateLine(index, { description: e.target.value })} /><Input className="col-span-2" type="number" value={item.quantity} onChange={(e) => updateLine(index, { quantity: Number(e.target.value) })} /><Input className="col-span-3" type="number" value={item.unitPrice} onChange={(e) => updateLine(index, { unitPrice: Number(e.target.value) })} /><Button className="col-span-2" variant="outline" onClick={() => setLineItems((current) => current.filter((_, i) => i !== index))}><Trash2 size={14} /></Button></div>)}<Button variant="outline" onClick={() => setLineItems((current) => [...current, { description: '', quantity: 1, unitPrice: 0, total: 0 }])}><Plus className="mr-2 h-4 w-4" />Add line item</Button></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Input placeholder="Proposed timeline, e.g. 12 weeks" value={timeline} onChange={(e) => setTimeline(e.target.value)} /><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div><Textarea placeholder="Methodology" value={methodology} onChange={(e) => setMethodology(e.target.value)} /><Textarea placeholder="Qualifications and relevant experience" value={qualifications} onChange={(e) => setQualifications(e.target.value)} /><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-4 text-sm font-bold"><UploadCloud size={16} /> Attach supporting documents<input type="file" multiple className="hidden" onChange={(e) => uploadAttachments(e.target.files)} /></label><div className="flex items-center justify-between border-t border-border pt-4"><span className="font-mono text-lg font-bold text-primary">R {total.toLocaleString()}</span><Button onClick={handleSubmit} disabled={submitting || hasActiveBid || !methodology || !timeline}>{hasActiveBid ? `Bid ${existingBid?.status}` : 'Submit Bid'}</Button></div></CardContent></Card>;
+  const submitTenderBid = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSubmit) return;
+    setIsSubmitting(true);
+    try {
+      const bidId = await submitBid(selectedTenderId, {
+        contractorId,
+        contractorName,
+        totalAmount,
+        lineItems: normalizedLineItems.filter((item) => item.description.trim()),
+        proposedTimeline: proposedTimeline.trim(),
+        proposedStartDate,
+        methodology: methodology.trim(),
+        qualifications: qualifications.trim(),
+        attachments,
+      });
+      toast.success('Bid submitted');
+      onSubmitted?.(selectedTenderId, bidId);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to submit bid');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Card className="rounded-3xl border-border bg-white shadow-sm">
+      <CardHeader className="border-b border-border p-6">
+        <CardTitle className="font-heading text-xl font-bold">Submit Contractor Bid</CardTitle>
+        <CardDescription>Select a published tender and provide pricing, timeline, and methodology.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-6">
+        {openTenders.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No open tenders are currently available.</p> : (
+          <form onSubmit={submitTenderBid} className="space-y-6">
+            <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={selectedTenderId} onChange={(event) => setSelectedTenderId(event.target.value)}>
+              {openTenders.map((tender) => <option key={tender.id} value={tender.id}>{tender.title}</option>)}
+            </select>
+
+            {selectedTender && <div className="rounded-2xl bg-secondary/30 p-4 text-sm"><strong>{selectedTender.title}</strong><p>{selectedTender.description}</p><Badge variant="secondary">Deadline {selectedTender.deadline}</Badge></div>}
+
+            <div className="space-y-3">
+              {lineItems.map((item, index) => (
+                <div key={index} className="grid gap-2 md:grid-cols-[1fr_120px_140px_48px]">
+                  <Input value={item.description} onChange={(event) => updateLineItem(index, 'description', event.target.value)} placeholder="Line item description" />
+                  <Input type="number" min="0" value={item.quantity} onChange={(event) => updateLineItem(index, 'quantity', event.target.value)} placeholder="Qty" />
+                  <Input type="number" min="0" value={item.unitPrice} onChange={(event) => updateLineItem(index, 'unitPrice', event.target.value)} placeholder="Unit price" />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setLineItems((items) => items.length === 1 ? [emptyLineItem()] : items.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /></Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" onClick={() => setLineItems((items) => [...items, emptyLineItem()])} className="gap-2"><Plus size={16} /> Add line item</Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input value={proposedTimeline} onChange={(event) => setProposedTimeline(event.target.value)} placeholder="Proposed timeline, e.g. 12 weeks" required />
+              <Input type="date" value={proposedStartDate} onChange={(event) => setProposedStartDate(event.target.value)} required />
+            </div>
+            <Textarea value={methodology} onChange={(event) => setMethodology(event.target.value)} placeholder="Construction methodology" required />
+            <Textarea value={qualifications} onChange={(event) => setQualifications(event.target.value)} placeholder="Qualifications, CIDB/NHBRC details, and relevant experience" required />
+
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+              {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+              Upload bid attachments
+              <input type="file" multiple className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+            </label>
+            {attachments.map((attachment) => <div key={attachment.url} className="flex items-center gap-2 rounded-xl border border-border p-3 text-sm"><FileText size={16} /> {attachment.name}</div>)}
+
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <strong>Total: {new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(totalAmount)}</strong>
+              <Button type="submit" disabled={!canSubmit || isSubmitting} className="gap-2">{isSubmitting && <Loader2 size={16} className="animate-spin" />} Submit Bid</Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
