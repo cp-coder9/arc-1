@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, collectionGroup, addDoc, orderBy } from 'firebase/firestore';
-import { UserProfile, Job, JobCard, UserRole, Review } from '../types';
+import { UserProfile, Job, JobCard, UserRole, Review, Project } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 import ProfileEditor from './ProfileEditor';
 import { safeFormat } from '../lib/utils';
 import { Chat } from './Chat';
+import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
+import SiteLogManager from './SiteLogManager';
 
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
@@ -186,6 +188,8 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
               </div>
             )}
 
+            <BEPConstructionSection user={user} tasks={assignedTasks} />
+
             <div className="space-y-6">
               <h2 className="text-2xl font-heading font-bold tracking-tight flex items-center gap-2">
                 <Clock className="text-primary" /> Active Job Cards
@@ -272,6 +276,44 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function BEPConstructionSection({ user, tasks }: { user: UserProfile; tasks: JobCard[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(tasks[0]?.jobId || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const jobIds = Array.from(new Set(tasks.map((task) => task.jobId).filter(Boolean)));
+
+  useEffect(() => {
+    if (!selectedJobId && jobIds[0]) setSelectedJobId(jobIds[0]);
+  }, [jobIds, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJobId) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJobId, setProject);
+  }, [selectedJobId]);
+
+  if (jobIds.length === 0) return null;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h2 className="text-2xl font-heading font-bold tracking-tight flex items-center gap-2">
+          <Hammer className="text-primary" /> Site Logs
+        </h2>
+        <select value={selectedJobId} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none" aria-label="Select site log project">
+          {jobIds.map((jobId) => <option key={jobId} value={jobId}>{jobId}</option>)}
+        </select>
+      </div>
+      {project ? (
+        <SiteLogManager projectId={project.id} jobId={selectedJobId} currentUserId={user.uid} compact />
+      ) : (
+        <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900"><CardContent className="p-6 text-sm">Site logs become available once this job is linked to a lifecycle project record.</CardContent></Card>
       )}
     </div>
   );

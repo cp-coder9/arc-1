@@ -244,6 +244,113 @@ service cloud.firestore {
         (isLeadArchitect(resource.data) && isTeamRosterUpdate())
       );
       allow delete: if isAdmin();
+
+      function canAccessConstructionSubcollections() {
+        return isProjectParticipantByData(get(/databases/$(database)/documents/projects/$(projectId)).data);
+      }
+
+      function constructionProjectData() {
+        return get(/databases/$(database)/documents/projects/$(projectId)).data;
+      }
+
+      function canManageConstructionRecords() {
+        return isAdmin() || isLeadArchitect(constructionProjectData());
+      }
+
+      function hasOnlyConstructionMetaFields() {
+        return request.resource.data.keys().hasOnly(['lastNumber', 'updatedAt']) &&
+          request.resource.data.lastNumber is number &&
+          request.resource.data.updatedAt is string;
+      }
+
+      function isRFIResponder() {
+        return isAuthenticated() && (
+          resource.data.assignedTo == request.auth.uid ||
+          canManageConstructionRecords()
+        );
+      }
+
+      function canCloseRFI() {
+        return isAuthenticated() && (
+          resource.data.requestedBy == request.auth.uid ||
+          canManageConstructionRecords()
+        );
+      }
+
+      function immutableFieldsUnchanged(fields) {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+      }
+
+      match /gantt_tasks/{taskId} {
+        allow read: if canAccessConstructionSubcollections();
+        allow create: if canAccessConstructionSubcollections() &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdAt is string;
+        allow update: if canAccessConstructionSubcollections() &&
+          immutableFieldsUnchanged(['projectId', 'createdAt']);
+        allow delete: if canManageConstructionRecords();
+      }
+
+      match /site_logs/{logId} {
+        allow read: if canAccessConstructionSubcollections();
+        allow create: if canAccessConstructionSubcollections() &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.createdAt is string;
+        allow update: if canAccessConstructionSubcollections() &&
+          immutableFieldsUnchanged(['projectId', 'createdBy', 'loggedBy', 'createdAt']);
+        allow delete: if canManageConstructionRecords();
+      }
+
+      match /rfis/{rfiId} {
+        allow read: if canAccessConstructionSubcollections();
+        allow create: if canAccessConstructionSubcollections() &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.status == 'open' &&
+          request.resource.data.number is number &&
+          request.resource.data.createdAt is string;
+        allow update: if canAccessConstructionSubcollections() &&
+          immutableFieldsUnchanged(['projectId', 'requestedBy', 'number', 'createdAt']) &&
+          (
+            (isRFIResponder() &&
+              resource.data.status in ['open', 'overdue'] &&
+              request.resource.data.status == 'responded' &&
+              request.resource.data.respondedBy == request.auth.uid &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['response', 'responseAttachments', 'respondedBy', 'respondedAt', 'status', 'updatedAt'])) ||
+            (canCloseRFI() &&
+              resource.data.status == 'responded' &&
+              request.resource.data.status == 'closed' &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+            (canManageConstructionRecords() &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subject', 'question', 'attachments', 'assignedTo', 'priority', 'dueDate', 'status', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      match /inspections/{inspectionId} {
+        allow read: if canAccessConstructionSubcollections();
+        allow create: if canAccessConstructionSubcollections() &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdAt is string;
+        allow update: if canAccessConstructionSubcollections() &&
+          immutableFieldsUnchanged(['projectId', 'createdAt']);
+        allow delete: if canManageConstructionRecords();
+      }
+
+      match /_meta/{metaId} {
+        allow read: if canAccessConstructionSubcollections();
+        allow create: if metaId == 'rfi_counter' &&
+          canAccessConstructionSubcollections() &&
+          hasOnlyConstructionMetaFields() &&
+          request.resource.data.lastNumber >= 1;
+        allow update: if metaId == 'rfi_counter' &&
+          canAccessConstructionSubcollections() &&
+          hasOnlyConstructionMetaFields() &&
+          resource.data.keys().hasOnly(['lastNumber', 'updatedAt']) &&
+          request.resource.data.lastNumber == resource.data.lastNumber + 1;
+        allow delete: if false;
+      }
     }
 
     // Collection Group matches for Admin Dashboard

@@ -14,7 +14,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin, Upload } from 'lucide-react';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin, Upload, HardHat, ClipboardCheck } from 'lucide-react';
 import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
@@ -35,6 +35,9 @@ import AdvanceStageButton from './AdvanceStageButton';
 import ResponsibilityMatrix from './ResponsibilityMatrix';
 import TeamBuilder from './TeamBuilder';
 import { getDisciplineCoverage, subscribeToTeam } from '../services/teamService';
+import GanttChart from './GanttChart';
+import SiteLogManager from './SiteLogManager';
+import RFIManager from './RFIManager';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -161,6 +164,9 @@ export default function ArchitectDashboard({
             <TabsTrigger value="coordination" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <Users size={16} /> Coordination
             </TabsTrigger>
+            <TabsTrigger value="construction" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <HardHat size={16} /> Construction
+            </TabsTrigger>
             <TabsTrigger value="fees" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <CreditCard size={16} /> Fee Estimator
             </TabsTrigger>
@@ -260,6 +266,10 @@ export default function ArchitectDashboard({
 
         <TabsContent value="coordination" className="mt-8">
           <CoordinationDashboard user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="construction" className="mt-8">
+          <ConstructionDashboard user={user} myJobs={myJobs} />
         </TabsContent>
 
         <TabsContent value="fees" className="mt-8">
@@ -619,6 +629,83 @@ function CoordinationDashboard({ user, myJobs }: { user: UserProfile, myJobs: Jo
 
       <ResponsibilityMatrix job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
       <TeamBuilder job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
+    </div>
+  );
+}
+
+function ConstructionDashboard({ user, myJobs }: { user: UserProfile; myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([]);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  useEffect(() => {
+    if (!project?.id) {
+      setTeamMembers([]);
+      return;
+    }
+    return subscribeToTeam(project.id, setTeamMembers);
+  }, [project?.id]);
+
+  if (myJobs.length === 0 || !selectedJob) {
+    return (
+      <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+        <p className="text-muted-foreground italic">No active projects available for construction delivery.</p>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900">
+        <CardContent className="p-8">
+          <h2 className="font-heading text-2xl font-bold mb-2">Construction tools unavailable</h2>
+          <p className="text-sm">This job does not yet have a lifecycle project record. Construction delivery activates once the project record exists.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><HardHat className="text-primary" /> Construction Delivery</h2>
+          <p className="text-sm text-muted-foreground">Programme, site records, RFIs, and inspection summary for {selectedJob.title}.</p>
+        </div>
+        <select value={selectedJob.id} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none" aria-label="Select construction project">
+          {myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
+        </select>
+      </div>
+      <GanttChart projectId={project.id} teamMembers={teamMembers} />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <SiteLogManager projectId={project.id} jobId={selectedJob.id} currentUserId={user.uid} compact />
+        <RFIManager projectId={project.id} jobId={selectedJob.id} currentUser={user} teamMembers={teamMembers} compact />
+      </div>
+      <Card className="rounded-3xl border-border bg-white shadow-sm">
+        <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-2xl bg-primary/10 text-primary"><ClipboardCheck /></div>
+            <div>
+              <h3 className="font-heading text-xl font-bold">Site Inspections</h3>
+              <p className="text-sm text-muted-foreground">Inspection data model and Firestore service are available. Dedicated checklist UI is reserved for a later requested component scope.</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="rounded-full px-4 py-2">Phase 4 summary</Badge>
+        </CardContent>
+      </Card>
     </div>
   );
 }

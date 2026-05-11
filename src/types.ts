@@ -614,7 +614,7 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'site_log';
   jobId?: string;
   submissionId?: string;
 };
@@ -756,4 +756,133 @@ export interface ProjectTeamMember {
   discipline?: Discipline;
   joinedAt: string;
   status: 'invited' | 'active' | 'removed';
+}
+
+// --- Tender & Procurement Types ---------------------------------------------
+
+export type TenderStatus = 'draft' | 'published' | 'closed' | 'evaluating' | 'awarded' | 'cancelled';
+
+export interface TenderPackage {
+  id: string;
+  projectId: string;
+  jobId: string;
+  title: string;
+  description: string;
+  scope: string[];
+  documents: { name: string; url: string }[];
+  deadline: string;
+  estimatedBudget?: number;
+  requiredDisciplines: Discipline[];
+  requiredCertifications?: string[];
+  status: TenderStatus;
+  createdBy: string;
+  awardedBidId?: string;
+  awardedContractorId?: string;
+  aiComparisonReport?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type BidStatus = 'submitted' | 'shortlisted' | 'rejected' | 'awarded' | 'withdrawn';
+
+export interface BidLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Bid {
+  id: string;
+  tenderPackageId: string;
+  contractorId: string;
+  contractorName: string;
+  totalAmount: number;
+  lineItems: BidLineItem[];
+  proposedTimeline: string;
+  proposedStartDate: string;
+  methodology: string;
+  qualifications: string;
+  attachments: { name: string; url: string }[];
+  status: BidStatus;
+  aiScore?: number;
+  aiNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// --- Construction Delivery Types --------------------------------------------
+
+export interface GanttTask {
+  id: string;
+  projectId: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  progress: number;
+  dependsOn?: string[];
+  assignedTo?: string;
+  phase: string;
+  status: 'not_started' | 'in_progress' | 'completed' | 'delayed';
+  color?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SiteLog {
+  id: string;
+  projectId: string;
+  date: string;
+  weather: 'sunny' | 'cloudy' | 'rainy' | 'stormy';
+  temperature?: number;
+  workDescription: string;
+  labourCount?: number;
+  materialsUsed?: string[];
+  issues?: string[];
+  photos: { url: string; caption: string }[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export type RFIStatus = 'open' | 'responded' | 'closed' | 'overdue';
+export type RFIPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface RFI {
+  id: string;
+  projectId: string;
+  number: number;
+  subject: string;
+  question: string;
+  attachments: { name: string; url: string }[];
+  requestedBy: string;
+  assignedTo: string;
+  priority: RFIPriority;
+  status: RFIStatus;
+  response?: string;
+  responseAttachments?: { name: string; url: string }[];
+  respondedBy?: string;
+  respondedAt?: string;
+  dueDate: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SiteInspection {
+  id: string;
+  projectId: string;
+  inspectionType: 'foundation' | 'dpc' | 'roof' | 'final' | 'custom';
+  date: string;
+  inspector: string;
+  checklist: InspectionItem[];
+  overallResult: 'pass' | 'fail' | 'conditional';
+  notes?: string;
+  photos: { url: string; caption: string }[];
+  createdAt: string;
+}
+
+export interface InspectionItem {
+  item: string;
+  standard?: string;
+  result: 'pass' | 'fail' | 'na';
+  comment?: string;
 }
