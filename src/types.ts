@@ -115,6 +115,30 @@ export type Discipline =
   | 'nhbrc'
   | 'coordination';
 
+export interface DisciplineInfo {
+  key: Discipline;
+  label: string;
+  sacapCategory: string;
+  requiredFor: JobCategory[];
+  icon: string;
+}
+
+export const DISCIPLINE_REGISTRY: DisciplineInfo[] = [
+  { key: 'architecture', label: 'Architecture', sacapCategory: 'Professional Architect', requiredFor: ['Residential', 'Commercial', 'Industrial'], icon: 'Building2' },
+  { key: 'structure', label: 'Structural Engineering', sacapCategory: 'Pr Eng (Structural)', requiredFor: ['Residential', 'Commercial', 'Industrial'], icon: 'Hammer' },
+  { key: 'fire', label: 'Fire Engineering', sacapCategory: 'Fire Consultant', requiredFor: ['Commercial', 'Industrial'], icon: 'Flame' },
+  { key: 'electrical', label: 'Electrical Engineering', sacapCategory: 'Pr Eng (Electrical)', requiredFor: ['Commercial', 'Industrial'], icon: 'Zap' },
+  { key: 'mechanical', label: 'Mechanical Engineering', sacapCategory: 'Pr Eng (Mechanical)', requiredFor: ['Commercial', 'Industrial'], icon: 'Cog' },
+  { key: 'energy', label: 'Energy Compliance', sacapCategory: 'Energy Consultant', requiredFor: ['Residential', 'Commercial'], icon: 'Sun' },
+  { key: 'drainage', label: 'Civil / Drainage', sacapCategory: 'Pr Eng (Civil)', requiredFor: ['Residential', 'Commercial'], icon: 'Droplets' },
+  { key: 'accessibility', label: 'Accessibility', sacapCategory: 'Accessibility Consultant', requiredFor: ['Commercial'], icon: 'Accessibility' },
+  { key: 'environmental', label: 'Environmental', sacapCategory: 'Environmental Consultant', requiredFor: ['Industrial'], icon: 'TreePine' },
+  { key: 'planning', label: 'Town Planning', sacapCategory: 'Town Planner', requiredFor: ['Residential', 'Commercial'], icon: 'Map' },
+  { key: 'nhbrc', label: 'NHBRC Enrolment', sacapCategory: 'NHBRC Registered Builder', requiredFor: ['Residential'], icon: 'ShieldCheck' },
+  { key: 'documentation', label: 'Documentation', sacapCategory: 'Draughtsperson', requiredFor: ['Residential', 'Commercial', 'Industrial'], icon: 'FileText' },
+  { key: 'coordination', label: 'Professional Coordination', sacapCategory: 'Lead Consultant', requiredFor: ['Commercial', 'Industrial'], icon: 'Users' },
+];
+
 export type StandardFamily =
   | 'NBR'
   | 'SANS10400'

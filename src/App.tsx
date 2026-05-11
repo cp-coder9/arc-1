@@ -4,6 +4,7 @@
  */
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
 import { 
   onAuthStateChanged, 
@@ -75,15 +76,42 @@ import { NotificationBell } from './components/NotificationBell';
 
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 
-const ClientDashboard = lazy(() => import('./components/ClientDashboard'));
-const ArchitectDashboard = lazy(() => import('./components/ArchitectDashboard'));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
-const FreelancerDashboard = lazy(() => import('./components/FreelancerDashboard'));
-const BEPDashboard = lazy(() => import('./components/BEPDashboard'));
-const UserSettings = lazy(() => import('./components/UserSettings'));
-const InvoiceManagement = lazy(() => import('./components/InvoiceManagement'));
-const FileManager = lazy(() => import('./components/FileManager'));
-const OnboardingFlow = lazy(() => import('./components/OnboardingFlow'));
+type LazyImport<T extends ComponentType<any>> = () => Promise<{ default: T }>;
+
+function isDynamicImportError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk \d+ failed/i.test(message);
+}
+
+function reloadOnceForUpdatedChunk(error: unknown) {
+  if (!isDynamicImportError(error) || typeof window === 'undefined') {
+    throw error;
+  }
+
+  const reloadKey = 'architex:chunk-reload-attempted';
+  if (window.sessionStorage.getItem(reloadKey) === 'true') {
+    throw error;
+  }
+
+  window.sessionStorage.setItem(reloadKey, 'true');
+  console.warn('A lazy-loaded application chunk could not be fetched. Reloading once to request the latest deployment assets.', error);
+  window.location.reload();
+  return new Promise<never>(() => undefined);
+}
+
+function lazyWithChunkRetry<T extends ComponentType<any>>(importer: LazyImport<T>): LazyExoticComponent<T> {
+  return lazy(() => importer().catch(reloadOnceForUpdatedChunk));
+}
+
+const ClientDashboard = lazyWithChunkRetry(() => import('./components/ClientDashboard'));
+const ArchitectDashboard = lazyWithChunkRetry(() => import('./components/ArchitectDashboard'));
+const AdminDashboard = lazyWithChunkRetry(() => import('./components/AdminDashboard'));
+const FreelancerDashboard = lazyWithChunkRetry(() => import('./components/FreelancerDashboard'));
+const BEPDashboard = lazyWithChunkRetry(() => import('./components/BEPDashboard'));
+const UserSettings = lazyWithChunkRetry(() => import('./components/UserSettings'));
+const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceManagement'));
+const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
+const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
@@ -512,6 +540,14 @@ export default function App() {
                 label="Team & Freelancers"
                 active={activeTab === 'team'}
                 onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {user!.role === 'architect' && (
+              <NavItem
+                icon={<Users size={18} />}
+                label="Coordination"
+                active={activeTab === 'coordination'}
+                onClick={() => { setActiveTab('coordination'); setIsSidebarOpen(false); }}
               />
             )}
             {(user!.role === 'client' || user!.role === 'architect') && (
