@@ -324,6 +324,22 @@ export interface Agent {
   authorizationHeader?: string;
 }
 
+export type WorkflowAgentRole =
+  | 'briefing_agent'
+  | 'matching_agent'
+  | 'tender_agent'
+  | 'construction_agent';
+
+export interface WorkflowAgentConfig {
+  role: WorkflowAgentRole;
+  name: string;
+  description: string;
+  systemPrompt: string;
+  activeInStages: ProjectStage[];
+  triggerEvents: string[];
+  temperature: number;
+}
+
 export interface SystemLog {
   id: string;
   timestamp: string;
