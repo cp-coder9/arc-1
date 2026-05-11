@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard } from 'lucide-react';
+import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard, Landmark } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -38,6 +38,7 @@ import FeeEstimator from './FeeEstimator';
 import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import AdvanceStageButton from './AdvanceStageButton';
+import FinancialDashboard from './FinancialDashboard';
 
 const PROVIDER_CONFIGS = {
   gemini: {
@@ -527,6 +528,7 @@ export default function AdminDashboard({
     activeTab === 'users' ? 'users' : 
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'fees' ? 'fees' :
+    activeTab === 'financial' ? 'financial' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
     'submissions';
@@ -770,6 +772,7 @@ export default function AdminDashboard({
           knowledge: 'knowledge',
           jobs: 'projects',
           fees: 'fees',
+          financial: 'financial',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
@@ -805,6 +808,9 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="fees" className={tabTriggerClass}>
               <CreditCard size={16} /> Fees
+            </TabsTrigger>
+            <TabsTrigger value="financial" className={tabTriggerClass}>
+              <Landmark size={16} /> Financial
             </TabsTrigger>
             <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
@@ -1096,6 +1102,10 @@ export default function AdminDashboard({
 
         <TabsContent value="fees">
           <FeeEstimator role="admin" />
+        </TabsContent>
+
+        <TabsContent value="financial">
+          <FinancialDashboard />
         </TabsContent>
       </Tabs>
 

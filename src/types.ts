@@ -477,6 +477,39 @@ export interface Escrow {
   updatedAt?: string;
 }
 
+export interface EscrowMilestone {
+  id: string;
+  name: string;
+  stage: ProjectStage;
+  percentage: number;
+  amount: number;
+  status: 'pending' | 'funded' | 'release_requested' | 'released' | 'disputed';
+  releaseConditions?: string[];
+  requestedAt?: string;
+  releasedAt?: string;
+  approvedBy?: string;
+}
+
+export interface EscrowV2 extends Omit<Escrow, 'milestones'> {
+  milestones: EscrowMilestone[];
+  linkedProjectId?: string;
+}
+
+export interface LedgerEntry {
+  id: string;
+  projectId: string;
+  jobId: string;
+  type: PaymentType | 'invoice_payment';
+  amount: number;
+  direction: 'credit' | 'debit';
+  description: string;
+  payerId: string;
+  payeeId: string;
+  paymentId?: string;
+  escrowMilestoneId?: string;
+  createdAt: string;
+}
+
 // Architect verification types
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired';
 

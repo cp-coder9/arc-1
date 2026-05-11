@@ -458,8 +458,28 @@ service cloud.firestore {
         getJob(jobId).data.selectedArchitectId == request.auth.uid
       );
       allow create: if isAuthenticated() && isAdmin();
+      // Financial state changes remain admin/server-only. Browser users may only
+      // request release through the minimal milestone-array transition supported
+      // by requestStageRelease; approvals, amounts, ledger, and invoices are not
+      // writable by non-admin clients.
       allow update: if isAuthenticated() && isAdmin();
       allow delete: if false;
+    }
+
+    // Central financial ledger
+    match /ledger/{entryId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.payerId == request.auth.uid ||
+        resource.data.payeeId == request.auth.uid ||
+        isProjectParticipant(resource.data.jobId)
+      );
+      allow create: if isAuthenticated() && isAdmin() &&
+        request.resource.data.keys().hasAll(['projectId', 'jobId', 'type', 'amount', 'direction', 'description', 'payerId', 'payeeId', 'createdAt']) &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount >= 0 &&
+        request.resource.data.direction in ['credit', 'debit'];
+      allow update, delete: if false;
     }
 
     // System settings (admin only)
@@ -511,10 +531,7 @@ service cloud.firestore {
         resource.data.clientId == request.auth.uid ||
         resource.data.architectId == request.auth.uid
       );
-      allow create: if isAuthenticated() && (
-        isAdmin() ||
-        (hasRole('architect') && request.resource.data.architectId == request.auth.uid)
-      );
+      allow create: if isAuthenticated() && isAdmin();
       allow update: if isAuthenticated() && (
         isAdmin() ||
         (resource.data.architectId == request.auth.uid &&

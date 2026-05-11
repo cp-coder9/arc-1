@@ -52,6 +52,7 @@ import {
   Settings2,
   CreditCard,
   Calculator,
+  Landmark,
   UserCircle,
   HardDrive,
   Sparkles,
@@ -595,6 +596,12 @@ export default function App() {
                   label="Fees"
                   active={activeTab === 'fees'}
                   onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
+                />
+                <NavItem
+                  icon={<Landmark size={18} />}
+                  label="Financial"
+                  active={activeTab === 'financial'}
+                  onClick={() => { setActiveTab('financial'); setIsSidebarOpen(false); }}
                 />
               </>
             )}
