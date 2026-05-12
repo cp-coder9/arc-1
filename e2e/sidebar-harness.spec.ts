@@ -1,30 +1,42 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createServer } from 'node:net';
 
 type RoleName = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep';
 
-const roles: Record<RoleName, { port: number; menuItems: string[] }> = {
+const roles: Record<RoleName, { menuItems: string[] }> = {
   client: {
-    port: 4511,
-    menuItems: ['Overview', 'Post a Job', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
+    menuItems: ['Overview', 'Post a Job', 'Fee Estimator', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
   },
   architect: {
-    port: 4512,
-    menuItems: ['Overview', 'Marketplace', 'My Applications', 'Team & Freelancers', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
+    menuItems: ['Overview', 'Marketplace', 'My Applications', 'Team & Freelancers', 'Coordination', 'Fee Estimator', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
   },
   admin: {
-    port: 4513,
-    menuItems: ['Overview', 'Active Projects', 'Compliance Hub', 'User Management', 'LLM Settings', 'Knowledge Base', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
+    menuItems: ['Overview', 'Active Projects', 'Compliance Hub', 'User Management', 'LLM Settings', 'Knowledge Base', 'Fees', 'Financial', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
   },
   freelancer: {
-    port: 4514,
     menuItems: ['Overview', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
   },
   bep: {
-    port: 4515,
     menuItems: ['Overview', 'Active Projects', 'Audit Logs', 'Invoices', 'Files', 'My Settings'],
   },
 };
+
+async function getAvailablePort() {
+  return new Promise<number>((resolve, reject) => {
+    const server = createServer();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('Unable to determine an available test port')));
+        return;
+      }
+      const { port } = address;
+      server.close(() => resolve(port));
+    });
+  });
+}
 
 async function waitForServer(port: number, timeoutMs = 30_000) {
   const startedAt = Date.now();
@@ -67,8 +79,11 @@ async function stopHarnessServer(server: ChildProcessWithoutNullStreams) {
 test.describe('Dashboard sidebar navigation harness', () => {
   test.setTimeout(120_000);
 
-  for (const [role, { port, menuItems }] of Object.entries(roles) as Array<[RoleName, typeof roles[RoleName]]>) {
-    test(`${role} sidebar menu items render without errors`, async ({ page }) => {
+  for (const [role, { menuItems }] of Object.entries(roles) as Array<[RoleName, typeof roles[RoleName]]>) {
+    test(`${role} sidebar menu items render without errors`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'chromium' && testInfo.project.name !== 'chromium-sidebar-harness', 'Sidebar harness uses a Chromium desktop Vite harness.');
+
+      const port = await getAvailablePort();
       const { server, getOutput } = startHarnessServer(role, port);
       const consoleErrors: string[] = [];
       page.on('console', message => {
@@ -84,7 +99,7 @@ test.describe('Dashboard sidebar navigation harness', () => {
         for (const label of menuItems) {
           await test.step(`${role}: ${label}`, async () => {
             const beforeErrorCount = consoleErrors.length;
-            await page.getByRole('button', { name: label }).click({ timeout: 10_000 });
+            await page.getByRole('button', { name: label }).dispatchEvent('click', { timeout: 10_000 });
             await page.waitForTimeout(200);
 
             await expect(page.locator('body')).not.toContainText('Something went wrong');

@@ -164,6 +164,10 @@ export async function addDoc() { return { id: `new-${Date.now()}` }; }
 export async function updateDoc() {}
 export async function setDoc() {}
 export async function deleteDoc() {}
+export async function runTransaction(_db: unknown, updateFunction: (transaction: { get: typeof getDoc; set: () => void; update: () => void; delete: () => void }) => unknown) {
+  return updateFunction({ get: getDoc, set() {}, update() {}, delete() {} });
+}
 export function deleteField() { return undefined; }
 export function increment(value: number) { return value; }
+export function arrayUnion(...values: unknown[]) { return values; }
 export function writeBatch() { return { set() {}, update() {}, delete() {}, commit: async () => undefined }; }

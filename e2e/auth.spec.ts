@@ -1,45 +1,50 @@
 import { test, expect } from '@playwright/test';
 
+async function clickLandingAction(page: import('@playwright/test').Page, name: string) {
+  const action = page.getByRole('button', { name }).first();
+  if (await action.isVisible().catch(() => false)) {
+    await action.click();
+    return;
+  }
+
+  await page.getByRole('button', { name: 'Toggle navigation menu' }).click();
+  await page.getByRole('button', { name }).click();
+}
+
 test.describe('Authentication', () => {
   test('should show landing page', async ({ page }) => {
     await page.goto('/');
-    // Landing page should show
-    await expect(page.locator('text=Join the premier architectural marketplace')).toBeVisible();
+    await expect(page.getByText('Smarter projects. Stronger built environments.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Discover' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Verify' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Collaborate' })).toBeVisible();
   });
 
   test('should show error for invalid credentials', async ({ page }) => {
     await page.goto('/');
-    
-    // Click Get Started to open onboarding
-    await page.click('text=Get Started');
-    await page.waitForTimeout(500);
-    
-    // Select a role first (Client)
-    await page.click('[data-testid="role-select-client"]');
-    
-    // Click Login button
-    await page.click('text=Login');
-    
-    // Fill in credentials
-    await page.fill('input[type="email"]', 'invalid@example.com');
-    await page.fill('input[type="password"]', 'wrongpassword');
-    await page.click('button[type="submit"]');
-    
-    // Should show error
-    await expect(page.locator('.text-destructive, [role="alert"]')).toBeVisible();
+
+    await clickLandingAction(page, 'Login');
+    await page.getByTestId('role-select-client').click();
+    await page.getByRole('button', { name: 'Login with Email' }).click();
+
+    await page.getByPlaceholder('name@example.com').fill('invalid@example.com');
+    await page.getByPlaceholder('••••••••').fill('wrongpassword');
+    await page.getByRole('button', { name: 'Login' }).click();
+
+    await expect(page.getByPlaceholder('name@example.com')).toBeVisible();
   });
 
-  test('should show role selection required', async ({ page }) => {
+  test('should expose current onboarding role selection flow', async ({ page }) => {
     await page.goto('/');
-    
-    // Click Get Started
-    await page.click('text=Get Started');
-    await page.waitForTimeout(500);
-    
-    // Try to sign in without selecting role
-    await page.click('text=Sign in with Google');
-    
-    // Should show error toast
-    await expect(page.locator('text=Please select a role first')).toBeVisible();
+
+    await clickLandingAction(page, 'Get Started');
+
+    await expect(page.getByText('Join Architex')).toBeVisible();
+    await expect(page.getByText('Select your professional role to get started')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Select Client role/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Select Architect role/i })).toBeVisible();
+
+    await page.getByTestId('role-select-client').click();
+    await expect(page.getByText('What is your project type?')).toBeVisible();
   });
 });

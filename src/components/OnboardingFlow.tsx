@@ -51,24 +51,28 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
         title="Client"
         description="I want to hire professionals for my building project"
         onClick={() => handleRoleSelect('client')}
+        data-testid="role-select-client"
       />
       <RoleCard
         icon={<Briefcase className="w-8 h-8" />}
         title="Architect"
         description="I am a SACAP registered architect looking for work"
         onClick={() => handleRoleSelect('architect')}
+        data-testid="role-select-architect"
       />
       <RoleCard
         icon={<Sparkles className="w-8 h-8" />}
         title="Freelancer"
         description="I am a specialist or consultant (Engineer, etc.)"
         onClick={() => handleRoleSelect('freelancer')}
+        data-testid="role-select-freelancer"
       />
       <RoleCard
         icon={<Construction className="w-8 h-8" />}
         title="BEP"
         description="Built Environment Professional (Builder, Tiler, etc.)"
         onClick={() => handleRoleSelect('bep')}
+        data-testid="role-select-bep"
       />
     </div>
   );
@@ -345,11 +349,13 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
   );
 }
 
-function RoleCard({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) {
+function RoleCard({ icon, title, description, onClick, ...props }: { icon: React.ReactNode, title: string, description: string, onClick: () => void } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       onClick={onClick}
+      aria-label={`Select ${title} role`}
       className="group p-8 text-left border border-border rounded-3xl hover:border-primary hover:bg-primary/5 transition-all duration-300 flex flex-col gap-6 bg-white shadow-sm hover:shadow-xl"
+      {...props}
     >
       <div className="p-4 bg-secondary rounded-2xl group-hover:bg-primary/10 group-hover:text-primary transition-all group-hover:scale-110">
         {icon}

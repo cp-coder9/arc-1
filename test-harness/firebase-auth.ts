@@ -15,6 +15,12 @@ export function getAuth() {
   return { currentUser: mockAuthUser };
 }
 
+export function setPersistence() {
+  return Promise.resolve();
+}
+
+export const browserLocalPersistence = {};
+
 export function onAuthStateChanged(_auth: unknown, callback: (user: typeof mockAuthUser) => void) {
   queueMicrotask(() => callback(mockAuthUser));
   return () => undefined;
