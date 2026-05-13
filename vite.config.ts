@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => {
       // Do not modify — file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
     },
+    optimizeDeps: {
+      entries: ['index.html'],
+    },
     build: {
       // Increase chunk size warning limit – some agent bundles are large
       chunkSizeWarningLimit: 1000,

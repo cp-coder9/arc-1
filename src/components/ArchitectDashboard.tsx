@@ -69,9 +69,12 @@ export default function ArchitectDashboard({
   const [projectsPage, setProjectsPage] = useState(1);
   const [applicationsPage, setApplicationsPage] = useState(1);
   const pageSize = 6;
+  const uniqueApplications = Array.from(
+    new Map<string, Application>(myApplications.map(application => [`${application.jobId}:${application.id}`, application])).values()
+  );
   const pagedMarketplaceJobs = paginateItems<Job>(availableJobs, marketplacePage, pageSize);
   const pagedMyJobs = paginateItems<Job>(myJobs, projectsPage, pageSize);
-  const pagedApplications = paginateItems<Application>(myApplications, applicationsPage, pageSize);
+  const pagedApplications = paginateItems<Application>(uniqueApplications, applicationsPage, pageSize);
 
   useEffect(() => {
     const qJobs = query(collection(db, 'jobs'), where('status', '==', 'open'));
@@ -98,7 +101,9 @@ export default function ArchitectDashboard({
   }, [user.uid]);
 
   useEffect(() => {
-    const trackedJobs = [...availableJobs, ...myJobs];
+    const trackedJobs = Array.from(
+      new Map([...availableJobs, ...myJobs].map(job => [job.id, job])).values()
+    );
     if (trackedJobs.length === 0) {
       setMyApplications([]);
       return;
@@ -239,15 +244,15 @@ export default function ArchitectDashboard({
             <h2 className="text-2xl font-heading font-bold">My Applications</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {pagedApplications.map(application => (
-                <div key={application.id}><ApplicationCard application={application} /></div>
+                <div key={`${application.jobId}:${application.id}`}><ApplicationCard application={application} /></div>
               ))}
-              {myApplications.length === 0 && (
+              {uniqueApplications.length === 0 && (
                 <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
                   <p className="text-muted-foreground italic">No applications submitted yet.</p>
                 </div>
               )}
             </div>
-            {myApplications.length > pageSize && <PaginationControls page={applicationsPage} totalPages={totalPages(myApplications.length, pageSize)} onPageChange={setApplicationsPage} />}
+            {uniqueApplications.length > pageSize && <PaginationControls page={applicationsPage} totalPages={totalPages(uniqueApplications.length, pageSize)} onPageChange={setApplicationsPage} />}
           </div>
         </TabsContent>
 

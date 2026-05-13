@@ -1,18 +1,28 @@
-const role = (import.meta.env.VITE_TEST_ROLE || 'client') as string;
+const fallbackRole = (import.meta.env.VITE_TEST_ROLE || 'client') as string;
 
-export const mockAuthUser = {
-  uid: `${role}-user`,
-  email: `${role}@example.test`,
-  displayName: `${role[0].toUpperCase()}${role.slice(1)} User`,
-  emailVerified: true,
-  isAnonymous: false,
-  tenantId: null,
-  providerData: [],
-  getIdToken: async () => 'mock-token',
-};
+function getRole() {
+  if (typeof window === 'undefined') return fallbackRole;
+  return new URLSearchParams(window.location.search).get('role') || fallbackRole;
+}
+
+function makeMockAuthUser() {
+  const role = getRole();
+  return {
+    uid: `${role}-user`,
+    email: `${role}@example.test`,
+    displayName: `${role[0].toUpperCase()}${role.slice(1)} User`,
+    emailVerified: true,
+    isAnonymous: false,
+    tenantId: null,
+    providerData: [],
+    getIdToken: async () => 'mock-token',
+  };
+}
+
+export const mockAuthUser = makeMockAuthUser();
 
 export function getAuth() {
-  return { currentUser: mockAuthUser };
+  return { get currentUser() { return makeMockAuthUser(); } };
 }
 
 export function setPersistence() {
@@ -21,25 +31,27 @@ export function setPersistence() {
 
 export const browserLocalPersistence = {};
 
-export function onAuthStateChanged(_auth: unknown, callback: (user: typeof mockAuthUser) => void) {
-  queueMicrotask(() => callback(mockAuthUser));
+export function onAuthStateChanged(_auth: unknown, callback: (user: ReturnType<typeof makeMockAuthUser>) => void) {
+  queueMicrotask(() => callback(makeMockAuthUser()));
   return () => undefined;
 }
 
-export class GoogleAuthProvider {}
+export class GoogleAuthProvider {
+  setCustomParameters() {}
+}
 
 export async function signInWithPopup() {
-  return { user: mockAuthUser };
+  return { user: makeMockAuthUser() };
 }
 
 export async function signOut() {}
 
 export async function signInWithEmailAndPassword() {
-  return { user: mockAuthUser };
+  return { user: makeMockAuthUser() };
 }
 
 export async function createUserWithEmailAndPassword() {
-  return { user: mockAuthUser };
+  return { user: makeMockAuthUser() };
 }
 
 export async function updateProfile() {}

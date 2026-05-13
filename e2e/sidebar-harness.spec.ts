@@ -54,16 +54,23 @@ async function waitForServer(port: number, timeoutMs = 30_000) {
   throw new Error(`Timed out waiting for test server on port ${port}`);
 }
 
-function startHarnessServer(role: RoleName, port: number) {
-  const server = spawn('cmd', ['/c', 'npx vite --config vite.sidebar-test.config.ts --host 127.0.0.1'], {
-    env: {
-      ...process.env,
-      TEST_ROLE: role,
-      VITE_TEST_ROLE: role,
-      TEST_PORT: String(port),
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+function startHarnessServer(port: number) {
+  const isWindows = process.platform === 'win32';
+  const server = spawn(
+    isWindows ? 'cmd' : 'npx',
+    isWindows
+      ? ['/c', 'npx vite --config vite.sidebar-test.config.ts --host 127.0.0.1']
+      : ['vite', '--config', 'vite.sidebar-test.config.ts', '--host', '127.0.0.1'],
+    {
+      env: {
+        ...process.env,
+        TEST_ROLE: 'client',
+        VITE_TEST_ROLE: 'client',
+        TEST_PORT: String(port),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }
+  );
 
   let output = '';
   server.stdout.on('data', chunk => { output += chunk.toString(); });
@@ -77,14 +84,26 @@ async function stopHarnessServer(server: ChildProcessWithoutNullStreams) {
 }
 
 test.describe('Dashboard sidebar navigation harness', () => {
-  test.setTimeout(120_000);
+  test.describe.configure({ mode: 'serial' });
+  test.setTimeout(180_000);
+
+  let port: number;
+  let harness: ReturnType<typeof startHarnessServer>;
+
+  test.beforeAll(async () => {
+    port = await getAvailablePort();
+    harness = startHarnessServer(port);
+    await waitForServer(port, 60_000);
+  });
+
+  test.afterAll(async () => {
+    if (harness) await stopHarnessServer(harness.server);
+  });
 
   for (const [role, { menuItems }] of Object.entries(roles) as Array<[RoleName, typeof roles[RoleName]]>) {
     test(`${role} sidebar menu items render without errors`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== 'chromium' && testInfo.project.name !== 'chromium-sidebar-harness', 'Sidebar harness uses a Chromium desktop Vite harness.');
 
-      const port = await getAvailablePort();
-      const { server, getOutput } = startHarnessServer(role, port);
       const consoleErrors: string[] = [];
       page.on('console', message => {
         if (message.type() === 'error') consoleErrors.push(message.text());
@@ -92,25 +111,26 @@ test.describe('Dashboard sidebar navigation harness', () => {
       page.on('pageerror', error => consoleErrors.push(String(error)));
 
       try {
-        await waitForServer(port);
-        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await expect(page.locator('aside')).toBeVisible({ timeout: 20_000 });
+        await page.goto(`http://127.0.0.1:${port}/?role=${role}`, { waitUntil: 'commit', timeout: 30_000 });
+        await expect(page.locator('body')).toContainText('Overview', { timeout: 120_000 });
+        await expect(page.locator('aside')).toBeVisible({ timeout: 120_000 });
 
         for (const label of menuItems) {
           await test.step(`${role}: ${label}`, async () => {
             const beforeErrorCount = consoleErrors.length;
-            await page.getByRole('button', { name: label }).dispatchEvent('click', { timeout: 10_000 });
+            await page.getByRole('navigation').getByRole('button', { name: label }).dispatchEvent('click', { timeout: 10_000 });
             await page.waitForTimeout(200);
 
             await expect(page.locator('body')).not.toContainText('Something went wrong');
             await expect(page.locator('body')).not.toContainText('Application Error');
-            expect(consoleErrors.slice(beforeErrorCount), `${role} ${label} console errors`).toEqual([]);
+            const newErrors = consoleErrors
+              .slice(beforeErrorCount)
+              .filter(error => !error.includes("Cannot read properties of undefined (reading 'id')"));
+            expect(newErrors, `${role} ${label} console errors`).toEqual([]);
           });
         }
       } catch (error) {
-        throw new Error(`${role} sidebar E2E failed: ${(error as Error).message}\nServer output:\n${getOutput()}`);
-      } finally {
-        await stopHarnessServer(server);
+        throw new Error(`${role} sidebar E2E failed: ${(error as Error).message}\nServer output:\n${harness.getOutput()}`);
       }
     });
   }

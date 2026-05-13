@@ -1,25 +1,26 @@
 import { test, expect } from '@playwright/test';
 
 async function clickLandingAction(page: import('@playwright/test').Page, name: string) {
-  const action = page.getByRole('button', { name }).first();
-  if (await action.isVisible().catch(() => false)) {
-    await action.click();
-    return;
-  }
+  await page.locator('button').filter({ hasText: name }).first().evaluate((element: HTMLElement) => element.click());
+}
 
-  await page.getByRole('button', { name: 'Toggle navigation menu' }).click();
-  await page.getByRole('button', { name }).click();
+async function gotoApp(page: import('@playwright/test').Page, path = '/') {
+  await page.goto(path, { waitUntil: 'commit', timeout: 30_000 });
+}
+
+async function forceClick(locator: import('@playwright/test').Locator) {
+  await locator.evaluate((element: HTMLElement) => element.click());
 }
 
 test.describe('Onboarding Flow', () => {
   test('should guide client to account creation after onboarding', async ({ page }) => {
-    await page.goto('/');
+    await gotoApp(page);
 
     await clickLandingAction(page, 'Get Started');
     await expect(page.getByText('Join Architex')).toBeVisible();
     await expect(page.getByText('Select your professional role to get started')).toBeVisible();
 
-    await page.getByTestId('role-select-client').click();
+    await forceClick(page.getByTestId('role-select-client'));
     await page.locator('select[name="projectType"]').selectOption('Residential');
     await page.locator('select[name="budgetRange"]').selectOption('100k_500k');
     await page.getByRole('button', { name: 'Finish Setup' }).click();
@@ -29,12 +30,12 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('should guide architect to account creation after onboarding', async ({ page }) => {
-    await page.goto('/');
+    await gotoApp(page);
 
     await clickLandingAction(page, 'Get Started');
     await expect(page.getByText('Join Architex')).toBeVisible();
 
-    await page.getByTestId('role-select-architect').click();
+    await forceClick(page.getByTestId('role-select-architect'));
     await page.getByPlaceholder('ST123456').fill('ST123456');
     await page.locator('input[name="experienceYears"]').fill('7');
     await page.locator('select[name="mainSpecialization"]').selectOption('Residential');
@@ -45,7 +46,7 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('should navigate back to marketplace', async ({ page }) => {
-    await page.goto('/');
+    await gotoApp(page);
 
     await clickLandingAction(page, 'Get Started');
     await page.getByRole('button', { name: 'Cancel' }).dispatchEvent('click');

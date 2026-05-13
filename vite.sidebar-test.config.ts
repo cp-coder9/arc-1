@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       hmr: false,
     },
+    optimizeDeps: {
+      entries: ['index.html'],
+    },
     build: {
       rollupOptions: {
         output: {
