@@ -14,7 +14,8 @@ import {
   Construction,
   ShieldCheck,
   HardHat,
-  BadgeCheck
+  BadgeCheck,
+  Factory
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -73,6 +74,13 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
         description="Built Environment Professional (Builder, Tiler, etc.)"
         onClick={() => handleRoleSelect('bep')}
         data-testid="role-select-bep"
+      />
+      <RoleCard
+        icon={<Factory className="w-8 h-8" />}
+        title="Contractor"
+        description="I manage construction delivery, tenders, and site teams"
+        onClick={() => handleRoleSelect('contractor')}
+        data-testid="role-select-contractor"
       />
     </div>
   );
@@ -252,6 +260,67 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
     </div>
   );
 
+  const renderContractorOnboarding = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Contracting Focus</label>
+          <select
+            name="professionalLabel"
+            onChange={handleInputChange}
+            className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm"
+            required
+          >
+            <option value="">Select focus...</option>
+            <option value="General Contractor">General Contractor</option>
+            <option value="Residential Builder">Residential Builder</option>
+            <option value="Commercial Contractor">Commercial Contractor</option>
+            <option value="Civil Contractor">Civil Contractor</option>
+            <option value="Specialist Subcontractor">Specialist Subcontractor</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Region of Operation</label>
+          <Input name="region" placeholder="e.g. Gauteng, Cape Town" className="h-12 rounded-xl" onChange={handleInputChange} required />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <ShieldCheck size={14} /> NHBRC Registration #
+          </label>
+          <Input name="nhbrcNumber" placeholder="Reg Number" className="h-10 rounded-lg bg-white" onChange={handleInputChange} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <BadgeCheck size={14} /> CIDB Grading
+          </label>
+          <select name="cidbGrading" onChange={handleInputChange} className="w-full h-10 px-3 rounded-lg border border-border bg-white text-xs">
+            <option value="">Select grade</option>
+            <option value="1GB">Grade 1</option>
+            <option value="2GB">Grade 2</option>
+            <option value="5GB">Grade 5</option>
+            <option value="9GB">Grade 9</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 p-4 border border-border rounded-2xl bg-white">
+        <input type="checkbox" name="hasPIInsurance" id="contractor_pi" onChange={handleInputChange} className="w-5 h-5 rounded border-border text-primary focus:ring-primary" />
+        <label htmlFor="contractor_pi" className="text-sm font-medium cursor-pointer">I have contractor liability / PI Insurance</label>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Company / Experience Summary</label>
+        <textarea name="bio" className="w-full p-4 rounded-2xl border border-border bg-white text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="Tell us about your construction delivery experience..." onChange={handleInputChange} />
+      </div>
+      <Button onClick={() => onComplete(formData)} className="w-full h-14 rounded-2xl font-bold text-lg group">
+        Complete Contractor Profile <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+      </Button>
+    </div>
+  );
+
   const renderFreelancerOnboarding = () => (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -339,6 +408,7 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
                 {step === 2 && role === 'client' && renderClientOnboarding()}
                 {step === 2 && role === 'architect' && renderArchitectOnboarding()}
                 {step === 2 && role === 'bep' && renderBEPOnboarding()}
+                {step === 2 && role === 'contractor' && renderContractorOnboarding()}
                 {step === 2 && role === 'freelancer' && renderFreelancerOnboarding()}
               </motion.div>
             </AnimatePresence>

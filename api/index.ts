@@ -90,7 +90,7 @@ app.post('/api/auth/check-admin', async (req, res) => {
     const userRef = db.collection('users').doc(decoded.uid);
     const userDoc = await userRef.get();
     const profileData = sanitizeUserProfileData(req.body.profileData);
-    const requestedRole = ['client', 'architect', 'freelancer', 'bep'].includes(req.body.role)
+    const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor'].includes(req.body.role)
       ? req.body.role
       : 'client';
 

@@ -19,7 +19,7 @@ import {
   browserLocalPersistence,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { UserProfile, UserRole, Job, JobCategory } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
@@ -69,7 +69,8 @@ import {
   Lightbulb,
   Database,
   Construction,
-  ArrowLeft
+  ArrowLeft,
+  Factory
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -109,6 +110,8 @@ const ArchitectDashboard = lazyWithChunkRetry(() => import('./components/Archite
 const AdminDashboard = lazyWithChunkRetry(() => import('./components/AdminDashboard'));
 const FreelancerDashboard = lazyWithChunkRetry(() => import('./components/FreelancerDashboard'));
 const BEPDashboard = lazyWithChunkRetry(() => import('./components/BEPDashboard'));
+const ContractorDashboard = lazyWithChunkRetry(() => import('./components/ContractorDashboard'));
+const FirmDashboard = lazyWithChunkRetry(() => import('./components/FirmDashboard'));
 const UserSettings = lazyWithChunkRetry(() => import('./components/UserSettings'));
 const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceManagement'));
 const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
@@ -244,6 +247,14 @@ export default function App() {
     return profile;
   };
 
+  const refetchServerProfile = async (firebaseUser: FirebaseUser) => {
+    const refreshedDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    if (!refreshedDoc.exists()) {
+      throw new Error('Server profile was not available after sync. Please try signing in again.');
+    }
+    return refreshedDoc.data() as UserProfile;
+  };
+
   const handleGoogleLogin = async () => {
     if (!roleSelection) {
       toast.error("Please select a role first");
@@ -258,24 +269,9 @@ export default function App() {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
       await syncServerProfile(roleSelection || 'client', firebaseUser);
-      const profile = await ensureAdminAccess(firebaseUser);
+      const profile = await ensureAdminAccess(firebaseUser) || await refetchServerProfile(firebaseUser);
       if (isAdminRoute && !profile) return;
-      
-      if (!profile) {
-        const newUser: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || 'Anonymous',
-          role: roleSelection || 'client',
-          ...formData,
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-        setUser(newUser);
-        
-      } else {
-        setUser(profile);
-      }
+      setUser(profile);
     } catch (error: any) {
       console.error("Login error:", error);
       toast.error(getAuthErrorMessage(error));
@@ -304,22 +300,9 @@ export default function App() {
       }
 
       await syncServerProfile(roleSelection, firebaseUser);
-      const profile = await ensureAdminAccess(firebaseUser);
+      const profile = await ensureAdminAccess(firebaseUser) || await refetchServerProfile(firebaseUser);
       if (isAdminRoute && !profile) return;
-      if (!profile) {
-        const newUser: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
-          role: roleSelection || 'client',
-          ...formData,
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-        setUser(newUser);
-      } else {
-        setUser(profile);
-      }
+      setUser(profile);
       toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
     } catch (error: any) {
       console.error("Auth error:", error);
@@ -441,6 +424,7 @@ export default function App() {
                       <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
                       <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
                       <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP" description="Built Environment Professional (Builder, Tiler, etc.)" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                      <AuthRoleCard data-testid="role-select-contractor" icon={<Factory className="w-8 h-8" />} title="Contractor" description="I manage construction delivery, tendering, and site work" active={roleSelection === 'contractor'} onClick={() => setRoleSelection('contractor')} />
                     </div>
                     <div className="space-y-3">
                       <Button onClick={handleGoogleLogin} className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={!roleSelection || isLoggingIn}>
@@ -517,6 +501,22 @@ export default function App() {
                 label="Post a Job"
                 active={activeTab === 'post-job'}
                 onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {(user!.role === 'architect' || user!.primaryFirmId) && (
+              <NavItem
+                icon={<Building2 size={18} />}
+                label="Firm Workspace"
+                active={activeTab === 'firm'}
+                onClick={() => { setActiveTab('firm'); setIsSidebarOpen(false); }}
+              />
+            )}
+            {user!.role === 'contractor' && (
+              <NavItem
+                icon={<Search size={18} />}
+                label="Tender Marketplace"
+                active={activeTab === 'marketplace'}
+                onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
               />
             )}
             {user!.role === 'architect' && (
@@ -603,6 +603,12 @@ export default function App() {
                   active={activeTab === 'financial'}
                   onClick={() => { setActiveTab('financial'); setIsSidebarOpen(false); }}
                 />
+                <NavItem
+                  icon={<Building2 size={18} />}
+                  label="Firms"
+                  active={activeTab === 'firms'}
+                  onClick={() => { setActiveTab('firms'); setIsSidebarOpen(false); }}
+                />
               </>
             )}
             <NavItem 
@@ -663,13 +669,15 @@ export default function App() {
               {activeTab === 'invoices' && <InvoiceManagement user={user} />}
               {activeTab === 'files' && <FileManager user={user} />}
               {activeTab === 'profile-settings' && <UserSettings user={user} />}
-              {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings') && (
+              {activeTab === 'firm' && <FirmDashboard user={user} />}
+              {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'firm') && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
                   {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
+                  {user.role === 'contractor' && <ContractorDashboard user={user} />}
                 </>
               )}
             </Suspense>
