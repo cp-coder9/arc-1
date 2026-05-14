@@ -202,6 +202,27 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'aiComparisonReport', 'updatedAt']);
     }
 
+    // Audit logs are append-only. Backend/Admin SDK writes bypass rules, but
+    // client access remains read-only for admins and immutable for everyone.
+    match /audit_logs/{auditId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.immutable == true;
+      allow update, delete: if false;
+    }
+
+    // Generalized user verification records for BEPs, contractors,
+    // subcontractors, suppliers, freelancers, and admins.
+    match /user_verifications/{verificationId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.submittedBy == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.subjectType in ['bep', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'];
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
     // Users collection
     match /users/{userId} {
       // Allow reading user profiles if authenticated
@@ -209,7 +230,7 @@ service cloud.firestore {
       
        allow create: if isAuthenticated() && isOwner(userId) && 
          request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
-         request.resource.data.role in ['client', 'architect', 'admin', 'freelancer', 'bep'];
+         request.resource.data.role in ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'];
 
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
@@ -250,7 +271,7 @@ service cloud.firestore {
           resource.data.architectId == request.auth.uid
         );
         allow create: if isAuthenticated() && 
-          hasRole('architect') &&
+          (hasRole('architect') || hasRole('bep')) &&
           request.resource.data.architectId == request.auth.uid;
         allow update: if isAuthenticated() && (
           (getJob(jobId).data.clientId == request.auth.uid) ||

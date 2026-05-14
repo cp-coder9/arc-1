@@ -1,4 +1,69 @@
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
+
+export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
+export type FirmMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';
+export type FirmSubscriptionStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'none';
+export type FirmInviteStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+
+export interface Firm {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  ownerId: string;
+  primaryContactEmail?: string;
+  billingEmail?: string;
+  subscriptionStatus: FirmSubscriptionStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FirmMember {
+  id: string;
+  firmId: string;
+  userId: string;
+  email: string;
+  displayName?: string;
+  role: FirmRole;
+  status: FirmMemberStatus;
+  invitedBy?: string;
+  invitedAt?: string;
+  acceptedAt?: string;
+  removedBy?: string;
+  removedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FirmInvite {
+  id: string;
+  firmId: string;
+  email: string;
+  invitedUid?: string;
+  role: FirmRole;
+  status: FirmInviteStatus;
+  invitedBy: string;
+  invitedAt: string;
+  acceptedBy?: string;
+  acceptedAt?: string;
+  revokedBy?: string;
+  revokedAt?: string;
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FirmAuditEvent {
+  id: string;
+  firmId: string;
+  actorId: string;
+  type: 'firm_created' | 'member_invited' | 'invite_accepted' | 'role_changed' | 'member_removed';
+  targetUserId?: string;
+  targetInviteId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
 
 export interface UserProfile {
   uid: string;
@@ -19,6 +84,12 @@ export interface UserProfile {
   createdAt: string;
   updatedAt?: string;
   notificationPreferences?: NotificationPreferences;
+  primaryFirmId?: string;
+  firmMembershipIds?: string[];
+  firmRole?: FirmRole;
+  firmStatus?: FirmMemberStatus;
+  subscriptionStatus?: FirmSubscriptionStatus;
+  billingRole?: FirmRole | 'none';
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -392,7 +463,10 @@ export type NotificationType =
   | 'milestone_due'
   | 'council_update'
   | 'invoice_sent'
-  | 'invoice_paid';
+  | 'invoice_paid'
+  | 'firm_invite'
+  | 'firm_role_changed'
+  | 'firm_member_removed';
 
 export interface Notification {
   id: string;
@@ -402,9 +476,12 @@ export interface Notification {
   body: string;
   data?: {
     jobId?: string;
+    projectId?: string;
     submissionId?: string;
     senderId?: string;
     applicationId?: string;
+    firmId?: string;
+    firmInviteId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -528,6 +605,31 @@ export interface LedgerEntry {
 
 // Architect verification types
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired';
+
+export type VerificationSubjectType = 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'freelancer' | 'admin';
+export type VerificationSource = 'professional_body_api' | 'public_register' | 'manual_admin_review' | 'document_upload' | 'privyseal' | 'other';
+
+export interface UserVerification {
+  id: string;
+  userId: string;
+  subjectType: VerificationSubjectType;
+  status: VerificationStatus;
+  source: VerificationSource;
+  registrationNumber?: string;
+  statutoryBody?: string;
+  evidenceDocumentIds?: string[];
+  evidenceUrls?: string[];
+  submittedAt: string;
+  submittedBy: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+  expiresAt?: string;
+  lastVerifiedAt?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface ArchitectVerification {
   userId: string;
@@ -794,6 +896,10 @@ export interface Project {
   currentStage: ProjectStage;
   stageHistory: StageHistoryEntry[];
   teamMembers: ProjectTeamMember[];
+  firmId?: string;
+  firmAccessEnabled?: boolean;
+  firmSharedBy?: string;
+  firmSharedAt?: string;
   createdAt: string;
   updatedAt?: string;
 }
