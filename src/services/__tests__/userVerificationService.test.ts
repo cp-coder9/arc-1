@@ -4,10 +4,12 @@ import {
   assertReviewStatus,
   assertVerificationSubjectType,
   buildUserVerification,
+  getVerificationLifecycle,
   inferVerificationProvider,
   isActiveVerifiedVerification,
   normalizeRegistrationNumber,
   normalizeStatutoryBody,
+  queueVerificationRecheck,
 } from '../userVerificationService';
 
 describe('userVerificationService', () => {
@@ -96,6 +98,22 @@ describe('userVerificationService', () => {
     expect(isActiveVerifiedVerification(base, { subjectType: 'contractor', statutoryBody: 'SACAP' })).toBe(false);
     expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'CIDB' })).toBe(false);
     expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'SACAP', now: new Date('2026-03-01T00:00:00.000Z') })).toBe(false);
+  });
+
+
+  it('classifies verification lifecycle and queues rechecks', () => {
+    vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    const active = { status: 'verified' as const, expiresAt: '2026-03-01T00:00:00.000Z' };
+    const dueSoon = { status: 'verified' as const, expiresAt: '2026-01-20T00:00:00.000Z' };
+    const expired = { status: 'verified' as const, expiresAt: '2025-12-31T00:00:00.000Z' };
+
+    expect(getVerificationLifecycle(active).lifecycleStatus).toBe('active');
+    expect(getVerificationLifecycle(dueSoon)).toMatchObject({ lifecycleStatus: 'due_for_recheck', isDueForRecheck: true });
+    expect(getVerificationLifecycle(expired)).toMatchObject({ lifecycleStatus: 'expired', isExpired: true });
+
+    const queued = queueVerificationRecheck({ id: 'ver-1', status: 'verified', metadata: { existing: true } }, 'admin-1');
+    expect(queued).toMatchObject({ status: 'pending', metadata: { existing: true, verificationAgentStatus: 'queued', recheckRequestedBy: 'admin-1', previousStatus: 'verified' } });
+    vi.useRealTimers();
   });
 
 

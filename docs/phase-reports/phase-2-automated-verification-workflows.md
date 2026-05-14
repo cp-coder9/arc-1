@@ -82,6 +82,25 @@ Updated `src/lib/api-router.ts` with:
   - preserves admin review as an exception/fallback path, not the primary flow
 
 
+### Verification Lifecycle and Recheck Queue
+
+Added expiry-aware verification lifecycle support:
+
+- `getVerificationLifecycle()` classifies persisted records as:
+  - `pending`
+  - `active`
+  - `due_for_recheck`
+  - `expired`
+  - `rejected`
+- `queueVerificationRecheck()` moves a record back to `pending` and stores durable metadata:
+  - `verificationAgentStatus: queued`
+  - `recheckRequestedAt`
+  - `recheckRequestedBy`
+  - `previousStatus`
+- Added admin-only `POST /api/admin/verifications/:verificationId/recheck`.
+- The recheck route persists the queued state, mirrors SACAP legacy records, writes `verification.recheck_queued`, and starts the browser verification agent in the background.
+- The Admin Verify tab now shows expiry dates, queued-agent state, and a `Recheck` action.
+
 ### Contractor Tender Bid Verification Gate
 
 Added the next high-risk workflow gate for contractor delivery workflows:
@@ -202,6 +221,7 @@ npx vitest run src/services/__tests__/userVerificationService.test.ts src/servic
 Result for original automated-verification slice: 4 test files passed, 28 tests passed.
 Result after marketplace gate slice: focused gate validation passed with 2 test files and 24 tests passed, including updated API route coverage and 6 verification-service tests.
 Result after contractor tender gate slice: focused validation passed with 4 test files and 29 tests passed, including tender service, Firestore rules, verification service, and schema role coverage.
+Result after lifecycle/recheck slice: focused validation passed with 2 test files and 26 tests passed, including lifecycle helpers and admin recheck API coverage.
 
 ```bash
 npm run lint

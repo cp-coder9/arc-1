@@ -109,6 +109,60 @@ export function isActiveVerifiedVerification(
   return expiryTime >= (requirement.now || new Date()).getTime();
 }
 
+
+export interface VerificationLifecycleState {
+  isExpired: boolean;
+  isDueForRecheck: boolean;
+  daysUntilExpiry?: number;
+  lifecycleStatus: 'pending' | 'active' | 'due_for_recheck' | 'expired' | 'rejected';
+}
+
+export function getVerificationLifecycle(
+  verification: Pick<UserVerification, 'status' | 'expiresAt'>,
+  options: { now?: Date; dueWithinDays?: number } = {},
+): VerificationLifecycleState {
+  if (verification.status === 'pending') return { isExpired: false, isDueForRecheck: false, lifecycleStatus: 'pending' };
+  if (verification.status === 'rejected') return { isExpired: false, isDueForRecheck: false, lifecycleStatus: 'rejected' };
+  if (verification.status === 'expired') return { isExpired: true, isDueForRecheck: true, lifecycleStatus: 'expired' };
+  if (!verification.expiresAt) return { isExpired: false, isDueForRecheck: false, lifecycleStatus: 'active' };
+
+  const expiryTime = Date.parse(verification.expiresAt);
+  if (Number.isNaN(expiryTime)) return { isExpired: true, isDueForRecheck: true, lifecycleStatus: 'expired' };
+
+  const now = options.now || new Date();
+  const msUntilExpiry = expiryTime - now.getTime();
+  const daysUntilExpiry = Math.ceil(msUntilExpiry / 86_400_000);
+  if (msUntilExpiry < 0) return { isExpired: true, isDueForRecheck: true, daysUntilExpiry, lifecycleStatus: 'expired' };
+
+  const dueWithinDays = options.dueWithinDays ?? 30;
+  const isDueForRecheck = daysUntilExpiry <= dueWithinDays;
+  return {
+    isExpired: false,
+    isDueForRecheck,
+    daysUntilExpiry,
+    lifecycleStatus: isDueForRecheck ? 'due_for_recheck' : 'active',
+  };
+}
+
+export function queueVerificationRecheck<T extends UserVerification | Record<string, any>>(verification: T, requestedBy: string): T {
+  const now = new Date().toISOString();
+  return {
+    ...verification,
+    status: 'pending',
+    reviewedAt: undefined,
+    reviewedBy: undefined,
+    rejectionReason: undefined,
+    metadata: {
+      ...((verification as any).metadata || {}),
+      verificationAgentStatus: 'queued',
+      recheckRequestedAt: now,
+      recheckRequestedBy: requestedBy,
+      previousStatus: (verification as any).status,
+    },
+    updatedAt: now,
+  };
+}
+
 export function applyVerificationReview<T extends UserVerification | Record<string, any>>(verification: T, input: VerificationReviewInput): T {
   assertReviewStatus(input.status);
   if (input.status === 'rejected' && !input.rejectionReason?.trim()) {

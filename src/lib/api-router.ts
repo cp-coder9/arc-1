@@ -21,6 +21,7 @@ import {
   isActiveVerifiedVerification,
   normalizeRegistrationNumber,
   normalizeStatutoryBody,
+  queueVerificationRecheck,
   type ProviderVerificationResult,
 } from "../services/userVerificationService";
 import { runVerificationBrowserAgent, type VerificationAgentInput } from "../services/verificationAgentService";
@@ -2605,6 +2606,55 @@ router.get("/admin/verifications", async (req, res) => {
     const queryRef = status ? collectionRef.where('status', '==', status) : collectionRef;
     const snapshot = await queryRef.limit(250).get();
     res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/admin/verifications/:verificationId/recheck", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+    const { verificationId } = req.params;
+    const ref = adminDb.collection('user_verifications').doc(verificationId);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: 'Verification not found' });
+    const existing = { id: snapshot.id, ...snapshot.data() } as UserVerification;
+    const queued = queueVerificationRecheck(existing, authContext.uid);
+    const { id: _id, ...persisted } = queued;
+    await ref.set(persisted, { merge: true });
+    await mirrorLegacyArchitectVerification(verificationId, persisted);
+
+    const userDoc = await adminDb.collection('users').doc(existing.userId).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+    const requestId = req.get('x-request-id') || crypto.randomUUID();
+    const auditActor = decodedAuditActor(authContext.decoded, authContext.role);
+
+    await recordAuditEvent(req, {
+      category: 'verification',
+      action: 'verification.recheck_queued',
+      actor: auditActor,
+      target: { type: 'user_verification', id: verificationId },
+      reason: req.body.reason || 'Admin queued official register recheck',
+      metadata: { previousStatus: existing.status, subjectType: existing.subjectType, userId: existing.userId, statutoryBody: existing.statutoryBody || null },
+    });
+
+    runAndPersistVerificationAgent({
+      verificationId,
+      actor: auditActor,
+      requestId,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      agentInput: {
+        subjectType: existing.subjectType,
+        statutoryBody: existing.statutoryBody,
+        registrationNumber: existing.registrationNumber,
+        displayName: (userData?.displayName || userData?.name || req.body.displayName) as string | undefined,
+        businessName: (existing.metadata?.businessName || req.body.businessName) as string | undefined,
+      },
+    }).catch(error => console.error('[Verification Agent] Background recheck failed:', error));
+
+    res.json({ id: verificationId, ...persisted });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

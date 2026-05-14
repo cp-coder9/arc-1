@@ -1507,6 +1507,29 @@ function DisputeRow({ dispute }: { dispute: Dispute }) {
     }
   };
 
+  const recheckUserVerification = async (verification: UserVerification) => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Admin session expired');
+      const response = await fetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/recheck`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: 'Admin queued official register recheck from verification console' }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Verification recheck failed');
+      }
+      toast.success('Verification recheck queued');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Failed to queue verification recheck');
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-border p-4 space-y-4">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">

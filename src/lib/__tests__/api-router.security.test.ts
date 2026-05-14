@@ -672,6 +672,41 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.verified')).toBe(true);
   });
 
+
+
+  it('lets admins queue official register rechecks for expiring verification records', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('user_verifications/ver-recheck', {
+      userId: 'architect-1',
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      registrationNumber: 'SACAP-123',
+      status: 'verified',
+      source: 'automated_browser_agent',
+      submittedAt: '2026-01-01T00:00:00.000Z',
+      submittedBy: 'architect-1',
+      lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2026-01-20T00:00:00.000Z',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      metadata: { existing: true },
+    });
+
+    const forbidden = await request(app)
+      .post('/api/admin/verifications/ver-recheck/recheck')
+      .set(authHeader('architect'))
+      .send({ reason: 'Trying as non-admin' });
+    const queued = await request(app)
+      .post('/api/admin/verifications/ver-recheck/recheck')
+      .set(authHeader('admin'))
+      .send({ reason: 'Expiry due soon' });
+
+    expect(forbidden.status).toBe(403);
+    expect(queued.status).toBe(200);
+    expect(queued.body).toMatchObject({ status: 'pending', metadata: { existing: true, verificationAgentStatus: 'queued', recheckRequestedBy: 'admin-1', previousStatus: 'verified' } });
+    expect(mockAdminDb.getDoc('architect_verifications/architect-1')).toMatchObject({ userVerificationId: 'ver-recheck' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.recheck_queued')).toBe(true);
+  });
+
   it('delegates municipal automation, OCR, heatmap, and shadow-tracker routes after auth', async () => {
     const app = await buildApp();
     mockAdminDb.seed('municipal_credentials/client-1_city_of_cape_town', { userId: 'client-1', municipality: 'city_of_cape_town' });
