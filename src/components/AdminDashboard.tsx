@@ -3,7 +3,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, Firm } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, Firm, UserVerification } from '../types';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -530,6 +530,7 @@ export default function AdminDashboard({
     activeTab === 'fees' ? 'fees' :
     activeTab === 'financial' ? 'financial' :
     activeTab === 'firms' ? 'firms' :
+    activeTab === 'verifications' ? 'verifications' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
     'submissions';
@@ -547,6 +548,7 @@ export default function AdminDashboard({
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [projectsByJobId, setProjectsByJobId] = useState<Record<string, Project>>({});
   const [firms, setFirms] = useState<Firm[]>([]);
+  const [userVerifications, setUserVerifications] = useState<UserVerification[]>([]);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
@@ -625,6 +627,13 @@ export default function AdminDashboard({
       },
       handleListenerError('firms')
     );
+    const unsubVerifications = onSnapshot(
+      query(collection(db, 'user_verifications'), limit(250)),
+      (snapshot) => {
+        setUserVerifications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserVerification)));
+      },
+      handleListenerError('verifications')
+    );
     return () => {
       unsubSubmissions();
       unsubAgents();
@@ -634,6 +643,7 @@ export default function AdminDashboard({
       unsubUsers();
       unsubProjects();
       unsubFirms();
+      unsubVerifications();
     };
   }, []);
 
@@ -762,6 +772,40 @@ export default function AdminDashboard({
     }
   };
 
+  const reviewUserVerification = async (verification: UserVerification, status: 'verified' | 'rejected') => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Admin session expired');
+      const rejectionReason = status === 'rejected'
+        ? window.prompt('Enter rejection reason for audit log') || ''
+        : undefined;
+      if (status === 'rejected' && rejectionReason.trim().length < 5) {
+        toast.error('A clear rejection reason is required');
+        return;
+      }
+      const response = await fetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/review`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status,
+          rejectionReason,
+          adminReviewNote: status === 'verified' ? 'Admin confirmed automated browser verification evidence.' : rejectionReason,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Verification review failed');
+      }
+      toast.success(status === 'verified' ? 'Verification approved' : 'Verification rejected');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Failed to review verification');
+    }
+  };
+
   return (
     <div className="space-y-12">
       <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
@@ -784,6 +828,7 @@ export default function AdminDashboard({
           fees: 'fees',
           financial: 'financial',
           firms: 'firms',
+          verifications: 'verifications',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
@@ -825,6 +870,9 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="firms" className={tabTriggerClass}>
               <Building2 size={16} /> Firms
+            </TabsTrigger>
+            <TabsTrigger value="verifications" className={tabTriggerClass}>
+              <ShieldCheck size={16} /> Verify
             </TabsTrigger>
             <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
@@ -1120,6 +1168,58 @@ export default function AdminDashboard({
 
         <TabsContent value="financial">
           <FinancialDashboard />
+        </TabsContent>
+
+        <TabsContent value="verifications">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden space-y-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-primary" /> Verification Agent Queue</h2>
+                <p className="text-sm text-muted-foreground mt-1">Review records created by the Architex browser verification agent against official registers.</p>
+              </div>
+              <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{userVerifications.length} records</Badge>
+            </div>
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Register</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Agent Evidence</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {userVerifications.map(verification => {
+                    const agentResult = verification.metadata?.verificationAgent as any;
+                    return (
+                      <TableRow key={verification.id}>
+                        <TableCell className="font-mono text-xs">{verification.userId}</TableCell>
+                        <TableCell><Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verification.subjectType}</Badge></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{verification.statutoryBody || 'Unspecified'} · {verification.registrationNumber || 'No number'}</TableCell>
+                        <TableCell><Badge variant={verification.status === 'verified' ? 'secondary' : verification.status === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verification.status}</Badge></TableCell>
+                        <TableCell className="max-w-[320px] text-xs text-muted-foreground">
+                          {agentResult?.officialUrl ? (
+                            <a className="text-primary underline" href={agentResult.officialUrl} target="_blank" rel="noreferrer">{agentResult.provider} official check</a>
+                          ) : 'Queued or not yet checked'}
+                          {agentResult?.error && <p className="mt-1 line-clamp-2 text-red-600">{agentResult.error}</p>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" onClick={() => reviewUserVerification(verification, 'verified')} disabled={verification.status === 'verified'}>Approve</Button>
+                            <Button size="sm" variant="destructive" onClick={() => reviewUserVerification(verification, 'rejected')} disabled={verification.status === 'rejected'}>Reject</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {userVerifications.length === 0 && <p className="text-muted-foreground italic">No verification records have been submitted yet.</p>}
+          </div>
         </TabsContent>
 
         <TabsContent value="firms">

@@ -220,6 +220,18 @@ vi.mock('@vercel/blob', () => ({ put, del }));
 vi.mock('../../services/ocrService', () => ({ processReceiptOCR }));
 vi.mock('../../services/shadowTrackerService', () => ({ detectMunicipalInvoices, getMunicipalityHeatMap }));
 vi.mock('../../services/sacapVerificationService', () => ({ verifySACAPByName: vi.fn(async () => ({ isValid: true })) }));
+vi.mock('../../services/verificationAgentService', () => ({
+  runVerificationBrowserAgent: vi.fn(async () => ({
+    provider: 'sacap',
+    status: 'verified',
+    source: 'automated_browser_agent',
+    checkedAt: '2026-01-02T03:04:05.000Z',
+    officialUrl: 'https://search.mymembership.co.za/Search/?Id=4f3f0fde-d5dc-4af0-97cd-0a192a56830e',
+    searchMode: 'name',
+    requiresHumanReview: false,
+    details: { category: 'Professional Architect', registrationNumber: 'SACAP-123' },
+  })),
+}));
 vi.mock('../municipalAutomation', () => ({ runMunicipalBrowserAutomation, trackMunicipalityStatus }));
 vi.mock('../../services/notificationService', () => ({ notificationService: { create: vi.fn() } }));
 
@@ -572,6 +584,63 @@ describe('api-router security and high-value integration routes', () => {
       action: 'municipal.credentials_saved',
       target: { type: 'municipal_credentials', id: 'client-1_city_of_cape_town' },
     });
+  });
+
+  it('submits generalized verifications and queues the browser verification agent', async () => {
+    const app = await buildApp();
+
+    const response = await request(app)
+      .post('/api/verifications/submit')
+      .set(authHeader('architect'))
+      .send({
+        subjectType: 'bep',
+        statutoryBody: 'SACAP',
+        registrationNumber: 'SACAP-123',
+        evidenceUrls: ['https://files.public.blob.vercel-storage.com/certificate.pdf'],
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      userId: 'architect-1',
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      source: 'automated_browser_agent',
+      status: 'pending',
+    });
+    expect(mockAdminDb.getDoc(`user_verifications/${response.body.id}`)).toMatchObject({ metadata: { verificationAgentStatus: 'queued' } });
+    expect(mockAdminDb.getDoc('architect_verifications/architect-1')).toMatchObject({ userVerificationId: response.body.id, sacapNumber: 'SACAP-123' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.submitted')).toBe(true);
+  });
+
+  it('allows admins to review verification records and mirrors SACAP legacy records', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('user_verifications/ver-1', {
+      userId: 'architect-1',
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      registrationNumber: 'SACAP-123',
+      status: 'pending',
+      source: 'automated_browser_agent',
+      submittedAt: '2026-01-02T03:04:05.000Z',
+      submittedBy: 'architect-1',
+      createdAt: '2026-01-02T03:04:05.000Z',
+      metadata: {},
+    });
+
+    const forbidden = await request(app)
+      .post('/api/admin/verifications/ver-1/review')
+      .set(authHeader('architect'))
+      .send({ status: 'verified' });
+    const approved = await request(app)
+      .post('/api/admin/verifications/ver-1/review')
+      .set(authHeader('admin'))
+      .send({ status: 'verified', adminReviewNote: 'Confirmed against official register evidence' });
+
+    expect(forbidden.status).toBe(403);
+    expect(approved.status).toBe(200);
+    expect(mockAdminDb.getDoc('user_verifications/ver-1')).toMatchObject({ status: 'verified', reviewedBy: 'admin-1' });
+    expect(mockAdminDb.getDoc('architect_verifications/architect-1')).toMatchObject({ status: 'verified', userVerificationId: 'ver-1' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.verified')).toBe(true);
   });
 
   it('delegates municipal automation, OCR, heatmap, and shadow-tracker routes after auth', async () => {

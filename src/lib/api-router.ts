@@ -9,13 +9,22 @@ import { extractCadData } from "./cadProcessor";
 import { encrypt, decrypt } from "./encryption";
 import { processReceiptOCR } from "../services/ocrService";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService";
-import { verifySACAPByName } from "../services/sacapVerificationService";
 import { runMunicipalBrowserAutomation, trackMunicipalityStatus } from "./municipalAutomation";
 import { notificationService } from "../services/notificationService";
 import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../services/auditService";
 import { normalizeUserRole } from "../services/permissionService";
+import {
+  applyVerificationReview,
+  assertVerificationSubjectType,
+  buildUserVerification,
+  inferVerificationProvider,
+  normalizeRegistrationNumber,
+  normalizeStatutoryBody,
+  type ProviderVerificationResult,
+} from "../services/userVerificationService";
+import { runVerificationBrowserAgent, type VerificationAgentInput } from "../services/verificationAgentService";
 
-import { UserRole, MunicipalityType } from "../types";
+import { UserRole, MunicipalityType, type UserVerification, type VerificationSubjectType } from "../types";
 
 
 // ── Environment variables ─────────────────────────────────────────────────────
@@ -309,6 +318,86 @@ function decodedAuditActor(decoded: any, role?: UserRole | string) {
     displayName: decoded.displayName || decoded.name,
     authorizationType: decoded.authorizationType,
   };
+}
+
+function verificationDocId(userId: string, subjectType: VerificationSubjectType, statutoryBody?: string, registrationNumber?: string) {
+  const body = normalizeStatutoryBody(statutoryBody) || subjectType.toUpperCase();
+  const registration = normalizeRegistrationNumber(registrationNumber)?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'manual';
+  return `${userId}_${subjectType}_${body}_${registration}`.slice(0, 480);
+}
+
+function sanitizeEvidenceUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((url): url is string => typeof url === 'string' && isAllowedBlobUrl(url)).slice(0, 10);
+}
+
+function sanitizeEvidenceDocumentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === 'string' && /^[a-zA-Z0-9_/-]{1,160}$/.test(id)).slice(0, 20);
+}
+
+async function mirrorLegacyArchitectVerification(verificationId: string, verification: Omit<UserVerification, 'id'>) {
+  if (verification.subjectType !== 'bep' || verification.statutoryBody !== 'SACAP') return;
+  await adminDb.collection('architect_verifications').doc(verification.userId).set({
+    userId: verification.userId,
+    status: verification.status,
+    sacapNumber: verification.registrationNumber || '',
+    certificateUrl: verification.evidenceUrls?.[0] || undefined,
+    submittedAt: verification.submittedAt,
+    reviewedAt: verification.reviewedAt,
+    reviewedBy: verification.reviewedBy,
+    rejectionReason: verification.rejectionReason,
+    expiresAt: verification.expiresAt,
+    lastVerifiedAt: verification.lastVerifiedAt,
+    userVerificationId: verificationId,
+    updatedAt: verification.updatedAt,
+  }, { merge: true });
+}
+
+async function runSacapProviderCheck(name: string, sacapNumber?: string): Promise<ProviderVerificationResult> {
+  return runVerificationBrowserAgent({ subjectType: 'bep', statutoryBody: 'SACAP', displayName: name, registrationNumber: sacapNumber });
+}
+
+async function runAndPersistVerificationAgent(input: {
+  verificationId: string;
+  agentInput: VerificationAgentInput;
+  actor: { uid: string; role?: UserRole | string; email?: string; displayName?: string; authorizationType?: string };
+  requestId: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) {
+  const result = await runVerificationBrowserAgent(input.agentInput);
+  const ref = adminDb.collection('user_verifications').doc(input.verificationId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return;
+  const existing = snapshot.data() as Omit<UserVerification, 'id'>;
+  const now = new Date().toISOString();
+  const updated: Omit<UserVerification, 'id'> = {
+    ...existing,
+    status: result.status,
+    source: result.source,
+    lastVerifiedAt: result.status === 'verified' ? now : existing.lastVerifiedAt,
+    reviewedAt: result.status === 'rejected' ? now : existing.reviewedAt,
+    reviewedBy: result.status === 'rejected' ? 'verification_agent' : existing.reviewedBy,
+    rejectionReason: result.status === 'rejected' ? (result.error || 'Official register did not return a matching record') : existing.rejectionReason,
+    metadata: {
+      ...(existing.metadata || {}),
+      verificationAgent: result,
+    },
+    updatedAt: now,
+  };
+  await ref.set(updated, { merge: true });
+  await mirrorLegacyArchitectVerification(input.verificationId, updated);
+  await adminDb.collection('audit_logs').add(buildAuditEvent({
+    category: 'verification',
+    action: 'verification.agent_completed',
+    actor: input.actor,
+    target: { type: 'user_verification', id: input.verificationId },
+    requestId: input.requestId,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    metadata: { provider: result.provider, status: result.status, requiresHumanReview: result.requiresHumanReview === true, officialUrl: result.officialUrl },
+  }));
 }
 
 // ── Multer (memory storage, max 20 MB) ───────────────────────────────────────
@@ -1200,7 +1289,7 @@ router.post("/agent/search", apiLimiter, async (req, res) => {
         console.error(`[API] AI Search failed: ${response.status}`, errData);
         return res.status(response.status).json({ error: "Search provider error", details: errData });
       }
-      
+
       const data = await response.json();
       const text = data.choices?.[0]?.message?.content;
       return res.json(text ? { text } : { text: `No results for: ${query}` });
@@ -1726,18 +1815,18 @@ router.get("/payment/refund/requests", async (req, res) => {
   try {
     const { status = "pending" } = req.query;
     let query = adminDb.collection("refund_requests").orderBy("requestedAt", "desc");
-    
+
     if (status !== "all") {
       query = query.where("status", "==", status);
     }
-    
+
     const snapshot = await query.limit(50).get();
     const requests = await Promise.all(snapshot.docs.map(async (doc) => {
       const data = doc.data();
       // Fetch job details
       const jobDoc = await adminDb.collection("jobs").doc(data.jobId).get();
       const jobData = jobDoc.exists ? jobDoc.data() : null;
-      
+
       return {
         id: doc.id,
         ...data,
@@ -1769,7 +1858,7 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
 
   const { requestId } = req.params;
   const { action, adminNote } = req.body; // action: "approve" or "reject"
-  
+
   if (!action || !["approve", "reject"].includes(action)) {
     return res.status(400).json({ error: "action must be 'approve' or 'reject'" });
   }
@@ -1777,9 +1866,9 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
   try {
     const requestRef = adminDb.collection("refund_requests").doc(requestId);
     const requestDoc = await requestRef.get();
-    
+
     if (!requestDoc.exists) return res.status(404).json({ error: "Refund request not found" });
-    
+
     const request = requestDoc.data()!;
     if (request.status !== "pending") {
       return res.status(400).json({ error: "Refund request has already been processed" });
@@ -1822,7 +1911,7 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
     // Approve refund - process the actual refund
     const jobDoc = await adminDb.collection("jobs").doc(request.jobId).get();
     const job = jobDoc.data()!;
-    
+
     const escrowRef = adminDb.collection("escrow").doc(request.jobId);
     const escrowDoc = await escrowRef.get();
     const escrow = escrowDoc.data()!;
@@ -1850,8 +1939,8 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
         amount: request.amount,
         type: "refund",
         status: "completed",
-        metadata: { 
-          reason: request.reason, 
+        metadata: {
+          reason: request.reason,
           originalEscrow: request.jobId,
           approvedBy: decoded.uid,
           adminNote,
@@ -2384,6 +2473,144 @@ router.get("/municipal/submissions", async (req, res) => {
   }
 });
 
+// Generalized user verification records. These replace role-specific client
+// writes with server-authorized, auditable persistence while preserving legacy
+// SACAP mirror documents for existing UI/rules compatibility.
+router.get("/verifications/me", async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const subjectType = req.query.subjectType as VerificationSubjectType | undefined;
+    let queryRef = adminDb.collection('user_verifications').where('userId', '==', decoded.uid);
+    if (subjectType) {
+      assertVerificationSubjectType(subjectType);
+      queryRef = queryRef.where('subjectType', '==', subjectType);
+    }
+    const snapshot = await queryRef.get();
+    res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/verifications/submit", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const subjectType = req.body.subjectType as VerificationSubjectType;
+    assertVerificationSubjectType(subjectType);
+    const registrationNumber = normalizeRegistrationNumber(req.body.registrationNumber);
+    const statutoryBody = normalizeStatutoryBody(req.body.statutoryBody);
+    const evidenceUrls = sanitizeEvidenceUrls(req.body.evidenceUrls);
+    const evidenceDocumentIds = sanitizeEvidenceDocumentIds(req.body.evidenceDocumentIds);
+    const provider = inferVerificationProvider({ subjectType, statutoryBody });
+
+    const decodedWithOptionalName = authContext.decoded as unknown as { name?: unknown };
+    const decodedName = typeof decodedWithOptionalName.name === 'string' ? decodedWithOptionalName.name : undefined;
+    const displayName = (req.body.displayName || authContext.userData?.displayName || authContext.decoded.displayName || decodedName) as string | undefined;
+
+    const verification = buildUserVerification({
+      userId: authContext.uid,
+      submittedBy: authContext.uid,
+      subjectType,
+      registrationNumber,
+      statutoryBody: statutoryBody || (provider === 'sacap' ? 'SACAP' : undefined),
+      source: 'automated_browser_agent',
+      evidenceUrls,
+      evidenceDocumentIds,
+      metadata: {
+        provider,
+        verificationAgentStatus: 'queued',
+        submittedRole: authContext.role || null,
+        normalizedRole: authContext.normalizedRole || null,
+        businessName: req.body.businessName || null,
+      },
+    });
+
+    const verificationId = verificationDocId(authContext.uid, subjectType, verification.statutoryBody, verification.registrationNumber);
+    await adminDb.collection('user_verifications').doc(verificationId).set(verification, { merge: true });
+    await mirrorLegacyArchitectVerification(verificationId, verification);
+    const auditActor = decodedAuditActor(authContext.decoded, authContext.role);
+    const requestId = req.get('x-request-id') || crypto.randomUUID();
+
+    await recordAuditEvent(req, {
+      category: 'verification',
+      action: 'verification.submitted',
+      actor: auditActor,
+      target: { type: 'user_verification', id: verificationId },
+      metadata: { subjectType, statutoryBody: verification.statutoryBody || null, provider, status: verification.status, verificationAgentStatus: 'queued' },
+    });
+
+    runAndPersistVerificationAgent({
+      verificationId,
+      actor: auditActor,
+      requestId,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+      agentInput: {
+        subjectType,
+        statutoryBody: verification.statutoryBody,
+        registrationNumber: verification.registrationNumber,
+        displayName,
+        businessName: req.body.businessName,
+      },
+    }).catch(error => console.error('[Verification Agent] Background verification failed:', error));
+
+    res.status(201).json({ id: verificationId, ...verification });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/admin/verifications", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+    const status = req.query.status as string | undefined;
+    const collectionRef = adminDb.collection('user_verifications');
+    const queryRef = status ? collectionRef.where('status', '==', status) : collectionRef;
+    const snapshot = await queryRef.limit(250).get();
+    res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/admin/verifications/:verificationId/review", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+    const { verificationId } = req.params;
+    const ref = adminDb.collection('user_verifications').doc(verificationId);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: 'Verification not found' });
+    const existing = { id: snapshot.id, ...snapshot.data() } as UserVerification;
+    const reviewed = applyVerificationReview(existing, {
+      status: req.body.status,
+      reviewedBy: authContext.uid,
+      rejectionReason: req.body.rejectionReason,
+      expiresAt: req.body.expiresAt,
+      metadata: {
+        adminReviewNote: req.body.adminReviewNote || null,
+      },
+    });
+    const { id: _id, ...persisted } = reviewed;
+    await ref.set(persisted, { merge: true });
+    await mirrorLegacyArchitectVerification(verificationId, persisted);
+
+    await recordAuditEvent(req, {
+      category: 'verification',
+      action: `verification.${reviewed.status}`,
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'user_verification', id: verificationId },
+      reason: req.body.rejectionReason || req.body.adminReviewNote || 'Admin verification review completed',
+      metadata: { previousStatus: existing.status, nextStatus: reviewed.status, subjectType: reviewed.subjectType, userId: reviewed.userId },
+    });
+
+    res.json({ id: verificationId, ...persisted });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // SACAP Verification Agent (Real Automation)
 router.post("/architect/verify-sacap", async (req, res) => {
   try {
@@ -2393,17 +2620,32 @@ router.post("/architect/verify-sacap", async (req, res) => {
     if (!architectId || !name) {
       return res.status(400).json({ error: "Missing architectId or name" });
     }
+    if (architectId !== decoded.uid && !(await isAdmin(decoded.uid))) {
+      return res.status(403).json({ error: "Not authorized to verify this profile" });
+    }
 
     console.log(`[SACAP Agent] Verifying architect: ${name} (SACAP: ${sacapNumber || 'N/A'})`);
 
-    const result = await verifySACAPByName(name);
-    const status = result.verified ? 'verified' : 'failed';
+    const result = await runSacapProviderCheck(name, sacapNumber);
+    const status = result.status === 'verified' ? 'verified' : 'failed';
+    const verification = buildUserVerification({
+      userId: architectId,
+      submittedBy: decoded.uid,
+      subjectType: 'bep',
+      registrationNumber: sacapNumber,
+      statutoryBody: 'SACAP',
+      source: 'automated_browser_agent',
+      metadata: { provider: 'sacap', legacyRoute: '/architect/verify-sacap' },
+    }, result);
+    const verificationId = verificationDocId(architectId, 'bep', 'SACAP', verification.registrationNumber);
+    await adminDb.collection('user_verifications').doc(verificationId).set(verification, { merge: true });
+    await mirrorLegacyArchitectVerification(verificationId, verification);
 
     // Update the architect profile in Firestore
     await adminDb.collection("architect_profiles").doc(architectId).set({
       sacapStatus: status,
       sacapLastVerifiedAt: new Date().toISOString(),
-      sacapRegistrationType: result.registrationDetails?.category || null,
+      sacapRegistrationType: (result.details as any)?.category || null,
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
@@ -2411,16 +2653,17 @@ router.post("/architect/verify-sacap", async (req, res) => {
       category: 'verification',
       action: 'verification.sacap_checked',
       actor: decodedAuditActor(decoded),
-      target: { type: 'architect_profile', id: architectId },
-      metadata: { status, sacapNumber: sacapNumber || null, source: 'SACAP public search automation' },
+      target: { type: 'user_verification', id: verificationId },
+      metadata: { status, sacapNumber: sacapNumber || null, source: 'SACAP browser verification agent', officialUrl: (result as any).officialUrl },
     });
 
     res.json({
       success: true,
       status,
-      details: result.registrationDetails,
+      verificationId,
+      details: result.details,
       message: status === 'verified'
-        ? `Architect SACAP status verified as ${result.registrationDetails?.category}.`
+        ? `Architect SACAP status verified as ${(result.details as any)?.category}.`
         : 'Architect not found in SACAP registry.'
     });
   } catch (err: any) {
@@ -2468,7 +2711,7 @@ router.get("/payment/:paymentId/receipt", async (req, res) => {
     const jobDoc = await adminDb.collection("jobs").doc(payment.jobId).get();
     const job = jobDoc.exists ? jobDoc.data() : null;
 
-    const isAuthorized = 
+    const isAuthorized =
       payment.payerId === decoded.uid ||
       payment.payeeId === decoded.uid ||
       (job && (job.clientId === decoded.uid || job.selectedArchitectId === decoded.uid)) ||
@@ -2549,7 +2792,7 @@ router.post("/payment/:paymentId/receipt/pdf", async (req, res) => {
     const jobDoc = await adminDb.collection("jobs").doc(payment.jobId).get();
     const job = jobDoc.exists ? jobDoc.data() : null;
 
-    const isAuthorized = 
+    const isAuthorized =
       payment.payerId === decoded.uid ||
       payment.payeeId === decoded.uid ||
       (job && (job.clientId === decoded.uid || job.selectedArchitectId === decoded.uid)) ||
@@ -2607,7 +2850,7 @@ router.post("/payment/:paymentId/receipt/pdf", async (req, res) => {
     <div style="text-align: center; margin-bottom: 20px;">
       <span class="receipt-id">RECEIPT #RCP-${paymentId.substring(0, 8).toUpperCase()}</span>
     </div>
-    
+
     <div style="text-align: center; margin-bottom: 20px;">
       <span class="status ${payment.status}">${payment.status}</span>
     </div>
@@ -2738,11 +2981,11 @@ router.get("/payment/receipts", async (req, res) => {
     ]);
 
     const paymentMap = new Map();
-    
+
     payerSnapshot.docs.forEach(doc => {
       paymentMap.set(doc.id, { id: doc.id, ...doc.data(), role: 'payer' });
     });
-    
+
     payeeSnapshot.docs.forEach(doc => {
       if (!paymentMap.has(doc.id)) {
         paymentMap.set(doc.id, { id: doc.id, ...doc.data(), role: 'payee' });

@@ -607,7 +607,7 @@ export interface LedgerEntry {
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired';
 
 export type VerificationSubjectType = 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'freelancer' | 'admin';
-export type VerificationSource = 'professional_body_api' | 'public_register' | 'manual_admin_review' | 'document_upload' | 'privyseal' | 'other';
+export type VerificationSource = 'professional_body_api' | 'public_register' | 'automated_browser_agent' | 'manual_admin_review' | 'document_upload' | 'privyseal' | 'other';
 
 export interface UserVerification {
   id: string;

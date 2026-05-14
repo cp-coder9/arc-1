@@ -4,8 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,14 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle, XCircle, Clock, Shield } from 'lucide-react';
 import { uploadAndTrackFile } from '@/lib/uploadService';
 import { toast } from 'sonner';
-import { ArchitectVerification, UserProfile, VerificationStatus } from '@/types';
+import { UserProfile, UserVerification, VerificationStatus } from '@/types';
 
 interface SACAPVerificationProps {
   user: UserProfile;
 }
 
 export function SACAPVerification({ user }: SACAPVerificationProps) {
-  const [verification, setVerification] = useState<ArchitectVerification | null>(null);
+  const [verification, setVerification] = useState<UserVerification | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [sacapNumber, setSacapNumber] = useState('');
@@ -32,11 +31,15 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
 
   const loadVerification = async () => {
     try {
-      const docRef = doc(db, 'architect_verifications', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setVerification(docSnap.data() as ArchitectVerification);
-      }
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      const res = await fetch('/api/verifications/me?subjectType=bep', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to load verification status');
+      const records = await res.json() as UserVerification[];
+      const sacapRecord = records.find(record => record.statutoryBody === 'SACAP') || records[0];
+      if (sacapRecord) setVerification(sacapRecord);
     } catch (error) {
       console.error('Failed to load verification:', error);
     } finally {
@@ -80,18 +83,29 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
         context: 'certificate',
       });
 
-      // Create verification record
-      const verificationData: ArchitectVerification = {
-        userId: user.uid,
-        status: 'pending',
-        certificateUrl: url,
-        sacapNumber: sacapNumber.trim(),
-        submittedAt: new Date().toISOString(),
-      };
-
-      await setDoc(doc(db, 'architect_verifications', user.uid), verificationData);
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be signed in to submit verification');
+      const response = await fetch('/api/verifications/submit', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subjectType: 'bep',
+          statutoryBody: 'SACAP',
+          registrationNumber: sacapNumber.trim(),
+          evidenceUrls: [url],
+          displayName: user.displayName,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to submit verification');
+      }
+      const verificationData = await response.json() as UserVerification;
       setVerification(verificationData);
-      toast.success('Verification submitted successfully! We will review your documents shortly.');
+      toast.success('Verification submitted. The Architex verification agent is checking the official SACAP register in the background.');
     } catch (error) {
       console.error('Failed to submit verification:', error);
       toast.error('Failed to submit verification');
@@ -145,7 +159,7 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
                 <span className="font-semibold">Verification Complete</span>
               </div>
               <p className="text-sm text-green-700">
-                Your SACAP registration ({verification.sacapNumber}) has been verified.
+                Your SACAP registration ({verification.registrationNumber}) has been verified.
                 You can now apply for jobs on the platform.
               </p>
             </div>
@@ -164,7 +178,7 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
                 <span className="font-semibold">Under Review</span>
               </div>
               <p className="text-sm text-yellow-700">
-                Your verification request (SACAP: {verification.sacapNumber}) is being reviewed by our team.
+                Your verification request (SACAP: {verification.registrationNumber}) is being reviewed by our team.
                 This usually takes 1-2 business days.
               </p>
             </div>
