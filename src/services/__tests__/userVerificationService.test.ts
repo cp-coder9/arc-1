@@ -5,6 +5,7 @@ import {
   assertVerificationSubjectType,
   buildUserVerification,
   inferVerificationProvider,
+  isActiveVerifiedVerification,
   normalizeRegistrationNumber,
   normalizeStatutoryBody,
 } from '../userVerificationService';
@@ -79,6 +80,24 @@ describe('userVerificationService', () => {
     expect(reviewed.metadata.adminOverrideReason).toBe('Documents checked against public registry');
     vi.useRealTimers();
   });
+
+
+
+  it('recognizes only active verified records for gated marketplace access', () => {
+    const base = {
+      status: 'verified' as const,
+      subjectType: 'bep' as const,
+      statutoryBody: 'SACAP',
+      expiresAt: '2026-02-01T00:00:00.000Z',
+    };
+
+    expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'SACAP', now: new Date('2026-01-15T00:00:00.000Z') })).toBe(true);
+    expect(isActiveVerifiedVerification({ ...base, status: 'pending' }, { subjectType: 'bep', statutoryBody: 'SACAP' })).toBe(false);
+    expect(isActiveVerifiedVerification(base, { subjectType: 'contractor', statutoryBody: 'SACAP' })).toBe(false);
+    expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'CIDB' })).toBe(false);
+    expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'SACAP', now: new Date('2026-03-01T00:00:00.000Z') })).toBe(false);
+  });
+
 
   it('rejects unsupported subject and review statuses', () => {
     expect(() => assertVerificationSubjectType('architect')).toThrow('Unsupported');

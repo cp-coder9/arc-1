@@ -95,6 +95,20 @@ export function buildUserVerification(input: VerificationSubmissionInput, provid
   };
 }
 
+export function isActiveVerifiedVerification(
+  verification: Pick<UserVerification, 'status' | 'expiresAt' | 'subjectType' | 'statutoryBody'>,
+  requirement: { subjectType?: VerificationSubjectType; statutoryBody?: string; now?: Date } = {},
+): boolean {
+  if (verification.status !== 'verified') return false;
+  if (requirement.subjectType && verification.subjectType !== requirement.subjectType) return false;
+  const requiredBody = normalizeStatutoryBody(requirement.statutoryBody);
+  if (requiredBody && normalizeStatutoryBody(verification.statutoryBody) !== requiredBody) return false;
+  if (!verification.expiresAt) return true;
+  const expiryTime = Date.parse(verification.expiresAt);
+  if (Number.isNaN(expiryTime)) return false;
+  return expiryTime >= (requirement.now || new Date()).getTime();
+}
+
 export function applyVerificationReview<T extends UserVerification | Record<string, any>>(verification: T, input: VerificationReviewInput): T {
   assertReviewStatus(input.status);
   if (input.status === 'rejected' && !input.rejectionReason?.trim()) {

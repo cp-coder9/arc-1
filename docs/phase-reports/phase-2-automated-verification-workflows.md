@@ -81,6 +81,31 @@ Updated `src/lib/api-router.ts` with:
   - writes reviewed metadata and audit event
   - preserves admin review as an exception/fallback path, not the primary flow
 
+
+### Marketplace Verification Gate
+
+Added the first hard production gate required by the scope statement that BEPs must be verified before accessing client marketplace opportunities:
+
+- `POST /api/jobs/:jobId/applications` now requires an active persisted `user_verifications` record for:
+  - `subjectType: bep`
+  - `statutoryBody: SACAP`
+  - `status: verified`
+  - non-expired `expiresAt` when an expiry date is present
+- Unverified BEP/architect users are blocked with HTTP 403 and a machine-readable `verificationRequired` response.
+- Blocked attempts persist an `access` audit event with action `marketplace.application_blocked_unverified_bep`.
+- Accepted applications persist the verification id and SACAP registration number onto the application record.
+- `marketplace.application_submitted` audit events include the verification id used for the access decision.
+
+### Verification Gate Helper
+
+Extended `src/services/userVerificationService.ts` with:
+
+- `isActiveVerifiedVerification(record, requirement)`
+  - validates `verified` status
+  - validates required subject type
+  - validates required statutory body
+  - rejects invalid/expired `expiresAt` values
+
 ### SACAP Legacy Compatibility
 
 Updated legacy `POST /api/architect/verify-sacap` to:
@@ -128,6 +153,7 @@ Updated `src/types.ts`:
   - subject validation
   - provider inference
   - build defaults
+  - active verified record/expiry helper
   - rejection reason enforcement
   - verified review metadata
 - `src/services/__tests__/verificationAgentService.test.ts`
@@ -137,6 +163,9 @@ Updated `src/types.ts`:
   - generalized verification submission route
   - queued browser verification agent metadata
   - legacy SACAP mirror creation
+  - persisted BEP marketplace verification gate
+  - unverified BEP application blocking and audit logging
+  - verified BEP application persistence with verification id
   - admin-only review route
   - review audit event persistence
 
@@ -146,7 +175,8 @@ Updated `src/types.ts`:
 npx vitest run src/services/__tests__/userVerificationService.test.ts src/services/__tests__/verificationAgentService.test.ts src/lib/__tests__/api-router.security.test.ts src/lib/__tests__/firestore-rules.static.test.ts
 ```
 
-Result: 4 test files passed, 28 tests passed.
+Result for original automated-verification slice: 4 test files passed, 28 tests passed.
+Result after marketplace gate slice: focused gate validation passed with 2 test files and 24 tests passed, including updated API route coverage and 6 verification-service tests.
 
 ```bash
 npm run lint

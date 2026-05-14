@@ -248,6 +248,24 @@ function authHeader(token = 'client') {
   return { Authorization: `Bearer ${token}`, Origin: 'http://127.0.0.1', Host: '127.0.0.1' };
 }
 
+function seedVerifiedBepVerification(userId = 'architect-1', overrides: StoredDoc = {}) {
+  mockAdminDb.seed(`user_verifications/${userId}_bep_SACAP_SACAP-123`, {
+    userId,
+    subjectType: 'bep',
+    statutoryBody: 'SACAP',
+    registrationNumber: 'SACAP-123',
+    status: 'verified',
+    source: 'automated_browser_agent',
+    submittedAt: '2026-01-01T00:00:00.000Z',
+    submittedBy: userId,
+    lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    metadata: {},
+    ...overrides,
+  });
+}
+
 describe('api-router security and high-value integration routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -350,6 +368,7 @@ describe('api-router security and high-value integration routes', () => {
   it('allows architects to apply once to open jobs and notifies the client', async () => {
     const app = await buildApp();
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
+    seedVerifiedBepVerification();
 
     const response = await request(app)
       .post('/api/jobs/job-1/applications')
@@ -360,13 +379,13 @@ describe('api-router security and high-value integration routes', () => {
     expect(response.body).toMatchObject({ jobId: 'job-1', status: 'pending' });
     const apps = mockAdminDb.listCollection('jobs/job-1/applications');
     expect(apps).toHaveLength(1);
-    expect(apps[0].data).toMatchObject({ architectId: 'architect-1', status: 'pending', proposal: 'I can deliver compliant plans.' });
+    expect(apps[0].data).toMatchObject({ architectId: 'architect-1', status: 'pending', proposal: 'I can deliver compliant plans.', verificationId: 'architect-1_bep_SACAP_SACAP-123' });
     expect(mockAdminDb.listCollection('notifications')[0].data).toMatchObject({ userId: 'client-1', type: 'job_application' });
     expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
       category: 'project',
       action: 'marketplace.application_submitted',
       actor: { uid: 'architect-1', role: 'architect' },
-      metadata: { normalizedRole: 'bep' },
+      metadata: { normalizedRole: 'bep', verificationId: 'architect-1_bep_SACAP_SACAP-123' },
     });
   });
 
@@ -375,6 +394,7 @@ describe('api-router security and high-value integration routes', () => {
     mockAdminDb.seed('users/bep-1', { role: 'bep', displayName: 'BEP One', mainSpecialization: 'coordination' });
     verifyIdToken.mockImplementationOnce(async () => ({ uid: 'bep-1', email: 'bep@example.com', displayName: 'BEP One' }));
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
+    seedVerifiedBepVerification('bep-1');
 
     const response = await request(app)
       .post('/api/jobs/job-1/applications')
@@ -386,21 +406,30 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({ metadata: { normalizedRole: 'bep' } });
   });
 
-  it('prevents clients or duplicate architects from applying to marketplace jobs', async () => {
+  it('prevents clients, unverified architects, and duplicate architects from applying to marketplace jobs', async () => {
     const app = await buildApp();
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
-    mockAdminDb.seed('jobs/job-1/applications/app-existing', { architectId: 'architect-1', status: 'pending' });
 
     const clientResponse = await request(app)
       .post('/api/jobs/job-1/applications')
       .set(authHeader('client'))
       .send({ proposal: 'Let me apply' });
+    const unverifiedResponse = await request(app)
+      .post('/api/jobs/job-1/applications')
+      .set(authHeader('architect'))
+      .send({ proposal: 'I am not verified yet' });
+
+    seedVerifiedBepVerification();
+    mockAdminDb.seed('jobs/job-1/applications/app-existing', { architectId: 'architect-1', status: 'pending' });
     const duplicateResponse = await request(app)
       .post('/api/jobs/job-1/applications')
       .set(authHeader('architect'))
       .send({ proposal: 'Second application' });
 
     expect(clientResponse.status).toBe(403);
+    expect(unverifiedResponse.status).toBe(403);
+    expect(unverifiedResponse.body).toMatchObject({ verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'marketplace.application_blocked_unverified_bep')).toBe(true);
     expect(duplicateResponse.status).toBe(409);
   });
 

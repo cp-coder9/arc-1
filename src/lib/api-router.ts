@@ -18,6 +18,7 @@ import {
   assertVerificationSubjectType,
   buildUserVerification,
   inferVerificationProvider,
+  isActiveVerifiedVerification,
   normalizeRegistrationNumber,
   normalizeStatutoryBody,
   type ProviderVerificationResult,
@@ -400,6 +401,24 @@ async function runAndPersistVerificationAgent(input: {
   }));
 }
 
+async function getActiveUserVerification(userId: string, subjectType: VerificationSubjectType, statutoryBody?: string): Promise<UserVerification | null> {
+  const snapshot = await adminDb
+    .collection('user_verifications')
+    .where('userId', '==', userId)
+    .where('subjectType', '==', subjectType)
+    .where('status', '==', 'verified')
+    .limit(25)
+    .get();
+
+  for (const doc of snapshot.docs) {
+    const verification = { id: doc.id, ...doc.data() } as UserVerification;
+    if (isActiveVerifiedVerification(verification, { subjectType, statutoryBody })) {
+      return verification;
+    }
+  }
+  return null;
+}
+
 // ── Multer (memory storage, max 20 MB) ───────────────────────────────────────
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -577,6 +596,22 @@ router.post("/jobs/:jobId/applications", async (req, res) => {
     if (normalizeUserRole(userData.role) !== 'bep') {
       return res.status(403).json({ error: 'Only verified BEPs can apply for marketplace jobs' });
     }
+
+    const activeBepVerification = await getActiveUserVerification(decoded.uid, 'bep', 'SACAP');
+    if (!activeBepVerification) {
+      await recordAuditEvent(req, {
+        category: 'access',
+        action: 'marketplace.application_blocked_unverified_bep',
+        actor: decodedAuditActor(decoded, userData.role),
+        target: { type: 'job', id: jobId, projectId: jobId },
+        metadata: { jobId, normalizedRole: normalizeUserRole(userData.role), requiredSubjectType: 'bep', requiredStatutoryBody: 'SACAP' },
+      });
+      return res.status(403).json({
+        error: 'BEP verification is required before applying for client marketplace jobs',
+        verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' },
+      });
+    }
+
     if (jobData.status !== 'open') {
       return res.status(400).json({ error: 'This job is not open for applications' });
     }
@@ -605,7 +640,8 @@ router.post("/jobs/:jobId/applications", async (req, res) => {
       status: 'pending',
       createdAt: now,
       updatedAt: now,
-      sacapNumber: userData.sacapNumber || '',
+      sacapNumber: activeBepVerification.registrationNumber || userData.sacapNumber || '',
+      verificationId: activeBepVerification.id,
       specializations: userData.mainSpecialization ? [userData.mainSpecialization] : [],
       completedJobs: userData.completedJobs || 0,
       averageRating: userData.averageRating || 5,
@@ -632,7 +668,7 @@ router.post("/jobs/:jobId/applications", async (req, res) => {
       action: 'marketplace.application_submitted',
       actor: decodedAuditActor(decoded, userData.role),
       target: { type: 'job_application', id: applicationRef.id, projectId: jobId },
-      metadata: { jobId, normalizedRole: normalizeUserRole(userData.role) },
+      metadata: { jobId, normalizedRole: normalizeUserRole(userData.role), verificationId: activeBepVerification.id },
     });
 
     res.status(201).json({ id: applicationRef.id, jobId, status: 'pending' });
