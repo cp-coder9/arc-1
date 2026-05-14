@@ -1,4 +1,4 @@
-import { adminDb } from '../lib/firebase-admin.js';
+import { adminDb } from '../lib/firebase-admin';
 
 export async function processReceiptOCR(imageUrl: string, userId: string) {
   console.log(`[OCR] Processing receipt for user ${userId}: ${imageUrl}`);

@@ -1,10 +1,14 @@
+import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
-import apiRouter from "./src/lib/api-router.js";
-import { adminDb, testFirebase } from "./src/lib/firebase-admin.js";
+
+const mode = process.env.NODE_ENV || "development";
+dotenv.config({
+  path: [`.env.${mode}.local`, ".env.local", `.env.${mode}`, ".env"],
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,9 +16,14 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
+  const BODY_LIMIT = "50mb";
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  // File uploads are transported as base64 JSON to /api/files/upload.
+  // Keep the local Express dev server aligned with api/index.ts so uploads
+  // that work in production do not fail locally with Express's default 100 KB
+  // "Payload Too Large" limit.
+  app.use(express.json({ limit: BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
   // Apply CORS
   app.use(cors({
@@ -27,20 +36,38 @@ async function startServer() {
   // Console logging for requests and COOP headers for Firebase Auth
   app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-    
+
     if (req.path.startsWith('/api')) {
       console.log(`[API] ${req.method} ${req.path}`);
     }
     next();
   });
 
-  // Mount the shared API router
-  app.use("/api", apiRouter);
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Mount the shared API router lazily. Firebase Admin / Firestore can add a
+  // noticeable cold-start cost locally, so the server should become healthy
+  // before those integrations are imported.
+  app.use("/api", async (req, res, next) => {
+    try {
+      const { default: apiRouter } = await import("./src/lib/api-router.js");
+      return apiRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load API router:", error);
+      return res.status(500).json({
+        error: "API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
 
   // --- Local Development Notification Worker ---
   // In Vercel, this is handled by api/notifications/worker.ts as a cron job.
   // We keep it here for real-time local testing.
   async function startNotificationWorker() {
+    const { adminDb } = await import("./src/lib/firebase-admin.js");
     console.log("Starting background notification worker...");
     adminDb.collection("notifications")
       .where("deliveryStatus", "==", "pending")
@@ -74,20 +101,22 @@ async function startServer() {
       });
   }
   
-  // --- Municipal Scraper Worker ---
-  async function startScraperWorker() {
-    console.log("Starting background municipal scraper worker...");
-    // In a real app, this would be a cron job. Here we'll just log.
-    setInterval(async () => {
-      console.log("[Scraper Worker] Checking for daily municipal updates...");
-      // Implementation would query users with credentials and run scrapers
-    }, 24 * 60 * 60 * 1000); // Daily
-  }
+  const shouldStartNotificationWorker = process.env.NODE_ENV !== "production" && process.env.DISABLE_NOTIFICATION_WORKER !== "true";
 
-  if (process.env.NODE_ENV !== "production") {
-    startNotificationWorker();
-    startScraperWorker();
-  }
+  // Firebase test endpoint
+  app.get("/firebase/test", async (_req, res) => {
+    try {
+      const { testFirebase } = await import("./src/lib/firebase-admin.js");
+      const result = await testFirebase();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ 
+        status: "error", 
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
@@ -99,28 +128,19 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get(/.*/, (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  // Firebase test endpoint
-  app.get("/firebase/test", async (_req, res) => {
-    try {
-      const result = await testFirebase();
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ 
-        status: "error", 
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+    if (shouldStartNotificationWorker) {
+      startNotificationWorker().catch((error) => {
+        console.warn("Notification worker disabled:", error instanceof Error ? error.message : String(error));
+      });
+    }
   });
 }
 

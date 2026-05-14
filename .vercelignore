@@ -1,7 +1,14 @@
 node_modules
 .git
 .bun-cache
+.tmp
+tmp.*
+*.tgz
 dist
 .firebase
 *.log
 .env.local
+scripts
+maintenance_scripts
+src/test
+__tests__

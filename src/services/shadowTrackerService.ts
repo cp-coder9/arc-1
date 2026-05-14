@@ -1,5 +1,5 @@
-import { adminDb } from '../lib/firebase-admin.js';
-import { MunicipalityType, TrackingEvent } from '../types.js';
+import { adminDb } from '../lib/firebase-admin';
+import { MunicipalityType, TrackingEvent } from '../types';
 
 export async function detectMunicipalInvoices(emailContent: string, userId: string) {
   console.log(`[Shadow Tracker] Scanning content for user ${userId}...`);

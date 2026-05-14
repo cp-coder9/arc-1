@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2 } from 'lucide-react';
+import { Origami } from 'lucide-react';
 
 interface LogoProps {
   className?: string;
@@ -32,8 +32,10 @@ export function Logo({
             if (fallback) fallback.classList.remove('hidden');
           }}
         />
-        <div className="logo-fallback hidden">
-          <Building2 className={iconClassName} />
+        <div className="logo-fallback hidden" aria-hidden="true">
+          <div className="rounded-2xl bg-primary/10 p-2 text-primary ring-1 ring-primary/20">
+            <Origami className={iconClassName} />
+          </div>
         </div>
       </div>
       {showText && <span className={textClassName}>Architex</span>}

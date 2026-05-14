@@ -10,14 +10,17 @@ import {
   serverTimestamp,
   orderBy,
   deleteDoc,
-  Timestamp
+  Timestamp,
+  increment
 } from "firebase/firestore";
 import { AgentKnowledge, KnowledgeStatus } from "../types";
 
 const KNOWLEDGE_COLLECTION = "agent_knowledge";
+const COPYRIGHT_SAFE_DISCLAIMER = "Summary only — refer to official SANS document for authoritative text.";
 
 export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus = "active"): Promise<AgentKnowledge[]> => {
   try {
+    // Production agent prompts must request active knowledge only; pending/rejected entries are never authoritative.
     const q = query(
       collection(db, KNOWLEDGE_COLLECTION),
       where("agentRole", "==", agentId),
@@ -59,15 +62,24 @@ export const getAllAgentKnowledge = async (status: KnowledgeStatus = "active"): 
   }
 };
 
-export const getKnowledgeForAgents = async (agentRoles: string[], status: KnowledgeStatus = "active"): Promise<AgentKnowledge[]> => {
+export const getKnowledgeForAgents = async (
+  agentRoles: string[],
+  status: KnowledgeStatus = "active",
+  filters?: { discipline?: string; standardFamily?: string; municipality?: string }
+): Promise<AgentKnowledge[]> => {
   try {
+    if (agentRoles.length === 0) return [];
     const q = query(
       collection(db, KNOWLEDGE_COLLECTION),
       where("agentRole", "in", agentRoles),
       where("status", "==", status)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentKnowledge));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as AgentKnowledge))
+      .filter(entry => !filters?.discipline || entry.discipline === filters.discipline)
+      .filter(entry => !filters?.standardFamily || entry.standardFamily === filters.standardFamily)
+      .filter(entry => !filters?.municipality || entry.municipality === filters.municipality);
   } catch (error: any) {
     console.error("Error fetching knowledge for agents:", error);
     return [];
@@ -76,8 +88,15 @@ export const getKnowledgeForAgents = async (agentRoles: string[], status: Knowle
 
 export const addKnowledge = async (entry: Omit<AgentKnowledge, "id">): Promise<string> => {
   try {
+    const shouldPrependDisclaimer = entry.source === "web_search" || entry.source === "documentation";
+    const content = shouldPrependDisclaimer && !entry.content.startsWith(COPYRIGHT_SAFE_DISCLAIMER)
+      ? `${COPYRIGHT_SAFE_DISCLAIMER}\n\n${entry.content}`
+      : entry.content;
+
     const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), {
       ...entry,
+      content,
+      disclaimer: entry.disclaimer || COPYRIGHT_SAFE_DISCLAIMER,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       usageCount: 0
@@ -95,6 +114,7 @@ export const approveKnowledge = async (entryId: string, adminId: string) => {
       status: "active",
       reviewedBy: adminId,
       reviewedAt: new Date().toISOString(),
+      version: new Date().toISOString().slice(0, 10),
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -143,7 +163,7 @@ export const incrementKnowledgeUsage = async (entryId: string) => {
   try {
     const entryRef = doc(db, KNOWLEDGE_COLLECTION, entryId);
     await updateDoc(entryRef, {
-      usageCount: Timestamp.now(),
+      usageCount: increment(1),
       lastUsedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -169,6 +189,16 @@ export const searchKnowledge = async (searchTerm: string, agentRole?: string): P
     return filtered;
   } catch (error) {
     console.error("Error searching knowledge:", error);
+    return [];
+  }
+};
+
+export const searchKnowledgeByStandard = async (standardFamily: string): Promise<AgentKnowledge[]> => {
+  try {
+    const allKnowledge = await getAllAgentKnowledge('active');
+    return allKnowledge.filter(entry => entry.standardFamily === standardFamily || entry.tags?.includes(standardFamily));
+  } catch (error) {
+    console.error("Error searching knowledge by standard:", error);
     return [];
   }
 };

@@ -33,22 +33,43 @@ export class ErrorBoundary extends React.Component<Props, State> {
     window.location.reload();
   };
 
+  private getErrorContext() {
+    const fallback = {
+      message: 'An unexpected error occurred.',
+      isFirestoreError: false,
+      isChunkLoadError: false,
+    };
+    const message = this.state.error?.message || '';
+
+    if (/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk \d+ failed/i.test(message)) {
+      return {
+        message: 'The application could not load the latest deployed assets. Reload the page to fetch the current version.',
+        isFirestoreError: false,
+        isChunkLoadError: true,
+      };
+    }
+
+    try {
+      if (message) {
+        const parsed = JSON.parse(message);
+        if (parsed.error && parsed.operationType) {
+          return {
+            message: `Firestore ${parsed.operationType} error: ${parsed.error}`,
+            isFirestoreError: true,
+            isChunkLoadError: false,
+          };
+        }
+      }
+    } catch (e) {
+      return { ...fallback, message: message || fallback.message };
+    }
+
+    return { ...fallback, message: message || fallback.message };
+  }
+
   render() {
     if (this.state.hasError) {
-      let errorMessage = "An unexpected error occurred.";
-      let isFirestoreError = false;
-
-      try {
-        if (this.state.error?.message) {
-          const parsed = JSON.parse(this.state.error.message);
-          if (parsed.error && parsed.operationType) {
-            errorMessage = `Firestore ${parsed.operationType} error: ${parsed.error}`;
-            isFirestoreError = true;
-          }
-        }
-      } catch (e) {
-        errorMessage = this.state.error?.message || errorMessage;
-      }
+      const { message: errorMessage, isFirestoreError, isChunkLoadError } = this.getErrorContext();
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-6">
@@ -61,6 +82,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {errorMessage}
               </p>
+              {isChunkLoadError && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  This can happen immediately after a production deployment while a browser is still using an older HTML bundle.
+                </p>
+              )}
             </div>
             {isFirestoreError && (
               <div className="p-4 bg-secondary/30 rounded-xl text-[10px] font-mono text-left overflow-auto max-h-32">

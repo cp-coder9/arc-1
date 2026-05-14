@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
 export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected']);
@@ -30,7 +30,12 @@ export const NotificationTypeEnum = z.enum([
   'payment_released',
   'message',
   'milestone_due',
-  'council_update'
+  'council_update',
+  'invoice_sent',
+  'invoice_paid',
+  'firm_invite',
+  'firm_role_changed',
+  'firm_member_removed'
 ]);
 export const PaymentTypeEnum = z.enum([
   'escrow_deposit',
@@ -40,6 +45,12 @@ export const PaymentTypeEnum = z.enum([
 ]);
 export const PaymentStatusEnum = z.enum(['pending', 'completed', 'failed', 'refunded']);
 export const VerificationStatusEnum = z.enum(['pending', 'verified', 'rejected', 'expired']);
+export const DisciplineEnum = z.enum(['architecture', 'structure', 'fire', 'accessibility', 'energy', 'drainage', 'electrical', 'mechanical', 'planning', 'documentation', 'environmental', 'nhbrc', 'coordination']);
+export const StandardFamilyEnum = z.enum(['NBR', 'SANS10400', 'SANS10160', 'SANS10100', 'SANS10162', 'SANS10142', 'SANS10252', 'MunicipalBylaw', 'NHBRC', 'ProfessionalCoordination', 'Other']);
+export const AutonomyLabelEnum = z.enum(['autonomous_check', 'professional_review_required', 'competent_person_required', 'municipal_confirmation_required', 'insufficient_information']);
+export const ResponsiblePartyEnum = z.enum(['architect', 'structural_engineer', 'civil_engineer', 'fire_engineer', 'electrical_engineer', 'mechanical_engineer', 'energy_professional', 'client', 'contractor', 'municipality', 'admin']);
+export const RiskStatusEnum = z.enum(['ready_for_admin_review', 'ready_for_professional_review', 'requires_minor_corrections', 'requires_major_corrections', 'requires_specialist_design', 'not_assessable_insufficient_information', 'ai_review_failed']);
+export const ExecutionModeEnum = z.enum(['basic_ai_screen', 'council_readiness', 'fire_plan_review', 'engineering_coordination', 'full_professional_review', 'resubmission_delta_review', 'specialist_pack_review']);
 
 // User schemas
 export const UserProfileSchema = z.object({
@@ -106,9 +117,20 @@ export const ApplicationCreateSchema = ApplicationSchema.omit({
 // Submission schemas
 export const AIIssueSchema = z.object({
   description: z.string(),
-  severity: z.enum(['low', 'medium', 'high']),
+  regulationStipulation: z.string().optional(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
   actionItem: z.string(),
-});
+  discipline: DisciplineEnum.optional(),
+  standardFamily: StandardFamilyEnum.optional(),
+  reference: z.string().optional(),
+  confidence: z.enum(['low', 'medium', 'high']).optional(),
+  autonomyLabel: AutonomyLabelEnum.optional(),
+  responsibleParty: ResponsiblePartyEnum.optional(),
+  evidence: z.string().optional(),
+  requiresProfessionalSignoff: z.boolean().optional(),
+  boundingBox: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).optional(),
+  annotatedImageUrl: z.string().optional(),
+}).passthrough();
 
 export const AICategorySchema = z.object({
   name: z.string(),
@@ -122,6 +144,66 @@ export const TraceLogSchema = z.object({
   details: z.string(),
 });
 
+export const KnowledgeCitationSchema = z.object({
+  knowledgeId: z.string(),
+  title: z.string(),
+  content: z.string(),
+  source: z.enum(['documentation', 'human_feedback', 'self_improvement', 'web_search']),
+  sourceUrl: z.string().optional(),
+  pdfUrl: z.string().optional(),
+  pdfPageNumber: z.number().optional(),
+  tags: z.array(z.string()).default([]),
+}).passthrough();
+
+export const DrawingReferenceSchema = z.object({
+  url: z.string(),
+  name: z.string(),
+  type: z.string().optional(),
+}).passthrough();
+
+export const FindingSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  discipline: DisciplineEnum,
+  standardFamily: StandardFamilyEnum,
+  reference: z.string(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  confidence: z.enum(['low', 'medium', 'high']),
+  autonomyLabel: AutonomyLabelEnum,
+  responsibleParty: ResponsiblePartyEnum,
+  actionItem: z.string(),
+  evidence: z.string(),
+  sourceCitations: z.array(KnowledgeCitationSchema).default([]),
+  drawingReferences: z.array(DrawingReferenceSchema).default([]),
+  requiresProfessionalSignoff: z.boolean(),
+}).passthrough();
+
+export const SignOffRequirementSchema = z.object({
+  discipline: DisciplineEnum,
+  responsibleParty: ResponsiblePartyEnum,
+  requirement: z.string(),
+  reason: z.string(),
+  standardFamily: StandardFamilyEnum.optional(),
+  reference: z.string().optional(),
+  priority: z.enum(['low', 'medium', 'high', 'critical']),
+}).passthrough();
+
+export const OrchestratorResultSchema = z.object({
+  status: z.string(),
+  feedback: z.string(),
+  categories: z.array(AICategorySchema).optional(),
+  traceLog: z.string().optional(),
+}).passthrough();
+
+export const OrchestratorResultV2Schema = OrchestratorResultSchema.extend({
+  riskStatus: RiskStatusEnum.optional(),
+  findings: z.array(FindingSchema).optional(),
+  signOffChecklist: z.array(SignOffRequirementSchema).optional(),
+  submissionIndex: z.array(DrawingReferenceSchema.extend({ detectedType: z.string() })).optional(),
+  mode: ExecutionModeEnum.optional(),
+  disclaimers: z.array(z.string()).optional(),
+}).passthrough();
+
 export const SubmissionSchema = z.object({
   id: z.string().optional(),
   jobId: z.string().min(1),
@@ -131,6 +213,10 @@ export const SubmissionSchema = z.object({
   status: SubmissionStatusEnum,
   aiFeedback: z.string().optional(),
   aiStructuredFeedback: z.array(AICategorySchema).optional(),
+  findings: z.array(FindingSchema).optional(),
+  signOffChecklist: z.array(SignOffRequirementSchema).optional(),
+  riskStatus: RiskStatusEnum.optional(),
+  executionMode: ExecutionModeEnum.optional(),
   adminFeedback: z.string().optional(),
   traceability: z.array(TraceLogSchema),
   createdAt: z.string().datetime().optional(),
@@ -162,7 +248,7 @@ export const ReviewSchema = z.object({
     professionalism: z.number().min(1).max(5).optional(),
   }).optional(),
   comment: z.string().min(10, 'Comment must be at least 10 characters').max(2000),
-  type: z.enum(['client_to_architect', 'architect_to_client']),
+  type: z.enum(['client_to_architect', 'architect_to_client', 'to_bep', 'from_bep', 'to_freelancer']),
   isPublic: z.boolean().default(true),
   createdAt: z.string().datetime().optional(),
 });
@@ -183,9 +269,12 @@ export const NotificationSchema = z.object({
   body: z.string().min(1).max(1000),
   data: z.object({
     jobId: z.string().optional(),
+    projectId: z.string().optional(),
     submissionId: z.string().optional(),
     senderId: z.string().optional(),
     applicationId: z.string().optional(),
+    firmId: z.string().optional(),
+    firmInviteId: z.string().optional(),
   }).optional(),
   isRead: z.boolean().default(false),
   channels: z.array(z.enum(['in_app', 'email', 'push'])).default(['in_app']),
@@ -304,19 +393,13 @@ export const ArchitectProfileSchema = z.object({
 });
 
 // Council submission schemas
-export const MunicipalityTypeEnum = z.enum(['COJ', 'COCT', 'Tshwane', 'Ekurhuleni', 'Mangaung', 'eThekwini', 'Other']);
-
 export const CouncilSubmissionSchema = z.object({
   id: z.string().optional(),
-  jobId: z.string().optional(),
-  userId: z.string().min(1),
-  municipality: MunicipalityTypeEnum,
-  municipalityName: z.string().optional(),
+  jobId: z.string().min(1),
+  municipality: z.string().min(1),
   referenceNumber: z.string().optional(),
-  status: z.string().min(1),
-  rawStatus: z.string().optional(),
+  status: z.enum(['preparing', 'submitted', 'under_review', 'approved', 'rejected', 'queries_raised']),
   submittedAt: z.string().datetime().optional(),
-  lastCheckedAt: z.string().datetime().optional(),
   documents: z.array(z.object({
     name: z.string(),
     url: z.string().url(),
@@ -325,19 +408,12 @@ export const CouncilSubmissionSchema = z.object({
     status: z.string(),
     timestamp: z.string().datetime(),
     notes: z.string().optional(),
-    source: z.enum(['scraper', 'ocr', 'crowdsource', 'shadow_tracker', 'manual']),
-    actorId: z.string().optional(),
   })).default([]),
   queries: z.array(z.object({
     raisedAt: z.string().datetime(),
     description: z.string(),
     response: z.string().optional(),
-    respondedAt: z.string().datetime().optional(),
-    attachments: z.array(z.object({ name: z.string(), url: z.string().url() })).optional(),
   })).optional(),
-  erfNumber: z.string().optional(),
-  projectDescription: z.string().optional(),
-  source: z.enum(['manual', 'ocr', 'scraper', 'shadow_tracker']),
 });
 
 // Search and filter schemas

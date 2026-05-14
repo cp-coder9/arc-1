@@ -34,3 +34,13 @@ export function safeLocale(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(value as number)) return '0';
   return value.toLocaleString();
 }
+
+export function paginateItems<T>(items: T[], page: number, pageSize: number): T[] {
+  const safePage = Math.max(1, page);
+  const start = (safePage - 1) * pageSize;
+  return items.slice(start, start + pageSize);
+}
+
+export function totalPages(totalItems: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(totalItems / pageSize));
+}

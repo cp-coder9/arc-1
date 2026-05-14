@@ -29,6 +29,7 @@ function Tabs({
     <TabsContext.Provider value={{ value: activeValue, onValueChange: handleValueChange }}>
       <div
         data-slot="tabs"
+        data-testid="tabs"
         className={cn("group/tabs flex flex-col gap-2", className)}
         {...props}
       />
@@ -58,6 +59,7 @@ function TabsList({
 }: React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof tabsListVariants>) {
   return (
     <div
+      role="tablist"
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}
@@ -76,6 +78,7 @@ function TabsTrigger({ className, value, ...props }: React.ButtonHTMLAttributes<
       role="tab"
       aria-selected={isActive}
       data-active={isActive}
+      data-state={isActive ? "active" : "inactive"}
       onClick={() => onValueChange?.(value)}
       className={cn(
         "relative inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",

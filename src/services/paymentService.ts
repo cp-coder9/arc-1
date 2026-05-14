@@ -8,14 +8,30 @@ import {
   getDoc,
   doc,
   orderBy,
+  setDoc,
+  updateDoc,
+  addDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { getIdToken } from 'firebase/auth';
-import { Payment, Escrow, Job, UserProfile } from '../types';
+import { LedgerEntry, Payment, Escrow, EscrowMilestone, EscrowV2, Job, Project, ProjectStage, PROJECT_STAGE_ORDER, UserProfile } from '../types';
 import { notificationService } from './notificationService';
+import { recordTransaction } from './financialLedgerService';
 import { toast } from 'sonner';
 import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
 const md5 = (jsMd5 as any).default || jsMd5;
+
+type PayFastEnv = {
+  VITE_PAYFAST_MERCHANT_ID?: string;
+  VITE_PAYFAST_MERCHANT_KEY?: string;
+  VITE_PAYFAST_PASSPHRASE?: string;
+  VITE_PAYFAST_SANDBOX?: string;
+};
+
+function getPayFastEnv(): PayFastEnv {
+  return typeof process !== 'undefined' ? (process.env as PayFastEnv) : {};
+}
 
 /** Fetch a fresh Firebase ID token for the current user, or throw if not signed in. */
 async function requireIdToken(): Promise<string> {
@@ -40,20 +56,107 @@ async function apiFetch(path: string, body: object): Promise<any> {
   return data;
 }
 
+// Safe env accessor that works in both Vite (browser) and Jest (Node)
+const getEnv = (key: string) => {
+  try { if ((import.meta as any)?.env) return (import.meta as any).env[key]; } catch (e) {}
+  try { if (typeof process !== 'undefined') return process.env[key]; } catch (e) {}
+  return '';
+};
+
 // PayFast configuration
+const payFastEnv = getPayFastEnv();
 const PAYFAST_CONFIG = {
-  merchantId: import.meta.env.VITE_PAYFAST_MERCHANT_ID || '',
-  merchantKey: import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '',
-  passphrase: import.meta.env.VITE_PAYFAST_PASSPHRASE || '',
-  sandbox: import.meta.env.VITE_PAYFAST_SANDBOX === 'true',
-  url: import.meta.env.VITE_PAYFAST_SANDBOX === 'true'
+  merchantId: String(getEnv('VITE_PAYFAST_MERCHANT_ID')),
+  merchantKey: String(getEnv('VITE_PAYFAST_MERCHANT_KEY')),
+  passphrase: String(getEnv('VITE_PAYFAST_PASSPHRASE')),
+  sandbox: getEnv('VITE_PAYFAST_SANDBOX') === 'true',
+  url: getEnv('VITE_PAYFAST_SANDBOX') === 'true'
     ? 'https://sandbox.payfast.co.za/eng/process'
     : 'https://www.payfast.co.za/eng/process',
 };
 
 const PLATFORM_FEE_PERCENTAGE = 0.05;
+const VAT_PERCENTAGE = 0.15;
+
+const STAGE_ESCROW_MILESTONES: Array<{ id: string; name: string; stage: ProjectStage; percentage: number; releaseConditions: string[] }> = [
+  { id: 'intake', name: 'Intake & Brief Confirmation', stage: 'intake', percentage: 10, releaseConditions: ['Client brief accepted', 'Project record created'] },
+  { id: 'appointment', name: 'Professional Appointment', stage: 'appointment', percentage: 15, releaseConditions: ['Lead architect appointed', 'Team responsibilities confirmed'] },
+  { id: 'compliance', name: 'Compliance Documentation', stage: 'compliance', percentage: 25, releaseConditions: ['Compliance review completed', 'Submission package ready'] },
+  { id: 'tender', name: 'Tender & Procurement', stage: 'tender', percentage: 20, releaseConditions: ['Tender package issued or procurement completed'] },
+  { id: 'delivery', name: 'Construction Delivery', stage: 'delivery', percentage: 20, releaseConditions: ['Delivery milestone evidence submitted'] },
+  { id: 'closeout', name: 'Close-out & Handover', stage: 'closeout', percentage: 10, releaseConditions: ['Close-out documentation accepted'] },
+];
+
+const STAGE_ESCROW_SEQUENCE = STAGE_ESCROW_MILESTONES.map((milestone) => milestone.stage);
+
+function assertStageReleaseAllowed(project: Project, escrow: EscrowV2, milestone: EscrowMilestone): void {
+  if (milestone.status !== 'release_requested') {
+    if (milestone.status === 'released') throw new Error('Milestone already released');
+    throw new Error('Milestone release must be requested before approval');
+  }
+
+  const milestoneIndex = STAGE_ESCROW_SEQUENCE.indexOf(milestone.stage);
+  if (milestoneIndex === -1) throw new Error('Milestone is not part of the Phase 5 escrow sequence');
+
+  const unreleasedPriorMilestone = (escrow.milestones || []).find((item) => {
+    const itemIndex = STAGE_ESCROW_SEQUENCE.indexOf(item.stage);
+    return itemIndex >= 0 && itemIndex < milestoneIndex && item.status !== 'released';
+  });
+  if (unreleasedPriorMilestone) {
+    throw new Error(`Cannot release ${milestone.stage} before prior milestone ${unreleasedPriorMilestone.stage} is released`);
+  }
+
+  const projectStageIndex = PROJECT_STAGE_ORDER.indexOf(project.currentStage);
+  const requestedStageIndex = PROJECT_STAGE_ORDER.indexOf(milestone.stage);
+  if (projectStageIndex === -1 || requestedStageIndex === -1) {
+    throw new Error('Project stage is not valid for milestone release approval');
+  }
+  if (projectStageIndex < requestedStageIndex) {
+    throw new Error(`Cannot release ${milestone.stage} while project is at ${project.currentStage}`);
+  }
+}
+
+function buildMilestoneInvoice(project: Project, milestone: EscrowMilestone, architectId: string, createdAt: string) {
+  const taxRate = VAT_PERCENTAGE * 100;
+  const subtotal = Math.round(milestone.amount / (1 + VAT_PERCENTAGE));
+  const taxAmount = milestone.amount - subtotal;
+  const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+
+  return {
+    invoiceNumber,
+    jobId: project.jobId,
+    projectId: project.id,
+    milestoneId: milestone.id,
+    escrowMilestoneId: milestone.id,
+    clientId: project.clientId,
+    architectId,
+    items: [{ description: `${milestone.name} milestone release`, quantity: 1, unitPrice: subtotal, total: subtotal }],
+    subtotal,
+    taxAmount,
+    taxRate,
+    totalAmount: milestone.amount,
+    currency: 'R',
+    status: 'sent',
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    notes: `Auto-generated for ${milestone.name} (${milestone.percentage}%) on project ${project.id}`,
+    createdAt,
+  };
+}
 
 class PaymentService {
+  /**
+   * Calculate escrow amounts including platform fees
+   */
+  calculateEscrowAmounts(baseAmount: number, feePercentage: number = PLATFORM_FEE_PERCENTAGE) {
+    const platformFee = Math.round(baseAmount * feePercentage);
+    const total = baseAmount + platformFee;
+    return {
+      architectAmount: baseAmount,
+      platformFee,
+      total,
+    };
+  }
+
   /**
    * Generate MD5 hash for PayFast signature
    */
@@ -96,6 +199,7 @@ class PaymentService {
     return expectedSignature === signature;
   }
 
+
   /**
    * Initialize escrow for a job — delegates to server for privileged write.
    */
@@ -105,13 +209,123 @@ class PaymentService {
     return { paymentUrl, paymentId: data.paymentId };
   }
 
-  /**
-   * Confirm payment received (manual trigger — delegates to server).
-   */
-  async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
-    await apiFetch('/api/payment/confirm', { paymentId, pfData });
-    toast.success('Escrow funded successfully!');
+  async initializeStageEscrow(project: Project, totalAmount: number): Promise<void> {
+    const platformFeeAmount = Math.round(totalAmount * PLATFORM_FEE_PERCENTAGE);
+    const milestones = STAGE_ESCROW_MILESTONES.map((milestone, index) => {
+      const amount = index === STAGE_ESCROW_MILESTONES.length - 1
+        ? totalAmount - STAGE_ESCROW_MILESTONES.slice(0, -1).reduce((sum, item) => sum + Math.round(totalAmount * (item.percentage / 100)), 0)
+        : Math.round(totalAmount * (milestone.percentage / 100));
+      return { ...milestone, amount, status: 'funded' as const };
+    });
+    const escrow: EscrowV2 = {
+      jobId: project.jobId,
+      linkedProjectId: project.id,
+      totalAmount,
+      heldAmount: totalAmount,
+      releasedAmount: 0,
+      platformFeeAmount,
+      refundedAmount: 0,
+      status: 'funded',
+      milestones,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'escrow', project.jobId), escrow, { merge: true });
+    await recordTransaction({
+      projectId: project.id,
+      jobId: project.jobId,
+      type: 'escrow_deposit',
+      amount: totalAmount,
+      direction: 'credit',
+      description: 'Stage-linked escrow funded',
+      payerId: project.clientId,
+      payeeId: project.leadArchitectId || project.clientId,
+      createdAt: new Date().toISOString(),
+    });
   }
+
+  async requestStageRelease(projectId: string, stage: ProjectStage): Promise<void> {
+    const projectSnap = await getDoc(doc(db, 'projects', projectId));
+    if (!projectSnap.exists()) throw new Error('Project not found');
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
+    const escrowSnap = await getDoc(doc(db, 'escrow', project.jobId));
+    if (!escrowSnap.exists()) throw new Error('Escrow not found');
+    const escrow = { jobId: escrowSnap.id, ...escrowSnap.data() } as EscrowV2;
+    const now = new Date().toISOString();
+    const milestones = (escrow.milestones || []).map((milestone) => milestone.stage === stage ? { ...milestone, status: 'release_requested' as const, requestedAt: now } : milestone);
+    if (!milestones.some((milestone) => milestone.stage === stage && milestone.status === 'release_requested')) throw new Error('Milestone not found');
+    await updateDoc(doc(db, 'escrow', project.jobId), { milestones, updatedAt: now });
+  }
+
+  async approveStageRelease(projectId: string, stage: ProjectStage, adminId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const result = await runTransaction(db, async (transaction) => {
+      const projectRef = doc(db, 'projects', projectId);
+      const projectSnap = await transaction.get(projectRef);
+      if (!projectSnap.exists()) throw new Error('Project not found');
+      const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
+      const escrowRef = doc(db, 'escrow', project.jobId);
+      const escrowSnap = await transaction.get(escrowRef);
+      if (!escrowSnap.exists()) throw new Error('Escrow not found');
+      const escrow = { jobId: escrowSnap.id, ...escrowSnap.data() } as EscrowV2;
+      const milestone = escrow.milestones?.find((item) => item.stage === stage);
+      if (!milestone) throw new Error('Milestone not found');
+      assertStageReleaseAllowed(project, escrow, milestone);
+
+      const payeeId = project.leadArchitectId || adminId;
+      const releasedMilestone = { ...milestone, status: 'released' as const, releasedAt: now, approvedBy: adminId };
+      const milestones = escrow.milestones.map((item) => item.stage === stage ? releasedMilestone : item);
+      const releasedAmount = (escrow.releasedAmount || 0) + milestone.amount;
+      const heldAmount = Math.max((escrow.heldAmount || 0) - milestone.amount, 0);
+      transaction.update(escrowRef, {
+        milestones,
+        releasedAmount,
+        heldAmount,
+        status: heldAmount === 0 ? 'fully_released' : 'partially_released',
+        updatedAt: now,
+      });
+
+      const ledgerEntry: Omit<LedgerEntry, 'id'> = {
+        projectId,
+        jobId: project.jobId,
+        type: 'milestone_release',
+        amount: milestone.amount,
+        direction: 'debit',
+        description: `${milestone.name} released`,
+        payerId: project.clientId,
+        payeeId,
+        escrowMilestoneId: milestone.id,
+        createdAt: now,
+      };
+      transaction.set(doc(collection(db, 'ledger')), ledgerEntry);
+
+      const invoice = buildMilestoneInvoice(project, milestone, payeeId, now);
+      transaction.set(doc(collection(db, 'invoices')), invoice);
+      return { payeeId, amount: milestone.amount, milestoneName: milestone.name, jobId: project.jobId, invoiceNumber: invoice.invoiceNumber };
+    });
+    await notificationService.notifyPaymentReleased(result.payeeId, result.amount, result.milestoneName, result.jobId);
+    await notificationService.notifyInvoiceSent(result.payeeId, result.invoiceNumber, result.amount, result.jobId);
+  }
+
+  private async createMilestoneInvoice(project: Project, milestone: EscrowMilestone, architectId: string, createdAt: string): Promise<string> {
+    const invoice = buildMilestoneInvoice(project, milestone, architectId, createdAt);
+    const invoiceRef = await addDoc(collection(db, 'invoices'), invoice);
+    await notificationService.notifyInvoiceSent(project.clientId, invoice.invoiceNumber, invoice.totalAmount, project.jobId);
+    return invoiceRef.id;
+  }
+
+/**
+ * Confirm payment received (manual trigger — delegates to server).
+ * The server handles notification; we only toast based on response.
+ */
+async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
+ const data = await apiFetch('/api/payment/confirm', { paymentId, pfData });
+ if (data.success === true) {
+ toast.success('Escrow funded successfully!');
+ } else {
+ toast.info(data.message || 'Payment confirmed');
+ }
+}
 
   /**
    * Release milestone payment — delegates to server for privileged write.
@@ -133,42 +347,32 @@ class PaymentService {
     toast.success(`R${data.architectAmount.toLocaleString()} released successfully`);
   }
 
-  /**
-   * Request milestone release (architect initiates) — delegates to server.
-   */
-  async requestMilestoneRelease(
-    job: Job,
-    milestone: 'initial' | 'draft' | 'final',
-    architectId: string
-  ): Promise<void> {
-    await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
-    await notificationService.notifyMilestoneRequest(
-      job.clientId,
-      job.title,
-      milestone,
-      job.id
-    );
-    toast.success('Payment release requested');
-  }
+/**
+ * Request milestone release (architect initiates) — delegates to server.
+ * Server emits notification; client does not duplicate.
+ */
+async requestMilestoneRelease(
+ job: Job,
+ milestone: 'initial' | 'draft' | 'final',
+ architectId: string
+): Promise<void> {
+ await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
+ toast.success('Payment release requested');
+}
 
-  /**
-   * Process refund — delegates to server for privileged write.
-   */
-  async processRefund(
-    job: Job,
-    amount: number,
-    reason: string,
-    requestingUserId: string
-  ): Promise<void> {
-    const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
-    await notificationService.notifyRefundProcessed(
-      job.clientId,
-      data.refundAmount,
-      reason,
-      job.id
-    );
-    toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
-  }
+/**
+ * Process refund — delegates to server for privileged write.
+ * Server emits notification; client does not duplicate.
+ */
+async processRefund(
+ job: Job,
+ amount: number,
+ reason: string,
+ requestingUserId: string
+): Promise<void> {
+ const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
+ toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
+}
 
   /**
    * Generate PayFast payment URL
@@ -187,8 +391,8 @@ class PaymentService {
     const notifyUrl = `${window.location.origin}/api/payment/notify`;
 
     const data: Record<string, string> = {
-      merchant_id: PAYFAST_CONFIG.merchantId,
-      merchant_key: PAYFAST_CONFIG.merchantKey,
+      merchant_id: PAYFAST_CONFIG.merchantId as string,
+      merchant_key: PAYFAST_CONFIG.merchantKey as string,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,

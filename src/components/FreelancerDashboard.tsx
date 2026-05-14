@@ -12,6 +12,18 @@ import ProfileEditor from './ProfileEditor';
 import { safeFormat } from '@/lib/utils';
 import { Chat } from './Chat';
 
+const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
+  pending: 'bg-primary/5 text-primary border-primary/10',
+  'in-progress': 'bg-accent/10 text-primary border-accent/20',
+  completed: 'bg-primary-light/10 text-primary-light border-primary-light/20',
+};
+
+const priorityStyles: Record<'low' | 'medium' | 'high', string> = {
+  low: 'border-primary/20 text-primary bg-primary/5',
+  medium: 'border-accent/30 text-primary bg-accent/10',
+  high: 'border-destructive/30 text-destructive bg-destructive/10',
+};
+
 export default function FreelancerDashboard({ user }: { user: UserProfile }) {
   const [assignedTasks, setAssignedTasks] = useState<JobCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +50,7 @@ export default function FreelancerDashboard({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
             <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Freelancer Portal</h1>
@@ -50,9 +62,9 @@ export default function FreelancerDashboard({ user }: { user: UserProfile }) {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard label="Assigned Tasks" value={stats.total} icon={<LayoutDashboard size={20} />} />
-        <StatCard label="Pending" value={stats.pending} icon={<Clock size={20} />} color="text-yellow-600" />
-        <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} color="text-blue-600" />
-        <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={20} />} color="text-green-600" />
+        <StatCard label="Pending" value={stats.pending} icon={<Clock size={20} />} tone="muted" />
+        <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} tone="accent" />
+        <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={20} />} tone="success" />
       </div>
 
       <div className="space-y-6">
@@ -66,9 +78,9 @@ export default function FreelancerDashboard({ user }: { user: UserProfile }) {
             <FreelancerJobCard key={task.id} task={task} user={user} />
           ))}
           {assignedTasks.length === 0 && !loading && (
-            <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
-              <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center mx-auto mb-6">
-                <Briefcase className="w-10 h-10 text-muted-foreground" />
+            <div className="empty-state col-span-full py-20 px-6">
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 text-primary">
+                <Briefcase className="w-10 h-10" />
               </div>
               <h3 className="text-2xl font-heading font-bold mb-2">No assigned tasks yet</h3>
               <p className="text-muted-foreground max-w-sm mx-auto">
@@ -115,24 +127,16 @@ function FreelancerJobCard({ task, user }: { task: JobCard, user: UserProfile, k
   };
 
   return (
-    <Card className="border-border shadow-sm bg-white overflow-hidden group hover:border-primary/30 transition-all flex flex-col rounded-3xl hover:shadow-xl">
+    <Card className="interactive-card border-border shadow-sm bg-card overflow-hidden group flex flex-col rounded-3xl">
       <div className="p-8 flex-1 space-y-6">
         <div className="flex justify-between items-start">
           <div className="space-y-2">
             <div className="flex gap-2">
-              <Badge className={`text-[10px] uppercase tracking-widest ${
-                task.status === 'completed' ? 'bg-green-100 text-green-700' :
-                task.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                'bg-yellow-100 text-yellow-700'
-              }`}>
+              <Badge className={`text-[10px] uppercase tracking-widest ${taskStatusStyles[task.status]}`}>
                 {task.status.replace('-', ' ')}
               </Badge>
               {task.priority && (
-                <Badge variant="outline" className={`text-[10px] uppercase tracking-widest ${
-                  task.priority === 'high' ? 'border-red-200 text-red-700' :
-                  task.priority === 'medium' ? 'border-yellow-200 text-yellow-700' :
-                  'border-blue-200 text-blue-700'
-                }`}>
+                <Badge variant="outline" className={`text-[10px] uppercase tracking-widest ${priorityStyles[task.priority]}`}>
                   {task.priority} Priority
                 </Badge>
               )}
@@ -220,11 +224,18 @@ function FreelancerJobCard({ task, user }: { task: JobCard, user: UserProfile, k
   );
 }
 
-function StatCard({ label, value, icon, color = "text-primary" }: { label: string, value: string | number, icon: React.ReactNode, color?: string }) {
+function StatCard({ label, value, icon, tone = "default" }: { label: string, value: string | number, icon: React.ReactNode, tone?: 'default' | 'muted' | 'accent' | 'success' }) {
+  const toneClass = {
+    default: 'bg-primary/10 text-primary',
+    muted: 'bg-secondary text-secondary-foreground',
+    accent: 'bg-accent/10 text-primary',
+    success: 'bg-primary-light/10 text-primary-light',
+  }[tone];
+
   return (
-    <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden group">
+    <Card className="interactive-card border-border shadow-sm bg-card rounded-3xl overflow-hidden group">
       <CardContent className="p-6 flex items-center gap-4">
-        <div className={`p-3 rounded-2xl bg-secondary/50 ${color}`}>
+        <div className={`p-3 rounded-2xl ${toneClass}`}>
           {icon}
         </div>
         <div>

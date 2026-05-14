@@ -11,6 +11,7 @@
     ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
@@ -23,11 +24,18 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": [
-      "vite/client"
-    ],
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
+      "vite/client",
+      "jest",
+      "@testing-library/jest-dom"
     ]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test/**",
+    "e2e/**"
+  ]
 }

@@ -16,9 +16,10 @@ import {
   orderBy,
   limit,
   getDocs,
+  getDoc,
   writeBatch
 } from 'firebase/firestore';
-import { Notification, NotificationType } from '../types';
+import { Notification, NotificationPreferences, NotificationType } from '../types';
 
 // Notification types with their default channels
 const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: ('in_app' | 'email' | 'push')[] }> = {
@@ -70,10 +71,32 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Invoice Paid',
     channels: ['in_app', 'email', 'push'],
   },
+  firm_invite: {
+    title: 'Firm Invitation',
+    channels: ['in_app', 'email'],
+  },
+  firm_role_changed: {
+    title: 'Firm Role Updated',
+    channels: ['in_app', 'email'],
+  },
+  firm_member_removed: {
+    title: 'Firm Access Removed',
+    channels: ['in_app', 'email'],
+  },
 };
 
 class NotificationService {
   private unsubscribeFns: Map<string, () => void> = new Map();
+
+  private async getUserPreferences(userId: string): Promise<NotificationPreferences> {
+    const userSnap = await getDoc(doc(db, 'users', userId));
+    const preferences = userSnap.data()?.notificationPreferences as Partial<NotificationPreferences> | undefined;
+    return {
+      in_app: preferences?.in_app ?? true,
+      email: preferences?.email ?? true,
+      push: preferences?.push ?? true,
+    };
+  }
 
   /**
    * Send a notification to a user
@@ -82,9 +105,13 @@ class NotificationService {
     userId: string,
     type: NotificationType,
     body: string,
-    data?: { jobId?: string; submissionId?: string; senderId?: string; applicationId?: string }
+    data?: Notification['data']
   ): Promise<void> {
     const config = NOTIFICATION_CONFIG[type];
+    const preferences = await this.getUserPreferences(userId);
+    const channels = config.channels.filter(channel => preferences[channel]);
+
+    if (channels.length === 0) return;
 
     const notification: Omit<Notification, 'id'> = {
       userId,
@@ -93,16 +120,16 @@ class NotificationService {
       body,
       data: data || {},
       isRead: false,
-      channels: config.channels,
+      channels,
       createdAt: new Date().toISOString(),
-      deliveryStatus: 'pending' as any, // Tracked by the server.ts notification worker
+      deliveryStatus: 'pending', // Tracked by the server.ts notification worker
     };
 
     // Save to Firestore (triggers Cloud Function for email/push)
     await addDoc(collection(db, 'notifications'), notification);
 
     // Also send in-app immediately
-    if (config.channels.includes('in_app')) {
+    if (channels.includes('in_app')) {
       this.showToast(notification.title, body, type);
     }
   }
@@ -198,6 +225,9 @@ class NotificationService {
       council_update: '🏛️',
       invoice_sent: '📄',
       invoice_paid: '💰',
+      firm_invite: '🏢',
+      firm_role_changed: '🪪',
+      firm_member_removed: '🚪',
     };
 
     toast(`${icons[type] || '🔔'} ${title}`, {
@@ -212,6 +242,10 @@ class NotificationService {
   cleanup(): void {
     this.unsubscribeFns.forEach(unsubscribe => unsubscribe());
     this.unsubscribeFns.clear();
+  }
+
+  unsubscribe(): void {
+    this.cleanup();
   }
 
   /**
@@ -248,6 +282,15 @@ class NotificationService {
       'job_application',
       `${architectName} applied for "${jobTitle}"`,
       { jobId }
+    );
+  }
+
+  async notifyJobApplication(clientId: string, architectId: string, jobId: string, applicationId: string): Promise<void> {
+    await this.sendNotification(
+      clientId,
+      'job_application',
+      `${architectId} applied for your job`,
+      { jobId, applicationId }
     );
   }
 
@@ -344,6 +387,24 @@ class NotificationService {
     );
   }
 
+  async notifyMessage(recipientId: string, senderId: string, body: string, jobId: string): Promise<void> {
+    await this.sendNotification(
+      recipientId,
+      'message',
+      body,
+      { jobId, senderId }
+    );
+  }
+
+  async notifyMilestoneDue(architectId: string, milestone: string, jobId: string, daysUntilDue: number): Promise<void> {
+    await this.sendNotification(
+      architectId,
+      'milestone_due',
+      `${milestone} milestone is due in ${daysUntilDue} days`,
+      { jobId }
+    );
+  }
+
   /**
    * Notify client of council update
    */
@@ -436,6 +497,33 @@ class NotificationService {
       'invoice_paid',
       `Invoice ${invoiceNumber} has been marked as paid`,
       { jobId }
+    );
+  }
+
+  async notifyFirmInvite(userId: string, firmId: string, firmInviteId: string, inviterName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_invite',
+      `${inviterName} invited you to join a firm workspace.`,
+      { firmId, firmInviteId }
+    );
+  }
+
+  async notifyFirmRoleChanged(userId: string, firmId: string, role: string, senderId: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_role_changed',
+      `Your firm workspace role is now ${role.replace('_', ' ')}.`,
+      { firmId, senderId }
+    );
+  }
+
+  async notifyFirmMemberRemoved(userId: string, firmId: string, senderId: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_member_removed',
+      'Your access to a firm workspace has been removed.',
+      { firmId, senderId }
     );
   }
 }
