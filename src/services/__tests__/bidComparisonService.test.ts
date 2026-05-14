@@ -27,8 +27,8 @@ const tender: TenderPackage = {
 };
 
 const bids: Bid[] = [
-  { id: 'bid-expensive', tenderPackageId: 'tender-1', contractorId: 'contractor-2', contractorName: 'Premium Build', totalAmount: 140000, lineItems: [], proposedTimeline: '8 weeks', proposedStartDate: '2026-07-01', methodology: 'Fast track', qualifications: 'CIDB 6GB', attachments: [], status: 'submitted', createdAt: '2026-01-01T00:00:00.000Z' },
-  { id: 'bid-cheap', tenderPackageId: 'tender-1', contractorId: 'contractor-1', contractorName: 'Value Build', totalAmount: 100000, lineItems: [], proposedTimeline: '10 weeks', proposedStartDate: '2026-07-01', methodology: 'Standard', qualifications: 'CIDB 5GB', attachments: [], status: 'submitted', createdAt: '2026-01-01T00:00:00.000Z' },
+  { id: 'bid-expensive', tenderPackageId: 'tender-1', contractorId: 'contractor-2', contractorName: 'Premium Build', totalAmount: 140000, lineItems: [], proposedTimeline: '8 weeks', proposedStartDate: '2026-07-01', methodology: 'Fast track', qualifications: 'CIDB 6GB', attachments: [], verificationId: 'contractor-1_contractor_CIDB_CIDB-5GB', status: 'submitted', createdAt: '2026-01-01T00:00:00.000Z' },
+  { id: 'bid-cheap', tenderPackageId: 'tender-1', contractorId: 'contractor-1', contractorName: 'Value Build', totalAmount: 100000, lineItems: [], proposedTimeline: '10 weeks', proposedStartDate: '2026-07-01', methodology: 'Standard', qualifications: 'CIDB 5GB', attachments: [], verificationId: 'contractor-1_contractor_CIDB_CIDB-5GB', status: 'submitted', createdAt: '2026-01-01T00:00:00.000Z' },
 ];
 
 describe('bidComparisonService', () => {

@@ -959,6 +959,7 @@ export interface Bid {
   methodology: string;
   qualifications: string;
   attachments: { name: string; url: string }[];
+  verificationId: string;
   status: BidStatus;
   aiScore?: number;
   aiNotes?: string;

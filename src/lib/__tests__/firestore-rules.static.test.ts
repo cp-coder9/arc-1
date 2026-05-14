@@ -24,4 +24,12 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain("request.resource.data.role in ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier']");
     expect(rules).toContain("(hasRole('architect') || hasRole('bep'))");
   });
+
+  it('requires active contractor verification references for tender bids', () => {
+    expect(rules).toContain("hasRole('contractor') || hasRole('subcontractor')");
+    expect(rules).toContain('function isActiveContractorBidVerification(verificationId)');
+    expect(rules).toContain('isActiveContractorBidVerification(request.resource.data.verificationId)');
+    expect(rules).toContain("'verificationId'");
+  });
+
 });

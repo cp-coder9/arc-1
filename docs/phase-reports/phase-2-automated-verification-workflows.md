@@ -82,6 +82,30 @@ Updated `src/lib/api-router.ts` with:
   - preserves admin review as an exception/fallback path, not the primary flow
 
 
+### Contractor Tender Bid Verification Gate
+
+Added the next high-risk workflow gate for contractor delivery workflows:
+
+- `submitBid()` now requires an active persisted contractor/subcontractor verification before a tender bid can be written.
+- Accepted verification sources for this slice are:
+  - `subjectType: contractor`, `statutoryBody: CIDB`
+  - `subjectType: subcontractor`, `statutoryBody: CIDB`
+  - `subjectType: contractor`, `statutoryBody: NHBRC`
+- Submitted bids now persist `verificationId`.
+- Bid documents use deterministic ids of `contractor_{uid}` to match existing Firestore rule expectations and prevent duplicate bid documents per contractor/tender.
+- Firestore rules now allow tender bidding only for `contractor` and `subcontractor` roles, not BEP/freelancer users.
+- Firestore rules now require `request.resource.data.verificationId` to reference a verified `user_verifications` document owned by the bidder.
+- Bid status updates preserve immutable `verificationId` with the rest of bid identity/financial fields.
+
+### Runtime Schema Alignment
+
+Updated `UserRoleEnum` in `src/lib/schemas.ts` to include the full production role set:
+
+- `subcontractor`
+- `supplier`
+
+This closes a runtime validation gap where TypeScript and Firestore accepted these roles but Zod rejected them.
+
 ### Marketplace Verification Gate
 
 Added the first hard production gate required by the scope statement that BEPs must be verified before accessing client marketplace opportunities:
@@ -177,6 +201,7 @@ npx vitest run src/services/__tests__/userVerificationService.test.ts src/servic
 
 Result for original automated-verification slice: 4 test files passed, 28 tests passed.
 Result after marketplace gate slice: focused gate validation passed with 2 test files and 24 tests passed, including updated API route coverage and 6 verification-service tests.
+Result after contractor tender gate slice: focused validation passed with 4 test files and 29 tests passed, including tender service, Firestore rules, verification service, and schema role coverage.
 
 ```bash
 npm run lint

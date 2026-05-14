@@ -144,8 +144,21 @@ service cloud.firestore {
 
     function isEligibleContractorForTender(tenderData) {
       return isAuthenticated() && tenderData.status == 'published' && !isTenderParticipant(tenderData) && (
-        hasRole('freelancer') || hasRole('bep') || hasRole('architect')
+        hasRole('contractor') || hasRole('subcontractor')
       );
+    }
+
+    function getUserVerification(verificationId) {
+      return get(/databases/$(database)/documents/user_verifications/$(verificationId));
+    }
+
+    function isActiveContractorBidVerification(verificationId) {
+      return verificationId is string &&
+        exists(/databases/$(database)/documents/user_verifications/$(verificationId)) &&
+        getUserVerification(verificationId).data.userId == request.auth.uid &&
+        getUserVerification(verificationId).data.status == 'verified' &&
+        getUserVerification(verificationId).data.subjectType in ['contractor', 'subcontractor'] &&
+        getUserVerification(verificationId).data.statutoryBody in ['CIDB', 'NHBRC'];
     }
 
     function isValidBidId(bidId) {
@@ -163,6 +176,7 @@ service cloud.firestore {
         request.resource.data.methodology == resource.data.methodology &&
         request.resource.data.qualifications == resource.data.qualifications &&
         request.resource.data.attachments == resource.data.attachments &&
+        request.resource.data.verificationId == resource.data.verificationId &&
         request.resource.data.createdAt == resource.data.createdAt;
     }
 
@@ -398,11 +412,12 @@ service cloud.firestore {
           request.resource.data.contractorId == request.auth.uid &&
           request.resource.data.tenderPackageId == tenderId &&
           isEligibleContractorForTender(getTender(tenderId).data) &&
+          isActiveContractorBidVerification(request.resource.data.verificationId) &&
           request.resource.data.status == 'submitted' &&
           !('aiScore' in request.resource.data) &&
           !('aiNotes' in request.resource.data) &&
-          request.resource.data.keys().hasOnly(['tenderPackageId', 'contractorId', 'contractorName', 'totalAmount', 'lineItems', 'proposedTimeline', 'proposedStartDate', 'methodology', 'qualifications', 'attachments', 'status', 'createdAt', 'updatedAt']) &&
-          request.resource.data.keys().hasAll(['tenderPackageId', 'contractorId', 'contractorName', 'totalAmount', 'lineItems', 'proposedTimeline', 'proposedStartDate', 'methodology', 'qualifications', 'attachments', 'status', 'createdAt']);
+          request.resource.data.keys().hasOnly(['tenderPackageId', 'contractorId', 'contractorName', 'totalAmount', 'lineItems', 'proposedTimeline', 'proposedStartDate', 'methodology', 'qualifications', 'attachments', 'verificationId', 'status', 'createdAt', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['tenderPackageId', 'contractorId', 'contractorName', 'totalAmount', 'lineItems', 'proposedTimeline', 'proposedStartDate', 'methodology', 'qualifications', 'attachments', 'verificationId', 'status', 'createdAt']);
         allow update: if isAuthenticated() && (
           isContractorBidWithdrawal() ||
           isTenderReviewBidStatusUpdate(tenderId) ||

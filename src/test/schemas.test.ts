@@ -148,7 +148,7 @@ describe('Validation Schemas', () => {
   });
 
   describe('Enum Consistency', () => {
-    const userRoles: Array<'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor'> = ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor'];
+    const userRoles: Array<'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier'> = ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'];
     it('should accept all UserRole values', () => {
       for (const role of userRoles) {
         const result = UserRoleEnum.safeParse(role);
