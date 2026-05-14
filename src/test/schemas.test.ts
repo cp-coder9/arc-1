@@ -148,7 +148,7 @@ describe('Validation Schemas', () => {
   });
 
   describe('Enum Consistency', () => {
-    const userRoles: Array<'client' | 'architect' | 'admin' | 'freelancer' | 'bep'> = ['client', 'architect', 'admin', 'freelancer', 'bep'];
+    const userRoles: Array<'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor'> = ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor'];
     it('should accept all UserRole values', () => {
       for (const role of userRoles) {
         const result = UserRoleEnum.safeParse(role);
@@ -156,7 +156,7 @@ describe('Validation Schemas', () => {
       }
     });
 
-    const notificationTypes: Array<'job_application' | 'application_accepted' | 'drawing_submitted' | 'ai_review_complete' | 'admin_approval' | 'admin_rejection' | 'payment_released' | 'message' | 'milestone_due' | 'council_update' | 'invoice_sent' | 'invoice_paid'> = [
+    const notificationTypes: Array<'job_application' | 'application_accepted' | 'drawing_submitted' | 'ai_review_complete' | 'admin_approval' | 'admin_rejection' | 'payment_released' | 'message' | 'milestone_due' | 'council_update' | 'invoice_sent' | 'invoice_paid' | 'firm_invite' | 'firm_role_changed' | 'firm_member_removed'> = [
       'job_application',
       'application_accepted',
       'drawing_submitted',
@@ -168,7 +168,10 @@ describe('Validation Schemas', () => {
       'milestone_due',
       'council_update',
       'invoice_sent',
-      'invoice_paid'
+      'invoice_paid',
+      'firm_invite',
+      'firm_role_changed',
+      'firm_member_removed'
     ];
     it('should accept all NotificationType values', () => {
       for (const type of notificationTypes) {

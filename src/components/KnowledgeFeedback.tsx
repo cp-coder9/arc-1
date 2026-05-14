@@ -12,7 +12,7 @@ interface KnowledgeFeedbackProps {
   agentRole: string;
   categoryName: string;
   issue: AIIssue;
-  userRole?: 'admin' | 'architect' | 'client' | 'freelancer' | 'bep';
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
 }
 
 export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: KnowledgeFeedbackProps) {

@@ -71,6 +71,18 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Invoice Paid',
     channels: ['in_app', 'email', 'push'],
   },
+  firm_invite: {
+    title: 'Firm Invitation',
+    channels: ['in_app', 'email'],
+  },
+  firm_role_changed: {
+    title: 'Firm Role Updated',
+    channels: ['in_app', 'email'],
+  },
+  firm_member_removed: {
+    title: 'Firm Access Removed',
+    channels: ['in_app', 'email'],
+  },
 };
 
 class NotificationService {
@@ -93,7 +105,7 @@ class NotificationService {
     userId: string,
     type: NotificationType,
     body: string,
-    data?: { jobId?: string; submissionId?: string; senderId?: string; applicationId?: string }
+    data?: Notification['data']
   ): Promise<void> {
     const config = NOTIFICATION_CONFIG[type];
     const preferences = await this.getUserPreferences(userId);
@@ -110,7 +122,7 @@ class NotificationService {
       isRead: false,
       channels,
       createdAt: new Date().toISOString(),
-      deliveryStatus: 'pending' as any, // Tracked by the server.ts notification worker
+      deliveryStatus: 'pending', // Tracked by the server.ts notification worker
     };
 
     // Save to Firestore (triggers Cloud Function for email/push)
@@ -213,6 +225,9 @@ class NotificationService {
       council_update: '🏛️',
       invoice_sent: '📄',
       invoice_paid: '💰',
+      firm_invite: '🏢',
+      firm_role_changed: '🪪',
+      firm_member_removed: '🚪',
     };
 
     toast(`${icons[type] || '🔔'} ${title}`, {
@@ -482,6 +497,33 @@ class NotificationService {
       'invoice_paid',
       `Invoice ${invoiceNumber} has been marked as paid`,
       { jobId }
+    );
+  }
+
+  async notifyFirmInvite(userId: string, firmId: string, firmInviteId: string, inviterName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_invite',
+      `${inviterName} invited you to join a firm workspace.`,
+      { firmId, firmInviteId }
+    );
+  }
+
+  async notifyFirmRoleChanged(userId: string, firmId: string, role: string, senderId: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_role_changed',
+      `Your firm workspace role is now ${role.replace('_', ' ')}.`,
+      { firmId, senderId }
+    );
+  }
+
+  async notifyFirmMemberRemoved(userId: string, firmId: string, senderId: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_member_removed',
+      'Your access to a firm workspace has been removed.',
+      { firmId, senderId }
     );
   }
 }

@@ -14,11 +14,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const [{ default: apiRouter }, { adminDb, testFirebase }] = await Promise.all([
-    import("./src/lib/api-router.js"),
-    import("./src/lib/firebase-admin.js"),
-  ]);
-
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
   const BODY_LIMIT = "50mb";
@@ -48,13 +43,31 @@ async function startServer() {
     next();
   });
 
-  // Mount the shared API router
-  app.use("/api", apiRouter);
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Mount the shared API router lazily. Firebase Admin / Firestore can add a
+  // noticeable cold-start cost locally, so the server should become healthy
+  // before those integrations are imported.
+  app.use("/api", async (req, res, next) => {
+    try {
+      const { default: apiRouter } = await import("./src/lib/api-router.js");
+      return apiRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load API router:", error);
+      return res.status(500).json({
+        error: "API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
 
   // --- Local Development Notification Worker ---
   // In Vercel, this is handled by api/notifications/worker.ts as a cron job.
   // We keep it here for real-time local testing.
   async function startNotificationWorker() {
+    const { adminDb } = await import("./src/lib/firebase-admin.js");
     console.log("Starting background notification worker...");
     adminDb.collection("notifications")
       .where("deliveryStatus", "==", "pending")
@@ -88,9 +101,22 @@ async function startServer() {
       });
   }
   
-  if (process.env.NODE_ENV !== "production") {
-    startNotificationWorker();
-  }
+  const shouldStartNotificationWorker = process.env.NODE_ENV !== "production" && process.env.DISABLE_NOTIFICATION_WORKER !== "true";
+
+  // Firebase test endpoint
+  app.get("/firebase/test", async (_req, res) => {
+    try {
+      const { testFirebase } = await import("./src/lib/firebase-admin.js");
+      const result = await testFirebase();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ 
+        status: "error", 
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
@@ -107,23 +133,14 @@ async function startServer() {
     });
   }
 
-  // Firebase test endpoint
-  app.get("/firebase/test", async (_req, res) => {
-    try {
-      const result = await testFirebase();
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ 
-        status: "error", 
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+    if (shouldStartNotificationWorker) {
+      startNotificationWorker().catch((error) => {
+        console.warn("Notification worker disabled:", error instanceof Error ? error.message : String(error));
+      });
+    }
   });
 }
 

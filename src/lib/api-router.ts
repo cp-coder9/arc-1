@@ -12,6 +12,8 @@ import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/sha
 import { verifySACAPByName } from "../services/sacapVerificationService";
 import { runMunicipalBrowserAutomation, trackMunicipalityStatus } from "./municipalAutomation";
 import { notificationService } from "../services/notificationService";
+import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../services/auditService";
+import { normalizeUserRole } from "../services/permissionService";
 
 import { UserRole, MunicipalityType } from "../types";
 
@@ -266,6 +268,49 @@ async function isAdmin(uid: string): Promise<boolean> {
   return userDoc.data()?.role === "admin";
 }
 
+async function getAuthContext(headers: Record<string, any>) {
+  const decoded = await verifyAuth(headers);
+  const decodedClaims = decoded as typeof decoded & { admin?: boolean };
+  const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+  const userData = userDoc.exists ? userDoc.data() : null;
+  const role = (userData?.role || decodedClaims.role) as UserRole | string | undefined;
+  return {
+    decoded,
+    userData,
+    uid: decoded.uid as string,
+    role,
+    normalizedRole: normalizeUserRole(role),
+    isAdmin: role === "admin" || decodedClaims.admin === true,
+  };
+}
+
+async function recordAuditEvent(req: express.Request, input: {
+  category: AuditEventCategory;
+  action: string;
+  actor: { uid: string; role?: UserRole | string; email?: string; displayName?: string; authorizationType?: string };
+  target?: AuditTarget;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const event = buildAuditEvent({
+    ...input,
+    requestId: req.get("x-request-id") || crypto.randomUUID(),
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent") || undefined,
+  });
+  await adminDb.collection("audit_logs").add(event);
+}
+
+function decodedAuditActor(decoded: any, role?: UserRole | string) {
+  return {
+    uid: decoded.uid,
+    role: role || decoded.role,
+    email: decoded.email,
+    displayName: decoded.displayName || decoded.name,
+    authorizationType: decoded.authorizationType,
+  };
+}
+
 // ── Multer (memory storage, max 20 MB) ───────────────────────────────────────
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -353,7 +398,7 @@ router.post("/auth/check-admin", async (req, res) => {
     const userRef = adminDb.collection("users").doc(decoded.uid);
     const userDoc = await userRef.get();
     const profileData = sanitizeUserProfileData(req.body.profileData);
-    const requestedRole = ['client', 'architect', 'freelancer', 'bep'].includes(req.body.role)
+    const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'].includes(req.body.role)
       ? req.body.role
       : 'client';
 
@@ -369,6 +414,13 @@ router.post("/auth/check-admin", async (req, res) => {
         updatedAt: new Date().toISOString(),
       };
       await userRef.set(newUser);
+      await recordAuditEvent(req, {
+        category: 'auth',
+        action: 'auth.user_bootstrapped',
+        actor: decodedAuditActor(decoded, newUser.role),
+        target: { type: 'user', id: decoded.uid },
+        metadata: { requestedRole, assignedRole: newUser.role, normalizedRole: normalizeUserRole(newUser.role) },
+      });
       return res.json({ role: newUser.role, isAdmin: isAdminEmail, created: true });
     }
 
@@ -386,6 +438,13 @@ router.post("/auth/check-admin", async (req, res) => {
       await userRef.update({
         role: 'admin',
         updatedAt: new Date().toISOString(),
+      });
+      await recordAuditEvent(req, {
+        category: 'role',
+        action: 'role.admin_allowlist_upgraded',
+        actor: decodedAuditActor(decoded, 'admin'),
+        target: { type: 'user', id: decoded.uid },
+        metadata: { previousRole: currentRole, assignedRole: 'admin' },
       });
       return res.json({ role: 'admin', isAdmin: true, upgraded: true });
     }
@@ -426,8 +485,8 @@ router.post("/jobs/:jobId/applications", async (req, res) => {
     const userData = userDoc.data()!;
     const jobData = jobDoc.data()!;
 
-    if (userData.role !== 'architect') {
-      return res.status(403).json({ error: 'Only architects can apply for marketplace jobs' });
+    if (normalizeUserRole(userData.role) !== 'bep') {
+      return res.status(403).json({ error: 'Only verified BEPs can apply for marketplace jobs' });
     }
     if (jobData.status !== 'open') {
       return res.status(400).json({ error: 'This job is not open for applications' });
@@ -478,6 +537,14 @@ router.post("/jobs/:jobId/applications", async (req, res) => {
     } catch (notificationError) {
       console.error('Failed to create job application notification:', notificationError);
     }
+
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'marketplace.application_submitted',
+      actor: decodedAuditActor(decoded, userData.role),
+      target: { type: 'job_application', id: applicationRef.id, projectId: jobId },
+      metadata: { jobId, normalizedRole: normalizeUserRole(userData.role) },
+    });
 
     res.status(201).json({ id: applicationRef.id, jobId, status: 'pending' });
   } catch (err: any) {
@@ -596,6 +663,14 @@ router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) 
     } catch (notificationError) {
       console.error('Failed to create acceptance notification:', notificationError);
     }
+
+    await recordAuditEvent(req, {
+      category: 'approval',
+      action: 'marketplace.application_accepted',
+      actor: decodedAuditActor(decoded, 'client'),
+      target: { type: 'job_application', id: applicationId, projectId: jobId },
+      metadata: { jobId, selectedBepId: acceptedApplication.architectId, projectCreatedOrUpdated: true },
+    });
 
     res.json({ jobId, applicationId, selectedArchitectId: acceptedApplication.architectId, status: 'in-progress' });
   } catch (err: any) {
@@ -790,6 +865,13 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
     }
 
     const data = await response.json();
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: 'ai.review_requested',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'ai_review', id: crypto.randomUUID() },
+      metadata: { provider: config.provider, model: activeModel, drawingCount: drawingUrls.length },
+    });
     res.json(data);
   } catch (error: any) {
     console.error("LLM Proxy Error:", error);
@@ -803,8 +885,9 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
 
 // Gemini proxy (authenticated + URL-validated)
 router.post("/gemini/review", reviewLimiter, async (req, res) => {
+  let decoded;
   try {
-    await verifyAuth(req.headers);
+    decoded = await verifyAuth(req.headers);
   } catch (err: any) {
     return res.status(err.status || 401).json({ error: err.message });
   }
@@ -817,21 +900,7 @@ router.post("/gemini/review", reviewLimiter, async (req, res) => {
   const activeModel = config?.model || dbConfig?.model || "gemini-2.0-flash";
 
   if (!activeApiKey) {
-    return res.json({
-      candidates: [{
-        content: {
-          parts: [{
-            text: JSON.stringify({
-              status: "failed",
-              feedback: "AI Review (MOCK): No API key configured. Add GEMINI_API_KEY in environment variables.",
-              categories: [],
-              traceLog: "MOCK MODE: Missing API Key.",
-            }),
-          }],
-        },
-        finishReason: "STOP",
-      }],
-    });
+    return res.status(503).json({ error: "AI review provider is not configured" });
   }
 
   if (!prompt) return res.status(400).json({ error: "Prompt is required" });
@@ -951,7 +1020,15 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
       return res.status(response.status).json({ error: "Gemini API request failed", details: errorData });
     }
 
-    res.json(await response.json());
+    const data = await response.json();
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: 'ai.gemini_review_requested',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'ai_review', id: crypto.randomUUID() },
+      metadata: { provider: 'gemini', model: activeModel, drawingCount: drawingUrls.length },
+    });
+    res.json(data);
   } catch (error) {
     console.error("Gemini Proxy Error:", error);
     res.status(500).json({ error: "Failed to fetch from Gemini API" });
@@ -1212,6 +1289,14 @@ router.post("/files/upload", async (req, res) => {
     });
     console.log(`[API] Firestore success: ${fileRef.id}`);
 
+    await recordAuditEvent(req, {
+      category: 'document',
+      action: 'file.uploaded',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'uploaded_file', id: fileRef.id, projectId: jobId || undefined },
+      metadata: { context, jobId: jobId || null, submissionId: submissionId || null, fileName: safeFileName, fileType: fileType || 'application/octet-stream', fileSize: fileSize || fileBuffer.byteLength },
+    });
+
     res.json({ url: blob.url, fileId: fileRef.id });
   } catch (err: any) {
     console.error("[API] ❌ Upload failed catastrophically:", err);
@@ -1254,6 +1339,13 @@ router.post("/files/delete", async (req, res) => {
     }
 
     await fileRef.delete();
+    await recordAuditEvent(req, {
+      category: 'document',
+      action: 'file.deleted',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'uploaded_file', id: fileId, projectId: fileData?.jobId || undefined },
+      metadata: { fileUrl, uploadedBy: fileData?.uploadedBy || null, context: fileData?.context || null },
+    });
     res.json({ success: true, message: "File deleted successfully" });
   } catch (error: any) {
     console.error("Delete operation failed:", error);
@@ -1370,6 +1462,14 @@ router.post("/payment/escrow/init", async (req, res) => {
     if (PAYFAST_PASSPHRASE) paramStr += `&passphrase=${encodeURIComponent(PAYFAST_PASSPHRASE).replace(/%20/g, "+")}`;
     const signature = crypto.createHash("md5").update(paramStr).digest("hex");
 
+    await recordAuditEvent(req, {
+      category: 'payment',
+      action: 'payment.escrow_initiated',
+      actor: decodedAuditActor(decoded, 'client'),
+      target: { type: 'payment', id: paymentRef.id, projectId: jobId },
+      metadata: { jobId, totalAmount, platformFee, payeeId: job.selectedArchitectId || '' },
+    });
+
     const params = new URLSearchParams({ ...data, signature }).toString();
     res.json({ paymentUrl: `${pfUrl}?${params}`, paymentId: paymentRef.id });
   } catch (err: any) {
@@ -1437,6 +1537,13 @@ router.post("/payment/milestone/release", async (req, res) => {
     });
 
     await batch.commit();
+    await recordAuditEvent(req, {
+      category: 'escrow',
+      action: 'escrow.milestone_released',
+      actor: decodedAuditActor(decoded, 'client'),
+      target: { type: 'escrow', id: jobId, projectId: jobId },
+      metadata: { jobId, milestone, releaseAmount, architectAmount, platformFee },
+    });
      res.json({ success: true, architectAmount });
   } catch (err: any) {
     console.error("Release milestone error:", err);
@@ -1570,6 +1677,15 @@ router.post("/payment/refund/request", async (req, res) => {
       updatedAt: new Date().toISOString(),
     });
 
+    await recordAuditEvent(req, {
+      category: 'payment',
+      action: 'payment.refund_requested',
+      actor: decodedAuditActor(decoded, 'client'),
+      target: { type: 'refund_request', id: refundRequestRef.id, projectId: jobId },
+      reason: reason || 'Client requested refund',
+      metadata: { jobId, amount: refundAmount },
+    });
+
     // Notify admins about the refund request
     const adminsSnapshot = await adminDb.collection("users").where("role", "==", "admin").get();
     const adminNotifications = adminsSnapshot.docs.map(adminDoc => {
@@ -1691,6 +1807,15 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
         createdAt: new Date().toISOString(),
       });
 
+      await recordAuditEvent(req, {
+        category: 'admin_override',
+        action: 'payment.refund_rejected',
+        actor: decodedAuditActor(decoded, 'admin'),
+        target: { type: 'refund_request', id: requestId, projectId: request.jobId },
+        reason: adminNote || 'Admin rejected refund request',
+        metadata: { jobId: request.jobId, amount: request.amount },
+      });
+
       return res.json({ success: true, status: "rejected" });
     }
 
@@ -1771,6 +1896,15 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
       });
     }
 
+    await recordAuditEvent(req, {
+      category: 'admin_override',
+      action: 'payment.refund_approved',
+      actor: decodedAuditActor(decoded, 'admin'),
+      target: { type: 'refund_request', id: requestId, projectId: request.jobId },
+      reason: adminNote || 'Admin approved refund request',
+      metadata: { jobId: request.jobId, amount: request.amount, paymentId: refundPaymentId },
+    });
+
     res.json({ success: true, status: "approved", refundAmount: request.amount, paymentId: refundPaymentId });
   } catch (err: any) {
     console.error("Process refund error:", err);
@@ -1839,6 +1973,15 @@ router.post("/payment/refund", async (req, res) => {
       });
     });
 
+    await recordAuditEvent(req, {
+      category: 'admin_override',
+      action: 'payment.legacy_direct_refund_processed',
+      actor: decodedAuditActor(decoded, 'admin'),
+      target: { type: 'payment', id: refundPaymentId, projectId: jobId },
+      reason: reason || 'Admin direct refund override',
+      metadata: { jobId, amount: refundAmount },
+    });
+
     res.json({ success: true, refundAmount });
   } catch (err: any) {
     console.error("Refund error:", err);
@@ -1902,6 +2045,13 @@ router.post("/payment/notify", async (req, res) => {
             updatedAt: new Date().toISOString(),
           });
         }
+        await recordAuditEvent(req, {
+          category: 'payment',
+          action: 'payment.payfast_itn_completed',
+          actor: { uid: 'payfast_itn', role: 'admin', authorizationType: 'webhook' },
+          target: { type: 'payment', id: paymentId, projectId: payment.jobId || undefined },
+          metadata: { jobId: payment.jobId || null, pfPaymentId: pfData["pf_payment_id"] || null, status: pfData["payment_status"] },
+        });
       }
     }
     res.status(200).send("OK");
@@ -2093,6 +2243,14 @@ router.post("/municipal/credentials", async (req, res) => {
       }
     }
 
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: 'municipal.credentials_saved',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'municipal_credentials', id: credentialId },
+      metadata: { municipality, hasReferenceNumber: Boolean(referenceNumber), hasErfNumber: Boolean(erfNumber) },
+    });
+
     res.json({ success: true, credentialId });
   } catch (error: any) {
     console.error("Municipal credential save error:", error);
@@ -2229,7 +2387,7 @@ router.get("/municipal/submissions", async (req, res) => {
 // SACAP Verification Agent (Real Automation)
 router.post("/architect/verify-sacap", async (req, res) => {
   try {
-    await verifyAuth(req.headers);
+    const decoded = await verifyAuth(req.headers);
     const { architectId, name, sacapNumber } = req.body;
 
     if (!architectId || !name) {
@@ -2248,6 +2406,14 @@ router.post("/architect/verify-sacap", async (req, res) => {
       sacapRegistrationType: result.registrationDetails?.category || null,
       updatedAt: new Date().toISOString()
     }, { merge: true });
+
+    await recordAuditEvent(req, {
+      category: 'verification',
+      action: 'verification.sacap_checked',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'architect_profile', id: architectId },
+      metadata: { status, sacapNumber: sacapNumber || null, source: 'SACAP public search automation' },
+    });
 
     res.json({
       success: true,

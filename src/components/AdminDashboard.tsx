@@ -3,7 +3,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, Firm } from '../types';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -529,6 +529,7 @@ export default function AdminDashboard({
     activeTab === 'settings' ? 'settings' : 
     activeTab === 'fees' ? 'fees' :
     activeTab === 'financial' ? 'financial' :
+    activeTab === 'firms' ? 'firms' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
     'submissions';
@@ -545,6 +546,7 @@ export default function AdminDashboard({
   const [pendingKnowledgeCount, setPendingKnowledgeCount] = useState(0);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [projectsByJobId, setProjectsByJobId] = useState<Record<string, Project>>({});
+  const [firms, setFirms] = useState<Firm[]>([]);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
@@ -616,6 +618,13 @@ export default function AdminDashboard({
       },
       handleListenerError('projects')
     );
+    const unsubFirms = onSnapshot(
+      query(collection(db, 'firms'), limit(200)),
+      (snapshot) => {
+        setFirms(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Firm)));
+      },
+      handleListenerError('firms')
+    );
     return () => {
       unsubSubmissions();
       unsubAgents();
@@ -624,6 +633,7 @@ export default function AdminDashboard({
       unsubDisputes();
       unsubUsers();
       unsubProjects();
+      unsubFirms();
     };
   }, []);
 
@@ -773,6 +783,7 @@ export default function AdminDashboard({
           jobs: 'projects',
           fees: 'fees',
           financial: 'financial',
+          firms: 'firms',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
@@ -811,6 +822,9 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="financial" className={tabTriggerClass}>
               <Landmark size={16} /> Financial
+            </TabsTrigger>
+            <TabsTrigger value="firms" className={tabTriggerClass}>
+              <Building2 size={16} /> Firms
             </TabsTrigger>
             <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
@@ -1106,6 +1120,43 @@ export default function AdminDashboard({
 
         <TabsContent value="financial">
           <FinancialDashboard />
+        </TabsContent>
+
+        <TabsContent value="firms">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden space-y-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2"><Building2 className="text-primary" /> Firm Oversight</h2>
+                <p className="text-sm text-muted-foreground mt-1">Review firm workspace records and subscription/access status without replacing user management.</p>
+              </div>
+              <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{firms.length} firms</Badge>
+            </div>
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>Firm</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Subscription</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {firms.map(firm => (
+                    <TableRow key={firm.id}>
+                      <TableCell className="font-bold">{firm.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{firm.ownerId}</TableCell>
+                      <TableCell><Badge variant="outline" className="uppercase text-[10px] tracking-widest">{firm.subscriptionStatus}</Badge></TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{firm.primaryContactEmail || firm.billingEmail || 'Not set'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{safeFormat(firm.createdAt, 'MMM d, yyyy')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {firms.length === 0 && <p className="text-muted-foreground italic">No firm workspaces have been created yet.</p>}
+          </div>
         </TabsContent>
       </Tabs>
 

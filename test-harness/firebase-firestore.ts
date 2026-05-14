@@ -1,13 +1,20 @@
-const role = (import.meta.env.VITE_TEST_ROLE || 'client') as string;
+const fallbackRole = (import.meta.env.VITE_TEST_ROLE || 'client') as string;
 const now = new Date('2026-05-01T12:00:00.000Z').toISOString();
 
-const users = [
-  { uid: 'client-user', email: 'client@example.test', displayName: 'Client User', role: 'client', createdAt: now, averageRating: 4.8, completedJobs: 2 },
-  { uid: 'architect-user', email: 'architect@example.test', displayName: 'Architect User', role: 'architect', createdAt: now, averageRating: 4.9, completedJobs: 7 },
-  { uid: 'admin-user', email: 'admin@example.test', displayName: 'Admin User', role: 'admin', createdAt: now },
-  { uid: 'freelancer-user', email: 'freelancer@example.test', displayName: 'Freelancer User', role: 'freelancer', createdAt: now },
-  { uid: 'bep-user', email: 'bep@example.test', displayName: 'BEP User', role: 'bep', createdAt: now },
-];
+function getRole() {
+  if (typeof window === 'undefined') return fallbackRole;
+  return new URLSearchParams(window.location.search).get('role') || fallbackRole;
+}
+
+function getUsers() {
+  return [
+    { uid: 'client-user', email: 'client@example.test', displayName: 'Client User', role: 'client', createdAt: now, averageRating: 4.8, completedJobs: 2 },
+    { uid: 'architect-user', email: 'architect@example.test', displayName: 'Architect User', role: 'architect', createdAt: now, averageRating: 4.9, completedJobs: 7 },
+    { uid: 'admin-user', email: 'admin@example.test', displayName: 'Admin User', role: 'admin', createdAt: now },
+    { uid: 'freelancer-user', email: 'freelancer@example.test', displayName: 'Freelancer User', role: 'freelancer', createdAt: now },
+    { uid: 'bep-user', email: 'bep@example.test', displayName: 'BEP User', role: 'bep', createdAt: now },
+  ];
+}
 
 const jobs = [
   {
@@ -64,14 +71,14 @@ const disputes: unknown[] = [];
 const notifications: unknown[] = [];
 const councilSubmissions: unknown[] = [];
 const delegatedTasks = [
-  { id: 'task-1', jobId: 'job-1', architectId: 'architect-user', assigneeId: `${role}-user`, assigneeName: 'Assigned User', assigneeRole: role, deadline: '2026-06-01', notes: 'Review drawings', status: 'pending', createdAt: now },
+  { id: 'task-1', jobId: 'job-1', architectId: 'architect-user', assigneeId: `${getRole()}-user`, assigneeName: 'Assigned User', assigneeRole: getRole(), deadline: '2026-06-01', notes: 'Review drawings', status: 'pending', createdAt: now },
 ];
 const invoices: unknown[] = [];
 const files: unknown[] = [];
 
 function dataForCollection(name: string) {
   switch (name) {
-    case 'users': return users;
+    case 'users': return getUsers();
     case 'jobs': return jobs;
     case 'reviews': return reviews;
     case 'agents': return agents;
@@ -144,7 +151,7 @@ export async function getDoc(ref: any) {
   const id = ref.id;
   const collectionName = ref.path?.split('/')?.at(-2) || ref.path?.split('/')?.at(0);
   const items = dataForCollection(collectionName || 'users');
-  const found = items.find((item: any) => item.id === id || item.uid === id) || users.find(u => u.uid === id);
+  const found = items.find((item: any) => item.id === id || item.uid === id) || getUsers().find(u => u.uid === id);
   return found ? makeDoc(found) : { id, exists: () => false, data: () => undefined };
 }
 
@@ -170,4 +177,5 @@ export async function runTransaction(_db: unknown, updateFunction: (transaction:
 export function deleteField() { return undefined; }
 export function increment(value: number) { return value; }
 export function arrayUnion(...values: unknown[]) { return values; }
+export function arrayRemove(...values: unknown[]) { return values; }
 export function writeBatch() { return { set() {}, update() {}, delete() {}, commit: async () => undefined }; }

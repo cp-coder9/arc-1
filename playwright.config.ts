@@ -2,15 +2,19 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: 'html',
+  timeout: 120_000,
+  expect: { timeout: 20_000 },
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    actionTimeout: 30_000,
+    navigationTimeout: 30_000,
   },
   projects: [
     {
@@ -35,8 +39,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'cross-env ENCRYPTION_KEY=0123456789abcdef0123456789abcdef node -r dotenv/config node_modules/tsx/dist/cli.mjs server.ts dotenv_config_path=.env',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    command: 'npx vite --host 0.0.0.0 --port 3000',
+    url: 'http://127.0.0.1:3000',
+    reuseExistingServer: false,
   },
 });

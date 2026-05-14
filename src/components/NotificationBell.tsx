@@ -30,6 +30,9 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   council_update: '🏛️',
   invoice_sent: '📄',
   invoice_paid: '💰',
+  firm_invite: '🏢',
+  firm_role_changed: '🪪',
+  firm_member_removed: '🚪',
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {
@@ -94,6 +97,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     const { data } = notification;
     if (data?.jobId) {
       return `#/jobs/${data.jobId}`;
+    }
+    if (data?.firmId) {
+      return `#/firms/${data.firmId}`;
     }
     return '#';
   };
