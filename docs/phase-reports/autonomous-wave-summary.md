@@ -14,6 +14,7 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `f9cc45d9` | Permission tests | Added a subcontractor package-assignee regression proving package participants keep read/payment visibility without project mutation or municipal insight rights. |
 | `3ee9f272` | Verification tests | Added a static regression test that keeps the API contract docs validator wired through package scripts, README guidance, and GitHub Actions. |
 | `abc09847` | Verification docs | Documented local and CI verification gates in the README, including the API contract documentation check. |
 | `0fe1177b` | CI verification | Added reusable `npm run docs:api-contracts` validation and wired it into GitHub Actions so documented routes keep deterministic contract coverage. |
@@ -76,7 +77,7 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 The phase reports and commit history record the following validation categories:
 
-- Service/unit workflow coverage for project workflow write APIs, service workflow edge cases, package readiness, financial/appointment helpers, CPD logic, resource booking conflict and ledger behavior, and contractor readiness helpers.
+- Service/unit workflow coverage for project workflow write APIs, service workflow edge cases, package readiness, financial/appointment helpers, CPD logic, resource booking conflict and ledger behavior, contractor readiness helpers, and package-scoped subcontractor permission boundaries.
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
 - API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, invitations, guided client briefs, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, municipal helpers, and dashboard knowledge resources; deterministic API examples now cover project brief list/detail/write/attachments/interpretations, opportunity detail, proposal detail and appointment-readiness preflight, profile update/projection, directory search/invite/respond, admin verification review/recheck responses, resource centre reads/writes, drawing checklist item status workflows, project-scoped municipal tracker status/control views and legacy tracking helper, project workflow document/task/approval/message/transmittal writes, AI issue routing/resolution/human-review flows, CPD scoring/certificate/sync service contracts, resource booking conflict/billing/payout service contracts, AI governance action-log/review/sign-off persistence contracts, freelancer work package lifecycle contracts, and command-centre/team/coordination contracts.
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
