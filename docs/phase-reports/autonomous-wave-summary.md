@@ -14,6 +14,7 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `7257ed86` | Browser E2E harness | Fixed sidebar E2E Firestore harness exports and aligned role menu assertions to the canonical command-centre dashboard navigation; Chromium E2E now passes. |
 | `cb12e3e4` | CI verification | Added GitHub Actions workflow for app typecheck, test typecheck, full Vitest, and production build. |
 | `5440142c` | Full-suite stabilization | Stabilized deterministic component/service/integration tests and hardened legacy file/job metadata rendering. |
 | `62b6aa44` | OCR/PDF service tests | Added mocked OCR and PDF generation service coverage. |
@@ -55,7 +56,7 @@ The phase reports and commit history record the following validation categories:
 - Service/unit workflow coverage for project workflow write APIs, service workflow edge cases, package readiness, financial/appointment helpers, CPD logic, resource booking conflict and ledger behavior, and contractor readiness helpers.
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
 - API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources.
-- Source-level dashboard alignment checks against `backend.html`, with browser visual validation deferred because browser automation was unavailable in that slice.
+- Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
 - Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 50 test files / 371 tests, and `npm run build` passed without the previous Vite circular chunk warning.
 - CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
 - Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, and confirmed `backend.html` remains untouched.
@@ -82,11 +83,11 @@ These tasks are safe because they avoid irreversible external actions, live paym
 1. Keep expanding automated tests around existing route handlers, component shells, and Firestore/static rules using local mocks and deterministic fixtures.
 2. Add non-production API contract examples for documented endpoints, clearly marked as mock/dev fixtures.
 3. Extend docs with request/response examples for canonical Phase 2 brief/proposal/profile/directory endpoints.
-4. Add browser smoke tests for dashboard shells once browser automation is stable, using `backend.html` as read-only reference.
+4. Keep browser smoke tests current for dashboard shells using `backend.html` as read-only reference, and extend them only with deterministic local mocks.
 5. Build read-only admin review queue views for verification, CPD sync status, municipal evidence status, and provider integration readiness without enabling external submission.
 6. Add feature flags and environment guards for any workflow that could later interact with payments, statutory systems, provider APIs, or outbound transactional email.
 7. Prepare migration design notes for canonical Phase 2 collections versus compatibility stores before any data migration code is written.
-8. Rerun browser validation of dashboard surfaces when browser automation is available, especially against `backend.html` parity assumptions.
+8. Periodically rerun browser validation of dashboard surfaces after dashboard role/page changes, especially against `backend.html` parity assumptions.
 
 ## Workspace Note
 
