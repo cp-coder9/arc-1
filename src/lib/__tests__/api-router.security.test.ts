@@ -482,6 +482,50 @@ describe('api-router security and high-value integration routes', () => {
     });
   });
 
+  it('lists project briefs as a read-only endpoint scoped to the authenticated client', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'Owned brief', description: 'Client scope', status: 'submitted' });
+    mockAdminDb.seed('project_briefs/brief-2', { clientId: 'other-client', title: 'Other brief', description: 'Private scope', status: 'submitted' });
+
+    const writesBefore = mockAdminDb.writes.length;
+    const response = await request(app)
+      .get('/api/project-briefs?limit=10')
+      .set(authHeader('client'));
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body).toMatchObject({ readOnly: true });
+    expect(response.body.briefs).toHaveLength(1);
+    expect(response.body.briefs[0]).toMatchObject({ id: 'brief-1', clientId: 'client-1', title: 'Owned brief' });
+    expect(response.body.briefs.some((brief: StoredDoc) => brief.id === 'brief-2')).toBe(false);
+    expect(mockAdminDb.writes).toHaveLength(writesBefore);
+    expect(mockAdminDb.listCollection('audit_logs')).toHaveLength(0);
+  });
+
+  it('reads project brief details with attachments and interpretations without mutating state', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'Owned brief', description: 'Client scope', status: 'submitted', assignedBepIds: ['architect-1'] });
+    mockAdminDb.seed('project_briefs/brief-1/attachments/attachment-1', { briefId: 'brief-1', clientId: 'client-1', fileName: 'survey.pdf', fileUrl: 'https://files.public.blob.vercel-storage.com/survey.pdf' });
+    mockAdminDb.seed('project_briefs/brief-1/interpretations/interpretation-1', { briefId: 'brief-1', clientId: 'client-1', summary: 'Advisory summary', advisoryOnly: true, status: 'ready_for_review' });
+
+    const blocked = await request(app)
+      .get('/api/project-briefs/brief-1')
+      .set(authHeader('intruder'));
+    expect(blocked.status).toBe(403);
+
+    seedVerifiedBepVerification();
+    const writesBefore = mockAdminDb.writes.length;
+    const response = await request(app)
+      .get('/api/project-briefs/brief-1')
+      .set(authHeader('architect'));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ readOnly: true, brief: { id: 'brief-1', clientId: 'client-1', title: 'Owned brief' } });
+    expect(response.body.attachments).toEqual([expect.objectContaining({ id: 'attachment-1', fileName: 'survey.pdf' })]);
+    expect(response.body.interpretations).toEqual([expect.objectContaining({ id: 'interpretation-1', advisoryOnly: true })]);
+    expect(mockAdminDb.writes).toHaveLength(writesBefore);
+    expect(mockAdminDb.listCollection('audit_logs')).toHaveLength(0);
+  });
+
   it('persists project brief attachments and advisory interpretations with owner gates', async () => {
     const app = await buildApp();
     mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'Alteration', description: 'Scope', status: 'submitted', assignedBepIds: ['architect-1'] });
@@ -515,6 +559,41 @@ describe('api-router security and high-value integration routes', () => {
     });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'project_brief.attachment_added' && data.metadata.canonicalRoute === true)).toBe(true);
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'project_brief.interpretation_added' && data.category === 'ai' && data.metadata.advisoryOnly === true)).toBe(true);
+  });
+
+  it('reads and lists project briefs only for owners, assigned verified BEPs, or admins', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'Owner brief', description: 'Scope', status: 'submitted', assignedBepIds: ['architect-1'] });
+    mockAdminDb.seed('project_briefs/brief-2', { clientId: 'other-client', title: 'Private brief', description: 'Hidden', status: 'submitted', assignedBepIds: [] });
+
+    const ownerRead = await request(app)
+      .get('/api/project-briefs/brief-1')
+      .set(authHeader('client'));
+    expect(ownerRead.status).toBe(200);
+    expect(ownerRead.body).toMatchObject({ readOnly: true, brief: { id: 'brief-1', clientId: 'client-1' } });
+
+    const unverifiedAssigned = await request(app)
+      .get('/api/project-briefs/brief-1')
+      .set(authHeader('architect'));
+    expect(unverifiedAssigned.status).toBe(403);
+
+    seedVerifiedBepVerification();
+    const assignedRead = await request(app)
+      .get('/api/project-briefs/brief-1')
+      .set(authHeader('architect'));
+    expect(assignedRead.status).toBe(200);
+    expect(assignedRead.body.brief).toMatchObject({ id: 'brief-1', title: 'Owner brief' });
+
+    const clientMine = await request(app)
+      .get('/api/project-briefs?mine=true')
+      .set(authHeader('client'));
+    expect(clientMine.status).toBe(200);
+    expect(clientMine.body.briefs.map((brief: StoredDoc) => brief.id)).toEqual(['brief-1']);
+
+    const blocked = await request(app)
+      .get('/api/project-briefs/brief-2')
+      .set(authHeader('intruder'));
+    expect(blocked.status).toBe(403);
   });
 
   it('persists AI action logs, creates review queue items, resolves with human sign-off, and audits both steps', async () => {
@@ -689,6 +768,49 @@ describe('api-router security and high-value integration routes', () => {
     expect(submitted.body.proposal).toMatchObject({ opportunityId: 'opp-1', briefId: 'brief-1', clientId: 'client-1', professionalId: 'architect-1', status: 'submitted', humanReviewRequired: true, advisoryOnly: true, autoAppointment: false, verificationId: 'architect-1_bep_SACAP_SACAP-123' });
     const proposal = mockAdminDb.listCollection('proposals')[0].data;
     expect(proposal).toMatchObject({ autoAppointment: false, humanReviewRequired: true });
+  });
+
+  it('reads marketplace opportunities and proposals with participant gates and no writes', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('marketplace_opportunities/opp-1', { briefId: 'brief-1', clientId: 'client-1', title: 'New house', description: 'Residential plans', status: 'published', advisoryMatchingOnly: true });
+    mockAdminDb.seed('proposals/proposal-1', { briefId: 'brief-1', opportunityId: 'opp-1', clientId: 'client-1', professionalId: 'architect-1', feeAmount: 125000, scopeSummary: 'Stages 1 to 4', status: 'submitted', humanReviewRequired: true });
+
+    const writesBefore = mockAdminDb.writes.length;
+    const clientOpportunity = await request(app)
+      .get('/api/marketplace/opportunities/opp-1')
+      .set(authHeader('client'));
+    expect(clientOpportunity.status).toBe(200);
+    expect(clientOpportunity.body).toMatchObject({ advisoryOnly: true, readOnly: true, opportunity: { id: 'opp-1', clientId: 'client-1', advisoryMatchingOnly: true } });
+
+    const blockedOpportunity = await request(app)
+      .get('/api/marketplace/opportunities/opp-1')
+      .set(authHeader('architect'));
+    expect(blockedOpportunity.status).toBe(403);
+
+    seedVerifiedBepVerification();
+    const verifiedOpportunity = await request(app)
+      .get('/api/marketplace/opportunities/opp-1')
+      .set(authHeader('architect'));
+    expect(verifiedOpportunity.status).toBe(200);
+    expect(verifiedOpportunity.body.verificationId).toBe('architect-1_bep_SACAP_SACAP-123');
+
+    const clientProposal = await request(app)
+      .get('/api/proposals/proposal-1')
+      .set(authHeader('client'));
+    expect(clientProposal.status).toBe(200);
+    expect(clientProposal.body).toMatchObject({ readOnly: true, proposal: { id: 'proposal-1', clientId: 'client-1', professionalId: 'architect-1', advisoryOnly: true, autoAppointment: false } });
+
+    const professionalProposal = await request(app)
+      .get('/api/proposals/proposal-1')
+      .set(authHeader('architect'));
+    expect(professionalProposal.status).toBe(200);
+    expect(professionalProposal.body.verificationId).toBe('architect-1_bep_SACAP_SACAP-123');
+
+    const blockedProposal = await request(app)
+      .get('/api/proposals/proposal-1')
+      .set(authHeader('intruder'));
+    expect(blockedProposal.status).toBe(403);
+    expect(mockAdminDb.writes).toHaveLength(writesBefore);
   });
 
   it('checks appointment readiness without creating contracts, signatures, payments, or audit writes', async () => {

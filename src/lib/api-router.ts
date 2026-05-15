@@ -1319,6 +1319,63 @@ router.post("/project-briefs", async (req, res) => {
   }
 });
 
+router.get("/project-briefs", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const mineOnly = String(req.query.mine || '') === 'true';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 50);
+
+    let snapshot;
+    if (authContext.isAdmin && !mineOnly) {
+      snapshot = await adminDb.collection('project_briefs').limit(limit).get();
+    } else if (authContext.normalizedRole === 'client') {
+      snapshot = await adminDb.collection('project_briefs').where('clientId', '==', authContext.uid).limit(limit).get();
+    } else if (authContext.normalizedRole === 'bep') {
+      const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+      assertVerifiedParticipantForOpportunity(verification);
+      snapshot = await adminDb.collection('project_briefs').limit(100).get();
+    } else {
+      return res.status(403).json({ error: 'Only clients, assigned verified BEPs, and admins can list project briefs' });
+    }
+
+    const briefs = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>))
+      .filter(brief => authContext.isAdmin || brief.clientId === authContext.uid || (Array.isArray(brief.assignedBepIds) && brief.assignedBepIds.includes(authContext.uid)))
+      .slice(0, 50);
+    res.json({ briefs, mine: mineOnly, readOnly: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.get("/project-briefs/:briefId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { briefId } = req.params;
+    const briefSnap = await adminDb.collection('project_briefs').doc(briefId).get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Project brief not found' });
+    const brief = { id: briefId, ...briefSnap.data() } as Record<string, any>;
+    const assignedBep = Array.isArray(brief.assignedBepIds) && brief.assignedBepIds.includes(authContext.uid);
+    if (assignedBep && !authContext.isAdmin && brief.clientId !== authContext.uid) {
+      const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+      assertVerifiedParticipantForOpportunity(verification);
+    }
+    if (!authContext.isAdmin && brief.clientId !== authContext.uid && !assignedBep) return res.status(403).json({ error: 'Only the brief owner, assigned verified BEP, or admin can read this project brief' });
+    const [attachmentsSnap, interpretationsSnap] = await Promise.all([
+      adminDb.collection('project_briefs').doc(briefId).collection('attachments').limit(50).get(),
+      adminDb.collection('project_briefs').doc(briefId).collection('interpretations').limit(50).get(),
+    ]);
+    res.json({
+      brief,
+      attachments: attachmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      interpretations: interpretationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      readOnly: true,
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
 router.post("/project-briefs/:briefId/attachments", async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
@@ -2860,6 +2917,26 @@ router.get("/marketplace/opportunities", async (req, res) => {
   }
 });
 
+router.get("/marketplace/opportunities/:id", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const opportunitySnap = await adminDb.collection('marketplace_opportunities').doc(req.params.id).get();
+    if (!opportunitySnap.exists) return res.status(404).json({ error: 'Marketplace opportunity not found' });
+    const opportunity = { id: opportunitySnap.id, ...opportunitySnap.data(), advisoryMatchingOnly: true } as Record<string, any>;
+    let verificationId: string | undefined;
+    if (authContext.isAdmin || opportunity.clientId === authContext.uid) {
+      return res.json({ opportunity, advisoryOnly: true, readOnly: true });
+    }
+    if (authContext.normalizedRole !== 'bep' || opportunity.status !== 'published') return res.status(403).json({ error: 'Only the owning client, admin, or verified BEPs can read this marketplace opportunity' });
+    const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+    assertVerifiedParticipantForOpportunity(verification);
+    verificationId = verification?.id;
+    res.json({ opportunity, verificationId, advisoryOnly: true, readOnly: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
 router.post("/proposals", async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
@@ -2893,6 +2970,25 @@ router.post("/proposals", async (req, res) => {
     res.status(201).json({ proposal: { id: proposalRef.id, ...proposal, verificationId: verification?.id, advisoryOnly: true, autoAppointment: false } });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/proposals/:proposalId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { proposalId } = req.params;
+    const proposalSnap = await adminDb.collection('proposals').doc(proposalId).get();
+    if (!proposalSnap.exists) return res.status(404).json({ error: 'Proposal not found' });
+    const proposal = { id: proposalId, ...proposalSnap.data(), advisoryOnly: true, autoAppointment: false } as Record<string, any>;
+    if (authContext.isAdmin || proposal.clientId === authContext.uid) return res.json({ proposal, readOnly: true });
+    if (proposal.professionalId === authContext.uid && authContext.normalizedRole === 'bep') {
+      const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+      assertVerifiedParticipantForOpportunity(verification);
+      return res.json({ proposal: { ...proposal, verificationId: proposal.verificationId || verification?.id }, verificationId: verification?.id, readOnly: true });
+    }
+    return res.status(403).json({ error: 'Only the client owner, submitting verified BEP, or admin can read this proposal' });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
   }
 });
 

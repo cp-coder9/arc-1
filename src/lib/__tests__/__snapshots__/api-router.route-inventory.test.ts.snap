@@ -34,6 +34,18 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
   },
   {
     "authExpectation": "authenticated",
+    "canonicalPath": "/project-briefs",
+    "domain": "briefs",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/project-briefs/:briefId",
+    "domain": "briefs",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
     "canonicalPath": "/project-briefs/:briefId/attachments",
     "domain": "briefs",
     "method": "post",
@@ -250,9 +262,21 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
   },
   {
     "authExpectation": "authenticated",
+    "canonicalPath": "/marketplace/opportunities/:id",
+    "domain": "marketplace",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
     "canonicalPath": "/proposals",
     "domain": "marketplace",
     "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/proposals/:proposalId",
+    "domain": "marketplace",
+    "method": "get",
   },
   {
     "authExpectation": "authenticated",
