@@ -196,6 +196,8 @@ const verifyIdToken = vi.fn(async (token: string) => {
     architect: { uid: 'architect-1', email: 'architect@example.com', displayName: 'Architect One' },
     intruder: { uid: 'intruder-1', email: 'intruder@example.com', displayName: 'Intruder' },
     admin: { uid: 'admin-1', email: 'gm.tarb@gmail.com', displayName: 'Admin' },
+    contractor: { uid: 'contractor-1', email: 'contractor@example.com', displayName: 'Contractor One' },
+    newbep: { uid: 'new-bep-1', email: 'newbep@example.com', displayName: 'New BEP' },
   };
   if (!users[token]) throw new Error('bad token');
   return users[token];
@@ -266,6 +268,24 @@ function seedVerifiedBepVerification(userId = 'architect-1', overrides: StoredDo
   });
 }
 
+function seedVerifiedDirectoryVerification(userId: string, subjectType: string, statutoryBody: string, registrationNumber: string, overrides: StoredDoc = {}) {
+  mockAdminDb.seed(`user_verifications/${userId}_${subjectType}_${statutoryBody}_${registrationNumber}`, {
+    userId,
+    subjectType,
+    statutoryBody,
+    registrationNumber,
+    status: 'verified',
+    source: 'automated_browser_agent',
+    submittedAt: '2026-01-01T00:00:00.000Z',
+    submittedBy: userId,
+    lastVerifiedAt: '2026-01-01T00:00:00.000Z',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    metadata: {},
+    ...overrides,
+  });
+}
+
 describe('api-router security and high-value integration routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -276,6 +296,7 @@ describe('api-router security and high-value integration routes', () => {
     mockAdminDb.seed('users/architect-1', { role: 'architect', displayName: 'Architect One', sacapNumber: 'SACAP-123', mainSpecialization: 'residential' });
     mockAdminDb.seed('users/admin-1', { role: 'admin', displayName: 'Admin', email: 'gm.tarb@gmail.com' });
     mockAdminDb.seed('users/intruder-1', { role: 'architect', displayName: 'Intruder' });
+    mockAdminDb.seed('users/contractor-1', { role: 'contractor', displayName: 'Contractor One', companyName: 'BuildCo', region: 'Cape Town', contractorCategory: 'general contractor', averageRating: 4.5, totalReviews: 7 });
     mockAdminDb.seed('system_settings/llm_config', { provider: 'openai', apiKey: 'test-llm-key', model: 'gpt-test', baseUrl: 'https://llm.test/v1' });
   });
 
@@ -705,6 +726,119 @@ describe('api-router security and high-value integration routes', () => {
     expect(queued.body).toMatchObject({ status: 'pending', metadata: { existing: true, verificationAgentStatus: 'queued', recheckRequestedBy: 'admin-1', previousStatus: 'verified' } });
     expect(mockAdminDb.getDoc('architect_verifications/architect-1')).toMatchObject({ userVerificationId: 'ver-recheck' });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.recheck_queued')).toBe(true);
+  });
+
+  it('returns profile-backed manual directory results without exposing private or unverified-only filtered records', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('users/architect-2', { role: 'architect', displayName: 'Verified Architect', companyName: 'Studio A', region: 'Cape Town', professionalDiscipline: 'architecture', averageRating: 4.8, totalReviews: 12 });
+    mockAdminDb.seed('users/architect-private', { role: 'architect', displayName: 'Private Architect', region: 'Cape Town', directoryVisibility: 'private' });
+    mockAdminDb.seed('users/contractor-2', { role: 'contractor', displayName: 'Verified Contractor', companyName: 'BuildRight', region: 'Cape Town', contractorCategory: 'general contractor' });
+    seedVerifiedBepVerification('architect-2', { registrationNumber: 'SACAP-999' });
+    seedVerifiedDirectoryVerification('contractor-2', 'contractor', 'CIDB', 'CIDB-7GB');
+
+    const response = await request(app)
+      .get('/api/directory/search')
+      .query({ role: 'bep,contractor', region: 'cape' })
+      .set(authHeader('client'));
+    const verifiedOnly = await request(app)
+      .get('/api/directory/search')
+      .query({ role: 'bep,contractor', region: 'cape', verificationStatus: 'verified' })
+      .set(authHeader('client'));
+
+    expect(response.status).toBe(200);
+    expect(response.body.results.map((result: any) => result.userId)).toEqual(expect.arrayContaining(['architect-2', 'contractor-1', 'contractor-2']));
+    expect(response.body.results.map((result: any) => result.userId)).not.toContain('architect-private');
+    const unverified = response.body.results.find((result: any) => result.userId === 'contractor-1');
+    expect(unverified).toMatchObject({ verificationStatus: 'unverified', verificationLabel: 'unverified', canInvite: false });
+    expect(verifiedOnly.body.results.map((result: any) => result.userId)).toEqual(expect.arrayContaining(['architect-2', 'contractor-2']));
+    expect(verifiedOnly.body.results.every((result: any) => result.verificationStatus === 'verified' && result.canInvite === true)).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.search')).toBe(true);
+  });
+
+  it('enforces Full_scope role eligibility for manual directory search', async () => {
+    const app = await buildApp();
+
+    const supplierSearch = await request(app)
+      .get('/api/directory/search')
+      .query({ role: 'supplier' })
+      .set(authHeader('client'));
+
+    expect(supplierSearch.status).toBe(403);
+    expect(supplierSearch.body.error).toContain('Requested directory role');
+  });
+
+  it('creates verified directory invitations and blocks unverified invitees', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('users/architect-2', { role: 'architect', displayName: 'Verified Architect', region: 'Cape Town' });
+    mockAdminDb.seed('users/contractor-unverified', { role: 'contractor', displayName: 'No Verification Construction', region: 'Cape Town' });
+    seedVerifiedBepVerification('architect-2', { registrationNumber: 'SACAP-999' });
+
+    const blocked = await request(app)
+      .post('/api/directory/invitations')
+      .set(authHeader('client'))
+      .send({ targetUserId: 'contractor-unverified', action: 'quote', context: { jobId: 'job-1', unsafe: 'ignored' } });
+    const created = await request(app)
+      .post('/api/directory/invitations')
+      .set(authHeader('client'))
+      .send({ targetUserId: 'architect-2', action: 'project', context: { jobId: 'job-1', projectId: 'project-1', unsafe: 'ignored' } });
+
+    expect(blocked.status).toBe(403);
+    expect(blocked.body).toMatchObject({ verificationRequired: { role: 'contractor' } });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ status: 'pending_acceptance', verificationId: 'architect-2_bep_SACAP_SACAP-123', requiresAcceptance: true });
+    const invite = mockAdminDb.listCollection('directory_invitations')[0].data;
+    expect(invite).toMatchObject({ inviterId: 'client-1', targetUserId: 'architect-2', targetRole: 'bep', action: 'project', status: 'pending_acceptance', context: { jobId: 'job-1', projectId: 'project-1' } });
+    expect(invite.context).not.toHaveProperty('unsafe');
+    expect(mockAdminDb.listCollection('notifications')[0].data).toMatchObject({ userId: 'architect-2', type: 'directory_invitation' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.invitation_blocked_unverified')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.invitation_created')).toBe(true);
+  });
+
+  it('creates registration invitations for unregistered recipients and requires verification before acceptance', async () => {
+    const app = await buildApp();
+
+    const created = await request(app)
+      .post('/api/directory/invitations')
+      .set(authHeader('client'))
+      .send({ targetEmail: 'newbep@example.com', targetRole: 'bep', action: 'quote', context: { jobId: 'job-1' } });
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ status: 'pending_registration', targetEmail: 'newbep@example.com', targetRole: 'bep', onboardingRequired: true, requiresAcceptance: true });
+    const invitationId = created.body.id;
+    const blockedAcceptance = await request(app)
+      .post(`/api/directory/invitations/${invitationId}/respond`)
+      .set(authHeader('newbep'))
+      .send({ decision: 'accepted' });
+
+    expect(blockedAcceptance.status).toBe(403);
+    expect(blockedAcceptance.body).toMatchObject({ verificationRequired: { role: 'bep' } });
+
+    mockAdminDb.seed('users/new-bep-1', { role: 'bep', displayName: 'New BEP', email: 'newbep@example.com' });
+    seedVerifiedBepVerification('new-bep-1', { registrationNumber: 'SACAP-NEW' });
+    const accepted = await request(app)
+      .post(`/api/directory/invitations/${invitationId}/respond`)
+      .set(authHeader('newbep'))
+      .send({ decision: 'accepted' });
+
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toMatchObject({ status: 'accepted', verificationId: 'new-bep-1_bep_SACAP_SACAP-123' });
+    expect(mockAdminDb.getDoc(`directory_invitations/${invitationId}`)).toMatchObject({ targetUserId: 'new-bep-1', status: 'accepted' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.registration_invitation_created')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.invitation_accepted')).toBe(true);
+  });
+
+  it('enforces the directory role-action invitation matrix', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('users/freelancer-1', { role: 'freelancer', displayName: 'Freelancer One', email: 'freelancer@example.com' });
+    seedVerifiedDirectoryVerification('freelancer-1', 'freelancer', 'freelancer', 'manual');
+
+    const blocked = await request(app)
+      .post('/api/directory/invitations')
+      .set(authHeader('client'))
+      .send({ targetUserId: 'freelancer-1', action: 'task', context: { taskId: 'task-1' } });
+
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.error).toContain('not eligible');
   });
 
   it('delegates municipal automation, OCR, heatmap, and shadow-tracker routes after auth', async () => {

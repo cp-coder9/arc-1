@@ -420,6 +420,352 @@ async function getActiveUserVerification(userId: string, subjectType: Verificati
   return null;
 }
 
+type DirectoryTargetRole = 'bep' | 'contractor' | 'freelancer' | 'subcontractor' | 'supplier';
+type DirectoryInviteAction = 'quote' | 'tender' | 'project' | 'package' | 'task';
+
+const DIRECTORY_TARGET_ROLES: DirectoryTargetRole[] = ['bep', 'contractor', 'freelancer', 'subcontractor', 'supplier'];
+const DIRECTORY_INVITE_ACTIONS: DirectoryInviteAction[] = ['quote', 'tender', 'project', 'package', 'task'];
+
+const DIRECTORY_ROLE_ACCESS: Record<string, DirectoryTargetRole[]> = {
+  client: ['bep', 'contractor'],
+  bep: ['bep', 'contractor', 'freelancer'],
+  contractor: ['subcontractor', 'supplier', 'bep'],
+  admin: DIRECTORY_TARGET_ROLES,
+};
+
+const DIRECTORY_INVITE_MATRIX: Record<string, Partial<Record<DirectoryTargetRole, DirectoryInviteAction[]>>> = {
+  client: {
+    bep: ['quote', 'project'],
+    contractor: ['quote', 'tender', 'project'],
+  },
+  bep: {
+    bep: ['project'],
+    contractor: ['quote', 'tender', 'project'],
+    freelancer: ['task'],
+  },
+  contractor: {
+    subcontractor: ['quote', 'tender', 'package'],
+    supplier: ['quote', 'package'],
+    bep: ['quote', 'project'],
+  },
+  admin: DIRECTORY_TARGET_ROLES.reduce((matrix, role) => {
+    matrix[role] = DIRECTORY_INVITE_ACTIONS;
+    return matrix;
+  }, {} as Partial<Record<DirectoryTargetRole, DirectoryInviteAction[]>>),
+};
+
+function parseDirectoryRoles(value: unknown): DirectoryTargetRole[] {
+  if (!value) return [];
+  const values = Array.isArray(value) ? value : String(value).split(',');
+  return values
+    .map(role => normalizeUserRole(String(role).trim()))
+    .filter((role): role is DirectoryTargetRole => Boolean(role && DIRECTORY_TARGET_ROLES.includes(role as DirectoryTargetRole)));
+}
+
+function getAllowedDirectoryTargetRoles(actorRole?: UserRole | string | null): DirectoryTargetRole[] {
+  const normalized = normalizeUserRole(actorRole || undefined);
+  return normalized ? DIRECTORY_ROLE_ACCESS[normalized] || [] : [];
+}
+
+function getDirectoryInviteAccess(actorRole?: UserRole | string | null): DirectoryTargetRole[] {
+  return getAllowedDirectoryTargetRoles(actorRole);
+}
+
+function canCreateDirectoryInvite(actorRole: UserRole | string | null | undefined, targetRole: DirectoryTargetRole, action: DirectoryInviteAction): boolean {
+  const normalized = normalizeUserRole(actorRole || undefined);
+  if (!normalized) return false;
+  return Boolean(DIRECTORY_INVITE_MATRIX[normalized]?.[targetRole]?.includes(action));
+}
+
+function normalizeEmail(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const email = value.trim().toLowerCase();
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : undefined;
+}
+
+function profileString(value: unknown): string {
+  if (Array.isArray(value)) return value.filter(item => typeof item === 'string').join(' ');
+  return typeof value === 'string' ? value : '';
+}
+
+function pickDirectoryDiscipline(profile: Record<string, any>): string {
+  return profileString(profile.professionalDiscipline || profile.discipline || profile.mainSpecialization || profile.specialization || profile.contractorCategory || profile.trade || profile.tradeCategory || profile.packageType || profile.skills?.[0]);
+}
+
+function pickDirectoryRegion(profile: Record<string, any>): string {
+  return profileString(profile.region || profile.projectRegion || profile.serviceRegion || profile.regionsServed?.[0] || profile.location);
+}
+
+function pickDirectoryCompany(profile: Record<string, any>): string {
+  return profileString(profile.companyName || profile.businessName || profile.practiceName || profile.professionalName || profile.firmName);
+}
+
+function directorySearchText(profile: Record<string, any>): string {
+  return [
+    profile.displayName,
+    profile.email,
+    pickDirectoryCompany(profile),
+    profile.sacapNumber,
+    profile.registrationNumber,
+    profile.companyRegistration,
+    profile.cidbNumber,
+    profile.nhbrcNumber,
+    profile.cipcNumber,
+    pickDirectoryDiscipline(profile),
+    pickDirectoryRegion(profile),
+    profileString(profile.trades),
+    profileString(profile.specializations),
+    profileString(profile.servicesOffered),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+async function getDirectoryVerification(userId: string, targetRole: DirectoryTargetRole): Promise<UserVerification | null> {
+  if (targetRole === 'bep') return getActiveUserVerification(userId, 'bep', 'SACAP');
+  if (targetRole === 'contractor') {
+    return (await getActiveUserVerification(userId, 'contractor', 'CIDB')) || (await getActiveUserVerification(userId, 'contractor', 'NHBRC'));
+  }
+  if (targetRole === 'subcontractor') {
+    return (await getActiveUserVerification(userId, 'subcontractor', 'CIDB')) || (await getActiveUserVerification(userId, 'subcontractor', 'NHBRC'));
+  }
+  if (targetRole === 'supplier') return getActiveUserVerification(userId, 'supplier', 'CIPC');
+  return getActiveUserVerification(userId, 'freelancer');
+}
+
+function sanitizeDirectoryInviteContext(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const allowed = ['jobId', 'projectId', 'packageId', 'taskId', 'tenderId', 'quoteRequestId', 'message'];
+  return allowed.reduce<Record<string, unknown>>((context, key) => {
+    const raw = (value as Record<string, unknown>)[key];
+    if (typeof raw === 'string' && raw.trim().length > 0 && raw.length <= 500) context[key] = raw.trim();
+    return context;
+  }, {});
+}
+
+router.get("/directory/search", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const allowedRoles = getAllowedDirectoryTargetRoles(authContext.role);
+    if (allowedRoles.length === 0) return res.status(403).json({ error: 'Directory search is not available for this role' });
+
+    const requestedRoles = parseDirectoryRoles(req.query.role);
+    const targetRoles = requestedRoles.length > 0 ? requestedRoles.filter(role => allowedRoles.includes(role)) : allowedRoles;
+    if (targetRoles.length === 0) return res.status(403).json({ error: 'Requested directory role is not available to this user' });
+
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const region = String(req.query.region || '').trim().toLowerCase();
+    const discipline = String(req.query.discipline || '').trim().toLowerCase();
+    const trade = String(req.query.trade || '').trim().toLowerCase();
+    const verificationStatus = String(req.query.verificationStatus || '').trim().toLowerCase();
+    const maxResults = Math.max(1, Math.min(50, Number.parseInt(String(req.query.limit || '25'), 10) || 25));
+
+    const snapshot = await adminDb.collection('users').limit(500).get();
+    const results = [];
+
+    for (const doc of snapshot.docs) {
+      if (doc.id === authContext.uid) continue;
+      const profile = doc.data() as Record<string, any>;
+      const targetRole = normalizeUserRole(profile.role) as DirectoryTargetRole | null;
+      if (!targetRole || !targetRoles.includes(targetRole)) continue;
+      if (profile.directoryVisibility === false || profile.directoryVisibility === 'private') continue;
+
+      const searchText = directorySearchText(profile);
+      const profileRegion = pickDirectoryRegion(profile).toLowerCase();
+      const profileDiscipline = pickDirectoryDiscipline(profile).toLowerCase();
+      const profileTrade = profileString(profile.trade || profile.tradeCategory || profile.trades).toLowerCase();
+      if (q && !searchText.includes(q)) continue;
+      if (region && !profileRegion.includes(region)) continue;
+      if (discipline && !profileDiscipline.includes(discipline)) continue;
+      if (trade && !profileTrade.includes(trade)) continue;
+
+      const verification = await getDirectoryVerification(doc.id, targetRole);
+      const isVerified = Boolean(verification);
+      if (verificationStatus === 'verified' && !isVerified) continue;
+      if (verificationStatus === 'unverified' && isVerified) continue;
+
+      results.push({
+        userId: doc.id,
+        name: profile.displayName || profile.name || pickDirectoryCompany(profile) || 'Directory profile',
+        company: pickDirectoryCompany(profile) || null,
+        role: profile.role,
+        normalizedRole: targetRole,
+        discipline: pickDirectoryDiscipline(profile) || null,
+        trade: profileString(profile.trade || profile.tradeCategory || profile.trades) || null,
+        region: pickDirectoryRegion(profile) || null,
+        verificationStatus: isVerified ? 'verified' : 'unverified',
+        verificationLabel: isVerified ? 'verified' : 'unverified',
+        verificationId: verification?.id || null,
+        registrationNumber: verification?.registrationNumber || profile.registrationNumber || profile.sacapNumber || profile.cidbNumber || profile.nhbrcNumber || profile.cipcNumber || null,
+        ratings: { average: profile.averageRating ?? 0, count: profile.totalReviews ?? 0 },
+        availability: profile.availability || null,
+        canInvite: isVerified,
+      });
+
+      if (results.length >= maxResults) break;
+    }
+
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: 'directory.search',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      metadata: { requestedRoles, targetRoles, resultCount: results.length, verificationStatus: verificationStatus || null },
+    });
+
+    res.json({ results, count: results.length, allowedRoles: targetRoles });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/directory/invitations", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const allowedRoles = getDirectoryInviteAccess(authContext.role);
+    if (allowedRoles.length === 0) return res.status(403).json({ error: 'Directory invitations are not available for this role' });
+
+    const targetUserId = String(req.body.targetUserId || '').trim();
+    const targetEmail = normalizeEmail(req.body.targetEmail);
+    const requestedTargetRole = parseDirectoryRoles(req.body.targetRole)[0];
+    const action = String(req.body.action || '').trim() as DirectoryInviteAction;
+    if (!targetUserId && !targetEmail) return res.status(400).json({ error: 'targetUserId or targetEmail is required' });
+    if (!DIRECTORY_INVITE_ACTIONS.includes(action)) return res.status(400).json({ error: 'Unsupported directory invitation action' });
+    if (targetUserId === authContext.uid || (targetEmail && targetEmail === authContext.decoded.email?.toLowerCase())) return res.status(400).json({ error: 'You cannot invite yourself' });
+
+    let targetProfile: Record<string, any> | null = null;
+    let targetRole = requestedTargetRole || null;
+    if (targetUserId) {
+      const targetDoc = await adminDb.collection('users').doc(targetUserId).get();
+      if (!targetDoc.exists) return res.status(404).json({ error: 'Directory target profile not found' });
+      targetProfile = targetDoc.data() as Record<string, any>;
+      targetRole = normalizeUserRole(targetProfile.role) as DirectoryTargetRole | null;
+    } else if (targetEmail) {
+      const existingUser = await adminDb.collection('users').where('email', '==', targetEmail).limit(1).get();
+      if (!existingUser.empty) {
+        const doc = existingUser.docs[0];
+        targetProfile = doc.data() as Record<string, any>;
+        targetRole = normalizeUserRole(targetProfile.role) as DirectoryTargetRole | null;
+      }
+    }
+
+    if (!targetRole || !allowedRoles.includes(targetRole)) return res.status(403).json({ error: 'This user role is not eligible for this invitation' });
+    if (!canCreateDirectoryInvite(authContext.role, targetRole, action)) return res.status(403).json({ error: 'This invitation action is not allowed for the inviter and target roles' });
+
+    const now = new Date().toISOString();
+    const context = sanitizeDirectoryInviteContext(req.body.context);
+    const existingTargetUserId = targetProfile ? (targetUserId || (await adminDb.collection('users').where('email', '==', targetEmail || '').limit(1).get()).docs[0]?.id) : undefined;
+    const verification = existingTargetUserId ? await getDirectoryVerification(existingTargetUserId, targetRole) : null;
+    const isOnboardingInvite = !existingTargetUserId;
+
+    if (!verification && !isOnboardingInvite) {
+      await recordAuditEvent(req, {
+        category: 'access',
+        action: 'directory.invitation_blocked_unverified',
+        actor: decodedAuditActor(authContext.decoded, authContext.role),
+        target: { type: 'user', id: existingTargetUserId },
+        metadata: { targetRole, action, requiredVerification: true },
+      });
+      return res.status(403).json({ error: 'Verified profile is required before this user can be invited', verificationRequired: { role: targetRole } });
+    }
+
+    const inviteRef = await adminDb.collection('directory_invitations').add({
+      inviterId: authContext.uid,
+      inviterRole: authContext.role || null,
+      targetUserId: existingTargetUserId || null,
+      targetEmail: targetEmail || targetProfile?.email || null,
+      targetRole,
+      action,
+      context,
+      status: isOnboardingInvite ? 'pending_registration' : 'pending_acceptance',
+      requiresRegistration: isOnboardingInvite,
+      requiresAcceptance: true,
+      verificationRequiredOnAcceptance: true,
+      verificationId: verification?.id || null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (existingTargetUserId) {
+      await adminDb.collection('notifications').add({
+        userId: existingTargetUserId,
+        type: 'directory_invitation',
+        title: 'New directory invitation',
+        body: `${authContext.userData?.displayName || authContext.decoded.displayName || 'An Architex user'} invited you to ${action}.`,
+        data: { invitationId: inviteRef.id, senderId: authContext.uid, action, ...context },
+        isRead: false,
+        channels: ['in_app', 'email'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    }
+
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: isOnboardingInvite ? 'directory.registration_invitation_created' : 'directory.invitation_created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'directory_invitation', id: inviteRef.id, projectId: typeof context.projectId === 'string' ? context.projectId : undefined },
+      metadata: { targetUserId: existingTargetUserId || null, targetEmail: targetEmail || null, targetRole, action, verificationId: verification?.id || null, context },
+    });
+
+    res.status(201).json({
+      id: inviteRef.id,
+      status: isOnboardingInvite ? 'pending_registration' : 'pending_acceptance',
+      targetUserId: existingTargetUserId || null,
+      targetEmail: targetEmail || null,
+      targetRole,
+      verificationId: verification?.id || null,
+      onboardingRequired: isOnboardingInvite,
+      requiresAcceptance: true,
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/directory/invitations/:invitationId/respond", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { invitationId } = req.params;
+    const decision = String(req.body.decision || '').trim();
+    if (!['accepted', 'rejected'].includes(decision)) return res.status(400).json({ error: 'decision must be accepted or rejected' });
+
+    const inviteRef = adminDb.collection('directory_invitations').doc(invitationId);
+    const inviteSnap = await inviteRef.get();
+    if (!inviteSnap.exists) return res.status(404).json({ error: 'Directory invitation not found' });
+    const invitation = inviteSnap.data() as Record<string, any>;
+    const targetEmail = typeof invitation.targetEmail === 'string' ? invitation.targetEmail.toLowerCase() : undefined;
+    const actorEmail = typeof authContext.decoded.email === 'string' ? authContext.decoded.email.toLowerCase() : undefined;
+    const canRespond = invitation.targetUserId === authContext.uid || (!invitation.targetUserId && targetEmail && actorEmail === targetEmail);
+    if (!canRespond) return res.status(403).json({ error: 'Only the invited user can respond to this invitation' });
+    if (!['pending_acceptance', 'pending_registration'].includes(invitation.status)) return res.status(400).json({ error: 'Invitation is not awaiting a response' });
+
+    const targetRole = invitation.targetRole as DirectoryTargetRole;
+    const verification = await getDirectoryVerification(authContext.uid, targetRole);
+    if (decision === 'accepted' && !verification) {
+      return res.status(403).json({ error: 'Verification is required before accepting this invitation', verificationRequired: { role: targetRole } });
+    }
+
+    const now = new Date().toISOString();
+    await inviteRef.set({
+      targetUserId: authContext.uid,
+      status: decision,
+      respondedAt: now,
+      verificationId: decision === 'accepted' ? verification?.id : invitation.verificationId || null,
+      updatedAt: now,
+    }, { merge: true });
+
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: `directory.invitation_${decision}`,
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'directory_invitation', id: invitationId, projectId: invitation.context?.projectId },
+      metadata: { inviterId: invitation.inviterId, targetRole, verificationId: verification?.id || null },
+    });
+
+    res.json({ id: invitationId, status: decision, verificationId: decision === 'accepted' ? verification?.id : invitation.verificationId || null });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ── Multer (memory storage, max 20 MB) ───────────────────────────────────────
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
