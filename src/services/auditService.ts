@@ -3,6 +3,7 @@ import type { UserRole } from '@/types';
 export type AuditEventCategory =
   | 'auth'
   | 'access'
+  | 'profile'
   | 'role'
   | 'verification'
   | 'project'

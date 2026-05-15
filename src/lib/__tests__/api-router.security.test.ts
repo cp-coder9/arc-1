@@ -286,6 +286,28 @@ function seedVerifiedDirectoryVerification(userId: string, subjectType: string, 
   });
 }
 
+function seedDirectoryProfile(userId: string, data: StoredDoc) {
+  mockAdminDb.seed(`directory_profiles/${userId}`, {
+    userId,
+    name: data.displayName || data.name || data.company || data.companyName || data.businessName || 'Directory profile',
+    role: data.role,
+    normalizedRole: data.normalizedRole,
+    company: data.company || data.companyName || data.businessName || null,
+    professionalDiscipline: data.professionalDiscipline || data.discipline || data.contractorCategory || null,
+    trade: data.trade || data.tradeCategory || null,
+    region: data.region || null,
+    directoryVisibility: data.directoryVisibility ?? true,
+    averageRating: data.averageRating ?? 0,
+    totalReviews: data.totalReviews ?? 0,
+    verificationStatus: data.verificationStatus || 'unverified',
+    verificationLabel: data.verificationLabel || data.verificationStatus || 'unverified',
+    verificationId: data.verificationId || null,
+    registrationNumber: data.registrationNumber || null,
+    canInvite: data.verificationStatus === 'verified',
+    ...data,
+  });
+}
+
 describe('api-router security and high-value integration routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -346,7 +368,6 @@ describe('api-router security and high-value integration routes', () => {
           role: 'admin',
           isAdmin: true,
           email: 'attacker@example.com',
-          sacapNumber: 'SACAP-999',
         },
       });
 
@@ -356,9 +377,9 @@ describe('api-router security and high-value integration routes', () => {
       role: 'client',
       email: 'client@example.com',
       bio: 'Safe biography',
-      sacapNumber: 'SACAP-999',
     });
     expect(mockAdminDb.getDoc('users/client-1')).not.toHaveProperty('isAdmin');
+    expect(mockAdminDb.getDoc('users/client-1')).not.toHaveProperty('sacapNumber');
     expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
       category: 'auth',
       action: 'auth.user_bootstrapped',
@@ -728,6 +749,52 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.recheck_queued')).toBe(true);
   });
 
+  it('lets users update role-specific profile fields and projects directory-safe data', async () => {
+    const app = await buildApp();
+    seedVerifiedBepVerification('architect-1');
+
+    const response = await request(app)
+      .put('/api/profile/me')
+      .set(authHeader('architect'))
+      .send({
+        profileData: {
+          displayName: 'Architect Updated',
+          practiceName: 'Studio Profile',
+          professionalDiscipline: 'architecture',
+          region: 'Cape Town',
+          availability: 'available',
+          billingDetails: { vat: 'VAT-123' },
+          bankingPayoutDetails: { account: 'should-not-save-for-bep' },
+          role: 'admin',
+          isAdmin: true,
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(mockAdminDb.getDoc('users/architect-1')).toMatchObject({ displayName: 'Architect Updated', practiceName: 'Studio Profile', professionalDiscipline: 'architecture', billingDetails: { vat: 'VAT-123' } });
+    expect(mockAdminDb.getDoc('users/architect-1')).not.toHaveProperty('bankingPayoutDetails');
+    expect(mockAdminDb.getDoc('users/architect-1')).not.toHaveProperty('isAdmin');
+    expect(mockAdminDb.getDoc('directory_profiles/architect-1')).toMatchObject({ userId: 'architect-1', name: 'Architect Updated', company: 'Studio Profile', normalizedRole: 'bep', professionalDiscipline: 'architecture', region: 'Cape Town', verificationStatus: 'verified', verificationId: 'architect-1_bep_SACAP_SACAP-123' });
+    expect(mockAdminDb.getDoc('directory_profiles/architect-1')).not.toHaveProperty('billingDetails');
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'profile.updated')).toBe(true);
+  });
+
+  it('allows admins to update role profiles with scoped fields and audit trail', async () => {
+    const app = await buildApp();
+    seedVerifiedDirectoryVerification('contractor-1', 'contractor', 'CIDB', 'CIDB-1');
+
+    const response = await request(app)
+      .put('/api/admin/users/contractor-1/profile')
+      .set(authHeader('admin'))
+      .send({ profileData: { companyName: 'BuildCo Updated', trades: ['general building'], regionsServed: ['Gauteng'], cpdRecords: ['not-contractor-field'] }, reason: 'Correct contractor profile' });
+
+    expect(response.status).toBe(200);
+    expect(mockAdminDb.getDoc('users/contractor-1')).toMatchObject({ companyName: 'BuildCo Updated', trades: ['general building'], regionsServed: ['Gauteng'] });
+    expect(mockAdminDb.getDoc('users/contractor-1')).not.toHaveProperty('cpdRecords');
+    expect(mockAdminDb.getDoc('directory_profiles/contractor-1')).toMatchObject({ company: 'BuildCo Updated', normalizedRole: 'contractor', trade: 'general building', region: 'Gauteng', verificationStatus: 'verified' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'profile.admin_updated')).toBe(true);
+  });
+
   it('returns profile-backed manual directory results without exposing private or unverified-only filtered records', async () => {
     const app = await buildApp();
     mockAdminDb.seed('users/architect-2', { role: 'architect', displayName: 'Verified Architect', companyName: 'Studio A', region: 'Cape Town', professionalDiscipline: 'architecture', averageRating: 4.8, totalReviews: 12 });
@@ -735,6 +802,10 @@ describe('api-router security and high-value integration routes', () => {
     mockAdminDb.seed('users/contractor-2', { role: 'contractor', displayName: 'Verified Contractor', companyName: 'BuildRight', region: 'Cape Town', contractorCategory: 'general contractor' });
     seedVerifiedBepVerification('architect-2', { registrationNumber: 'SACAP-999' });
     seedVerifiedDirectoryVerification('contractor-2', 'contractor', 'CIDB', 'CIDB-7GB');
+    seedDirectoryProfile('architect-2', { role: 'architect', normalizedRole: 'bep', name: 'Verified Architect', company: 'Studio A', region: 'Cape Town', professionalDiscipline: 'architecture', averageRating: 4.8, totalReviews: 12, verificationStatus: 'verified', verificationLabel: 'verified', verificationId: 'architect-2_bep_SACAP_SACAP-123', registrationNumber: 'SACAP-999' });
+    seedDirectoryProfile('architect-private', { role: 'architect', normalizedRole: 'bep', name: 'Private Architect', region: 'Cape Town', directoryVisibility: 'private', verificationStatus: 'unverified' });
+    seedDirectoryProfile('contractor-1', { role: 'contractor', normalizedRole: 'contractor', name: 'Contractor One', company: 'BuildCo', region: 'Cape Town', professionalDiscipline: 'general contractor', averageRating: 4.5, totalReviews: 7, verificationStatus: 'unverified', verificationLabel: 'unverified' });
+    seedDirectoryProfile('contractor-2', { role: 'contractor', normalizedRole: 'contractor', name: 'Verified Contractor', company: 'BuildRight', region: 'Cape Town', professionalDiscipline: 'general contractor', verificationStatus: 'verified', verificationLabel: 'verified', verificationId: 'contractor-2_contractor_CIDB_CIDB-7GB', registrationNumber: 'CIDB-7GB' });
 
     const response = await request(app)
       .get('/api/directory/search')

@@ -493,17 +493,26 @@ function pickDirectoryDiscipline(profile: Record<string, any>): string {
 }
 
 function pickDirectoryRegion(profile: Record<string, any>): string {
+  const role = normalizeUserRole(profile.role);
+  if (role === 'contractor') {
+    return profileString(profile.regionsServed?.[0] || profile.region || profile.projectRegion || profile.serviceRegion || profile.location);
+  }
+  if (role === 'subcontractor' || role === 'supplier') {
+    return profileString(profile.serviceRegion || profile.region || profile.projectRegion || profile.regionsServed?.[0] || profile.location);
+  }
   return profileString(profile.region || profile.projectRegion || profile.serviceRegion || profile.regionsServed?.[0] || profile.location);
 }
 
 function pickDirectoryCompany(profile: Record<string, any>): string {
-  return profileString(profile.companyName || profile.businessName || profile.practiceName || profile.professionalName || profile.firmName);
+  return profileString(profile.company || profile.companyName || profile.businessName || profile.practiceName || profile.professionalName || profile.firmName);
 }
 
 function directorySearchText(profile: Record<string, any>): string {
   return [
     profile.displayName,
+    profile.name,
     profile.email,
+    profile.normalizedRole,
     pickDirectoryCompany(profile),
     profile.sacapNumber,
     profile.registrationNumber,
@@ -558,7 +567,7 @@ router.get("/directory/search", async (req, res) => {
     const verificationStatus = String(req.query.verificationStatus || '').trim().toLowerCase();
     const maxResults = Math.max(1, Math.min(50, Number.parseInt(String(req.query.limit || '25'), 10) || 25));
 
-    const snapshot = await adminDb.collection('users').limit(500).get();
+    const snapshot = await adminDb.collection('directory_profiles').limit(500).get();
     const results = [];
 
     for (const doc of snapshot.docs) {
@@ -802,31 +811,103 @@ router.get("/health", (_req, res) => {
 // Server-side admin role assignment
 // Replaces client-side admin assignment in App.tsx for security
 const ADMIN_EMAILS = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
-const USER_PROFILE_FIELDS = [
+const COMMON_PROFILE_FIELDS = [
+  'displayName',
   'bio',
-  'budgetRange',
-  'cidbGrading',
-  'experienceYears',
-  'hasPIInsurance',
-  'mainSpecialization',
-  'nhbrcNumber',
-  'professionalLabel',
-  'projectType',
-  'region',
-  'sacapNumber',
-  'specializations',
-  'tradeLicense',
-];
+  'mobileNumber',
+  'address',
+  'billingDetails',
+  'vatTaxDetails',
+  'digitalSignatureUrl',
+  'preferredNotificationMethod',
+  'projectRegion',
+  'directoryVisibility',
+  'directoryPrivacySettings',
+] as const;
 
-function sanitizeUserProfileData(profileData: unknown) {
+const ROLE_PROFILE_FIELDS: Record<string, readonly string[]> = {
+  client: [...COMMON_PROFILE_FIELDS, 'companyRegistration', 'residentialAddress', 'businessAddress'],
+  bep: [...COMMON_PROFILE_FIELDS, 'practiceName', 'professionalName', 'professionalDiscipline', 'statutoryBody', 'registrationNumber', 'practiceAddress', 'professionalIndemnityDetails', 'servicesOffered', 'region', 'availability', 'portfolio', 'cpdRecords', 'resourceOwnerSettings', 'sacapNumber', 'mainSpecialization', 'specializations'],
+  architect: [...COMMON_PROFILE_FIELDS, 'practiceName', 'professionalName', 'professionalDiscipline', 'statutoryBody', 'registrationNumber', 'practiceAddress', 'professionalIndemnityDetails', 'servicesOffered', 'region', 'availability', 'portfolio', 'cpdRecords', 'resourceOwnerSettings', 'sacapNumber', 'mainSpecialization', 'specializations'],
+  contractor: [...COMMON_PROFILE_FIELDS, 'companyName', 'contractorCategory', 'regionsServed', 'projectValueRange', 'companyRegistration', 'bankingPayoutDetails', 'insuranceDetails', 'healthSafetyDocuments', 'staffCapacity', 'trades', 'plantEquipmentCapability', 'portfolio', 'cidbGrading', 'nhbrcNumber'],
+  subcontractor: [...COMMON_PROFILE_FIELDS, 'businessName', 'tradeCategory', 'serviceRegion', 'packageType', 'bankingPayoutDetails', 'warrantySupportDetails', 'productCategories', 'deliveryCapacity', 'complianceDocuments', 'closeOutDocumentationRequirements'],
+  supplier: [...COMMON_PROFILE_FIELDS, 'businessName', 'supplyCategory', 'serviceRegion', 'packageType', 'bankingPayoutDetails', 'warrantySupportDetails', 'productCategories', 'deliveryCapacity', 'complianceDocuments', 'closeOutDocumentationRequirements'],
+  freelancer: [...COMMON_PROFILE_FIELDS, 'fullName', 'skills', 'softwareExperience', 'availability', 'portfolio', 'preferredTaskTypes', 'bankingPayoutDetails', 'identityVerification', 'directoryVisibility'],
+  admin: [...COMMON_PROFILE_FIELDS, 'adminName', 'permissionLevel', 'department', 'approvalAuthority', 'twoFactorStatus', 'auditIdentity', 'adminAccessScope'],
+};
+
+const USER_PROFILE_FIELDS = Array.from(new Set(Object.values(ROLE_PROFILE_FIELDS).flat()));
+
+function sanitizeProfileValue(value: unknown): unknown {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'string') return value.trim().slice(0, 2000);
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value
+      .map(item => sanitizeProfileValue(item))
+      .filter(item => item !== undefined)
+      .slice(0, 50);
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).slice(0, 50).reduce<Record<string, unknown>>((safe, [key, item]) => {
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(key)) return safe;
+      const sanitized = sanitizeProfileValue(item);
+      if (sanitized !== undefined) safe[key] = sanitized;
+      return safe;
+    }, {});
+  }
+  return undefined;
+}
+
+function sanitizeUserProfileData(profileData: unknown, role?: UserRole | string) {
   if (!profileData || typeof profileData !== 'object') return {};
-
-  return USER_PROFILE_FIELDS.reduce<Record<string, unknown>>((safeData, field) => {
+  const normalized = normalizeUserRole(role);
+  const allowedFields = new Set(normalized ? ROLE_PROFILE_FIELDS[normalized] || COMMON_PROFILE_FIELDS : USER_PROFILE_FIELDS);
+  return Array.from(allowedFields).reduce<Record<string, unknown>>((safeData, field) => {
     if (Object.prototype.hasOwnProperty.call(profileData, field)) {
-      safeData[field] = (profileData as Record<string, unknown>)[field];
+      const value = sanitizeProfileValue((profileData as Record<string, unknown>)[field]);
+      if (value !== undefined) safeData[field] = value;
     }
     return safeData;
   }, {});
+}
+
+function buildDirectoryProfile(userId: string, profile: Record<string, any>, verification?: UserVerification | null) {
+  const normalizedRole = normalizeUserRole(profile.role) as DirectoryTargetRole | null;
+  if (!normalizedRole || !DIRECTORY_TARGET_ROLES.includes(normalizedRole)) return null;
+  const isVerified = Boolean(verification);
+  return {
+    userId,
+    name: profile.displayName || profile.fullName || profile.professionalName || profile.practiceName || profile.companyName || profile.businessName || 'Directory profile',
+    displayName: profile.displayName || profile.fullName || profile.professionalName || profile.practiceName || profile.companyName || profile.businessName || 'Directory profile',
+    company: pickDirectoryCompany(profile) || null,
+    role: profile.role,
+    normalizedRole,
+    professionalDiscipline: pickDirectoryDiscipline(profile) || null,
+    trade: profileString(profile.trade || profile.tradeCategory || profile.supplyCategory || profile.trades) || null,
+    region: pickDirectoryRegion(profile) || null,
+    availability: profile.availability || null,
+    portfolio: Array.isArray(profile.portfolio) ? profile.portfolio.slice(0, 6) : (Array.isArray(profile.portfolioImages) ? profile.portfolioImages.slice(0, 6) : []),
+    directoryVisibility: profile.directoryVisibility ?? true,
+    averageRating: profile.averageRating ?? 0,
+    totalReviews: profile.totalReviews ?? 0,
+    verificationStatus: isVerified ? 'verified' : 'unverified',
+    verificationLabel: isVerified ? 'verified' : 'unverified',
+    verificationId: verification?.id || null,
+    registrationNumber: verification?.registrationNumber || profile.registrationNumber || profile.sacapNumber || profile.cidbNumber || profile.nhbrcNumber || profile.cipcNumber || null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function projectDirectoryProfile(userId: string, profile: Record<string, any>) {
+  const normalizedRole = normalizeUserRole(profile.role) as DirectoryTargetRole | null;
+  if (!normalizedRole || !DIRECTORY_TARGET_ROLES.includes(normalizedRole)) return null;
+  const verification = await getDirectoryVerification(userId, normalizedRole);
+  const projection = buildDirectoryProfile(userId, profile, verification);
+  if (!projection) return null;
+  await adminDb.collection('directory_profiles').doc(userId).set(projection, { merge: true });
+  return projection;
 }
 
 function withGuardrails(systemInstruction?: string) {
@@ -852,23 +933,24 @@ router.post("/auth/check-admin", async (req, res) => {
     const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
     const userRef = adminDb.collection("users").doc(decoded.uid);
     const userDoc = await userRef.get();
-    const profileData = sanitizeUserProfileData(req.body.profileData);
     const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'].includes(req.body.role)
       ? req.body.role
       : 'client';
 
     if (!userDoc.exists) {
+      const bootstrapProfileData = sanitizeUserProfileData(req.body.profileData, isAdminEmail ? 'admin' : requestedRole);
       // Create user with admin role if applicable
       const newUser = {
         uid: decoded.uid,
         email: decoded.email || '',
         displayName: req.body.displayName || decoded.displayName || decoded.name || 'Anonymous',
         role: isAdminEmail ? 'admin' : requestedRole,
-        ...profileData,
+        ...bootstrapProfileData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await userRef.set(newUser);
+      await projectDirectoryProfile(decoded.uid, newUser);
       await recordAuditEvent(req, {
         category: 'auth',
         action: 'auth.user_bootstrapped',
@@ -881,11 +963,14 @@ router.post("/auth/check-admin", async (req, res) => {
 
     const userData = userDoc.data()!;
     const currentRole = userData.role;
+    const profileData = sanitizeUserProfileData(req.body.profileData, currentRole);
     if (Object.keys(profileData).length > 0) {
+      const updatedAt = new Date().toISOString();
       await userRef.set({
         ...profileData,
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       }, { merge: true });
+      await projectDirectoryProfile(decoded.uid, { ...userData, ...profileData, updatedAt });
     }
 
     // If user is in admin list but doesn't have admin role, upgrade them
@@ -909,6 +994,72 @@ router.post("/auth/check-admin", async (req, res) => {
   } catch (err: any) {
     console.error("Admin check error:", err);
     res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.get("/profile/me", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const profile = authContext.userData ? { uid: authContext.uid, ...authContext.userData } : null;
+    if (!profile) return res.status(404).json({ error: 'User profile not found' });
+    res.json({ profile });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put("/profile/me", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const existing = authContext.userData || {};
+    const role = existing.role || authContext.role;
+    const profileData = sanitizeUserProfileData(req.body.profileData || req.body, role);
+    if (Object.keys(profileData).length === 0) return res.status(400).json({ error: 'No supported profile fields supplied' });
+    const now = new Date().toISOString();
+    await adminDb.collection('users').doc(authContext.uid).set({ ...profileData, updatedAt: now }, { merge: true });
+    const updatedSnap = await adminDb.collection('users').doc(authContext.uid).get();
+    const updatedProfile = { uid: authContext.uid, ...updatedSnap.data() } as Record<string, any>;
+    const directoryProfile = await projectDirectoryProfile(authContext.uid, updatedProfile);
+    await recordAuditEvent(req, {
+      category: 'profile',
+      action: 'profile.updated',
+      actor: decodedAuditActor(authContext.decoded, role),
+      target: { type: 'user', id: authContext.uid },
+      metadata: { fields: Object.keys(profileData), directoryProjected: Boolean(directoryProfile) },
+    });
+    res.json({ profile: updatedProfile, directoryProfile });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put("/admin/users/:userId/profile", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+    const { userId } = req.params;
+    const userRef = adminDb.collection('users').doc(userId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) return res.status(404).json({ error: 'User profile not found' });
+    const existing = userSnap.data() as Record<string, any>;
+    const profileData = sanitizeUserProfileData(req.body.profileData || req.body, existing.role);
+    if (Object.keys(profileData).length === 0) return res.status(400).json({ error: 'No supported profile fields supplied' });
+    const now = new Date().toISOString();
+    await userRef.set({ ...profileData, updatedAt: now }, { merge: true });
+    const updatedSnap = await userRef.get();
+    const updatedProfile = { uid: userId, ...updatedSnap.data() } as Record<string, any>;
+    const directoryProfile = await projectDirectoryProfile(userId, updatedProfile);
+    await recordAuditEvent(req, {
+      category: 'profile',
+      action: 'profile.admin_updated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'user', id: userId },
+      reason: req.body.reason || 'Admin profile update',
+      metadata: { fields: Object.keys(profileData), directoryProjected: Boolean(directoryProfile) },
+    });
+    res.json({ profile: updatedProfile, directoryProfile });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
