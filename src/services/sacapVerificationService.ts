@@ -15,9 +15,11 @@ export interface SACAPVerificationResult {
  * Service to verify SACAP registration by scraping the official registry.
  */
 export async function verifySACAPRegistration(firstName: string, lastName: string): Promise<SACAPVerificationResult> {
-  const fullName = `${firstName} ${lastName}`.trim();
+  const normalizedFirstName = firstName.trim();
+  const normalizedLastName = lastName.trim();
+  const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim();
   
-  if (!firstName || firstName.length < 2 || !lastName || lastName.length < 2) {
+  if (!normalizedFirstName || normalizedFirstName.length < 2 || !normalizedLastName || normalizedLastName.length < 2) {
     return { verified: false, error: 'First name and last name are required' };
   }
 
@@ -62,8 +64,8 @@ export async function verifySACAPRegistration(firstName: string, lastName: strin
     console.log(`[SACAP Service] Found ${results.length} potential matches`);
 
     // Normalize search names
-    const searchFirstName = firstName.toLowerCase().trim();
-    const searchLastName = lastName.toLowerCase().trim();
+    const searchFirstName = normalizedFirstName.toLowerCase();
+    const searchLastName = normalizedLastName.toLowerCase();
 
     // Look for exact or close match
     for (const row of results) {
