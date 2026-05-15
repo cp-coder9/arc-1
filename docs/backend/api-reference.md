@@ -174,6 +174,298 @@ Resolves an AI review queue item and, where supplied, records human sign-off.
 - **Audit actions:** `ai.review_resolved` or `ai.review_resolved_with_human_signoff`.
 - **Human blockers:** AI/system actors cannot sign. Compliance declarations, professional certificates, and municipal submissions require a verified BEP/architect or admin. Escrow release sign-off requires client or admin.
 
+
+## Canonical API examples
+
+Examples use the `/api` mount and omit unrelated headers. IDs and timestamps are illustrative.
+
+### Project briefs
+
+Create a project brief:
+
+```http
+POST /api/project-briefs
+Authorization: Bearer <client-id-token>
+Content-Type: application/json
+
+{
+  "title": "Residential alteration",
+  "description": "Need plans for additions",
+  "category": "Residential",
+  "location": "Cape Town",
+  "budgetRange": { "min": 50000, "max": 100000 },
+  "requirements": ["survey", "concept design"],
+  "propertyDetails": { "erf": "123" }
+}
+```
+
+```json
+{
+  "brief": {
+    "id": "brief-1",
+    "clientId": "client-1",
+    "createdBy": "client-1",
+    "title": "Residential alteration",
+    "description": "Need plans for additions",
+    "requirements": ["survey", "concept design"],
+    "status": "submitted"
+  }
+}
+```
+
+Add attachment metadata and an advisory interpretation:
+
+```http
+POST /api/project-briefs/brief-1/attachments
+Authorization: Bearer <client-id-token>
+Content-Type: application/json
+
+{
+  "fileName": "survey.pdf",
+  "fileUrl": "https://files.public.blob.vercel-storage.com/survey.pdf",
+  "evidenceType": "survey"
+}
+```
+
+```json
+{
+  "attachment": {
+    "id": "attachment-1",
+    "briefId": "brief-1",
+    "clientId": "client-1",
+    "uploadedBy": "client-1",
+    "evidenceType": "survey",
+    "storageProvider": "vercel_blob"
+  }
+}
+```
+
+```http
+POST /api/project-briefs/brief-1/interpretations
+Authorization: Bearer <assigned-bep-id-token>
+Content-Type: application/json
+
+{
+  "summary": "Likely needs an architect and municipal submission.",
+  "confidence": 0.75,
+  "sourceAttachmentIds": ["attachment-1"]
+}
+```
+
+```json
+{
+  "interpretation": {
+    "id": "interpretation-1",
+    "briefId": "brief-1",
+    "advisoryOnly": true,
+    "confidence": 0.75,
+    "sourceAttachmentIds": ["attachment-1"],
+    "status": "ready_for_review"
+  }
+}
+```
+
+### Marketplace opportunities and proposals
+
+Publish a client brief as a marketplace opportunity:
+
+```http
+POST /api/marketplace/opportunities
+Authorization: Bearer <client-id-token>
+Content-Type: application/json
+
+{ "briefId": "brief-1" }
+```
+
+```json
+{
+  "opportunity": {
+    "id": "brief-1",
+    "briefId": "brief-1",
+    "clientId": "client-1",
+    "status": "published",
+    "advisoryMatchingOnly": true
+  }
+}
+```
+
+List opportunities as a verified BEP and submit a proposal:
+
+```http
+GET /api/marketplace/opportunities
+Authorization: Bearer <verified-bep-id-token>
+```
+
+```json
+{
+  "opportunities": [
+    {
+      "id": "brief-1",
+      "title": "Residential alteration",
+      "status": "published",
+      "advisoryMatchingOnly": true
+    }
+  ],
+  "verificationId": "architect-1_bep_SACAP_SACAP-123",
+  "advisoryOnly": true
+}
+```
+
+```http
+POST /api/proposals
+Authorization: Bearer <verified-bep-id-token>
+Content-Type: application/json
+
+{
+  "opportunityId": "brief-1",
+  "feeAmount": 125000,
+  "scopeSummary": "Stages 1 to 4",
+  "exclusions": ["Council fees"]
+}
+```
+
+```json
+{
+  "proposal": {
+    "id": "proposal-1",
+    "opportunityId": "brief-1",
+    "briefId": "brief-1",
+    "clientId": "client-1",
+    "professionalId": "architect-1",
+    "status": "submitted",
+    "humanReviewRequired": true,
+    "advisoryOnly": true,
+    "autoAppointment": false
+  }
+}
+```
+
+### Appointment readiness
+
+Read-only readiness checks never create contracts, signatures, payments, appointments, or audit entries.
+
+```http
+GET /api/proposals/proposal-1/appointment-readiness
+Authorization: Bearer <client-id-token>
+```
+
+Ready response:
+
+```json
+{
+  "ready": true,
+  "proposalId": "proposal-1",
+  "briefId": "brief-1",
+  "professionalId": "architect-1",
+  "verificationId": "architect-1_bep_SACAP_SACAP-123",
+  "requiredHumanActions": ["client_contract_acceptance", "professional_contract_acceptance"],
+  "createsAppointment": false,
+  "createsContract": false,
+  "createsSignature": false,
+  "createsPayment": false
+}
+```
+
+Blocked response:
+
+```json
+{
+  "ready": false,
+  "proposalId": "proposal-1",
+  "briefId": "brief-1",
+  "professionalId": "architect-1",
+  "blocker": "A professional has already been appointed for this brief",
+  "blockerStatus": 409,
+  "createsAppointment": false,
+  "createsContract": false,
+  "createsSignature": false,
+  "createsPayment": false
+}
+```
+
+### AI governance action logs and review
+
+Log an AI action. Low confidence or flagged outputs create a human review queue item.
+
+```http
+POST /api/ai/action-logs
+Authorization: Bearer <project-participant-id-token>
+Content-Type: application/json
+
+{
+  "projectId": "project-1",
+  "actionKind": "drawing_check",
+  "target": { "type": "drawing_check_run", "id": "run-1" },
+  "prompt": { "provider": "gemini", "model": "gemini-2.0-flash", "promptVersion": "drawing-check-v1" },
+  "sourceReferences": [{ "type": "drawing", "id": "drawing-1", "excerptHash": "sha256:abc" }],
+  "confidence": 0.41,
+  "outputSummary": "Possible compliance risk. Advisory only.",
+  "flags": ["legal_or_compliance_risk"]
+}
+```
+
+```json
+{
+  "actionLog": {
+    "id": "ai-log-1",
+    "projectId": "project-1",
+    "actorUid": "client-1",
+    "status": "requires_review",
+    "requiresHumanConfirmation": true,
+    "immutable": true
+  },
+  "reviewQueueItem": {
+    "id": "queue-1",
+    "projectId": "project-1",
+    "priority": "critical",
+    "assignedRole": "admin",
+    "status": "open"
+  }
+}
+```
+
+Resolve the review with human sign-off:
+
+```http
+POST /api/admin/ai-review/queue-1/resolve
+Authorization: Bearer <admin-id-token>
+Content-Type: application/json
+
+{
+  "decision": "resolved",
+  "reason": "Admin reviewed evidence and recorded responsible human confirmation.",
+  "humanSignOff": {
+    "domain": "municipal_submission",
+    "target": { "type": "municipal_submission", "id": "submission-1", "projectId": "project-1" },
+    "declaration": "I reviewed the municipal package and approve this governance resolution."
+  }
+}
+```
+
+```json
+{
+  "reviewQueueItem": {
+    "id": "queue-1",
+    "status": "resolved",
+    "resolvedBy": "admin-1",
+    "humanSignOffRecorded": true
+  },
+  "actionLog": {
+    "id": "ai-log-1",
+    "status": "human_confirmed",
+    "reviewedBy": "admin-1",
+    "reviewDecision": "resolved"
+  },
+  "humanSignOff": {
+    "actorUid": "admin-1",
+    "actorRole": "admin",
+    "humanConfirmed": true,
+    "aiMayNotSign": true,
+    "immutable": true
+  }
+}
+```
+
 ## Work package APIs
 
 ### `POST /projects/:projectId/work-packages`
