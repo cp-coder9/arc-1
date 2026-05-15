@@ -1,0 +1,300 @@
+# Backend API Reference
+
+This reference covers production API routes implemented in recent backend commits for the project command centre, workflow write APIs, municipal tracking, resource centre and drawing checklist workflows, AI governance, directory invitations, and work packages.
+
+Base path is the Express API router mount, typically `/api`. All state-changing routes are protected by the same-origin guard when an `Origin` header is present and by the global API rate limiter.
+
+## Authentication and common behaviour
+
+- **Authentication:** use `Authorization: Bearer <Firebase ID token>` for user requests. Agent service requests may use `api-key` or `x-agent-key`, matched against `AGENT_API_KEY`, and are treated as admin.
+- **Audit collection:** all documented routes write immutable-style audit entries to `audit_logs` through `recordAuditEvent` / `buildAuditEvent`.
+- **Errors:** responses use JSON `{ "error": string }`; some authorization failures include `verificationRequired` metadata.
+- **Human blockers:** AI, project coordination, municipal, and sign-off APIs intentionally block when a verified professional, admin, client, or assigned human actor is required.
+
+## Role and verification gates
+
+| Gate | Roles allowed | Additional verification / membership |
+| --- | --- | --- |
+| Directory search/invite | client, bep, contractor, admin, scoped by target-role matrix | Existing invite targets must have active verification unless it is an onboarding invite. |
+| Project coordination | admin, lead BEP, active project team member | BEP coordinators require active SACAP verification. |
+| Project lead | admin, project lead BEP | Used for freelancer work package management. |
+| Verified freelancer | freelancer | Active freelancer verification is required. |
+| Resource centre | admin, verified BEP, verified freelancer | BEP requires SACAP; freelancer requires active freelancer verification. |
+| AI review resolution | admin, BEP/compliance reviewer per queue item logic | Human sign-off domains enforce human actor role and verification rules. |
+
+## Directory APIs
+
+### `GET /directory/search`
+
+Searches `directory_profiles` for visible users eligible for the caller to engage.
+
+- **Auth:** required.
+- **Access:** target role scope is derived from caller role: clients can search BEPs/contractors; BEPs can search BEPs/contractors/freelancers; contractors can search subcontractors/suppliers/BEPs; admins can search all supported target roles.
+- **Query:** `q`, `role`, `region`, `discipline`, `trade`, `verificationStatus=verified|unverified`, `limit` up to 50.
+- **Durable reads:** `directory_profiles`, `user_verifications`.
+- **Audit action:** `directory.search`.
+- **Human blockers:** invitations should only proceed to verified existing profiles; unverified results are returned with `canInvite: false`.
+
+### `POST /directory/invitations`
+
+Creates a role-scoped invitation with periodic reminder metadata.
+
+- **Auth:** required.
+- **Access matrix:**
+  - client to BEP: `quote`, `project`; client to contractor: `quote`, `tender`, `project`.
+  - BEP to BEP: `project`; BEP to contractor: `quote`, `tender`, `project`; BEP to freelancer: `task`.
+  - contractor to subcontractor: `quote`, `tender`, `package`; contractor to supplier: `quote`, `package`; contractor to BEP: `quote`, `project`.
+  - admin can invite all supported target roles for all supported actions.
+- **Body:** `targetUserId` or `targetEmail`, `targetRole`, `action`, optional `context` containing `jobId`, `projectId`, `packageId`, `taskId`, `tenderId`, `quoteRequestId`, `message`.
+- **Durable writes:** `directory_invitations`; notification records for existing targets.
+- **Audit actions:** `directory.invitation_created`; `directory.invitation_blocked_unverified` when an existing target lacks required verification.
+- **Human blockers:** existing target users must be verified before invitation. Email-only onboarding invites stay in `pending_registration` and require later registration and acceptance.
+
+### `POST /directory/invitations/:invitationId/respond`
+
+Accepts or declines an invitation.
+
+- **Auth:** required target user.
+- **Body:** response/decision fields as implemented by route.
+- **Durable writes:** updates `directory_invitations`; may add notifications.
+- **Audit action:** invitation response audit entries.
+- **Human blockers:** acceptance requires the invited human user and active verification where `verificationRequiredOnAcceptance` is true.
+
+## Project command centre
+
+### `GET /projects/:projectId/command-centre`
+
+Builds and persists the caller's project command-centre projection.
+
+- **Auth:** required.
+- **Access:** project coordinator gate: admin, lead BEP, or active project team member. BEP callers require active SACAP verification.
+- **Durable reads:** `projects/{projectId}`, subcollections `tasks`, `approvals`, `documents`, `message_threads`, `ai_issues`.
+- **Durable writes:** `project_command_views/{projectId}_{viewerUid}`.
+- **Response:** `commandCentre` with viewer role, stage history, team summary, and panel counts for tasks, approvals, documents, messages, and unresolved AI issues.
+- **Audit action:** `project.command_centre_viewed`.
+- **Human blockers:** non-team users are denied; unverified BEP coordinators receive a `verificationRequired` block.
+
+## Project workflow write APIs
+
+These endpoints operate under the project coordination gate unless noted.
+
+| Method and path | Purpose | Durable collection(s) | Audit action |
+| --- | --- | --- | --- |
+| `POST /projects/:projectId/documents` | Create project document and initial `v1` version. | `projects/{projectId}/documents`, `documents/{documentId}/versions` | `document.created` |
+| `POST /projects/:projectId/document-versions` | Add a new document revision and update current revision metadata. | `projects/{projectId}/documents/{documentId}/versions` | `document.version_created` |
+| `POST /projects/:projectId/tasks` | Create coordination task. | `projects/{projectId}/tasks` | `task.created` |
+| `POST /projects/:projectId/approvals` | Request project approval. | `projects/{projectId}/approvals` | `approval.requested` |
+| `POST /projects/:projectId/message-threads` | Create a project message thread. | `projects/{projectId}/message_threads` | `message.thread_created` |
+| `POST /projects/:projectId/messages` | Add message to a thread. | `projects/{projectId}/message_threads/{threadId}/messages` and thread metadata | `message.created` |
+| `POST /projects/:projectId/transmittals` | Create a transmittal for documents or revisions. | `projects/{projectId}/transmittals` | `transmittal.issued` |
+| `POST /projects/:projectId/ai-issues` | Record AI/compliance issue for project review. | `projects/{projectId}/ai_issues` | `ai.issue_created` |
+| `POST /projects/:projectId/ai-issues/:issueId/resolve` | Mark AI issue resolved/closed. | `projects/{projectId}/ai_issues/{issueId}` | `ai.issue_resolved` |
+| `POST /projects/:projectId/ai-issues/:issueId/review` | Record human review result on AI issue. | `projects/{projectId}/ai_issues/{issueId}` | `ai.issue_reviewed` |
+| `POST /projects/:projectId/team-members` | Invite/add active project team member. | `projects/{projectId}` team member array, `notifications` | `coordination.team_member_invited`; blocked unverified targets use `coordination.team_invitation_blocked_unverified` |
+| `POST /projects/:projectId/coordination/items` | Create coordination item such as RFI, dependency, deadline, compliance status, or municipal readiness. | `projects/{projectId}/coordination_items` | `coordination.{itemType}_created` |
+
+- **Human blockers:** BEP coordination requires verified SACAP status. Approval, review, and AI issue endpoints are records of human project coordination and do not certify compliance by AI.
+
+## AI governance APIs
+
+### `POST /ai/action-logs`
+
+Persists an AI action log and optionally creates a review queue item.
+
+- **Auth:** required.
+- **Body:** `projectId`, `actionKind`, `actorUid`, `target`, `prompt` metadata, `sourceReferences`, `confidence`, `outputSummary`, optional `flags`.
+- **Supported action kinds:** `draft_technical_brief`, `autofill_compliance_form`, `drawing_check`, `municipal_status_summary`, `checklist_recommendation`, `other_advisory`.
+- **Durable writes:** `ai_action_logs`; `ai_review_queue` when confidence is below `0.72` or flags are present.
+- **Audit action:** `ai.action_logged_requires_review` or `ai.action_logged_advisory`.
+- **Human blockers:** flagged or low-confidence outputs are `requires_review`; legal/compliance risk is critical and assigned to admin, otherwise review defaults to BEP.
+
+### `POST /admin/ai-review/:itemId/resolve`
+
+Resolves an AI review queue item and, where supplied, records human sign-off.
+
+- **Auth:** required, admin/reviewer context.
+- **Body:** decision/reason plus optional human sign-off payload with domain, declaration, and target.
+- **Durable writes:** `ai_review_queue/{itemId}`, `ai_action_logs/{actionLogId}`, optional `human_signoffs`.
+- **Audit actions:** `ai.review_resolved` or `ai.review_resolved_with_human_signoff`.
+- **Human blockers:** AI/system actors cannot sign. Compliance declarations, professional certificates, and municipal submissions require a verified BEP/architect or admin. Escrow release sign-off requires client or admin.
+
+## Work package APIs
+
+### `POST /projects/:projectId/work-packages`
+
+Creates a freelancer work package.
+
+- **Auth:** project lead gate, admin or lead BEP.
+- **Body:** `title`, optional `description`, `requirements`, `budget`, `deadline`, `invitedFreelancerIds`.
+- **Durable writes:** `projects/{projectId}/work_packages`; notifications for invited verified freelancers.
+- **Audit action:** `freelancer.work_package_created`.
+- **Human blockers:** only project lead/admin can create; unverified invited freelancer IDs are skipped for notification.
+
+### `POST /projects/:projectId/work-packages/:packageId/applications`
+
+Verified freelancer applies to an open work package.
+
+- **Auth:** verified freelancer only.
+- **Body:** `proposal` required, optional `proposedFee`.
+- **Durable writes:** `projects/{projectId}/work_packages/{packageId}/applications/{freelancerUid}`.
+- **Audit action:** `freelancer.work_package_application_submitted`.
+- **Human blockers:** route blocks non-freelancers and freelancers without active verification.
+
+### `POST /projects/:projectId/work-packages/:packageId/applications/:applicationId/assign`
+
+Assigns an application to a freelancer and marks the package pending signature.
+
+- **Auth:** project lead gate.
+- **Durable writes:** work package status, accepted application status, notification for freelancer.
+- **Audit action:** `freelancer.work_package_assigned`.
+- **Human blockers:** only open packages can be assigned; agreement still requires human signature outside this route.
+
+### `POST /projects/:projectId/work-packages/:packageId/submissions`
+
+Assigned freelancer submits deliverables.
+
+- **Auth:** verified freelancer who is assigned to the package.
+- **Body:** deliverable URLs/evidence as implemented by route.
+- **Durable writes:** `projects/{projectId}/work_packages/{packageId}/submissions`; work package status.
+- **Audit action:** `freelancer.work_package_submitted`.
+- **Human blockers:** only assigned freelancer can submit.
+
+### `POST /projects/:projectId/work-packages/:packageId/submissions/:submissionId/review`
+
+Project lead/admin reviews deliverables.
+
+- **Auth:** project lead gate.
+- **Body:** decision/status and notes.
+- **Durable writes:** submission review fields and work package status.
+- **Audit action:** `freelancer.work_package_submission_approved` or `freelancer.work_package_submission_rejected`, based on review decision.
+- **Human blockers:** approval/rejection is a human project lead/admin decision.
+
+## Resource centre and drawing checklist APIs
+
+### `POST /resources/centre`
+
+Creates a resource centre item.
+
+- **Auth:** admin, verified BEP, or verified freelancer.
+- **Body:** `title` required; optional `resourceType`, `description`, `municipality`, `submissionType`, `discipline`, `url`, `contact`, `tags`, `checklistItems`, `visibility`.
+- **Resource types:** `municipal_link`, `inspector_contact`, `fire_contact`, `drainage_roads_contact`, `submission_portal`, `zoning_portal`, `template`, `poa_template`, `checklist`.
+- **Durable writes:** `resource_centre`.
+- **Audit action:** `resource_centre.resource_created`.
+- **Human blockers:** unverified BEPs/freelancers are blocked.
+
+### `GET /resources/centre`
+
+Lists published resource centre items and caller-owned/admin private items.
+
+- **Auth:** admin, verified BEP, or verified freelancer.
+- **Query:** `resourceType`, `municipality`, `discipline`.
+- **Durable reads:** `resource_centre`.
+- **Audit action:** `resource_centre.resources_viewed`.
+
+### `POST /projects/:projectId/checklists/drawing`
+
+Creates a municipal drawing checklist for a project.
+
+- **Auth:** project coordinator gate.
+- **Body:** `municipality` and `submissionType` required; optional `checklistType`, `stage`, `disciplines`, `responsibleParty`, linked drawing/submission/task IDs, `requirements`, `componentChecks`.
+- **Durable writes:** `projects/{projectId}/drawing_checklists`.
+- **Audit action:** `resource_centre.drawing_checklist_created`.
+- **Human blockers:** checklist progress is a coordination tracker only; professional/municipal sign-off remains human.
+
+### `POST /projects/:projectId/checklists/drawing/:checklistId/items/:itemId/status`
+
+Updates one checklist item status.
+
+- **Auth:** project coordinator gate.
+- **Body:** `status` one of `not_started`, `in_progress`, `blocked`, `complete`, `not_applicable`; optional notes, assignee, linked drawings/tasks.
+- **Durable writes:** checklist arrays, progress, and status history in `projects/{projectId}/drawing_checklists/{checklistId}`.
+- **Audit action:** `resource_centre.drawing_checklist_item_updated`.
+
+### `GET /projects/:projectId/checklists/drawing`
+
+Lists drawing checklists for the project.
+
+- **Auth:** project coordinator gate.
+- **Query:** optional filters implemented by route.
+- **Durable reads:** `projects/{projectId}/drawing_checklists`.
+- **Audit action:** `resource_centre.drawing_checklists_viewed`.
+
+## Municipal tracker APIs
+
+### `POST /projects/:projectId/municipal/submissions`
+
+Creates a project municipal submission tracker record.
+
+- **Auth:** project coordinator gate.
+- **Body:** municipality/submission metadata, submission references, responsible party, and evidence fields as implemented by route.
+- **Durable writes:** `projects/{projectId}/municipal_submissions`.
+- **Audit action:** `municipal.submission_created`.
+- **Human blockers:** submission tracking does not replace municipal acceptance or registered professional sign-off.
+
+### `POST /projects/:projectId/municipal/submissions/:submissionId/status`
+
+Updates municipal submission status and history.
+
+- **Auth:** project coordinator gate.
+- **Body:** status, notes/evidence fields as implemented by route.
+- **Durable writes:** `projects/{projectId}/municipal_submissions/{submissionId}`.
+- **Audit action:** `municipal.status_updated`.
+- **Human blockers:** any official status remains subject to municipal confirmation and human review.
+
+### `GET /projects/:projectId/municipal/status`
+
+Returns project-level municipal tracker summary.
+
+- **Auth:** project coordinator gate.
+- **Durable reads:** `projects/{projectId}/municipal_submissions`, related checklist/status fields.
+- **Audit action:** `municipal.control_viewed` for admin/control queries, otherwise `municipal.insight_viewed`.
+
+### Legacy/global municipal helpers
+
+The router also exposes operational municipal routes used by existing tooling:
+
+| Method and path | Purpose | Durable collections / services | Notes |
+| --- | --- | --- | --- |
+| `POST /track-municipality` | Track municipality status from supplied details. | municipal automation service | Requires auth and returns tracker result. |
+| `POST /municipal/scrape` | Run municipal browser automation. | `municipalAutomation` | Human credentials/portal constraints may block automation. |
+| `POST /municipal/credentials` | Store encrypted municipal portal credentials. | municipal settings/credentials collection | Sensitive credential handling; human consent required operationally. |
+| `GET /municipal/settings` | Read municipal automation settings. | settings collection | Admin/operator route. |
+| `POST /municipal/ocr` | OCR municipal invoice/receipt data. | OCR/shadow tracker services | AI/OCR output is advisory. |
+| `GET /municipal/heatmap/:municipality` | Get municipal heatmap. | shadow tracker service | Aggregated operational insight. |
+| `POST /municipal/shadow-track` | Detect municipal invoices/status shadows. | shadow tracker service | Advisory signal requiring human confirmation. |
+| `POST /municipal/submissions` | Create legacy/global municipal submission. | municipal submissions collection | Coexists with project-scoped tracker. |
+| `GET /municipal/submissions` | List legacy/global municipal submissions. | municipal submissions collection | Existing dashboard compatibility. |
+| `POST /municipal/crowdsource` | Submit crowdsource municipal data. | crowdsource municipal collection | Requires human-entered evidence. |
+
+## Durable collections summary
+
+- `audit_logs`
+- `directory_profiles`, `directory_invitations`, `user_verifications`
+- `notifications`
+- `projects`, including subcollections: `documents`, `documents/{id}/versions`, `tasks`, `approvals`, `message_threads`, `message_threads/{id}/messages`, `transmittals`, `ai_issues`, `work_packages`, `work_packages/{id}/applications`, `work_packages/{id}/submissions`, `drawing_checklists`, `municipal_submissions`, `coordination_items`
+- `project_command_views`
+- `ai_action_logs`, `ai_review_queue`, `human_signoffs`
+- `resource_centre`
+- Legacy/global municipal settings, credentials, submissions, crowdsource/shadow tracker collections used by the municipal helper routes
+
+## Audit action summary
+
+Key action names observed in the implemented routes include:
+
+- `directory.search`, `directory.invitation_created`, `directory.invitation_blocked_unverified`
+- `project.command_centre_viewed`, `task.created`, `coordination.{itemType}_created`, `coordination.team_member_invited`, `coordination.team_invitation_blocked_unverified`
+- `document.created`, `document.version_created`, `transmittal.issued`
+- `approval.requested`
+- `message.thread_created`, `message.created`
+- `ai.action_logged_requires_review`, `ai.action_logged_advisory`, `ai.issue_routed`, `ai.issue_resolved`, `ai.issue_resolution_{decision}`, `ai.review_resolved`, `ai.review_resolved_with_human_signoff`
+- `freelancer.work_package_created`, `freelancer.work_package_application_submitted`, `freelancer.work_package_assigned`, `freelancer.work_package_submitted`, `freelancer.work_package_submission_{decision}`
+- `resource_centre.resource_created`, `resource_centre.resources_viewed`, `resource_centre.drawing_checklist_created`, `resource_centre.drawing_checklist_item_updated`, `resource_centre.drawing_checklists_viewed`
+- `municipal.submission_created`, `municipal.status_updated`, `municipal.control_viewed`, `municipal.insight_viewed`, plus legacy/global municipal helper audit events such as `municipal.credentials_saved`
+
+## Known human blockers and operational limits
+
+- AI outputs are advisory and cannot certify, approve, submit, or sign on behalf of a human.
+- Municipal submission readiness still requires registered professional judgement, municipal portal acceptance, and jurisdiction-specific evidence.
+- SACAP/CIDB/NHBRC/CIPC/freelancer verification is enforced before sensitive directory, coordination, resource, and work package operations.
+- Work package assignment sets `agreementStatus: pending_signature`; contractual execution remains a separate human-signature step.
+- Municipal browser automation may be blocked by portal MFA, CAPTCHA, downtime, expired credentials, or unsupported municipal portals.
