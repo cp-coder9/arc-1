@@ -646,6 +646,8 @@ Lists drawing checklists for the project.
 
 ## Municipal tracker APIs
 
+Deterministic request/response examples for project-scoped municipal tracker routes are maintained in `docs/backend/municipal-tracker-api-contract-examples.md`.
+
 ### `POST /projects/:projectId/municipal/submissions`
 
 Creates a project municipal submission tracker record.
