@@ -1,5 +1,5 @@
 import type { Bid, GanttTask, RFI, SiteInspection, SiteLog, TenderPackage } from '../../types';
-import { evaluatePackageReadiness, type DeliveryEvidenceItem } from '../packageReadinessService';
+import { evaluatePackageReadiness, evaluateProgrammeDependencies, type DeliveryEvidenceItem } from '../packageReadinessService';
 
 const tender: TenderPackage = {
   id: 'pkg-1',
@@ -133,5 +133,90 @@ describe('packageReadinessService', () => {
     ]));
     expect(result.missingEvidence).toEqual(['site_log', 'inspection', 'closeout_document']);
     expect(result.warnings).toContain('1 programme task not complete.');
+  });
+
+  it('blocks closeout for programme dependency cycles and completed tasks with incomplete predecessors', () => {
+    const foundationTask: GanttTask = {
+      ...completedTask,
+      id: 'task-foundation',
+      title: 'Foundation complete',
+      status: 'in_progress',
+      progress: 80,
+      dependsOn: ['task-coc'],
+    };
+    const cocTask: GanttTask = {
+      ...completedTask,
+      id: 'task-coc',
+      title: 'Electrical COC issued',
+      dependsOn: ['task-foundation'],
+    };
+
+    const dependencyIssues = evaluateProgrammeDependencies([foundationTask, cocTask]);
+    expect(dependencyIssues).toEqual(expect.arrayContaining([
+      'Programme task "Electrical COC issued" is complete before predecessor "Foundation complete" is complete.',
+      'Programme dependency cycle detected: task-foundation -> task-coc -> task-foundation -> task-foundation.',
+    ]));
+
+    const result = evaluatePackageReadiness({
+      tender,
+      awardedBid,
+      programmeTasks: [foundationTask, cocTask],
+      rfis: [closedRfi],
+      siteLogs: [siteLog],
+      inspections: [passedInspection],
+      evidence: approvedEvidence,
+      asOf: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.dependencyIssues).toHaveLength(2);
+    expect(result.blockers).toEqual(expect.arrayContaining(result.dependencyIssues));
+  });
+
+  it('preserves human approval gates for procurement and payment effects and blocks high severity snags', () => {
+    const result = evaluatePackageReadiness({
+      tender,
+      awardedBid,
+      programmeTasks: [completedTask],
+      rfis: [closedRfi],
+      siteLogs: [siteLog],
+      inspections: [passedInspection],
+      evidence: approvedEvidence,
+      procurementCommitments: [
+        {
+          id: 'po-1',
+          packageId: tender.id,
+          type: 'purchase_order',
+          title: 'Main cable purchase order',
+          status: 'issued',
+          amount: 42000,
+          dueDate: '2026-07-15',
+        },
+        {
+          id: 'claim-1',
+          packageId: tender.id,
+          type: 'payment_claim',
+          title: 'Electrical final payment claim',
+          status: 'pending_approval',
+          amount: 30000,
+        },
+      ],
+      snags: [
+        { id: 'snag-1', packageId: tender.id, title: 'Exposed conduit', severity: 'high', status: 'open', dueDate: '2026-07-31' },
+        { id: 'snag-2', packageId: tender.id, title: 'Label DB board', severity: 'low', status: 'ready_for_inspection', dueDate: '2026-07-31' },
+      ],
+      asOf: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      'Main cable purchase order requires recorded human approval before procurement, subcontract, or payment effects are treated as valid.',
+      '1 high/critical snag remain open.',
+    ]));
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      'Electrical final payment claim is waiting for human approval.',
+      '2 snags overdue.',
+      '1 low/medium snag remain open.',
+    ]));
   });
 });
