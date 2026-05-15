@@ -14,6 +14,7 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `0fe1177b` | CI verification | Added reusable `npm run docs:api-contracts` validation and wired it into GitHub Actions so documented routes keep deterministic contract coverage. |
 | `7b604205` | API contract docs | Closed remaining documented non-legacy API contract gaps with appointment-readiness and legacy municipal helper examples; coverage audit now reports no uncovered non-legacy routes. |
 | `d47e07c0` | API contract docs | Added deterministic directory invitation, invitation response, project brief write, attachment, interpretation, and guided client brief contracts. |
 | `2f34541d` | API contract docs | Added deterministic command-centre projection, project team invitation, and coordination item contracts. |
@@ -79,8 +80,8 @@ The phase reports and commit history record the following validation categories:
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
 - Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 51 test files / 377 tests, and `npm run build` passed without the previous Vite circular chunk warning.
 - Sensitive workflow guard validation: focused guard coverage passed 6/6, including the docs/constants drift regression; the full checkpoint also passed `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` after the guard work.
-- CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
-- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs, ran repeated `git diff --check`, and completed the API contract coverage audit with 58 documented routes, 12 contract-example docs, 118 valid JSON blocks, and no uncovered non-legacy routes; `backend.html` remains untouched.
+- CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, `npm run docs:api-contracts`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
+- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs, ran repeated `git diff --check`, completed the API contract coverage audit with 58 documented routes, 12 contract-example docs, 118 valid JSON blocks, and no uncovered non-legacy routes, then reran focused verification: `npm run lint`, `npm run lint:tests`, and `npm run docs:api-contracts`; `backend.html` remains untouched.
 
 ## Remaining Blockers Requiring Human Confirmation
 
