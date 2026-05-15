@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { UserRoleEnum } from '../../lib/schemas';
 import {
+  CANONICAL_USER_ROLES,
   assertCanUserPerform,
   canAdminOverrideSeparationOfDuty,
   canUserPerform,
@@ -27,6 +29,10 @@ describe('permissionService', () => {
     expect(isCanonicalUserRole('subcontractor')).toBe(true);
     expect(isCanonicalUserRole('supplier')).toBe(true);
     expect(isCanonicalUserRole('unknown')).toBe(false);
+  });
+
+  it('keeps runtime role schema aligned with canonical permission roles', () => {
+    expect(new Set(UserRoleEnum.options)).toEqual(new Set(CANONICAL_USER_ROLES));
   });
 
   it('treats architect as a BEP subtype for authorization', () => {
