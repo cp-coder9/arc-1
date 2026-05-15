@@ -1092,6 +1092,78 @@ describe('api-router security and high-value integration routes', () => {
     expect(duplicate.status).toBe(409);
   });
 
+  it('routes AI drawing issues to verified assignees and tracks resolution review', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    seedVerifiedBepVerification();
+    seedVerifiedDirectoryVerification('freelancer-1', 'freelancer', 'freelancer', 'manual');
+
+    const routed = await request(app)
+      .post('/api/projects/project-1/ai-issues')
+      .set(authHeader('architect'))
+      .send({ title: 'Missing door schedule', description: 'AI detected missing schedule', severity: 'high', discipline: 'documentation', sourceSubmissionId: 'submission-1', sourceFindingIndex: 2, assigneeId: 'freelancer-1' });
+    const issueId = routed.body.issue.id;
+    const resolved = await request(app)
+      .post(`/api/projects/project-1/ai-issues/${issueId}/resolve`)
+      .set(authHeader('freelancer'))
+      .send({ resolutionNotes: 'Door schedule uploaded', evidenceUrls: ['https://files.public.blob.vercel-storage.com/door-schedule.pdf'] });
+    const reviewed = await request(app)
+      .post(`/api/projects/project-1/ai-issues/${issueId}/review`)
+      .set(authHeader('architect'))
+      .send({ decision: 'accepted', reviewNotes: 'Resolution accepted' });
+
+    expect(routed.status).toBe(201);
+    expect(routed.body.issue).toMatchObject({ title: 'Missing door schedule', status: 'assigned', resolutionStatus: 'unresolved', assigneeId: 'freelancer-1', assigneeVerificationId: 'freelancer-1_freelancer_freelancer_manual' });
+    expect(resolved.status).toBe(200);
+    expect(resolved.body).toMatchObject({ status: 'resolved', resolutionStatus: 'resolved_pending_review', resolvedBy: 'freelancer-1', evidenceUrls: ['https://files.public.blob.vercel-storage.com/door-schedule.pdf'] });
+    expect(reviewed.status).toBe(200);
+    expect(reviewed.body).toMatchObject({ status: 'closed', resolutionStatus: 'accepted', reviewedBy: 'architect-1' });
+    expect(mockAdminDb.getDoc(`projects/project-1/ai_issues/${issueId}`)).toMatchObject({ status: 'closed', resolutionStatus: 'accepted' });
+    expect(mockAdminDb.listCollection('notifications')[0].data).toMatchObject({ userId: 'freelancer-1', type: 'message' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'ai.issue_routed')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'ai.issue_resolution_accepted')).toBe(true);
+  });
+
+  it('blocks AI issue routing to unverified assignees and freelancer resolution of unrelated issues', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockAdminDb.seed('projects/project-1/ai_issues/issue-1', { id: 'issue-1', projectId: 'project-1', title: 'Unassigned issue', status: 'open', assigneeId: 'someone-else' });
+    seedVerifiedBepVerification();
+    seedVerifiedDirectoryVerification('freelancer-1', 'freelancer', 'freelancer', 'manual');
+
+    const blockedRoute = await request(app)
+      .post('/api/projects/project-1/ai-issues')
+      .set(authHeader('architect'))
+      .send({ title: 'Unverified assignee', assigneeId: 'contractor-1' });
+    const blockedResolve = await request(app)
+      .post('/api/projects/project-1/ai-issues/issue-1/resolve')
+      .set(authHeader('freelancer'))
+      .send({ resolutionNotes: 'Trying to resolve unrelated issue' });
+
+    expect(blockedRoute.status).toBe(403);
+    expect(blockedRoute.body).toMatchObject({ verificationRequired: { role: 'contractor' } });
+    expect(blockedResolve.status).toBe(403);
+    expect(blockedResolve.body.error).toContain('Only the assignee');
+  });
+
   it('runs the verified freelancer work package lifecycle from posting to approval', async () => {
     const app = await buildApp();
     mockAdminDb.seed('projects/project-1', {

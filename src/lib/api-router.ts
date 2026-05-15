@@ -1626,6 +1626,151 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
   }
 });
 
+router.post("/projects/:projectId/ai-issues", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext, project } = await getProjectCoordinatorContext(req, projectId);
+    const title = sanitizeCoordinationString(req.body.title, 240);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const assigneeId = sanitizeCoordinationString(req.body.assigneeId, 128) || null;
+    const now = new Date().toISOString();
+    let assigneeRole: DirectoryTargetRole | null = null;
+    let assigneeVerificationId: string | null = null;
+
+    if (assigneeId) {
+      const assigneeDoc = await adminDb.collection('users').doc(assigneeId).get();
+      if (!assigneeDoc.exists) return res.status(404).json({ error: 'Assignee profile not found' });
+      const assigneeProfile = assigneeDoc.data() as Record<string, any>;
+      assigneeRole = normalizeUserRole(assigneeProfile.role) as DirectoryTargetRole;
+      if (!DIRECTORY_TARGET_ROLES.includes(assigneeRole)) return res.status(400).json({ error: 'Unsupported assignee role' });
+      const verification = await getDirectoryVerification(assigneeId, assigneeRole);
+      if (!verification) return res.status(403).json({ error: 'Verified assignee is required before routing AI issues', verificationRequired: { role: assigneeRole } });
+      assigneeVerificationId = verification.id;
+    }
+
+    const issueRef = adminDb.collection('projects').doc(projectId).collection('ai_issues').doc();
+    const issue = {
+      id: issueRef.id,
+      projectId,
+      jobId: project.jobId || null,
+      sourceSubmissionId: sanitizeCoordinationString(req.body.sourceSubmissionId, 128) || null,
+      sourceFindingIndex: Number.isInteger(Number(req.body.sourceFindingIndex)) ? Number(req.body.sourceFindingIndex) : null,
+      title,
+      description: sanitizeCoordinationString(req.body.description, 4000),
+      severity: sanitizeCoordinationString(req.body.severity, 40) || 'medium',
+      discipline: sanitizeCoordinationString(req.body.discipline, 80) || null,
+      responsibleParty: sanitizeCoordinationString(req.body.responsibleParty, 80) || null,
+      standardReference: sanitizeCoordinationString(req.body.standardReference, 200) || null,
+      assigneeId,
+      assigneeRole,
+      assigneeVerificationId,
+      status: assigneeId ? 'assigned' : 'open',
+      resolutionStatus: 'unresolved',
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await issueRef.set(issue);
+
+    if (assigneeId) {
+      await adminDb.collection('notifications').add({
+        userId: assigneeId,
+        type: 'message',
+        title: 'AI drawing issue assigned',
+        body: `${authContext.userData?.displayName || authContext.decoded.displayName || 'A project coordinator'} assigned you an AI drawing issue: ${title}.`,
+        data: { projectId, aiIssueId: issueRef.id, jobId: project.jobId, senderId: authContext.uid },
+        isRead: false,
+        channels: ['in_app', 'email'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    }
+
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: 'ai.issue_routed',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'ai_issue', id: issueRef.id, projectId },
+      metadata: { assigneeId, assigneeRole, severity: issue.severity, discipline: issue.discipline, sourceSubmissionId: issue.sourceSubmissionId },
+    });
+    res.status(201).json({ issue });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/ai-issues/:issueId/resolve", async (req, res) => {
+  try {
+    const { projectId, issueId } = req.params;
+    const authContext = await getAuthContext(req.headers);
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) return res.status(404).json({ error: 'Project not found' });
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Record<string, any>;
+    const issueRef = adminDb.collection('projects').doc(projectId).collection('ai_issues').doc(issueId);
+    const issueSnap = await issueRef.get();
+    if (!issueSnap.exists) return res.status(404).json({ error: 'AI issue not found' });
+    const issue = issueSnap.data() as Record<string, any>;
+    const canResolve = authContext.isAdmin || project.leadArchitectId === authContext.uid || issue.assigneeId === authContext.uid || isActiveProjectTeamMember(project, authContext.uid);
+    if (!canResolve) return res.status(403).json({ error: 'Only the assignee, active project team, lead BEP, or admin can resolve this issue' });
+    if (normalizeUserRole(authContext.role) === 'freelancer' && issue.assigneeId !== authContext.uid) return res.status(403).json({ error: 'Freelancers can only resolve issues assigned to them' });
+
+    const evidenceUrls = sanitizeEvidenceUrls(req.body.evidenceUrls);
+    const now = new Date().toISOString();
+    const update = {
+      status: 'resolved',
+      resolutionStatus: 'resolved_pending_review',
+      resolvedBy: authContext.uid,
+      resolvedAt: now,
+      resolutionNotes: sanitizeCoordinationString(req.body.resolutionNotes, 3000),
+      evidenceUrls,
+      updatedAt: now,
+    };
+    await issueRef.set(update, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: 'ai.issue_resolved',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'ai_issue', id: issueId, projectId },
+      metadata: { evidenceCount: evidenceUrls.length },
+    });
+    res.json({ id: issueId, ...update });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/projects/:projectId/ai-issues/:issueId/review", async (req, res) => {
+  try {
+    const { projectId, issueId } = req.params;
+    const { authContext } = await getProjectLeadContext(req, projectId);
+    const decision = sanitizeCoordinationString(req.body.decision, 20);
+    if (!['accepted', 'reopened'].includes(decision)) return res.status(400).json({ error: 'decision must be accepted or reopened' });
+    const issueRef = adminDb.collection('projects').doc(projectId).collection('ai_issues').doc(issueId);
+    const issueSnap = await issueRef.get();
+    if (!issueSnap.exists) return res.status(404).json({ error: 'AI issue not found' });
+    const now = new Date().toISOString();
+    const update = {
+      status: decision === 'accepted' ? 'closed' : 'assigned',
+      resolutionStatus: decision === 'accepted' ? 'accepted' : 'reopened',
+      reviewedBy: authContext.uid,
+      reviewedAt: now,
+      reviewNotes: sanitizeCoordinationString(req.body.reviewNotes, 3000),
+      updatedAt: now,
+    };
+    await issueRef.set(update, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'approval',
+      action: `ai.issue_resolution_${decision}`,
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'ai_issue', id: issueId, projectId },
+      metadata: { decision },
+    });
+    res.json({ id: issueId, ...update });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
 router.post("/projects/:projectId/work-packages", async (req, res) => {
   try {
     const { projectId } = req.params;
