@@ -1,5 +1,13 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { JobCreateSchema, ApplicationCreateSchema, ReviewCreateSchema, validateForm, UserRoleEnum, NotificationTypeEnum } from '../lib/schemas';
+import {
+  ApplicationCreateSchema,
+  JobCreateSchema,
+  NotificationSchema,
+  NotificationTypeEnum,
+  ReviewCreateSchema,
+  UserRoleEnum,
+  validateForm,
+} from '../lib/schemas';
 
 describe('Validation Schemas', () => {
   describe('JobCreateSchema', () => {
@@ -179,6 +187,24 @@ describe('Validation Schemas', () => {
         const result = NotificationTypeEnum.safeParse(type);
         expect(result.success).toBe(true);
       }
+    });
+
+    it('should accept directory invitation notification metadata fields', () => {
+      const result = NotificationSchema.safeParse({
+        userId: 'user-1',
+        type: 'directory_invitation',
+        title: 'Directory Invitation',
+        body: 'You have been invited to a project',
+        data: {
+          invitationId: 'invite-1',
+          projectId: 'project-1',
+          workPackageId: 'package-1',
+          senderId: 'client-1',
+          discipline: 'architecture',
+        },
+      });
+
+      expect(result.success).toBe(true);
     });
 
     const reviewTypes = ['client_to_architect', 'architect_to_client', 'to_bep', 'from_bep', 'to_freelancer'];
