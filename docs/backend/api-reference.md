@@ -24,6 +24,8 @@ Base path is the Express API router mount, typically `/api`. All state-changing 
 
 ## Directory APIs
 
+Deterministic request/response examples for profile projection, directory search, and admin verification review routes are maintained in `docs/backend/profile-directory-verification-api-contract-examples.md`.
+
 ### Route alias: `/api/directory/search`
 
 When this router is mounted at `/api`, the canonical route alias is also exposed as `GET /api/directory/search` for clients generated from the platform API namespace. It delegates to the same verified directory search handler as `GET /directory/search`, writes the same `directory.search` audit event, and returns the same `results` payload.
