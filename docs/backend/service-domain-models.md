@@ -115,6 +115,7 @@ Representative tests and deterministic contract examples:
 - `src/services/__tests__/cpdService.test.ts`
 - `src/services/__tests__/resourceBookingService.test.ts`
 - `docs/backend/cpd-service-contract-examples.md`
+- `docs/backend/resource-booking-service-contract-examples.md`
 
 ## Route and persistence integration checklist
 
