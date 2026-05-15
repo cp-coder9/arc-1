@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
 const registrySource = registryMatch?.[1] ?? '';
+const resourceLinksMatch = appSource.match(/const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink\[]> = \{([\s\S]*?)\n\};/);
+const resourceLinksSource = resourceLinksMatch?.[1] ?? '';
+
+const canonicalRoles = ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'];
+const designTeamRoles = ['bep', 'architect'];
 
 const findPageEntry = (id: string) => {
   const entry = registrySource
@@ -15,7 +21,6 @@ const findPageEntry = (id: string) => {
 };
 
 const entryIncludesRole = (entry: string, role: string) => {
-  const designTeamRoles = ['bep', 'architect'];
   return entry.includes(`'${role}'`) || (designTeamRoles.includes(role) && entry.includes('DESIGN_TEAM_ROLES'));
 };
 
@@ -28,11 +33,14 @@ const expectPage = (id: string, label: string, roles: string[]) => {
   }
 };
 
+const extractPageIds = () => [...registrySource.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
+const extractResourceLinkPageIds = () => [...resourceLinksSource.matchAll(/^\s{2}'?([a-z0-9-]+)'?: \[/gm)].map((match) => match[1]);
+const extractResourceHrefs = () => [...resourceLinksSource.matchAll(/href: '([^']+)'/g)].map((match) => match[1]);
+
 describe('canonical dashboard page registry', () => {
   it('keeps backend.html shared workflow pages exposed for every canonical role', () => {
     expect(registryMatch, 'CANONICAL_DASHBOARD_PAGES should remain statically discoverable').toBeTruthy();
 
-    const canonicalRoles = ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'];
     const sharedPages = [
       ['command', 'Command Centre'],
       ['profile', 'Profile Editor'],
@@ -65,5 +73,90 @@ describe('canonical dashboard page registry', () => {
     expectPage('freelancer-work', 'Assigned Work', ['freelancer']);
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
     expectPage('admin-console', 'Admin Console', ['admin']);
+  });
+
+  it('keeps registry ids unique and every shell-backed page statically routable', () => {
+    const pageIds = extractPageIds();
+    expect(pageIds.length, 'Expected dashboard page ids to be statically discoverable').toBeGreaterThan(20);
+    expect(new Set(pageIds).size, 'Dashboard page ids must be unique').toBe(pageIds.length);
+
+    expect(appSource).toContain('const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));');
+    expect(appSource).toContain('function pagesForRole(role: UserRole)');
+    expect(appSource).toContain('function pageById(pageId: string)');
+    expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab)');
+  });
+});
+
+describe('dashboard resource links', () => {
+  it('keeps resource links statically discoverable and attached to registered pages', () => {
+    expect(resourceLinksMatch, 'DASHBOARD_RESOURCE_LINKS should remain statically discoverable').toBeTruthy();
+
+    const pageIds = new Set(extractPageIds());
+    const linkedPageIds = extractResourceLinkPageIds();
+
+    expect(linkedPageIds).toEqual(expect.arrayContaining([
+      'toolbox',
+      'journey',
+      'tasks',
+      'directory-search',
+      'ai',
+      'knowledge',
+      'resource-centre',
+      'procurement',
+      'packages',
+    ]));
+
+    for (const pageId of linkedPageIds) {
+      expect(pageIds.has(pageId), `Resource links must point at registered dashboard page ${pageId}`).toBe(true);
+    }
+  });
+
+  it('points every dashboard resource link at a committed local documentation file', () => {
+    const hrefs = extractResourceHrefs();
+    expect(hrefs.length, 'Expected dashboard resource hrefs to be statically discoverable').toBeGreaterThan(10);
+
+    for (const href of hrefs) {
+      expect(href.startsWith('/docs/'), `Dashboard resource href ${href} should stay under /docs`).toBe(true);
+      expect(existsSync(resolve(process.cwd(), href.slice(1))), `Dashboard resource href ${href} should resolve to a repo file`).toBe(true);
+    }
+  });
+
+  it('keeps the dashboard shell rendering resource links with safe external-tab attributes', () => {
+    expect(appSource).toContain('resourcesForShell(pageId, user.role)');
+    expect(appSource).toContain('target="_blank"');
+    expect(appSource).toContain('rel="noreferrer"');
+  });
+});
+
+describe('backend.html dashboard alignment invariants', () => {
+  it('keeps App.tsx labels aligned with the backend.html canonical role/page matrix terms', () => {
+    const backendTermsByPage = [
+      ['command', 'Command Centre'],
+      ['toolbox', 'Project Toolbox'],
+      ['journey', 'Project Journey'],
+      ['tasks', 'Tasks & Approvals'],
+      ['messages', 'Project Messenger'],
+      ['programme', 'Programme'],
+      ['disputes', 'Dispute Resolution'],
+      ['payments', 'Payments'],
+      ['contracts', 'Contracts'],
+      ['escrow', 'Escrow Service'],
+      ['ai', 'AI Co-Pilot'],
+      ['client-intake', 'Guided Brief Wizard'],
+      ['technical-brief', 'Technical Brief Editor'],
+      ['resource-centre', 'Resource Centre'],
+    ] as const;
+
+    for (const [pageId, backendTerm] of backendTermsByPage) {
+      findPageEntry(pageId);
+      expect(backendSource, `backend.html should still contain canonical term ${backendTerm}`).toContain(backendTerm);
+    }
+  });
+
+  it('preserves explicit backend.html alignment copy in dashboard shell and citations', () => {
+    expect(appSource).toContain('DASHBOARD_ALIGNMENT_CITATIONS');
+    expect(appSource).toContain('backend.html role/page matrix');
+    expect(appSource).toContain('AI Co-Pilot canonical page requirement');
+    expect(appSource).toContain('Resource Centre / Checklists canonical page requirement');
   });
 });
