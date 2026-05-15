@@ -448,6 +448,74 @@ describe('api-router security and high-value integration routes', () => {
     });
   });
 
+  it('creates project briefs with canonical service sanitization and audit metadata', async () => {
+    const app = await buildApp();
+
+    const response = await request(app)
+      .post('/api/project-briefs')
+      .set(authHeader('client'))
+      .send({
+        title: '  Residential alteration  ',
+        description: '  Need plans for additions  ',
+        category: 'Residential',
+        location: 'Cape Town',
+        budgetRange: { min: 50000, max: 100000 },
+        requirements: ['  survey  ', '', 'concept design'],
+        propertyDetails: { erf: '123', nested: { ignored: true }, vacant: null },
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.brief).toMatchObject({
+      clientId: 'client-1',
+      createdBy: 'client-1',
+      title: 'Residential alteration',
+      description: 'Need plans for additions',
+      requirements: ['survey', 'concept design'],
+      propertyDetails: { erf: '123', vacant: null },
+      status: 'submitted',
+    });
+    expect(mockAdminDb.getDoc(`project_briefs/${response.body.brief.id}`)).toMatchObject({ clientId: 'client-1', status: 'submitted' });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
+      category: 'project',
+      action: 'project_brief.created',
+      metadata: { clientId: 'client-1', status: 'submitted', canonicalRoute: true },
+    });
+  });
+
+  it('persists project brief attachments and advisory interpretations with owner gates', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'Alteration', description: 'Scope', status: 'submitted', assignedBepIds: ['architect-1'] });
+
+    const forbiddenAttachment = await request(app)
+      .post('/api/project-briefs/brief-1/attachments')
+      .set(authHeader('intruder'))
+      .send({ fileName: 'survey.pdf', fileUrl: 'https://files.public.blob.vercel-storage.com/survey.pdf' });
+    const attachment = await request(app)
+      .post('/api/project-briefs/brief-1/attachments')
+      .set(authHeader('client'))
+      .send({ fileName: 'survey.pdf', fileUrl: 'https://files.public.blob.vercel-storage.com/survey.pdf', evidenceType: 'survey' });
+    const interpretation = await request(app)
+      .post('/api/project-briefs/brief-1/interpretations')
+      .set(authHeader('architect'))
+      .send({ summary: 'Likely needs an architect and municipal submission.', confidence: 0.75, sourceAttachmentIds: [attachment.body.attachment.id] });
+
+    expect(forbiddenAttachment.status).toBe(403);
+    expect(attachment.status).toBe(201);
+    expect(attachment.body.attachment).toMatchObject({ briefId: 'brief-1', clientId: 'client-1', uploadedBy: 'client-1', evidenceType: 'survey', storageProvider: 'vercel_blob' });
+    expect(mockAdminDb.listCollection('project_briefs/brief-1/attachments')[0].data).toMatchObject({ fileName: 'survey.pdf', evidenceType: 'survey' });
+    expect(interpretation.status).toBe(201);
+    expect(interpretation.body.interpretation).toMatchObject({
+      briefId: 'brief-1',
+      clientId: 'client-1',
+      createdBy: 'architect-1',
+      advisoryOnly: true,
+      confidence: 0.75,
+      sourceAttachmentIds: [attachment.body.attachment.id],
+      status: 'ready_for_review',
+    });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'project_brief.attachment_added' && data.metadata.canonicalRoute === true)).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'project_brief.interpretation_added' && data.category === 'ai' && data.metadata.advisoryOnly === true)).toBe(true);
+  });
 
   it('persists AI action logs, creates review queue items, resolves with human sign-off, and audits both steps', async () => {
     const app = await buildApp();

@@ -34,6 +34,11 @@ import {
   type AiActionLogInput,
   type HumanSignOffInput,
 } from "../services/aiGovernanceService";
+import {
+  buildBriefInterpretation,
+  buildProjectAttachmentMetadata,
+  buildProjectBrief,
+} from "../services/briefWorkflowService";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -1286,6 +1291,72 @@ function getDrawingUrls(body: any): string[] {
   if (body.drawingUrl) urls.unshift(body.drawingUrl);
   return Array.from(new Set(urls.filter(Boolean)));
 }
+
+router.post("/project-briefs", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (authContext.normalizedRole !== 'client' && !authContext.isAdmin) return res.status(403).json({ error: 'Only clients can create project briefs' });
+    const clientId = authContext.isAdmin && typeof req.body.clientId === 'string' ? req.body.clientId : authContext.uid;
+    const brief = buildProjectBrief({ ...req.body, clientId, createdBy: clientId });
+    const briefRef = await adminDb.collection('project_briefs').add(brief);
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'project_brief.created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project_brief', id: briefRef.id, projectId: briefRef.id },
+      metadata: { clientId, status: brief.status, canonicalRoute: true },
+    });
+    res.status(201).json({ brief: { id: briefRef.id, ...brief } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/project-briefs/:briefId/attachments", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { briefId } = req.params;
+    const briefSnap = await adminDb.collection('project_briefs').doc(briefId).get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Project brief not found' });
+    const brief = briefSnap.data() as Record<string, any>;
+    if (!authContext.isAdmin && brief.clientId !== authContext.uid) return res.status(403).json({ error: 'Only the brief owner can attach evidence' });
+    const attachment = buildProjectAttachmentMetadata({ ...req.body, briefId, clientId: brief.clientId, uploadedBy: authContext.uid });
+    const attachmentRef = await adminDb.collection('project_briefs').doc(briefId).collection('attachments').add(attachment);
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'project_brief.attachment_added',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project_brief_attachment', id: attachmentRef.id, projectId: briefId },
+      metadata: { briefId, clientId: brief.clientId, evidenceType: attachment.evidenceType, canonicalRoute: true },
+    });
+    res.status(201).json({ attachment: { id: attachmentRef.id, ...attachment } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/project-briefs/:briefId/interpretations", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { briefId } = req.params;
+    const briefSnap = await adminDb.collection('project_briefs').doc(briefId).get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Project brief not found' });
+    const brief = briefSnap.data() as Record<string, any>;
+    if (!canReadClientBrief(authContext, brief)) return res.status(403).json({ error: 'Only the brief owner, admin, or assigned BEP can add interpretations' });
+    const interpretation = buildBriefInterpretation({ ...req.body, briefId, clientId: brief.clientId, createdBy: authContext.uid, createdByRole: authContext.role || 'unknown' });
+    const interpretationRef = await adminDb.collection('project_briefs').doc(briefId).collection('interpretations').add(interpretation);
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: 'project_brief.interpretation_added',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project_brief_interpretation', id: interpretationRef.id, projectId: briefId },
+      metadata: { briefId, clientId: brief.clientId, advisoryOnly: true, confidence: interpretation.confidence, canonicalRoute: true },
+    });
+    res.status(201).json({ interpretation: { id: interpretationRef.id, ...interpretation } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
 
 router.post("/auth/check-admin", async (req, res) => {
   let decoded;
