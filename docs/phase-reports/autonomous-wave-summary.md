@@ -14,6 +14,7 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `8f9be439` | API contract docs | Added deterministic project-scoped municipal tracker contract examples with control/insight views and human confirmation boundaries. |
 | `ec1f1cc4` | API contract docs | Added deterministic resource centre and drawing checklist contract examples. |
 | `d7799612` | API contract docs | Updated API contract coverage summary for profile, directory, and verification examples. |
 | `aabbc9dc` | API contract docs | Added deterministic profile, directory search, and admin verification review contract examples. |
@@ -65,12 +66,12 @@ The phase reports and commit history record the following validation categories:
 
 - Service/unit workflow coverage for project workflow write APIs, service workflow edge cases, package readiness, financial/appointment helpers, CPD logic, resource booking conflict and ledger behavior, and contractor readiness helpers.
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
-- API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic API examples now cover project brief list/detail, opportunity detail, proposal detail, profile update/projection, directory search, admin verification review/recheck responses, resource centre reads/writes, and drawing checklist item status workflows.
+- API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic API examples now cover project brief list/detail, opportunity detail, proposal detail, profile update/projection, directory search, admin verification review/recheck responses, resource centre reads/writes, drawing checklist item status workflows, and project-scoped municipal tracker status/control views.
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
 - Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 51 test files / 377 tests, and `npm run build` passed without the previous Vite circular chunk warning.
 - Sensitive workflow guard validation: focused guard coverage passed 6/6, including the docs/constants drift regression; the full checkpoint also passed `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` after the guard work.
 - CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
-- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs including resource/checklist examples, ran `git diff --check`, and confirmed `backend.html` remains untouched.
+- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs including resource/checklist and municipal tracker examples, ran `git diff --check`, and confirmed `backend.html` remains untouched.
 
 ## Remaining Blockers Requiring Human Confirmation
 
@@ -93,7 +94,7 @@ These tasks are safe because they avoid irreversible external actions, live paym
 
 1. Keep expanding automated tests around existing route handlers, component shells, and Firestore/static rules using local mocks and deterministic fixtures.
 2. Add non-production API contract examples for any remaining documented endpoints, clearly marked as mock/dev fixtures.
-3. Extend docs with request/response examples for any remaining project workflow, municipal evidence, CPD sync, and admin review endpoints not yet covered by dedicated contract examples.
+3. Extend docs with request/response examples for any remaining project workflow, CPD sync, and legacy municipal helper endpoints not yet covered by dedicated contract examples.
 4. Keep browser smoke tests current for dashboard shells using `backend.html` as read-only reference, and extend them only with deterministic local mocks.
 5. Build read-only admin review queue views for verification, CPD sync status, municipal evidence status, and provider integration readiness without enabling external submission.
 6. Wire the sensitive workflow guard helper into future live-effect route handlers, but only after the corresponding product/legal/provider confirmations are complete.
