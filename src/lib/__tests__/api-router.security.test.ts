@@ -1092,6 +1092,53 @@ describe('api-router security and high-value integration routes', () => {
     expect(duplicate.status).toBe(409);
   });
 
+  it('returns and persists a permission-gated project command-centre projection', async () => {
+    const app = await buildApp();
+    seedVerifiedBepVerification('architect-1');
+    mockAdminDb.seed('projects/project-command-1', {
+      projectCode: 'ARC-20260102-ABC123',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'appointment',
+      stageHistory: [{ stage: 'appointment', enteredAt: '2026-01-02T00:00:00.000Z' }],
+      teamMembers: [
+        { userId: 'client-1', role: 'client', status: 'active' },
+        { userId: 'architect-1', role: 'architect', discipline: 'architecture', status: 'active', verificationId: 'ver-1' },
+      ],
+    });
+    mockAdminDb.seed('projects/project-command-1/tasks/task-1', { status: 'open', dueDate: '2026-01-01T00:00:00.000Z' });
+    mockAdminDb.seed('projects/project-command-1/tasks/task-2', { status: 'completed' });
+    mockAdminDb.seed('projects/project-command-1/approvals/approval-1', { status: 'pending' });
+    mockAdminDb.seed('projects/project-command-1/documents/doc-1', { updatedAt: '2026-01-02T01:00:00.000Z' });
+    mockAdminDb.seed('projects/project-command-1/message_threads/thread-1', { unreadFor: ['architect-1'] });
+    mockAdminDb.seed('projects/project-command-1/ai_issues/issue-1', { resolutionStatus: 'unresolved' });
+
+    const forbidden = await request(app)
+      .get('/api/projects/project-command-1/command-centre')
+      .set(authHeader('intruder'));
+    const response = await request(app)
+      .get('/api/projects/project-command-1/command-centre')
+      .set(authHeader('architect'));
+
+    expect(forbidden.status).toBe(403);
+    expect(response.status).toBe(200);
+    expect(response.body.commandCentre).toMatchObject({
+      projectId: 'project-command-1',
+      projectCode: 'ARC-20260102-ABC123',
+      viewer: { userId: 'architect-1', role: 'lead_bep', normalizedUserRole: 'bep' },
+      team: { activeCount: 2, leadBepId: 'architect-1' },
+      panels: {
+        tasks: { total: 2, open: 1, overdue: 1 },
+        approvals: { total: 1, pending: 1 },
+        documents: { total: 1, latestRevisionAt: '2026-01-02T01:00:00.000Z' },
+        messages: { threadCount: 1, unreadForViewer: 1 },
+        aiIssues: { total: 1, unresolved: 1 },
+      },
+    });
+    expect(mockAdminDb.getDoc('project_command_views/project-command-1_architect-1')).toMatchObject({ projectId: 'project-command-1', viewer: { role: 'lead_bep' } });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'project.command_centre_viewed')).toBe(true);
+  });
+
   it('routes AI drawing issues to verified assignees and tracks resolution review', async () => {
     const app = await buildApp();
     mockAdminDb.seed('projects/project-1', {
@@ -1456,6 +1503,93 @@ describe('api-router security and high-value integration routes', () => {
 
     expect(blocked.status).toBe(403);
     expect(blocked.body.error).toContain('not eligible');
+  });
+
+  it('limits resource centre publishing and browsing to verified BEPs and freelancers', async () => {
+    const app = await buildApp();
+    seedVerifiedBepVerification();
+    seedVerifiedDirectoryVerification('freelancer-1', 'freelancer', 'freelancer', 'manual');
+
+    const created = await request(app)
+      .post('/api/resources/centre')
+      .set(authHeader('architect'))
+      .send({
+        resourceType: 'submission_portal',
+        title: 'Cape Town portal',
+        municipality: 'City of Cape Town',
+        submissionType: 'Building plan submission',
+        discipline: 'architectural',
+        url: 'https://example.gov.za/portal',
+        tags: ['municipal', 'portal'],
+        checklistItems: [{ id: 'owner-consent', title: 'Owner consent', status: 'complete' }],
+      });
+    const freelancerBrowse = await request(app)
+      .get('/api/resources/centre?municipality=cape&resourceType=submission_portal')
+      .set(authHeader('freelancer'));
+    const clientBlocked = await request(app)
+      .get('/api/resources/centre')
+      .set(authHeader('client'));
+
+    expect(created.status).toBe(201);
+    expect(created.body.resource).toMatchObject({ resourceType: 'submission_portal', title: 'Cape Town portal', municipality: 'City of Cape Town', createdBy: 'architect-1' });
+    expect(created.body.resource.checklistItems[0]).toMatchObject({ id: 'owner-consent', status: 'complete' });
+    expect(freelancerBrowse.status).toBe(200);
+    expect(freelancerBrowse.body.resources).toHaveLength(1);
+    expect(clientBlocked.status).toBe(403);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'resource_centre.resource_created')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'resource_centre.resources_viewed')).toBe(true);
+  });
+
+  it('tracks municipal drawing checklist requirements and component completion', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'municipal_submission',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    seedVerifiedBepVerification();
+
+    const created = await request(app)
+      .post('/api/projects/project-1/checklists/drawing')
+      .set(authHeader('architect'))
+      .send({
+        municipality: 'City of Cape Town',
+        submissionType: 'alterations',
+        stage: 'municipal_submission',
+        disciplines: ['architectural', 'fire'],
+        linkedDrawingIds: ['A-100'],
+        linkedMunicipalSubmissionId: 'municipal-1',
+        linkedTaskBoardIds: ['task-1'],
+        requirements: [{ id: 'site-plan', title: 'Site plan', status: 'in_progress', responsibleParty: 'architect-1', linkedDrawingIds: ['A-100'] }],
+        componentChecks: [{ id: 'north-point', title: 'North point', discipline: 'architectural' }],
+      });
+    const checklistId = created.body.checklist.id;
+    const updated = await request(app)
+      .post(`/api/projects/project-1/checklists/drawing/${checklistId}/items/north-point/status`)
+      .set(authHeader('architect'))
+      .send({ status: 'complete', notes: 'North point added to all sheets', linkedDrawingIds: ['A-100'] });
+    const clientView = await request(app)
+      .get('/api/projects/project-1/checklists/drawing')
+      .set(authHeader('client'));
+    const intruderView = await request(app)
+      .get('/api/projects/project-1/checklists/drawing')
+      .set(authHeader('intruder'));
+
+    expect(created.status).toBe(201);
+    expect(created.body.checklist).toMatchObject({ municipality: 'City of Cape Town', submissionType: 'alterations', progress: { total: 2, complete: 0 } });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({ progress: { total: 2, complete: 1 } });
+    expect(updated.body.componentChecks[0]).toMatchObject({ id: 'north-point', status: 'complete', notes: 'North point added to all sheets' });
+    expect(clientView.status).toBe(200);
+    expect(clientView.body.checklists[0]).toMatchObject({ id: checklistId, progress: { total: 2, complete: 1 } });
+    expect(intruderView.status).toBe(403);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'resource_centre.drawing_checklist_created')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'resource_centre.drawing_checklist_item_updated')).toBe(true);
   });
 
   it('lets verified lead BEPs manage municipal tracker records and publishes client insights', async () => {

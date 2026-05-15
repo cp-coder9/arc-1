@@ -938,6 +938,8 @@ async function projectDirectoryProfile(userId: string, profile: Record<string, a
 
 const COORDINATION_ITEM_TYPES = ['deliverable', 'dependency', 'rfi', 'comment_thread', 'transmittal', 'deadline', 'compliance_status', 'municipal_readiness'] as const;
 const COORDINATION_STATUSES = ['open', 'in_progress', 'blocked', 'submitted', 'resolved', 'closed'] as const;
+const RESOURCE_CENTRE_TYPES = ['municipal_link', 'inspector_contact', 'fire_contact', 'drainage_roads_contact', 'submission_portal', 'zoning_portal', 'template', 'poa_template', 'checklist'] as const;
+const CHECKLIST_ITEM_STATUSES = ['not_started', 'in_progress', 'blocked', 'complete', 'not_applicable'] as const;
 
 function sanitizeCoordinationString(value: unknown, maxLength = 1000): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
@@ -994,6 +996,52 @@ async function getVerifiedFreelancerContext(req: express.Request) {
 
 function sanitizeWorkPackageRequirements(value: unknown): string[] {
   return sanitizeCoordinationStringArray(value, 50);
+}
+
+async function getResourceCentreContext(req: express.Request) {
+  const authContext = await getAuthContext(req.headers);
+  const normalizedRole = normalizeUserRole(authContext.role);
+  if (authContext.isAdmin) return { authContext, verification: null };
+  if (normalizedRole === 'bep') {
+    const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+    if (!verification) {
+      throw Object.assign(new Error('Active BEP verification is required for resource centre access'), { status: 403, verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    }
+    return { authContext, verification };
+  }
+  if (normalizedRole === 'freelancer') {
+    const verification = await getActiveUserVerification(authContext.uid, 'freelancer');
+    if (!verification) {
+      throw Object.assign(new Error('Freelancer verification is required for resource centre access'), { status: 403, verificationRequired: { role: 'freelancer' } });
+    }
+    return { authContext, verification };
+  }
+  throw Object.assign(new Error('Resource centre access is limited to verified BEPs and freelancers'), { status: 403 });
+}
+
+function sanitizeResourceType(value: unknown) {
+  const candidate = sanitizeCoordinationString(value, 80);
+  return RESOURCE_CENTRE_TYPES.includes(candidate as any) ? candidate : 'checklist';
+}
+
+function sanitizeChecklistItem(value: unknown, index: number) {
+  const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const status = sanitizeCoordinationString(record.status, 80);
+  return {
+    id: sanitizeCoordinationString(record.id, 120) || `item-${index + 1}`,
+    title: sanitizeCoordinationString(record.title || record.requirement || record.component, 240) || `Checklist item ${index + 1}`,
+    status: CHECKLIST_ITEM_STATUSES.includes(status as any) ? status : 'not_started',
+    responsibleParty: sanitizeCoordinationString(record.responsibleParty || record.assigneeId, 160) || null,
+    discipline: sanitizeCoordinationString(record.discipline, 120) || null,
+    notes: sanitizeCoordinationString(record.notes, 1000),
+    linkedDrawingIds: sanitizeCoordinationStringArray(record.linkedDrawingIds, 20),
+    linkedTaskIds: sanitizeCoordinationStringArray(record.linkedTaskIds, 20),
+  };
+}
+
+function sanitizeChecklistItems(value: unknown, maxItems = 80) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, maxItems).map(sanitizeChecklistItem);
 }
 
 const CLIENT_BRIEF_SUPPORT_NEEDS = new Set(['plans', 'approvals', 'construction_pricing', 'full_delivery_support', 'unsure']);
@@ -1623,6 +1671,93 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
     res.status(201).json({ project, contract, escrowId: projectRef.id, paymentId: paymentRef.id, invoices });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/projects/:projectId/command-centre", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext, project } = await getProjectCoordinatorContext(req, projectId);
+    const projectDoc = adminDb.collection('projects').doc(projectId);
+    const [tasksSnap, approvalsSnap, documentsSnap, threadsSnap, aiIssuesSnap] = await Promise.all([
+      projectDoc.collection('tasks').get(),
+      projectDoc.collection('approvals').get(),
+      projectDoc.collection('documents').get(),
+      projectDoc.collection('message_threads').get(),
+      projectDoc.collection('ai_issues').get(),
+    ]);
+
+    const activeTeamMembers = Array.isArray(project.teamMembers)
+      ? project.teamMembers.filter((member: Record<string, any>) => member.status === 'active')
+      : [];
+    const tasks = tasksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>));
+    const approvals = approvalsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>));
+    const documents = documentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>));
+    const threads = threadsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>));
+    const aiIssues = aiIssuesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>));
+    const viewerProjectRole = authContext.isAdmin
+      ? 'admin'
+      : project.clientId === authContext.uid
+        ? 'client'
+        : project.leadArchitectId === authContext.uid || project.leadBepId === authContext.uid
+          ? 'lead_bep'
+          : activeTeamMembers.find((member: Record<string, any>) => member.userId === authContext.uid)?.role || 'team_member';
+
+    const commandCentre = {
+      id: projectId,
+      projectId,
+      projectCode: project.projectCode || null,
+      viewer: { userId: authContext.uid, role: viewerProjectRole, normalizedUserRole: authContext.normalizedRole },
+      currentStage: project.currentStage || null,
+      stageHistory: Array.isArray(project.stageHistory) ? project.stageHistory : [],
+      team: {
+        leadBepId: project.leadBepId || project.leadArchitectId || null,
+        clientId: project.clientId || null,
+        activeCount: activeTeamMembers.length,
+        members: activeTeamMembers.map((member: Record<string, any>) => ({
+          userId: member.userId,
+          role: member.role,
+          discipline: member.discipline || null,
+          verificationId: member.verificationId || null,
+        })),
+      },
+      panels: {
+        tasks: {
+          total: tasks.length,
+          open: tasks.filter(task => !['done', 'complete', 'completed', 'closed'].includes(String(task.status || '').toLowerCase())).length,
+          overdue: tasks.filter(task => task.dueDate && new Date(task.dueDate).getTime() < Date.now() && !['done', 'complete', 'completed', 'closed'].includes(String(task.status || '').toLowerCase())).length,
+        },
+        approvals: {
+          total: approvals.length,
+          pending: approvals.filter(approval => ['pending', 'requested', 'in_review'].includes(String(approval.status || '').toLowerCase())).length,
+        },
+        documents: {
+          total: documents.length,
+          latestRevisionAt: documents.map(doc => doc.updatedAt || doc.createdAt).filter(Boolean).sort().at(-1) || null,
+        },
+        messages: {
+          threadCount: threads.length,
+          unreadForViewer: threads.filter(thread => Array.isArray(thread.unreadFor) && thread.unreadFor.includes(authContext.uid)).length,
+        },
+        aiIssues: {
+          total: aiIssues.length,
+          unresolved: aiIssues.filter(issue => !['resolved', 'closed'].includes(String(issue.resolutionStatus || issue.status || '').toLowerCase())).length,
+        },
+      },
+      generatedAt: new Date().toISOString(),
+    };
+
+    await adminDb.collection('project_command_views').doc(`${projectId}_${authContext.uid}`).set(commandCentre, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: 'project.command_centre_viewed',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project', id: projectId },
+      metadata: { viewerProjectRole, taskCount: tasks.length, approvalCount: approvals.length, documentCount: documents.length },
+    });
+    res.json({ commandCentre });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
   }
 });
 
@@ -3914,6 +4049,198 @@ router.post("/payment/notify", async (req, res) => {
   } catch (err) {
     console.error("ITN error:", err);
     res.status(500).send("Internal Error");
+  }
+});
+
+// ── Resource Centre / Drawing Checklist Tracker Routes ──────────────────────
+
+router.post("/resources/centre", async (req, res) => {
+  try {
+    const { authContext } = await getResourceCentreContext(req);
+    const title = sanitizeCoordinationString(req.body.title, 240);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const now = new Date().toISOString();
+    const resourceRef = adminDb.collection('resource_centre').doc();
+    const resource = {
+      id: resourceRef.id,
+      resourceType: sanitizeResourceType(req.body.resourceType || req.body.type),
+      title,
+      description: sanitizeCoordinationString(req.body.description, 2000),
+      municipality: sanitizeCoordinationString(req.body.municipality, 160) || null,
+      submissionType: sanitizeCoordinationString(req.body.submissionType, 160) || null,
+      discipline: sanitizeCoordinationString(req.body.discipline, 120) || null,
+      url: sanitizeCoordinationString(req.body.url, 1200) || null,
+      contact: {
+        name: sanitizeCoordinationString(req.body.contact?.name, 160) || null,
+        email: sanitizeCoordinationString(req.body.contact?.email, 240) || null,
+        phone: sanitizeCoordinationString(req.body.contact?.phone, 80) || null,
+      },
+      tags: sanitizeCoordinationStringArray(req.body.tags, 20),
+      checklistItems: sanitizeChecklistItems(req.body.checklistItems || req.body.requirements, 80),
+      visibility: req.body.visibility === 'private' ? 'private' : 'published',
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await resourceRef.set(resource);
+    await recordAuditEvent(req, {
+      category: 'document',
+      action: 'resource_centre.resource_created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'resource_centre_item', id: resourceRef.id },
+      metadata: { resourceType: resource.resourceType, municipality: resource.municipality, checklistItemCount: resource.checklistItems.length },
+    });
+    res.status(201).json({ resource });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.get("/resources/centre", async (req, res) => {
+  try {
+    const { authContext } = await getResourceCentreContext(req);
+    const resourceType = typeof req.query.resourceType === 'string' ? req.query.resourceType : null;
+    const municipality = typeof req.query.municipality === 'string' ? req.query.municipality.toLowerCase() : null;
+    const discipline = typeof req.query.discipline === 'string' ? req.query.discipline.toLowerCase() : null;
+    const snapshot = await adminDb.collection('resource_centre').get();
+    const resources = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Record<string, any>))
+      .filter(resource => resource.visibility !== 'private' || resource.createdBy === authContext.uid || authContext.isAdmin)
+      .filter(resource => !resourceType || resource.resourceType === resourceType)
+      .filter(resource => !municipality || String(resource.municipality || '').toLowerCase().includes(municipality))
+      .filter(resource => !discipline || String(resource.discipline || '').toLowerCase().includes(discipline));
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: 'resource_centre.resources_viewed',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'resource_centre', id: 'resource_centre' },
+      metadata: { resultCount: resources.length, resourceType, municipality, discipline },
+    });
+    res.json({ resources });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/checklists/drawing", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const municipality = sanitizeCoordinationString(req.body.municipality, 160);
+    const submissionType = sanitizeCoordinationString(req.body.submissionType, 160);
+    if (!municipality || !submissionType) return res.status(400).json({ error: 'municipality and submissionType are required' });
+    const now = new Date().toISOString();
+    const checklistRef = adminDb.collection('projects').doc(projectId).collection('drawing_checklists').doc();
+    const municipalRequirements = sanitizeChecklistItems(req.body.requirements || req.body.municipalRequirements, 80);
+    const componentChecks = sanitizeChecklistItems(req.body.componentChecks, 120);
+    const checklist = {
+      id: checklistRef.id,
+      projectId,
+      checklistType: sanitizeCoordinationString(req.body.checklistType, 80) || 'municipal_drawing',
+      municipality,
+      submissionType,
+      stage: sanitizeCoordinationString(req.body.stage, 120) || 'municipal_submission',
+      disciplines: sanitizeCoordinationStringArray(req.body.disciplines, 12),
+      responsibleParty: sanitizeCoordinationString(req.body.responsibleParty || req.body.assigneeId, 160) || null,
+      linkedDrawingIds: sanitizeCoordinationStringArray(req.body.linkedDrawingIds, 50),
+      linkedMunicipalSubmissionId: sanitizeCoordinationString(req.body.linkedMunicipalSubmissionId, 160) || null,
+      linkedTaskBoardIds: sanitizeCoordinationStringArray(req.body.linkedTaskBoardIds || req.body.linkedTaskIds, 50),
+      requirements: municipalRequirements,
+      componentChecks,
+      progress: {
+        total: municipalRequirements.length + componentChecks.length,
+        complete: [...municipalRequirements, ...componentChecks].filter(item => item.status === 'complete' || item.status === 'not_applicable').length,
+      },
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await checklistRef.set(checklist);
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'resource_centre.drawing_checklist_created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'drawing_checklist', id: checklistRef.id, projectId },
+      metadata: { municipality, submissionType, totalItems: checklist.progress.total },
+    });
+    res.status(201).json({ checklist });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/checklists/drawing/:checklistId/items/:itemId/status", async (req, res) => {
+  try {
+    const { projectId, checklistId, itemId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const status = sanitizeCoordinationString(req.body.status, 80);
+    if (!CHECKLIST_ITEM_STATUSES.includes(status as any)) return res.status(400).json({ error: 'valid status is required' });
+    const checklistRef = adminDb.collection('projects').doc(projectId).collection('drawing_checklists').doc(checklistId);
+    const checklistSnap = await checklistRef.get();
+    if (!checklistSnap.exists) return res.status(404).json({ error: 'Drawing checklist not found' });
+    const checklist = checklistSnap.data() as Record<string, any>;
+    const updateItem = (item: Record<string, any>) => item.id === itemId ? {
+      ...item,
+      status,
+      responsibleParty: sanitizeCoordinationString(req.body.responsibleParty || req.body.assigneeId, 160) || item.responsibleParty || null,
+      notes: sanitizeCoordinationString(req.body.notes, 1000) || item.notes || '',
+      linkedDrawingIds: Array.isArray(req.body.linkedDrawingIds) ? sanitizeCoordinationStringArray(req.body.linkedDrawingIds, 20) : (item.linkedDrawingIds || []),
+      linkedTaskIds: Array.isArray(req.body.linkedTaskIds) ? sanitizeCoordinationStringArray(req.body.linkedTaskIds, 20) : (item.linkedTaskIds || []),
+      updatedBy: authContext.uid,
+      updatedAt: new Date().toISOString(),
+    } : item;
+    const requirements = Array.isArray(checklist.requirements) ? checklist.requirements.map(updateItem) : [];
+    const componentChecks = Array.isArray(checklist.componentChecks) ? checklist.componentChecks.map(updateItem) : [];
+    const allItems = [...requirements, ...componentChecks];
+    if (!allItems.some(item => item.id === itemId)) return res.status(404).json({ error: 'Checklist item not found' });
+    const now = new Date().toISOString();
+    const update = {
+      requirements,
+      componentChecks,
+      progress: {
+        total: allItems.length,
+        complete: allItems.filter(item => item.status === 'complete' || item.status === 'not_applicable').length,
+      },
+      updatedAt: now,
+      statusHistory: [
+        ...(Array.isArray(checklist.statusHistory) ? checklist.statusHistory : []),
+        { itemId, status, at: now, by: authContext.uid, note: sanitizeCoordinationString(req.body.notes, 500) || 'Checklist item status updated' },
+      ],
+    };
+    await checklistRef.set(update, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'resource_centre.drawing_checklist_item_updated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'drawing_checklist_item', id: itemId, projectId },
+      metadata: { checklistId, status, progress: update.progress },
+    });
+    res.json({ id: checklistId, ...update });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.get("/projects/:projectId/checklists/drawing", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const authContext = await getAuthContext(req.headers);
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) return res.status(404).json({ error: 'Project not found' });
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Record<string, any>;
+    const canView = authContext.isAdmin || project.clientId === authContext.uid || project.leadArchitectId === authContext.uid || isActiveProjectTeamMember(project, authContext.uid);
+    if (!canView) return res.status(403).json({ error: 'Only project participants can view drawing checklist progress' });
+    const snapshot = await adminDb.collection('projects').doc(projectId).collection('drawing_checklists').get();
+    const checklists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: 'resource_centre.drawing_checklists_viewed',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project', id: projectId, projectId },
+      metadata: { resultCount: checklists.length },
+    });
+    res.json({ projectId, checklists });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
