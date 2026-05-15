@@ -64,4 +64,4 @@ Before production launch, humans must confirm:
 
 ## Implementation reference
 
-The non-persistence service guardrails are implemented in `src/services/aiGovernanceService.ts` with unit coverage in `src/services/__tests__/aiGovernanceService.test.ts`. API/router persistence wiring is intentionally deferred because `src/lib/api-router.ts` is owned by another agent in the current swarm session.
+The service guardrails are implemented in `src/services/aiGovernanceService.ts` with unit coverage in `src/services/__tests__/aiGovernanceService.test.ts`. Persistence route contracts are documented in `docs/backend/ai-governance-api-contract-examples.md`, and project-scoped AI issue routing/review contracts are documented in `docs/backend/ai-issue-review-api-contract-examples.md`.
