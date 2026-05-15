@@ -3,6 +3,28 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
+const indexes = JSON.parse(readFileSync(resolve(process.cwd(), 'firestore.indexes.json'), 'utf8')) as {
+  indexes: Array<{
+    collectionGroup: string;
+    queryScope: string;
+    fields: Array<{ fieldPath: string; order?: string; arrayConfig?: string }>;
+  }>;
+};
+const phase2VerificationDocs = readFileSync(resolve(process.cwd(), 'docs/phase-reports/phase-2-automated-verification-workflows.md'), 'utf8');
+const aiGovernanceDocs = readFileSync(resolve(process.cwd(), 'docs/backend/ai-governance-human-signoff.md'), 'utf8');
+
+function hasIndex(collectionGroup: string, fields: Array<{ fieldPath: string; order?: string; arrayConfig?: string }>) {
+  return indexes.indexes.some((index) =>
+    index.collectionGroup === collectionGroup &&
+    index.fields.length === fields.length &&
+    fields.every((field, indexPosition) => {
+      const candidate = index.fields[indexPosition];
+      return candidate.fieldPath === field.fieldPath &&
+        candidate.order === field.order &&
+        candidate.arrayConfig === field.arrayConfig;
+    }),
+  );
+}
 
 describe('firestore security rules static regressions', () => {
   it('keeps audit logs append-only and admin-readable', () => {
@@ -57,6 +79,37 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain('allow read: if isAdmin() || canReadProject(resource.data.target.projectId);');
     const serverOwnedRuleCount = rules.match(/allow create, update, delete: if false;/g)?.length || 0;
     expect(serverOwnedRuleCount).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps Firestore indexes aligned with AI governance and Phase 2 verification queries', () => {
+    expect(hasIndex('ai_action_logs', [
+      { fieldPath: 'projectId', order: 'ASCENDING' },
+      { fieldPath: 'status', order: 'ASCENDING' },
+      { fieldPath: 'createdAt', order: 'DESCENDING' },
+    ])).toBe(true);
+    expect(hasIndex('ai_review_queue', [
+      { fieldPath: 'projectId', order: 'ASCENDING' },
+      { fieldPath: 'status', order: 'ASCENDING' },
+      { fieldPath: 'priority', order: 'ASCENDING' },
+      { fieldPath: 'createdAt', order: 'DESCENDING' },
+    ])).toBe(true);
+    expect(hasIndex('human_signoffs', [
+      { fieldPath: 'target.projectId', order: 'ASCENDING' },
+      { fieldPath: 'domain', order: 'ASCENDING' },
+      { fieldPath: 'createdAt', order: 'DESCENDING' },
+    ])).toBe(true);
+    expect(hasIndex('user_verifications', [
+      { fieldPath: 'userId', order: 'ASCENDING' },
+      { fieldPath: 'subjectType', order: 'ASCENDING' },
+      { fieldPath: 'status', order: 'ASCENDING' },
+    ])).toBe(true);
+  });
+
+  it('documents human-only AI signoff controls and verification recheck persistence', () => {
+    expect(aiGovernanceDocs).toContain('AI and system actors cannot create human sign-off records');
+    expect(aiGovernanceDocs).toContain('requiresHumanConfirmation');
+    expect(phase2VerificationDocs).toContain('verificationAgentStatus: queued');
+    expect(phase2VerificationDocs).toContain('recheckRequestedAt');
   });
 
 });

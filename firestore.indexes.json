@@ -286,6 +286,15 @@
       ]
     },
     {
+      "collectionGroup": "user_verifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "subjectType", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ai_action_logs",
       "queryScope": "COLLECTION",
       "fields": [
