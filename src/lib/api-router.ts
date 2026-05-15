@@ -972,6 +972,30 @@ async function getProjectCoordinatorContext(req: express.Request, projectId: str
   return { authContext, projectRef, project };
 }
 
+async function getProjectLeadContext(req: express.Request, projectId: string) {
+  const context = await getProjectCoordinatorContext(req, projectId);
+  if (!context.authContext.isAdmin && context.project.leadArchitectId !== context.authContext.uid) {
+    throw Object.assign(new Error('Only the project lead BEP or admin can manage freelancer work packages'), { status: 403 });
+  }
+  return context;
+}
+
+async function getVerifiedFreelancerContext(req: express.Request) {
+  const authContext = await getAuthContext(req.headers);
+  if (normalizeUserRole(authContext.role) !== 'freelancer') {
+    throw Object.assign(new Error('Only verified freelancers can use freelancer work package routes'), { status: 403 });
+  }
+  const verification = await getActiveUserVerification(authContext.uid, 'freelancer');
+  if (!verification) {
+    throw Object.assign(new Error('Freelancer verification is required before using work package workflows'), { status: 403, verificationRequired: { role: 'freelancer' } });
+  }
+  return { authContext, verification };
+}
+
+function sanitizeWorkPackageRequirements(value: unknown): string[] {
+  return sanitizeCoordinationStringArray(value, 50);
+}
+
 const CLIENT_BRIEF_SUPPORT_NEEDS = new Set(['plans', 'approvals', 'construction_pricing', 'full_delivery_support', 'unsure']);
 const CLIENT_BRIEF_URGENCY = new Set(['not_urgent', 'standard', 'urgent', 'emergency']);
 const CLIENT_BRIEF_BUDGET = new Set(['unknown', 'exploring', 'limited', 'moderate', 'comfortable', 'fixed']);
@@ -1599,6 +1623,221 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
     res.status(201).json({ project, contract, escrowId: projectRef.id, paymentId: paymentRef.id, invoices });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/projects/:projectId/work-packages", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext, project } = await getProjectLeadContext(req, projectId);
+    const title = sanitizeCoordinationString(req.body.title, 200);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const invitedFreelancerIds = sanitizeCoordinationStringArray(req.body.invitedFreelancerIds, 20);
+    const now = new Date().toISOString();
+    const packageRef = adminDb.collection('projects').doc(projectId).collection('work_packages').doc();
+    const workPackage = {
+      id: packageRef.id,
+      projectId,
+      jobId: project.jobId || null,
+      title,
+      description: sanitizeCoordinationString(req.body.description, 4000),
+      requirements: sanitizeWorkPackageRequirements(req.body.requirements),
+      budget: Number.isFinite(Number(req.body.budget)) ? Math.max(Number(req.body.budget), 0) : null,
+      deadline: sanitizeCoordinationString(req.body.deadline, 80) || null,
+      status: 'open',
+      postedBy: authContext.uid,
+      invitedFreelancerIds,
+      assignedFreelancerId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await packageRef.set(workPackage);
+
+    for (const freelancerId of invitedFreelancerIds) {
+      const verification = await getDirectoryVerification(freelancerId, 'freelancer');
+      if (!verification) continue;
+      await adminDb.collection('notifications').add({
+        userId: freelancerId,
+        type: 'directory_invitation',
+        title: 'Freelancer work package invitation',
+        body: `${authContext.userData?.displayName || authContext.decoded.displayName || 'A BEP'} invited you to a work package: ${title}.`,
+        data: { projectId, workPackageId: packageRef.id, jobId: project.jobId, senderId: authContext.uid },
+        isRead: false,
+        channels: ['in_app', 'email'],
+        createdAt: now,
+        deliveryStatus: 'pending',
+      });
+    }
+
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'freelancer.work_package_created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'work_package', id: packageRef.id, projectId },
+      metadata: { invitedFreelancerCount: invitedFreelancerIds.length, budget: workPackage.budget },
+    });
+    res.status(201).json({ workPackage });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/work-packages/:packageId/applications", async (req, res) => {
+  try {
+    const { projectId, packageId } = req.params;
+    const { authContext, verification } = await getVerifiedFreelancerContext(req);
+    const packageRef = adminDb.collection('projects').doc(projectId).collection('work_packages').doc(packageId);
+    const packageSnap = await packageRef.get();
+    if (!packageSnap.exists) return res.status(404).json({ error: 'Work package not found' });
+    const workPackage = packageSnap.data() as Record<string, any>;
+    if (workPackage.status !== 'open') return res.status(400).json({ error: 'This work package is not open for applications' });
+    const now = new Date().toISOString();
+    const applicationRef = packageRef.collection('applications').doc(authContext.uid);
+    const application = {
+      id: applicationRef.id,
+      projectId,
+      workPackageId: packageId,
+      freelancerId: authContext.uid,
+      freelancerName: authContext.userData?.displayName || authContext.userData?.fullName || authContext.decoded.displayName || 'Freelancer',
+      proposal: sanitizeCoordinationString(req.body.proposal, 3000),
+      proposedFee: Number.isFinite(Number(req.body.proposedFee)) ? Math.max(Number(req.body.proposedFee), 0) : null,
+      status: 'submitted',
+      verificationId: verification.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (!application.proposal) return res.status(400).json({ error: 'proposal is required' });
+    await applicationRef.set(application);
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'freelancer.work_package_application_submitted',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'work_package_application', id: applicationRef.id, projectId },
+      metadata: { workPackageId: packageId, verificationId: verification.id, proposedFee: application.proposedFee },
+    });
+    res.status(201).json({ application });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/work-packages/:packageId/applications/:applicationId/assign", async (req, res) => {
+  try {
+    const { projectId, packageId, applicationId } = req.params;
+    const { authContext } = await getProjectLeadContext(req, projectId);
+    const packageRef = adminDb.collection('projects').doc(projectId).collection('work_packages').doc(packageId);
+    const applicationRef = packageRef.collection('applications').doc(applicationId);
+    const [packageSnap, applicationSnap] = await Promise.all([packageRef.get(), applicationRef.get()]);
+    if (!packageSnap.exists) return res.status(404).json({ error: 'Work package not found' });
+    if (!applicationSnap.exists) return res.status(404).json({ error: 'Application not found' });
+    const workPackage = packageSnap.data() as Record<string, any>;
+    const application = applicationSnap.data() as Record<string, any>;
+    if (workPackage.status !== 'open') return res.status(400).json({ error: 'Only open work packages can be assigned' });
+    const now = new Date().toISOString();
+    await packageRef.set({
+      status: 'assigned',
+      assignedFreelancerId: application.freelancerId,
+      assignedApplicationId: applicationId,
+      agreementStatus: 'pending_signature',
+      assignedAt: now,
+      updatedAt: now,
+    }, { merge: true });
+    await applicationRef.set({ status: 'accepted', acceptedAt: now, updatedAt: now }, { merge: true });
+    await adminDb.collection('notifications').add({
+      userId: application.freelancerId,
+      type: 'message',
+      title: 'Work package assigned',
+      body: `You have been assigned: ${workPackage.title}.`,
+      data: { projectId, workPackageId: packageId, senderId: authContext.uid },
+      isRead: false,
+      channels: ['in_app', 'email'],
+      createdAt: now,
+      deliveryStatus: 'pending',
+    });
+    await recordAuditEvent(req, {
+      category: 'approval',
+      action: 'freelancer.work_package_assigned',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'work_package', id: packageId, projectId },
+      metadata: { freelancerId: application.freelancerId, applicationId },
+    });
+    res.json({ id: packageId, status: 'assigned', assignedFreelancerId: application.freelancerId, agreementStatus: 'pending_signature' });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/work-packages/:packageId/submissions", async (req, res) => {
+  try {
+    const { projectId, packageId } = req.params;
+    const { authContext } = await getVerifiedFreelancerContext(req);
+    const packageRef = adminDb.collection('projects').doc(projectId).collection('work_packages').doc(packageId);
+    const packageSnap = await packageRef.get();
+    if (!packageSnap.exists) return res.status(404).json({ error: 'Work package not found' });
+    const workPackage = packageSnap.data() as Record<string, any>;
+    if (workPackage.assignedFreelancerId !== authContext.uid) return res.status(403).json({ error: 'Only the assigned freelancer can submit deliverables' });
+    if (!['assigned', 'in_progress', 'rejected'].includes(workPackage.status)) return res.status(400).json({ error: 'This work package is not awaiting freelancer submission' });
+    const deliverableUrls = sanitizeEvidenceUrls(req.body.deliverableUrls);
+    if (deliverableUrls.length === 0) return res.status(400).json({ error: 'At least one deliverable URL is required' });
+    const now = new Date().toISOString();
+    const submissionRef = packageRef.collection('submissions').doc();
+    const submission = {
+      id: submissionRef.id,
+      projectId,
+      workPackageId: packageId,
+      freelancerId: authContext.uid,
+      deliverableUrls,
+      notes: sanitizeCoordinationString(req.body.notes, 2000),
+      status: 'submitted',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await submissionRef.set(submission);
+    await packageRef.set({ status: 'submitted', latestSubmissionId: submissionRef.id, submittedAt: now, updatedAt: now }, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'freelancer.work_package_submitted',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'work_package_submission', id: submissionRef.id, projectId },
+      metadata: { workPackageId: packageId, deliverableCount: deliverableUrls.length },
+    });
+    res.status(201).json({ submission });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/work-packages/:packageId/submissions/:submissionId/review", async (req, res) => {
+  try {
+    const { projectId, packageId, submissionId } = req.params;
+    const { authContext } = await getProjectLeadContext(req, projectId);
+    const decision = sanitizeCoordinationString(req.body.decision, 20);
+    if (!['approved', 'rejected'].includes(decision)) return res.status(400).json({ error: 'decision must be approved or rejected' });
+    const packageRef = adminDb.collection('projects').doc(projectId).collection('work_packages').doc(packageId);
+    const submissionRef = packageRef.collection('submissions').doc(submissionId);
+    const [packageSnap, submissionSnap] = await Promise.all([packageRef.get(), submissionRef.get()]);
+    if (!packageSnap.exists) return res.status(404).json({ error: 'Work package not found' });
+    if (!submissionSnap.exists) return res.status(404).json({ error: 'Submission not found' });
+    const now = new Date().toISOString();
+    const review = {
+      status: decision,
+      reviewedBy: authContext.uid,
+      reviewedAt: now,
+      reviewNotes: sanitizeCoordinationString(req.body.reviewNotes, 2000),
+      updatedAt: now,
+    };
+    await submissionRef.set(review, { merge: true });
+    await packageRef.set({ status: decision, reviewedAt: now, reviewedBy: authContext.uid, updatedAt: now }, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'approval',
+      action: `freelancer.work_package_submission_${decision}`,
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'work_package_submission', id: submissionId, projectId },
+      metadata: { workPackageId: packageId },
+    });
+    res.json({ id: submissionId, ...review });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
   }
 });
 

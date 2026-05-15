@@ -197,6 +197,7 @@ const verifyIdToken = vi.fn(async (token: string) => {
     intruder: { uid: 'intruder-1', email: 'intruder@example.com', displayName: 'Intruder' },
     admin: { uid: 'admin-1', email: 'gm.tarb@gmail.com', displayName: 'Admin' },
     contractor: { uid: 'contractor-1', email: 'contractor@example.com', displayName: 'Contractor One' },
+    freelancer: { uid: 'freelancer-1', email: 'freelancer@example.com', displayName: 'Freelancer One' },
     newbep: { uid: 'new-bep-1', email: 'newbep@example.com', displayName: 'New BEP' },
   };
   if (!users[token]) throw new Error('bad token');
@@ -319,6 +320,7 @@ describe('api-router security and high-value integration routes', () => {
     mockAdminDb.seed('users/admin-1', { role: 'admin', displayName: 'Admin', email: 'gm.tarb@gmail.com' });
     mockAdminDb.seed('users/intruder-1', { role: 'architect', displayName: 'Intruder' });
     mockAdminDb.seed('users/contractor-1', { role: 'contractor', displayName: 'Contractor One', companyName: 'BuildCo', region: 'Cape Town', contractorCategory: 'general contractor', averageRating: 4.5, totalReviews: 7 });
+    mockAdminDb.seed('users/freelancer-1', { role: 'freelancer', displayName: 'Freelancer One', fullName: 'Freelancer One', skills: ['drafting'] });
     mockAdminDb.seed('system_settings/llm_config', { provider: 'openai', apiKey: 'test-llm-key', model: 'gpt-test', baseUrl: 'https://llm.test/v1' });
   });
 
@@ -1088,6 +1090,94 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.getDoc('technical_briefs/brief-appoint')).toMatchObject({ projectId, appointmentContractId: projectId });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'contract.appointment_generated')).toBe(true);
     expect(duplicate.status).toBe(409);
+  });
+
+  it('runs the verified freelancer work package lifecycle from posting to approval', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    seedVerifiedBepVerification();
+    seedVerifiedDirectoryVerification('freelancer-1', 'freelancer', 'freelancer', 'manual');
+
+    const created = await request(app)
+      .post('/api/projects/project-1/work-packages')
+      .set(authHeader('architect'))
+      .send({ title: 'Door schedule drafting', description: 'Prepare schedules', requirements: ['DWG deliverable'], budget: 4500, deadline: '2026-02-01', invitedFreelancerIds: ['freelancer-1'] });
+    const packageId = created.body.workPackage.id;
+    const applied = await request(app)
+      .post(`/api/projects/project-1/work-packages/${packageId}/applications`)
+      .set(authHeader('freelancer'))
+      .send({ proposal: 'I can draft the schedule this week', proposedFee: 4200 });
+    const assigned = await request(app)
+      .post(`/api/projects/project-1/work-packages/${packageId}/applications/freelancer-1/assign`)
+      .set(authHeader('architect'))
+      .send({});
+    const submitted = await request(app)
+      .post(`/api/projects/project-1/work-packages/${packageId}/submissions`)
+      .set(authHeader('freelancer'))
+      .send({ deliverableUrls: ['https://files.public.blob.vercel-storage.com/door-schedule.pdf'], notes: 'Submitted for review' });
+    const submissionId = submitted.body.submission.id;
+    const reviewed = await request(app)
+      .post(`/api/projects/project-1/work-packages/${packageId}/submissions/${submissionId}/review`)
+      .set(authHeader('architect'))
+      .send({ decision: 'approved', reviewNotes: 'Approved for issue' });
+
+    expect(created.status).toBe(201);
+    expect(created.body.workPackage).toMatchObject({ title: 'Door schedule drafting', status: 'open', postedBy: 'architect-1', invitedFreelancerIds: ['freelancer-1'] });
+    expect(applied.status).toBe(201);
+    expect(applied.body.application).toMatchObject({ freelancerId: 'freelancer-1', status: 'submitted', verificationId: 'freelancer-1_freelancer_freelancer_manual' });
+    expect(assigned.status).toBe(200);
+    expect(assigned.body).toMatchObject({ status: 'assigned', assignedFreelancerId: 'freelancer-1', agreementStatus: 'pending_signature' });
+    expect(submitted.status).toBe(201);
+    expect(submitted.body.submission).toMatchObject({ freelancerId: 'freelancer-1', status: 'submitted', deliverableUrls: ['https://files.public.blob.vercel-storage.com/door-schedule.pdf'] });
+    expect(reviewed.status).toBe(200);
+    expect(reviewed.body).toMatchObject({ status: 'approved', reviewedBy: 'architect-1', reviewNotes: 'Approved for issue' });
+    expect(mockAdminDb.getDoc(`projects/project-1/work_packages/${packageId}`)).toMatchObject({ status: 'approved', assignedFreelancerId: 'freelancer-1' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'freelancer.work_package_created')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'freelancer.work_package_submission_approved')).toBe(true);
+  });
+
+  it('blocks unverified freelancers and non-lead BEPs in work package workflows', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockAdminDb.seed('projects/project-1/work_packages/pkg-1', { id: 'pkg-1', projectId: 'project-1', status: 'open', title: 'Drafting', postedBy: 'architect-1' });
+
+    const unverifiedLead = await request(app)
+      .post('/api/projects/project-1/work-packages')
+      .set(authHeader('architect'))
+      .send({ title: 'Blocked package' });
+    seedVerifiedBepVerification();
+    const clientBlocked = await request(app)
+      .post('/api/projects/project-1/work-packages')
+      .set(authHeader('client'))
+      .send({ title: 'Client package' });
+    const unverifiedFreelancer = await request(app)
+      .post('/api/projects/project-1/work-packages/pkg-1/applications')
+      .set(authHeader('freelancer'))
+      .send({ proposal: 'Please pick me' });
+
+    expect(unverifiedLead.status).toBe(403);
+    expect(unverifiedLead.body).toMatchObject({ verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    expect(clientBlocked.status).toBe(403);
+    expect(unverifiedFreelancer.status).toBe(403);
+    expect(unverifiedFreelancer.body).toMatchObject({ verificationRequired: { role: 'freelancer' } });
   });
 
   it('lets verified lead BEPs invite consultants and seed coordination deliverables', async () => {
