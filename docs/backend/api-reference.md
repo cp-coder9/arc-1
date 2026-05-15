@@ -82,6 +82,8 @@ Builds and persists the caller's project command-centre projection.
 
 ## Project workflow write APIs
 
+Deterministic request/response examples for document register, task, approval, message, and transmittal workflow writes are maintained in `docs/backend/project-workflow-write-api-contract-examples.md`.
+
 These endpoints operate under the project coordination gate unless noted.
 
 | Method and path | Purpose | Durable collection(s) | Audit action |
