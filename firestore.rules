@@ -118,6 +118,19 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/projects/$(projectId));
     }
 
+    function canReadProject(projectId) {
+      return isAuthenticated() && projectExists(projectId) &&
+        isProjectParticipantByData(getProject(projectId).data);
+    }
+
+    function canManageProject(projectId) {
+      return canReadProject(projectId) && (
+        isAdmin() ||
+        getProject(projectId).data.clientId == request.auth.uid ||
+        getProject(projectId).data.leadArchitectId == request.auth.uid
+      );
+    }
+
     function projectExists(projectId) {
       return exists(/databases/$(database)/documents/projects/$(projectId));
     }
@@ -235,6 +248,22 @@ service cloud.firestore {
         request.resource.data.subjectType in ['bep', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'];
       allow update: if isAdmin();
       allow delete: if false;
+    }
+
+    // Persisted per-viewer command-centre projections. Server/Admin SDK writes
+    // bypass rules; browser clients can only read their own project projection.
+    match /project_command_views/{viewId} {
+      allow read: if isAuthenticated() &&
+        resource.data.viewerUserId == request.auth.uid &&
+        canReadProject(resource.data.projectId);
+      allow create, update, delete: if false;
+    }
+
+    // Curated resource-centre materials are globally readable by signed-in users
+    // and maintained by admins or trusted server code.
+    match /resource_centre/{resourceId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
 
     // Users collection
@@ -375,6 +404,71 @@ service cloud.firestore {
         (isLeadArchitect(resource.data) && isTeamRosterUpdate())
       );
       allow delete: if isAdmin();
+
+      match /drawing_checklists/{checklistId} {
+        allow read: if canReadProject(projectId);
+        allow create: if canManageProject(projectId) &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if canManageProject(projectId) &&
+          request.resource.data.projectId == resource.data.projectId &&
+          request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if false;
+      }
+
+      match /municipal_submissions/{submissionId} {
+        allow read: if canReadProject(projectId);
+        allow create: if canManageProject(projectId) &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if canManageProject(projectId) &&
+          request.resource.data.projectId == resource.data.projectId &&
+          request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if false;
+      }
+
+      match /work_packages/{packageId} {
+        allow read: if canReadProject(projectId) ||
+          (isAuthenticated() && resource.data.assignedFreelancerId == request.auth.uid);
+        allow create: if canManageProject(projectId) &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.postedBy == request.auth.uid;
+        allow update: if canManageProject(projectId) ||
+          (isAuthenticated() && resource.data.assignedFreelancerId == request.auth.uid &&
+            request.resource.data.projectId == resource.data.projectId &&
+            request.resource.data.postedBy == resource.data.postedBy &&
+            request.resource.data.assignedFreelancerId == resource.data.assignedFreelancerId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliverables', 'updatedAt']));
+        allow delete: if false;
+      }
+
+      match /ai_issues/{issueId} {
+        allow read: if canReadProject(projectId) ||
+          (isAuthenticated() && resource.data.assigneeId == request.auth.uid);
+        allow create: if canManageProject(projectId) &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.humanConfirmed == false;
+        allow update: if canManageProject(projectId) ||
+          (isAuthenticated() && resource.data.assigneeId == request.auth.uid &&
+            request.resource.data.projectId == resource.data.projectId &&
+            request.resource.data.createdBy == resource.data.createdBy &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolutionStatus', 'assigneeNotes', 'updatedAt']));
+        allow delete: if false;
+      }
+
+      match /coordination_items/{itemId} {
+        allow read: if canReadProject(projectId);
+        allow create: if canReadProject(projectId) &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if canManageProject(projectId) ||
+          (isAuthenticated() && resource.data.createdBy == request.auth.uid &&
+            request.resource.data.projectId == resource.data.projectId &&
+            request.resource.data.createdBy == resource.data.createdBy &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'status', 'linkedTaskId', 'linkedDrawingId', 'updatedAt']));
+        allow delete: if false;
+      }
     }
 
     // Tender packages and contractor bids

@@ -32,4 +32,20 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain("'verificationId'");
   });
 
+  it('gates Phase 3/4 operational collections by project access and immutable identity fields', () => {
+    expect(rules).toContain('function canReadProject(projectId)');
+    expect(rules).toContain('function canManageProject(projectId)');
+    expect(rules).toContain('match /project_command_views/{viewId}');
+    expect(rules).toContain('resource.data.viewerUserId == request.auth.uid');
+    expect(rules).toContain('match /resource_centre/{resourceId}');
+    expect(rules).toContain('match /drawing_checklists/{checklistId}');
+    expect(rules).toContain('match /municipal_submissions/{submissionId}');
+    expect(rules).toContain('match /work_packages/{packageId}');
+    expect(rules).toContain('match /ai_issues/{issueId}');
+    expect(rules).toContain('match /coordination_items/{itemId}');
+    expect(rules).toContain('request.resource.data.humanConfirmed == false');
+    expect(rules).toContain("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliverables', 'updatedAt'])");
+    expect(rules).toContain("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolutionStatus', 'assigneeNotes', 'updatedAt'])");
+  });
+
 });
