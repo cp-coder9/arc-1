@@ -151,6 +151,48 @@ Creates a guided client brief and immediate advisory interpretation for client-f
 
 Recent route tests cover the guided brief progression after `POST /client-briefs`: verified BEPs can be assigned, only assigned verified BEPs can finalize technical briefs, and downstream read/list views must preserve the owner/assignee gates. These routes read `client_briefs`, related `project_briefs`, and projected marketplace/proposal state rather than allowing unauthenticated list access.
 
+## Phase 2 marketplace, proposal, and project brief read/list APIs
+
+These read/list routes are the canonical Phase 2 surface for client briefs becoming marketplace opportunities, proposals, and appointment-readiness checks. They are safe reads: they do not create appointments, contracts, signatures, payments, or provider-side legal actions.
+
+### `GET /marketplace/opportunities`
+
+Lists canonical marketplace opportunities from `marketplace_opportunities`.
+
+- **Auth:** required.
+- **Access:**
+  - clients see only opportunities where `clientId` is their UID.
+  - verified BEPs see published opportunities and must have active `bep`/`SACAP` verification.
+  - admins see published opportunities.
+  - other roles are denied.
+- **Query:** current implementation returns up to 50 records. Filtering is role-gated by server-side Firestore predicates, not by client-supplied owner IDs.
+- **Durable reads:** `marketplace_opportunities`; BEP callers also read `user_verifications` through `getActiveUserVerification`.
+- **Indexed query shapes:** `marketplace_opportunities where clientId == <uid> limit 50`; `marketplace_opportunities where status == published limit 50`.
+- **Response:** `{ opportunities, verificationId?, advisoryOnly: true }`; each opportunity is returned with `advisoryMatchingOnly: true`.
+- **Audit action:** none for this canonical Phase 2 read route; it is a safe read and relies on auth/access enforcement.
+- **Human blockers:** unverified BEPs receive a verification block. Returned matching is advisory only and does not appoint or recommend a professional as a final decision.
+
+### `GET /proposals/:proposalId/appointment-readiness`
+
+Checks whether a submitted proposal currently satisfies appointment preconditions without mutating legal state.
+
+- **Auth:** required.
+- **Access:** client owner of the proposal or admin. The professional who submitted the proposal cannot use this route unless also an admin.
+- **Path params:** `proposalId`.
+- **Durable reads:** `proposals/{proposalId}`, `project_briefs/{briefId}`, and active `user_verifications` for the proposal `professionalId` as `bep`/`SACAP`.
+- **Indexed query shape:** direct document reads by proposal ID and brief ID; verification lookup uses the active-user-verification query shape documented in the Firestore schema notes.
+- **Response:** returns `ready: true` with `requiredHumanActions` when all preconditions pass, otherwise `ready: false` with `blocker` and `blockerStatus`.
+- **Audit action:** none; this route is intentionally read-only.
+- **Human blockers:** even a ready response sets `createsAppointment`, `createsContract`, `createsSignature`, and `createsPayment` to `false`. Client and professional contract acceptance must happen through explicit human/legal workflows.
+
+### Related Phase 2 read/list posture
+
+| Route | Reader gate | Primary reads | Notes |
+| --- | --- | --- | --- |
+| `GET /marketplace/opportunities` | owner client, verified BEP, admin | `marketplace_opportunities`, `user_verifications` for BEPs | Canonical published opportunity list; advisory matching only. |
+| `GET /proposals/:proposalId/appointment-readiness` | proposal client owner, admin | `proposals`, `project_briefs`, `user_verifications` | Safe preflight only; no appointment, contract, signature, or payment side effects. |
+| client/project brief list reads | brief owner, assigned verified BEP, admin | `client_briefs`, `project_briefs`, nested attachments/interpretations | Must preserve owner/assignee gates before exposing evidence or advisory interpretation detail. |
+
 ## AI governance APIs
 
 ### `POST /ai/action-logs`
@@ -308,6 +350,37 @@ Authorization: Bearer <verified-bep-id-token>
   ],
   "verificationId": "architect-1_bep_SACAP_SACAP-123",
   "advisoryOnly": true
+}
+```
+
+List a client's own published opportunities:
+
+```http
+GET /api/marketplace/opportunities
+Authorization: Bearer <client-id-token>
+```
+
+```json
+{
+  "opportunities": [
+    {
+      "id": "brief-1",
+      "briefId": "brief-1",
+      "clientId": "client-1",
+      "title": "Residential alteration",
+      "status": "published",
+      "advisoryMatchingOnly": true
+    }
+  ],
+  "advisoryOnly": true
+}
+```
+
+Unverified BEP list attempt:
+
+```json
+{
+  "error": "Verified participant is required for marketplace opportunity access"
 }
 ```
 
