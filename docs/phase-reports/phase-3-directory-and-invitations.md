@@ -142,4 +142,4 @@ Browser smoke validation completed against `http://localhost:3000/` using headle
 ## Human Information Still Needed
 
 - Confirm whether directory invitations should generate outbound email via a transactional email provider once configured. Current implementation persists onboarding invitations and in-app notifications for registered users, with durable state for later email delivery.
-- Confirm exact expiry period for pending registration and pending acceptance invitations.
+- Product decision confirmed: pending registration and acceptance invitations do not expire. They persist with `expiryPolicy: none` and reminder metadata for periodic in-app/email join or acceptance reminders.

@@ -1151,9 +1151,22 @@ describe('api-router security and high-value integration routes', () => {
     expect(blocked.status).toBe(403);
     expect(blocked.body).toMatchObject({ verificationRequired: { role: 'contractor' } });
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ status: 'pending_acceptance', verificationId: 'architect-2_bep_SACAP_SACAP-123', requiresAcceptance: true });
+    expect(created.body).toMatchObject({ status: 'pending_acceptance', verificationId: 'architect-2_bep_SACAP_SACAP-123', requiresAcceptance: true, expiryPolicy: 'none' });
     const invite = mockAdminDb.listCollection('directory_invitations')[0].data;
-    expect(invite).toMatchObject({ inviterId: 'client-1', targetUserId: 'architect-2', targetRole: 'bep', action: 'project', status: 'pending_acceptance', context: { jobId: 'job-1', projectId: 'project-1' } });
+    expect(invite).toMatchObject({
+      inviterId: 'client-1',
+      targetUserId: 'architect-2',
+      targetRole: 'bep',
+      action: 'project',
+      status: 'pending_acceptance',
+      context: { jobId: 'job-1', projectId: 'project-1' },
+      expiryPolicy: 'none',
+      expiresAt: null,
+      reminderPolicy: { cadence: 'periodic', intervalDays: 7, channels: ['in_app', 'email'], purpose: 'acceptance' },
+      reminderCount: 0,
+      lastReminderAt: null,
+    });
+    expect(invite.nextReminderAt).toBe('2026-01-09T03:04:05.000Z');
     expect(invite.context).not.toHaveProperty('unsafe');
     expect(mockAdminDb.listCollection('notifications')[0].data).toMatchObject({ userId: 'architect-2', type: 'directory_invitation' });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.invitation_blocked_unverified')).toBe(true);
@@ -1169,7 +1182,16 @@ describe('api-router security and high-value integration routes', () => {
       .send({ targetEmail: 'newbep@example.com', targetRole: 'bep', action: 'quote', context: { jobId: 'job-1' } });
 
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ status: 'pending_registration', targetEmail: 'newbep@example.com', targetRole: 'bep', onboardingRequired: true, requiresAcceptance: true });
+    expect(created.body).toMatchObject({ status: 'pending_registration', targetEmail: 'newbep@example.com', targetRole: 'bep', onboardingRequired: true, requiresAcceptance: true, expiryPolicy: 'none', nextReminderAt: '2026-01-09T03:04:05.000Z' });
+    const registrationInvite = mockAdminDb.listCollection('directory_invitations')[0].data;
+    expect(registrationInvite).toMatchObject({
+      expiryPolicy: 'none',
+      expiresAt: null,
+      reminderPolicy: { cadence: 'periodic', intervalDays: 7, channels: ['in_app', 'email'], purpose: 'registration_and_acceptance' },
+      nextReminderAt: '2026-01-09T03:04:05.000Z',
+      reminderCount: 0,
+      lastReminderAt: null,
+    });
     const invitationId = created.body.id;
     const blockedAcceptance = await request(app)
       .post(`/api/directory/invitations/${invitationId}/respond`)

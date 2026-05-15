@@ -458,6 +458,14 @@ const DIRECTORY_INVITE_MATRIX: Record<string, Partial<Record<DirectoryTargetRole
   }, {} as Partial<Record<DirectoryTargetRole, DirectoryInviteAction[]>>),
 };
 
+const DIRECTORY_INVITATION_REMINDER_INTERVAL_DAYS = 7;
+
+function addDaysIso(baseIso: string, days: number): string {
+  const date = new Date(baseIso);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString();
+}
+
 function parseDirectoryRoles(value: unknown): DirectoryTargetRole[] {
   if (!value) return [];
   const values = Array.isArray(value) ? value : String(value).split(',');
@@ -663,6 +671,7 @@ router.post("/directory/invitations", async (req, res) => {
     if (!canCreateDirectoryInvite(authContext.role, targetRole, action)) return res.status(403).json({ error: 'This invitation action is not allowed for the inviter and target roles' });
 
     const now = new Date().toISOString();
+    const nextReminderAt = addDaysIso(now, DIRECTORY_INVITATION_REMINDER_INTERVAL_DAYS);
     const context = sanitizeDirectoryInviteContext(req.body.context);
     const existingTargetUserId = targetProfile ? (targetUserId || (await adminDb.collection('users').where('email', '==', targetEmail || '').limit(1).get()).docs[0]?.id) : undefined;
     const verification = existingTargetUserId ? await getDirectoryVerification(existingTargetUserId, targetRole) : null;
@@ -692,6 +701,17 @@ router.post("/directory/invitations", async (req, res) => {
       requiresAcceptance: true,
       verificationRequiredOnAcceptance: true,
       verificationId: verification?.id || null,
+      expiryPolicy: 'none',
+      expiresAt: null,
+      reminderPolicy: {
+        cadence: 'periodic',
+        intervalDays: DIRECTORY_INVITATION_REMINDER_INTERVAL_DAYS,
+        channels: ['in_app', 'email'],
+        purpose: isOnboardingInvite ? 'registration_and_acceptance' : 'acceptance',
+      },
+      nextReminderAt,
+      reminderCount: 0,
+      lastReminderAt: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -727,6 +747,8 @@ router.post("/directory/invitations", async (req, res) => {
       verificationId: verification?.id || null,
       onboardingRequired: isOnboardingInvite,
       requiresAcceptance: true,
+      expiryPolicy: 'none',
+      nextReminderAt,
     });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
