@@ -594,6 +594,8 @@ Project lead/admin reviews deliverables.
 
 ## Resource centre and drawing checklist APIs
 
+Deterministic request/response examples for resource centre and drawing checklist routes are maintained in `docs/backend/resource-checklist-api-contract-examples.md`.
+
 ### `POST /resources/centre`
 
 Creates a resource centre item.
