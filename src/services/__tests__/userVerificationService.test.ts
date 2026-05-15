@@ -114,6 +114,8 @@ describe('userVerificationService', () => {
     };
 
     expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'SACAP', now: new Date('2026-01-15T00:00:00.000Z') })).toBe(true);
+    expect(isActiveVerifiedVerification({ ...base, expiresAt: undefined }, { subjectType: 'bep', statutoryBody: 'SACAP' })).toBe(true);
+    expect(isActiveVerifiedVerification({ ...base, expiresAt: 'not-a-date' }, { subjectType: 'bep', statutoryBody: 'SACAP' })).toBe(false);
     expect(isActiveVerifiedVerification({ ...base, status: 'pending' }, { subjectType: 'bep', statutoryBody: 'SACAP' })).toBe(false);
     expect(isActiveVerifiedVerification(base, { subjectType: 'contractor', statutoryBody: 'SACAP' })).toBe(false);
     expect(isActiveVerifiedVerification(base, { subjectType: 'bep', statutoryBody: 'CIDB' })).toBe(false);
