@@ -6,7 +6,7 @@ Scope: consolidated human blockers and confirmation points from `docs/phase-repo
 
 ## Summary
 
-The implementation reports consistently separate production-safe backend progress from decisions that require a human product, legal, operational, provider, or compliance owner. These items should be resolved before final production sign-off for the affected workflows. AI and automated services remain advisory or gated where confirmations are outstanding. Sensitive workflow launch flags and dry-run defaults are documented in `docs/backend/sensitive-workflow-feature-flags.md`.
+The implementation reports consistently separate production-safe backend progress from decisions that require a human product, legal, operational, provider, or compliance owner. These items should be resolved before final production sign-off for the affected workflows. AI and automated services remain advisory or gated where confirmations are outstanding. Sensitive workflow launch flags and dry-run defaults are documented in `docs/backend/sensitive-workflow-feature-flags.md`. The latest API contract coverage wave added deterministic mock/dev examples for documented non-legacy routes; this improves integration clarity but does not resolve any production legal, provider, municipal, payment, privacy, or statutory blocker below.
 
 ## Immediate Production Sign-Off Blockers
 

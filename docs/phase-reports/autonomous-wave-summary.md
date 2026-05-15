@@ -6,7 +6,7 @@ Scope: autonomous implementation and verification waves summarizing recent imple
 
 ## Executive Summary
 
-Recent autonomous waves converted several Phase 1 through Phase 7 plan areas from report-only gaps into concrete backend service slices, guarded API routes, Firestore rule/index coverage, dashboard wiring, consolidated documentation, and a passing full local verification baseline. The branch now contains auditable support for verification workflows, project workflow APIs, role-scoped profiles, guided briefs, appointment/project initiation, package readiness, CPD tracking, resource booking domain logic, AI governance, dashboard knowledge content, canonical Phase 2 read/write aliases, and CI enforcement of lint/test/build gates.
+Recent autonomous waves converted several Phase 1 through Phase 7 plan areas from report-only gaps into concrete backend service slices, guarded API routes, Firestore rule/index coverage, dashboard wiring, consolidated documentation, deterministic API/service contract examples, and a passing full local verification baseline. The branch now contains auditable support for verification workflows, project workflow APIs, role-scoped profiles, guided briefs, appointment/project initiation, package readiness, CPD tracking, resource booking domain logic, AI governance, dashboard knowledge content, canonical Phase 2 read/write aliases, API contract coverage for documented non-legacy routes, and CI enforcement of lint/test/build gates.
 
 Production sign-off is still blocked by human decisions around legal/commercial terms, provider agreements, statutory authority, POPIA/privacy ownership, external verification sources, and final dashboard/product matrix confirmation. Those blockers are consolidated in `docs/phase-reports/human-confirmations-required.md`.
 
@@ -14,6 +14,8 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `7b604205` | API contract docs | Closed remaining documented non-legacy API contract gaps with appointment-readiness and legacy municipal helper examples; coverage audit now reports no uncovered non-legacy routes. |
+| `d47e07c0` | API contract docs | Added deterministic directory invitation, invitation response, project brief write, attachment, interpretation, and guided client brief contracts. |
 | `2f34541d` | API contract docs | Added deterministic command-centre projection, project team invitation, and coordination item contracts. |
 | `cb398ff0` | API contract docs | Added deterministic work package contracts for freelancer package creation, applications, assignment, deliverable submissions, and human review. |
 | `51cc7ccb` | API contract docs | Added deterministic AI governance persistence contracts for action logs, review queues, and human sign-off records. |
@@ -73,12 +75,12 @@ The phase reports and commit history record the following validation categories:
 
 - Service/unit workflow coverage for project workflow write APIs, service workflow edge cases, package readiness, financial/appointment helpers, CPD logic, resource booking conflict and ledger behavior, and contractor readiness helpers.
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
-- API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic API examples now cover project brief list/detail, opportunity detail, proposal detail, profile update/projection, directory search, admin verification review/recheck responses, resource centre reads/writes, drawing checklist item status workflows, and project-scoped municipal tracker status/control views, and project workflow document/task/approval/message/transmittal writes, and AI issue routing/resolution/human-review flows, and CPD scoring/certificate/sync service contracts, and resource booking conflict/billing/payout service contracts, and AI governance action-log/review/sign-off persistence contracts, and freelancer work package lifecycle contracts, and command-centre/team/coordination contracts.
+- API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, invitations, guided client briefs, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, municipal helpers, and dashboard knowledge resources; deterministic API examples now cover project brief list/detail/write/attachments/interpretations, opportunity detail, proposal detail and appointment-readiness preflight, profile update/projection, directory search/invite/respond, admin verification review/recheck responses, resource centre reads/writes, drawing checklist item status workflows, project-scoped municipal tracker status/control views and legacy tracking helper, project workflow document/task/approval/message/transmittal writes, AI issue routing/resolution/human-review flows, CPD scoring/certificate/sync service contracts, resource booking conflict/billing/payout service contracts, AI governance action-log/review/sign-off persistence contracts, freelancer work package lifecycle contracts, and command-centre/team/coordination contracts.
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
 - Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 51 test files / 377 tests, and `npm run build` passed without the previous Vite circular chunk warning.
 - Sensitive workflow guard validation: focused guard coverage passed 6/6, including the docs/constants drift regression; the full checkpoint also passed `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` after the guard work.
 - CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
-- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs including resource/checklist, municipal tracker, and project workflow write and AI issue review examples, ran `git diff --check`, and confirmed `backend.html` remains untouched.
+- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs, ran repeated `git diff --check`, and completed the API contract coverage audit with 58 documented routes, 12 contract-example docs, 118 valid JSON blocks, and no uncovered non-legacy routes; `backend.html` remains untouched.
 
 ## Remaining Blockers Requiring Human Confirmation
 
@@ -100,8 +102,8 @@ The canonical blocker list remains `docs/phase-reports/human-confirmations-requi
 These tasks are safe because they avoid irreversible external actions, live payments, live statutory submissions, and automated purchasing:
 
 1. Keep expanding automated tests around existing route handlers, component shells, and Firestore/static rules using local mocks and deterministic fixtures.
-2. Add non-production API contract examples for any remaining documented endpoints, clearly marked as mock/dev fixtures.
-3. Extend docs with request/response examples for any remaining CPD sync, AI action log persistence, legacy municipal helper endpoints and remaining route-specific admin dashboards not yet covered by dedicated contract examples.
+2. Keep the API contract coverage audit in CI or a scripted docs check so future documented endpoints require deterministic mock/dev fixtures.
+3. Extend route-specific admin dashboard docs and smoke tests where product owners confirm the next dashboard priority.
 4. Keep browser smoke tests current for dashboard shells using `backend.html` as read-only reference, and extend them only with deterministic local mocks.
 5. Build read-only admin review queue views for verification, CPD sync status, municipal evidence status, and provider integration readiness without enabling external submission.
 6. Wire the sensitive workflow guard helper into future live-effect route handlers, but only after the corresponding product/legal/provider confirmations are complete.
