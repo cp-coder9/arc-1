@@ -821,7 +821,7 @@ export default function App() {
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
-                  {(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="packages" user={user} />}
+                  {(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />}
                 </>
               )}
             </Suspense>
@@ -898,6 +898,10 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
             <p className="text-sm text-muted-foreground leading-relaxed">
               This page is now surfaced from the backend.html role/page matrix while preserving existing APIs.
               It gives {roleLabel} users a first-class navigation target without introducing unsafe backend changes.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Placeholder actions stay read-only and advisory here. Payment, escrow, signature, provider, and approval
+              decisions still require the existing dedicated workflow plus human confirmation before anything is submitted.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-background/70 p-5 space-y-3">

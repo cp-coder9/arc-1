@@ -85,6 +85,17 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain('function pageById(pageId: string)');
     expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab)');
   });
+
+  it('routes shared subcontractor and supplier command fallback to the canonical shell', () => {
+    expect(appSource).toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />`);
+    expect(appSource).not.toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="packages" user={user} />`);
+  });
+
+  it('keeps dashboard shell placeholders read-only, advisory, and human-confirmed for unsafe actions', () => {
+    expect(appSource).toContain('Placeholder actions stay read-only and advisory here.');
+    expect(appSource).toContain('Payment, escrow, signature, provider, and approval');
+    expect(appSource).toContain('human confirmation before anything is submitted');
+  });
 });
 
 describe('dashboard resource links', () => {
