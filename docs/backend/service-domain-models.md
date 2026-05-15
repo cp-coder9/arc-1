@@ -110,10 +110,11 @@ Core resource booking model:
 5. Billing outputs include gross amount, platform fee, owner payout, currency, and the formula used.
 6. Payout records aggregate booking ids and produce an idempotency key from resource, owner, payout batch, and usage bookings.
 
-Representative tests:
+Representative tests and deterministic contract examples:
 
 - `src/services/__tests__/cpdService.test.ts`
 - `src/services/__tests__/resourceBookingService.test.ts`
+- `docs/backend/cpd-service-contract-examples.md`
 
 ## Route and persistence integration checklist
 
