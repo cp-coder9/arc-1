@@ -83,6 +83,10 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Firm Access Removed',
     channels: ['in_app', 'email'],
   },
+  directory_invitation: {
+    title: 'Directory Invitation',
+    channels: ['in_app', 'email'],
+  },
 };
 
 class NotificationService {
@@ -228,6 +232,7 @@ class NotificationService {
       firm_invite: '🏢',
       firm_role_changed: '🪪',
       firm_member_removed: '🚪',
+      directory_invitation: '📨',
     };
 
     toast(`${icons[type] || '🔔'} ${title}`, {

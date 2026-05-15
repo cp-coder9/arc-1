@@ -35,7 +35,8 @@ export const NotificationTypeEnum = z.enum([
   'invoice_paid',
   'firm_invite',
   'firm_role_changed',
-  'firm_member_removed'
+  'firm_member_removed',
+  'directory_invitation'
 ]);
 export const PaymentTypeEnum = z.enum([
   'escrow_deposit',

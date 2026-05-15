@@ -466,7 +466,8 @@ export type NotificationType =
   | 'invoice_paid'
   | 'firm_invite'
   | 'firm_role_changed'
-  | 'firm_member_removed';
+  | 'firm_member_removed'
+  | 'directory_invitation';
 
 export interface Notification {
   id: string;
@@ -482,6 +483,9 @@ export interface Notification {
     applicationId?: string;
     firmId?: string;
     firmInviteId?: string;
+    invitationId?: string;
+    workPackageId?: string;
+    discipline?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];

@@ -33,6 +33,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   firm_invite: '🏢',
   firm_role_changed: '🪪',
   firm_member_removed: '🚪',
+  directory_invitation: '📨',
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {

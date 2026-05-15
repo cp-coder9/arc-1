@@ -135,6 +135,25 @@ describe('NotificationService', () => {
 
       expect(mockAddDoc).not.toHaveBeenCalled();
     });
+
+    test('supports directory invitation notifications for persisted invite workflows', async () => {
+      await notificationService.sendNotification('bep-1', 'directory_invitation', 'You have been invited to a project', {
+        invitationId: 'invite-1',
+        projectId: 'project-1',
+        senderId: 'client-1',
+      });
+
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        { path: 'notifications' },
+        expect.objectContaining({
+          userId: 'bep-1',
+          type: 'directory_invitation',
+          title: 'Directory Invitation',
+          channels: ['in_app', 'email'],
+          data: { invitationId: 'invite-1', projectId: 'project-1', senderId: 'client-1' },
+        })
+      );
+    });
   });
 
   describe('subscribeToNotifications', () => {
