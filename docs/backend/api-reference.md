@@ -24,7 +24,7 @@ Base path is the Express API router mount, typically `/api`. All state-changing 
 
 ## Directory APIs
 
-Deterministic request/response examples for profile projection, directory search, and admin verification review routes are maintained in `docs/backend/profile-directory-verification-api-contract-examples.md`.
+Deterministic request/response examples for profile projection, directory search, and admin verification review routes are maintained in `docs/backend/profile-directory-verification-api-contract-examples.md`. Deterministic examples for directory invitation creation and invitation responses are maintained in `docs/backend/directory-invitation-brief-api-contract-examples.md`.
 
 ### Route alias: `/api/directory/search`
 
@@ -106,6 +106,8 @@ These endpoints operate under the project coordination gate unless noted.
 - **Human blockers:** BEP coordination requires verified SACAP status. Approval, review, and AI issue endpoints are records of human project coordination and do not certify compliance by AI.
 
 ## Project brief and client brief APIs
+
+Deterministic request/response examples for project brief creation, attachment metadata, advisory interpretations, and guided client brief intake are maintained in `docs/backend/directory-invitation-brief-api-contract-examples.md`.
 
 These Phase 2 brief routes are the canonical client intake/read surface for project brief workflows. They complement the marketplace/proposal routes and keep AI output advisory until a verified human actor reviews or finalizes it.
 
