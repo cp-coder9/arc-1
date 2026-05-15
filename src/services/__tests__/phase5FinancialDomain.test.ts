@@ -1,8 +1,16 @@
 import {
+  assertAppendOnlyLedgerMutationAllowed,
   assertEscrowTransitionAllowed,
+  buildClaimDraft,
+  buildClaimPaymentLedgerEntry,
+  buildDisputeEvidenceDraft,
   buildDisputeEscrowHold,
+  buildFeeScheduleDraft,
+  buildInvoicePaymentLedgerEntry,
+  buildInvoiceDraft,
   buildLedgerEntryDraft,
   buildPaymentCallbackIdempotencyKey,
+  calculateFeeBreakdown,
   ESCROW_TRANSITIONS,
 } from '../phase5FinancialDomain';
 
@@ -50,6 +58,13 @@ describe('phase5FinancialDomain', () => {
     expect(Object.isFrozen(entry)).toBe(true);
     expect(() => buildLedgerEntryDraft({ ...entry, amount: 0 })).toThrow('greater than zero');
     expect(() => buildLedgerEntryDraft({ ...entry, description: ' ' })).toThrow('requires a description');
+    expect(() => buildLedgerEntryDraft({ ...entry, payerId: ' ' })).toThrow('Ledger payer id is required');
+  });
+
+  it('rejects updates to append-only ledger entries and requires idempotency for creates', () => {
+    expect(() => assertAppendOnlyLedgerMutationAllowed({ before: null, after: { idempotencyKey: 'provider:ref:payment' }, actorId: 'admin-1', reason: 'new payment callback' })).not.toThrow();
+    expect(() => assertAppendOnlyLedgerMutationAllowed({ before: { amount: 1000 }, after: { amount: 900, idempotencyKey: 'provider:ref:payment' }, actorId: 'admin-1', reason: 'edit typo' })).toThrow('append-only');
+    expect(() => assertAppendOnlyLedgerMutationAllowed({ before: null, after: {}, actorId: 'admin-1', reason: 'new payment callback' })).toThrow('idempotency metadata');
   });
 
   it('creates dispute hold descriptors that link disputes to escrow holds', () => {
@@ -65,5 +80,123 @@ describe('phase5FinancialDomain', () => {
       reason: 'Dispute opened, escrow release must be held pending resolution',
     });
     expect(Object.isFrozen(hold)).toBe(true);
+  });
+
+  it('builds invoice drafts with calculated totals and immutable line items', () => {
+    const invoice = buildInvoiceDraft({
+      invoiceNumber: 'INV-001',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      architectId: 'architect-1',
+      items: [
+        { description: 'Concept design milestone', quantity: 2, unitPrice: 500 },
+        { description: 'Submission pack', quantity: 1, unitPrice: 1000, total: 1000 },
+      ],
+      taxRate: 15,
+      dueDate: '2026-02-01',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(invoice).toEqual(expect.objectContaining({ subtotal: 2000, taxAmount: 300, totalAmount: 2300, status: 'draft', currency: 'R' }));
+    expect(invoice.items[0]).toEqual(expect.objectContaining({ total: 1000 }));
+    expect(Object.isFrozen(invoice)).toBe(true);
+    expect(Object.isFrozen(invoice.items[0])).toBe(true);
+    expect(() => buildInvoiceDraft({ ...invoice, items: [], dueDate: '2026-02-01' })).toThrow('at least one line item');
+    expect(() => buildInvoiceDraft({ ...invoice, taxRate: -1, dueDate: '2026-02-01' })).toThrow('cannot be negative');
+  });
+
+  it('builds claim drafts that require evidence and positive amounts', () => {
+    const claim = buildClaimDraft({
+      projectId: 'project-1',
+      jobId: 'job-1',
+      contractId: 'contract-1',
+      claimantId: 'contractor-1',
+      respondentId: 'client-1',
+      amount: 1500,
+      currency: 'ZAR',
+      reason: 'Variation work completed',
+      evidenceIds: ['evidence-1'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(claim).toEqual(expect.objectContaining({ status: 'submitted', evidenceIds: ['evidence-1'] }));
+    expect(Object.isFrozen(claim)).toBe(true);
+    expect(() => buildClaimDraft({ ...claim, amount: 0 })).toThrow('Claim amount must be greater than zero');
+    expect(() => buildClaimDraft({ ...claim, evidenceIds: [] })).toThrow('at least one evidence reference');
+  });
+
+  it('builds governed fee schedule drafts without hard-coding provider behavior', () => {
+    const schedule = buildFeeScheduleDraft({
+      id: 'fees-2026-v1',
+      name: 'Platform standard fees',
+      version: '2026.1',
+      jurisdiction: 'ZA',
+      platformFeePercentage: 0.01,
+      vatPercentage: 0.15,
+      effectiveFrom: '2026-01-01',
+      createdBy: 'admin-1',
+      status: 'active',
+    });
+
+    expect(schedule).toEqual(expect.objectContaining({ platformFeePercentage: 0.01, vatPercentage: 0.15 }));
+    expect(Object.isFrozen(schedule)).toBe(true);
+    expect(() => buildFeeScheduleDraft({ ...schedule, platformFeePercentage: 1.5 })).toThrow('between 0 and 1');
+    expect(() => buildFeeScheduleDraft({ ...schedule, vatPercentage: -0.1 })).toThrow('between 0 and 1');
+  });
+
+  it('calculates fee breakdowns from governed fee schedules', () => {
+    const breakdown = calculateFeeBreakdown({
+      grossAmount: 10000,
+      calculatedAt: '2026-01-01T00:00:00.000Z',
+      feeSchedule: {
+        id: 'fees-2026-v1',
+        name: 'Platform standard fees',
+        version: '2026.1',
+        jurisdiction: 'ZA',
+        platformFeePercentage: 0.02,
+        vatPercentage: 0.15,
+        effectiveFrom: '2026-01-01',
+        createdBy: 'admin-1',
+        status: 'active',
+      },
+    });
+
+    expect(breakdown).toEqual({ grossAmount: 10000, platformFeeAmount: 200, vatAmount: 30, netPayableAmount: 9770, feeScheduleId: 'fees-2026-v1', calculatedAt: '2026-01-01T00:00:00.000Z' });
+    expect(Object.isFrozen(breakdown)).toBe(true);
+  });
+
+  it('builds invoice and claim payment ledger entries with deterministic idempotency keys', () => {
+    const invoiceEntry = buildInvoicePaymentLedgerEntry({
+      projectId: 'project-1',
+      paymentId: 'payment-1',
+      provider: 'PayFast',
+      providerReference: 'PF-123',
+      paidAt: '2026-01-01T00:00:00.000Z',
+      invoice: { id: 'invoice-1', jobId: 'job-1', clientId: 'client-1', architectId: 'architect-1', totalAmount: 2300, invoiceNumber: 'INV-001' },
+    });
+    const claim = buildClaimDraft({ projectId: 'project-1', jobId: 'job-1', claimantId: 'contractor-1', respondentId: 'client-1', amount: 1500, currency: 'ZAR', reason: 'Variation work completed', evidenceIds: ['evidence-1'], createdAt: '2026-01-01T00:00:00.000Z' });
+    const claimEntry = buildClaimPaymentLedgerEntry({ claim: { ...claim, id: 'claim-1' }, paymentId: 'payment-2', provider: 'PayFast', providerReference: 'PF-456', paidAt: '2026-01-02T00:00:00.000Z' });
+
+    expect(invoiceEntry).toEqual(expect.objectContaining({ type: 'invoice_payment', invoiceId: 'invoice-1', amount: 2300, idempotencyKey: 'payfast:pf-123:payment-1' }));
+    expect(claimEntry).toEqual(expect.objectContaining({ type: 'claim_payment', claimId: 'claim-1', amount: 1500, payerId: 'client-1', payeeId: 'contractor-1', idempotencyKey: 'payfast:pf-456:payment-2' }));
+    expect(Object.isFrozen(invoiceEntry)).toBe(true);
+    expect(Object.isFrozen(claimEntry)).toBe(true);
+  });
+
+  it('builds dispute evidence drafts with stable immutable references', () => {
+    const evidence = buildDisputeEvidenceDraft({
+      disputeId: 'dispute-1',
+      projectId: 'project-1',
+      jobId: 'job-1',
+      submittedBy: 'client-1',
+      sourceType: 'ledger_entry',
+      sourceId: 'ledger-1',
+      description: 'Escrow release entry under dispute',
+      capturedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(evidence).toEqual(expect.objectContaining({ immutableReference: 'dispute-1:ledger_entry:ledger-1' }));
+    expect(Object.isFrozen(evidence)).toBe(true);
+    expect(() => buildDisputeEvidenceDraft({ ...evidence, sourceId: ' ' })).toThrow('Evidence source id is required');
   });
 });
