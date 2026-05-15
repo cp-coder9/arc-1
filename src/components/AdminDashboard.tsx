@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { JobCard, MunicipalCredential } from '../types';
 import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
+import { getVerificationLifecycle } from '../services/userVerificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
 import { pdfGenerationService } from "../services/pdfGenerationService";
@@ -805,6 +806,29 @@ export default function AdminDashboard({
       toast.error(error.message || 'Failed to review verification');
     }
   };
+  const recheckUserVerification = async (verification: UserVerification) => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Admin session expired');
+      const response = await fetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/recheck`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: 'Admin queued official register recheck from verification console' }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Verification recheck failed');
+      }
+      toast.success('Verification recheck queued');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Failed to queue verification recheck');
+    }
+  };
+
 
   return (
     <div className="space-y-12">
@@ -1194,12 +1218,26 @@ export default function AdminDashboard({
                 <TableBody>
                   {userVerifications.map(verification => {
                     const agentResult = verification.metadata?.verificationAgent as any;
+                    const lifecycle = getVerificationLifecycle(verification);
+                    const agentStatus = verification.metadata?.verificationAgentStatus as string | undefined;
                     return (
                       <TableRow key={verification.id}>
                         <TableCell className="font-mono text-xs">{verification.userId}</TableCell>
                         <TableCell><Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verification.subjectType}</Badge></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{verification.statutoryBody || 'Unspecified'} · {verification.registrationNumber || 'No number'}</TableCell>
-                        <TableCell><Badge variant={verification.status === 'verified' ? 'secondary' : verification.status === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verification.status}</Badge></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {verification.statutoryBody || 'Unspecified'} · {verification.registrationNumber || 'No number'}
+                          {verification.expiresAt && <p className="mt-1">Expires {safeFormat(verification.expiresAt, 'MMM d, yyyy')}</p>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant={verification.status === 'verified' ? 'secondary' : verification.status === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verification.status}</Badge>
+                            {(lifecycle.isDueForRecheck || agentStatus) && (
+                              <Badge variant={lifecycle.isExpired ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">
+                                {agentStatus === 'queued' ? 'Agent queued' : lifecycle.lifecycleStatus.replace(/_/g, ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="max-w-[320px] text-xs text-muted-foreground">
                           {agentResult?.officialUrl ? (
                             <a className="text-primary underline" href={agentResult.officialUrl} target="_blank" rel="noreferrer">{agentResult.provider} official check</a>
@@ -1208,6 +1246,7 @@ export default function AdminDashboard({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button size="sm" variant="outline" onClick={() => recheckUserVerification(verification)} disabled={verification.status === 'pending'}>Recheck</Button>
                             <Button size="sm" onClick={() => reviewUserVerification(verification, 'verified')} disabled={verification.status === 'verified'}>Approve</Button>
                             <Button size="sm" variant="destructive" onClick={() => reviewUserVerification(verification, 'rejected')} disabled={verification.status === 'rejected'}>Reject</Button>
                           </div>
@@ -1504,29 +1543,6 @@ function DisputeRow({ dispute }: { dispute: Dispute }) {
       toast.success('Dispute updated');
     } catch {
       toast.error('Failed to update dispute');
-    }
-  };
-
-  const recheckUserVerification = async (verification: UserVerification) => {
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('Admin session expired');
-      const response = await fetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/recheck`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ reason: 'Admin queued official register recheck from verification console' }),
-      });
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'Verification recheck failed');
-      }
-      toast.success('Verification recheck queued');
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Failed to queue verification recheck');
     }
   };
 

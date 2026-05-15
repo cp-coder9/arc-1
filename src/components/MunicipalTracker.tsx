@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { pdfGenerationService } from '@/services/pdfGenerationService';
+import { uploadAndTrackFile } from '@/lib/uploadService';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { AnimatePresence } from 'framer-motion';
 
@@ -152,7 +153,13 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
     setOcrLoading(true);
     toast.info("Analyzing receipt with Vision AI...");
     try {
-      const mockUrl = "https://public.blob.vercel-storage.com/receipt-sample.png";
+      const receiptUrl = await uploadAndTrackFile(file, {
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        uploadedBy: user.uid,
+        context: 'submission',
+      });
 
       const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/municipal/ocr', {
@@ -161,7 +168,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ imageUrl: mockUrl })
+        body: JSON.stringify({ imageUrl: receiptUrl })
       });
       const result = await res.json();
 

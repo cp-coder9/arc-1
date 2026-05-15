@@ -250,6 +250,5 @@ These are not blockers for the implemented slice, but they are required before f
 ## Next Phase 2 Tasks
 
 - Harden provider-specific selectors with live official-page fixtures where permitted.
-- Add scheduled re-verification for expiring records.
 - Add richer admin review dialogs instead of `window.prompt` for rejection reasons.
 - Add role-specific verification requirement gates before users can accept high-risk work.

@@ -1004,11 +1004,12 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
             <Button onClick={onGetStarted} variant="outline" className="rounded-full font-bold">View Marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {(liveJobs.length > 0 ? liveJobs : [
-              { id: 'sample-1', title: 'Residential renovation concept', category: 'Residential', location: 'Cape Town', budget: 85000, deadline: 'Open brief', description: 'Kitchen and living area redesign with council-ready documentation.' },
-              { id: 'sample-2', title: 'Retail fit-out documentation', category: 'Commercial', location: 'Johannesburg', budget: 140000, deadline: 'Open brief', description: 'Technical drawing package for a small retail interior fit-out.' },
-              { id: 'sample-3', title: 'New home compliance review', category: 'Residential', location: 'Pretoria', budget: 65000, deadline: 'Open brief', description: 'Plan review and compliance support before municipal submission.' }
-            ] as Partial<Job>[]).map((job) => (
+            {liveJobs.length === 0 && (
+              <div className="md:col-span-3 rounded-3xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
+                No open marketplace projects are currently published. New client opportunities will appear here once persisted in the marketplace.
+              </div>
+            )}
+            {liveJobs.map((job) => (
               <motion.div
                 key={job.id}
                 initial={{ opacity: 0, y: 18 }}
