@@ -14,6 +14,9 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `aabbc9dc` | API contract docs | Added deterministic profile, directory search, and admin verification review contract examples. |
+| `ad3e9311` | Guard drift tests | Added regression linking sensitive workflow guard constants to the operational flag docs. |
+| `031be738` | Full verification docs | Recorded the full lint/typecheck/test/build checkpoint after guard/doc work. |
 | `1277cdec` | Sensitive workflow guard | Added default-off guard helper and tests for payment, escrow, appointment, statutory, provider, procurement, resource, and email launch flags. |
 | `c8881e2f` | Phase 2 migration docs | Added canonical collection migration/dual-read/dual-write strategy with dry-run, idempotency, reconciliation, and human-signoff gates. |
 | `f03837bf` | Sensitive workflow flags | Defined default-off launch flags and dry-run posture for payments, escrow, appointments, e-signature, municipal, CPD, provider verification, procurement, resource provisioning, and email. |
@@ -60,7 +63,7 @@ The phase reports and commit history record the following validation categories:
 
 - Service/unit workflow coverage for project workflow write APIs, service workflow edge cases, package readiness, financial/appointment helpers, CPD logic, resource booking conflict and ledger behavior, and contractor readiness helpers.
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
-- API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic read-only Phase 2 API examples now cover project brief list/detail, opportunity detail, and proposal detail responses.
+- API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic API examples now cover project brief list/detail, opportunity detail, proposal detail, profile update/projection, directory search, and admin verification review/recheck responses.
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
 - Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 51 test files / 377 tests, and `npm run build` passed without the previous Vite circular chunk warning.
 - Sensitive workflow guard validation: focused guard coverage passed 6/6, including the docs/constants drift regression; the full checkpoint also passed `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` after the guard work.
@@ -88,7 +91,7 @@ These tasks are safe because they avoid irreversible external actions, live paym
 
 1. Keep expanding automated tests around existing route handlers, component shells, and Firestore/static rules using local mocks and deterministic fixtures.
 2. Add non-production API contract examples for any remaining documented endpoints, clearly marked as mock/dev fixtures.
-3. Extend docs with request/response examples for canonical profile/directory/admin review endpoints not yet covered by dedicated contract examples.
+3. Extend docs with request/response examples for admin review, resource centre, checklist, and project workflow endpoints not yet covered by dedicated contract examples.
 4. Keep browser smoke tests current for dashboard shells using `backend.html` as read-only reference, and extend them only with deterministic local mocks.
 5. Build read-only admin review queue views for verification, CPD sync status, municipal evidence status, and provider integration readiness without enabling external submission.
 6. Wire the sensitive workflow guard helper into future live-effect route handlers, but only after the corresponding product/legal/provider confirmations are complete.
