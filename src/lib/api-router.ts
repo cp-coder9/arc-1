@@ -1541,6 +1541,92 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
   }
 });
 
+router.get("/jobs/opportunities", async (req, res) => {
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  try {
+    const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User profile not found' });
+
+    const userData = userDoc.data()!;
+    const normalizedRole = normalizeUserRole(userData.role);
+    if (normalizedRole !== 'bep') {
+      return res.status(403).json({ error: 'Only verified BEPs can access marketplace opportunities' });
+    }
+
+    const activeBepVerification = await getActiveUserVerification(decoded.uid, 'bep', 'SACAP');
+    if (!activeBepVerification) {
+      await recordAuditEvent(req, {
+        category: 'access',
+        action: 'marketplace.opportunities_blocked_unverified_bep',
+        actor: decodedAuditActor(decoded, userData.role),
+        target: { type: 'marketplace', id: 'jobs' },
+        metadata: { normalizedRole, requiredSubjectType: 'bep', requiredStatutoryBody: 'SACAP' },
+      });
+      return res.status(403).json({
+        error: 'BEP verification is required before viewing client marketplace opportunities',
+        verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' },
+      });
+    }
+
+    const search = String(req.query.q || '').trim().toLowerCase();
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const region = String(req.query.region || '').trim().toLowerCase();
+    const maxLimit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 50);
+    const specialization = String(userData.mainSpecialization || userData.professionalDiscipline || '').trim().toLowerCase();
+
+    const snapshot = await adminDb.collection('jobs').where('status', '==', 'open').limit(100).get();
+    const opportunities = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as any))
+      .filter(job => job.clientId !== decoded.uid)
+      .filter(job => !category || String(job.category || job.projectType || '').toLowerCase().includes(category))
+      .filter(job => !region || String(job.region || job.location || '').toLowerCase().includes(region))
+      .filter(job => {
+        if (!search) return true;
+        const haystack = [job.title, job.description, job.category, job.projectType, job.region, job.location].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(search);
+      })
+      .map(job => {
+        const jobText = [job.title, job.description, job.category, job.projectType].filter(Boolean).join(' ').toLowerCase();
+        const aiMatchScore = specialization && jobText.includes(specialization) ? 0.9 : 0.5;
+        const aiMatchReasons = aiMatchScore > 0.5 ? [`Matches your ${specialization} specialization`] : ['Open client opportunity'];
+        return {
+          id: job.id,
+          title: job.title,
+          description: job.description,
+          category: job.category || job.projectType || null,
+          region: job.region || job.location || null,
+          budget: job.budget || job.estimatedBudget || null,
+          createdAt: job.createdAt || null,
+          clientId: job.clientId,
+          aiMatchScore,
+          aiMatchReasons,
+          verificationId: activeBepVerification.id,
+        };
+      })
+      .sort((a, b) => b.aiMatchScore - a.aiMatchScore || String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+      .slice(0, maxLimit);
+
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: 'marketplace.opportunities_viewed',
+      actor: decodedAuditActor(decoded, userData.role),
+      target: { type: 'marketplace', id: 'jobs' },
+      metadata: { normalizedRole, verificationId: activeBepVerification.id, resultCount: opportunities.length, search: search || undefined, category: category || undefined, region: region || undefined },
+    });
+
+    res.json({ opportunities, verificationId: activeBepVerification.id });
+  } catch (err: any) {
+    console.error('Marketplace opportunities error:', err);
+    res.status(500).json({ error: 'Failed to load marketplace opportunities', details: err.message });
+  }
+});
+
 router.post("/jobs/:jobId/applications", async (req, res) => {
   let decoded;
   try {

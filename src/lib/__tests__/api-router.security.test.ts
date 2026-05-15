@@ -407,6 +407,45 @@ describe('api-router security and high-value integration routes', () => {
     });
   });
 
+  it('lists searchable AI-matched opportunities only for verified BEPs', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('jobs/job-1', { title: 'Residential House Plan', description: 'Residential additions', clientId: 'client-1', status: 'open', category: 'Residential', region: 'Cape Town', budget: 120000, createdAt: '2026-01-02T00:00:00.000Z' });
+    mockAdminDb.seed('jobs/job-2', { title: 'Industrial Warehouse', description: 'Large shed', clientId: 'client-1', status: 'open', category: 'Industrial', region: 'Durban', createdAt: '2026-01-01T00:00:00.000Z' });
+    mockAdminDb.seed('jobs/job-3', { title: 'Closed project', clientId: 'client-1', status: 'in-progress', category: 'Residential', region: 'Cape Town' });
+    seedVerifiedBepVerification();
+
+    const response = await request(app)
+      .get('/api/jobs/opportunities?q=house&region=cape')
+      .set(authHeader('architect'));
+
+    expect(response.status).toBe(200);
+    expect(response.body.verificationId).toBe('architect-1_bep_SACAP_SACAP-123');
+    expect(response.body.opportunities).toHaveLength(1);
+    expect(response.body.opportunities[0]).toMatchObject({ id: 'job-1', title: 'Residential House Plan', aiMatchScore: 0.9, verificationId: 'architect-1_bep_SACAP_SACAP-123' });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
+      category: 'access',
+      action: 'marketplace.opportunities_viewed',
+      metadata: { verificationId: 'architect-1_bep_SACAP_SACAP-123', resultCount: 1, search: 'house', region: 'cape' },
+    });
+  });
+
+  it('blocks unverified BEPs from viewing marketplace opportunities and audits the gate', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
+
+    const response = await request(app)
+      .get('/api/jobs/opportunities')
+      .set(authHeader('architect'));
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({ verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
+      category: 'access',
+      action: 'marketplace.opportunities_blocked_unverified_bep',
+      metadata: { normalizedRole: 'bep', requiredSubjectType: 'bep', requiredStatutoryBody: 'SACAP' },
+    });
+  });
+
   it('allows architects to apply once to open jobs and notifies the client', async () => {
     const app = await buildApp();
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
