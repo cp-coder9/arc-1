@@ -24,6 +24,10 @@ Base path is the Express API router mount, typically `/api`. All state-changing 
 
 ## Directory APIs
 
+### Route alias: `/api/directory/search`
+
+When this router is mounted at `/api`, the canonical route alias is also exposed as `GET /api/directory/search` for clients generated from the platform API namespace. It delegates to the same verified directory search handler as `GET /directory/search`, writes the same `directory.search` audit event, and returns the same `results` payload.
+
 ### `GET /directory/search`
 
 Searches `directory_profiles` for visible users eligible for the caller to engage.
@@ -94,6 +98,58 @@ These endpoints operate under the project coordination gate unless noted.
 | `POST /projects/:projectId/coordination/items` | Create coordination item such as RFI, dependency, deadline, compliance status, or municipal readiness. | `projects/{projectId}/coordination_items` | `coordination.{itemType}_created` |
 
 - **Human blockers:** BEP coordination requires verified SACAP status. Approval, review, and AI issue endpoints are records of human project coordination and do not certify compliance by AI.
+
+## Project brief and client brief APIs
+
+These Phase 2 brief routes are the canonical client intake/read surface for project brief workflows. They complement the marketplace/proposal routes and keep AI output advisory until a verified human actor reviews or finalizes it.
+
+### `POST /project-briefs`
+
+Creates a client-owned durable project brief from structured intake data.
+
+- **Auth:** client or admin acting for the client; non-client BEP/contractor callers are blocked.
+- **Body:** `title`, `description`, optional `category`, `location`, `budgetRange`, `requirements`, and shallow `propertyDetails`.
+- **Durable writes:** `project_briefs/{briefId}`.
+- **Response:** `{ brief }` with sanitized strings/lists, immutable owner fields, `status: submitted`, and timestamps.
+- **Audit action:** `project_brief.created` with `canonicalRoute: true` metadata.
+- **Human blockers:** project brief creation is client intent capture only. It does not publish an opportunity, appoint a professional, or certify scope.
+
+### `POST /project-briefs/:briefId/attachments`
+
+Adds evidence metadata for a project brief attachment.
+
+- **Auth:** brief owner/client or admin; unrelated users are denied.
+- **Body:** `fileName`, HTTPS/blob `fileUrl`, optional `evidenceType` and metadata.
+- **Durable writes:** `project_briefs/{briefId}/attachments`.
+- **Response:** `{ attachment }` with storage provider metadata and owner fields.
+- **Audit action:** `project_brief.attachment_added` with `canonicalRoute: true` metadata.
+- **Human blockers:** attachments are evidence inputs and require later professional review before they can support compliance or municipal submissions.
+
+### `POST /project-briefs/:briefId/interpretations`
+
+Persists an advisory-only brief interpretation linked to one or more attachments.
+
+- **Auth:** brief owner/client, assigned BEP, or admin depending on brief assignment state.
+- **Body:** `summary`, optional `confidence`, `sourceAttachmentIds`, `likelyRequiredProfessionals`, `risks`, and limitations.
+- **Durable writes:** `project_briefs/{briefId}/interpretations`.
+- **Response:** `{ interpretation }` with `advisoryOnly: true`, clamped confidence, bounded lists, and `status: ready_for_review`.
+- **Audit action:** `project_brief.interpretation_added` in the `ai` category.
+- **Human blockers:** interpretations cannot finalize a technical brief or professional appointment without a verified human review step.
+
+### `POST /client-briefs`
+
+Creates a guided client brief and immediate advisory interpretation for client-friendly intake.
+
+- **Auth:** client only, with admin support through trusted operational flows where implemented.
+- **Body:** `selectedOption`, `projectGoal`, site/context fields, urgency/budget comfort fields, `supportNeeds`, and `evidenceUploads`.
+- **Durable writes:** `client_briefs/{briefId}`.
+- **Response:** `{ brief }` with sanitized support needs/evidence uploads, `status: ai_interpreted`, and an advisory interpretation summary/risk flags.
+- **Audit action:** `brief.client_created`.
+- **Human blockers:** AI interpretation is triage only. A verified BEP must be assigned and must finalize technical scope before proposal/appointment workflows rely on it.
+
+### Client brief assignment/finalization reads and writes
+
+Recent route tests cover the guided brief progression after `POST /client-briefs`: verified BEPs can be assigned, only assigned verified BEPs can finalize technical briefs, and downstream read/list views must preserve the owner/assignee gates. These routes read `client_briefs`, related `project_briefs`, and projected marketplace/proposal state rather than allowing unauthenticated list access.
 
 ## AI governance APIs
 
@@ -270,6 +326,7 @@ The router also exposes operational municipal routes used by existing tooling:
 
 - `audit_logs`
 - `directory_profiles`, `directory_invitations`, `user_verifications`
+- `client_briefs`, `project_briefs` plus project brief `attachments` and `interpretations` subcollections
 - `notifications`
 - `projects`, including subcollections: `documents`, `documents/{id}/versions`, `tasks`, `approvals`, `message_threads`, `message_threads/{id}/messages`, `transmittals`, `ai_issues`, `work_packages`, `work_packages/{id}/applications`, `work_packages/{id}/submissions`, `drawing_checklists`, `municipal_submissions`, `coordination_items`
 - `project_command_views`
