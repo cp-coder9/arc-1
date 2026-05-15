@@ -646,6 +646,73 @@ describe('api-router security and high-value integration routes', () => {
     });
   });
 
+
+  it('publishes canonical marketplace opportunities from client briefs as advisory matches', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'New house', description: 'Residential plans', status: 'submitted', category: 'Residential', location: 'Cape Town' });
+
+    const response = await request(app)
+      .post('/api/marketplace/opportunities')
+      .set(authHeader('client'))
+      .send({ briefId: 'brief-1' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.opportunity).toMatchObject({ id: 'brief-1', briefId: 'brief-1', clientId: 'client-1', status: 'published', advisoryMatchingOnly: true });
+    expect(mockAdminDb.getDoc('marketplace_opportunities/brief-1')).toMatchObject({ advisoryMatchingOnly: true, status: 'published' });
+    expect(mockAdminDb.getDoc('project_briefs/brief-1')).toMatchObject({ status: 'published', marketplaceOpportunityId: 'brief-1' });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({ action: 'marketplace.opportunity_published', metadata: { advisoryMatchingOnly: true, canonicalRoute: true } });
+  });
+
+  it('requires verified BEPs to list and submit canonical proposals without auto appointment', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('marketplace_opportunities/opp-1', { briefId: 'brief-1', clientId: 'client-1', title: 'New house', description: 'Residential plans', status: 'published', advisoryMatchingOnly: true });
+
+    const blockedList = await request(app)
+      .get('/api/marketplace/opportunities')
+      .set(authHeader('architect'));
+    expect(blockedList.status).toBe(403);
+
+    seedVerifiedBepVerification();
+    const listed = await request(app)
+      .get('/api/marketplace/opportunities')
+      .set(authHeader('architect'));
+    expect(listed.status).toBe(200);
+    expect(listed.body).toMatchObject({ verificationId: 'architect-1_bep_SACAP_SACAP-123', advisoryOnly: true });
+    expect(listed.body.opportunities[0]).toMatchObject({ id: 'opp-1', advisoryMatchingOnly: true });
+
+    const submitted = await request(app)
+      .post('/api/proposals')
+      .set(authHeader('architect'))
+      .send({ opportunityId: 'opp-1', feeAmount: 125000, scopeSummary: 'Stages 1 to 4', exclusions: ['Council fees'] });
+
+    expect(submitted.status).toBe(201);
+    expect(submitted.body.proposal).toMatchObject({ opportunityId: 'opp-1', briefId: 'brief-1', clientId: 'client-1', professionalId: 'architect-1', status: 'submitted', humanReviewRequired: true, advisoryOnly: true, autoAppointment: false, verificationId: 'architect-1_bep_SACAP_SACAP-123' });
+    const proposal = mockAdminDb.listCollection('proposals')[0].data;
+    expect(proposal).toMatchObject({ autoAppointment: false, humanReviewRequired: true });
+  });
+
+  it('creates advisory proposal comparisons only for the client owner', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('proposals/proposal-1', { briefId: 'brief-1', opportunityId: 'opp-1', clientId: 'client-1', professionalId: 'architect-1', feeAmount: 100000, scopeSummary: 'A', status: 'submitted' });
+    mockAdminDb.seed('proposals/proposal-2', { briefId: 'brief-1', opportunityId: 'opp-1', clientId: 'client-1', professionalId: 'bep-2', feeAmount: 110000, scopeSummary: 'B', status: 'submitted' });
+
+    const blocked = await request(app)
+      .post('/api/proposals/proposal-1/compare')
+      .set(authHeader('intruder'))
+      .send({ proposalIds: ['proposal-2'] });
+    expect(blocked.status).toBe(403);
+
+    const response = await request(app)
+      .post('/api/proposals/proposal-1/compare')
+      .set(authHeader('client'))
+      .send({ proposalIds: ['proposal-2'], criteria: ['fee', 'scope'], recommendationSummary: 'Advisory shortlist only' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.comparison).toMatchObject({ briefId: 'brief-1', clientId: 'client-1', proposalIds: ['proposal-1', 'proposal-2'], advisoryOnly: true, autoAppointment: false });
+    expect(response.body.comparison.limitations.join(' ')).toContain('does not automatically appoint');
+    expect(mockAdminDb.listCollection('proposal_comparisons')[0].data).toMatchObject({ advisoryOnly: true, autoAppointment: false });
+  });
+
   it('allows architects to apply once to open jobs and notifies the client', async () => {
     const app = await buildApp();
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });

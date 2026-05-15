@@ -39,6 +39,12 @@ import {
   buildProjectAttachmentMetadata,
   buildProjectBrief,
 } from "../services/briefWorkflowService";
+import {
+  assertVerifiedParticipantForOpportunity,
+  buildMarketplaceOpportunityFromBrief,
+  buildProposal,
+  buildProposalComparison,
+} from "../services/marketplaceWorkflowService";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -2797,6 +2803,134 @@ router.get("/jobs/opportunities", async (req, res) => {
   } catch (err: any) {
     console.error('Marketplace opportunities error:', err);
     res.status(500).json({ error: 'Failed to load marketplace opportunities', details: err.message });
+  }
+});
+
+
+router.post("/marketplace/opportunities", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (authContext.normalizedRole !== 'client' && !authContext.isAdmin) return res.status(403).json({ error: 'Only clients can publish marketplace opportunities' });
+    const briefId = String(req.body.briefId || '').trim();
+    if (!briefId) return res.status(400).json({ error: 'briefId is required' });
+
+    const briefSnap = await adminDb.collection('project_briefs').doc(briefId).get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Project brief not found' });
+    const brief = { id: briefId, ...briefSnap.data() } as Record<string, any>;
+    if (!authContext.isAdmin && brief.clientId !== authContext.uid) return res.status(403).json({ error: 'Only the brief owner can publish this opportunity' });
+
+    const opportunity = buildMarketplaceOpportunityFromBrief(brief as any);
+    const opportunityRef = adminDb.collection('marketplace_opportunities').doc(briefId);
+    await opportunityRef.set(opportunity, { merge: false });
+    await adminDb.collection('project_briefs').doc(briefId).set({ status: 'published', marketplaceOpportunityId: opportunityRef.id, updatedAt: opportunity.updatedAt }, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'marketplace.opportunity_published',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'marketplace_opportunity', id: opportunityRef.id, projectId: briefId },
+      metadata: { briefId, clientId: opportunity.clientId, advisoryMatchingOnly: true, canonicalRoute: true },
+    });
+
+    res.status(201).json({ opportunity: { id: opportunityRef.id, ...opportunity } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/marketplace/opportunities", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    let verificationId: string | undefined;
+    if (authContext.normalizedRole === 'bep') {
+      const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+      assertVerifiedParticipantForOpportunity(verification);
+      verificationId = verification?.id;
+    } else if (authContext.normalizedRole !== 'client' && !authContext.isAdmin) {
+      return res.status(403).json({ error: 'Only clients and verified BEPs can view marketplace opportunities' });
+    }
+
+    const snapshot = authContext.normalizedRole === 'client' && !authContext.isAdmin
+      ? await adminDb.collection('marketplace_opportunities').where('clientId', '==', authContext.uid).limit(50).get()
+      : await adminDb.collection('marketplace_opportunities').where('status', '==', 'published').limit(50).get();
+    const opportunities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), advisoryMatchingOnly: true }));
+    res.json({ opportunities, verificationId, advisoryOnly: true });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/proposals", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (authContext.normalizedRole !== 'bep') return res.status(403).json({ error: 'Only verified BEPs can submit marketplace proposals' });
+    const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+    assertVerifiedParticipantForOpportunity(verification);
+
+    const opportunityId = String(req.body.opportunityId || '').trim();
+    const opportunitySnap = await adminDb.collection('marketplace_opportunities').doc(opportunityId).get();
+    if (!opportunitySnap.exists) return res.status(404).json({ error: 'Marketplace opportunity not found' });
+    const opportunity = opportunitySnap.data() as Record<string, any>;
+    if (opportunity.status !== 'published') return res.status(400).json({ error: 'Proposals can only be submitted to published opportunities' });
+    if (opportunity.clientId === authContext.uid) return res.status(400).json({ error: 'You cannot submit a proposal for your own opportunity' });
+
+    const proposal = buildProposal({
+      ...req.body,
+      opportunityId,
+      briefId: opportunity.briefId,
+      clientId: opportunity.clientId,
+      professionalId: authContext.uid,
+    });
+    const proposalRef = adminDb.collection('proposals').doc();
+    await proposalRef.set({ id: proposalRef.id, ...proposal, verificationId: verification?.id, advisoryOnly: true, autoAppointment: false }, { merge: false });
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'marketplace.proposal_submitted',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'proposal', id: proposalRef.id, projectId: proposal.briefId },
+      metadata: { opportunityId, verificationId: verification?.id, humanReviewRequired: true, autoAppointment: false, canonicalRoute: true },
+    });
+    res.status(201).json({ proposal: { id: proposalRef.id, ...proposal, verificationId: verification?.id, advisoryOnly: true, autoAppointment: false } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/proposals/:proposalId/compare", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { proposalId } = req.params;
+    const primarySnap = await adminDb.collection('proposals').doc(proposalId).get();
+    if (!primarySnap.exists) return res.status(404).json({ error: 'Proposal not found' });
+    const primary = { id: proposalId, ...primarySnap.data() } as Record<string, any>;
+    if (!authContext.isAdmin && primary.clientId !== authContext.uid) return res.status(403).json({ error: 'Only the client owner can compare proposals' });
+
+    const requestedIds = Array.from(new Set([proposalId, ...(Array.isArray(req.body.proposalIds) ? req.body.proposalIds : [])].filter((id): id is string => typeof id === 'string' && id.trim().length > 0)));
+    const proposalSnaps = await Promise.all(requestedIds.map(id => adminDb.collection('proposals').doc(id).get()));
+    const proposals = proposalSnaps.filter(snap => snap.exists).map(snap => ({ id: snap.id, ...snap.data() } as Record<string, any>));
+    if (proposals.length !== requestedIds.length) return res.status(404).json({ error: 'One or more proposals were not found' });
+    if (proposals.some(proposal => proposal.clientId !== primary.clientId || proposal.briefId !== primary.briefId)) return res.status(400).json({ error: 'Compared proposals must belong to the same client brief' });
+
+    const comparison = buildProposalComparison({
+      briefId: primary.briefId,
+      clientId: primary.clientId,
+      createdBy: authContext.uid,
+      proposalIds: requestedIds,
+      criteria: req.body.criteria,
+      recommendationSummary: req.body.recommendationSummary,
+      scores: req.body.scores,
+    });
+    const comparisonRef = adminDb.collection('proposal_comparisons').doc();
+    await comparisonRef.set({ id: comparisonRef.id, ...comparison, autoAppointment: false }, { merge: false });
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: 'marketplace.proposals_compared',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'proposal_comparison', id: comparisonRef.id, projectId: primary.briefId },
+      metadata: { proposalIds: requestedIds, advisoryOnly: true, autoAppointment: false, canonicalRoute: true },
+    });
+    res.status(201).json({ comparison: { id: comparisonRef.id, ...comparison, autoAppointment: false } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
