@@ -266,6 +266,25 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Phase 4 AI governance records are created by trusted API routes/Admin SDK.
+    // Browser clients can inspect project-scoped governance evidence only when
+    // they already have project access; direct client writes are denied so AI
+    // cannot be self-certified or retroactively changed from the browser.
+    match /ai_action_logs/{logId} {
+      allow read: if canReadProject(resource.data.projectId);
+      allow create, update, delete: if false;
+    }
+
+    match /ai_review_queue/{itemId} {
+      allow read: if isAdmin() || canReadProject(resource.data.projectId);
+      allow create, update, delete: if false;
+    }
+
+    match /human_signoffs/{signoffId} {
+      allow read: if isAdmin() || canReadProject(resource.data.target.projectId);
+      allow create, update, delete: if false;
+    }
+
     // Users collection
     match /users/{userId} {
       // Allow reading user profiles if authenticated

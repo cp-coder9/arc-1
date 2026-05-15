@@ -200,6 +200,82 @@ Recommended indexes:
 - collection group `coordination_items`: `projectId ASC, status ASC, updatedAt DESC`
 - collection group `coordination_items`: `createdBy ASC, updatedAt DESC`
 
+### `ai_action_logs/{logId}`
+
+Append-only AI governance evidence created by trusted API routes.
+
+Common fields:
+
+- `projectId`
+- `actionKind`
+- `actorUid`
+- `target`
+- `prompt`
+- `sourceReferences[]`
+- `confidence`
+- `status`
+- `requiresHumanConfirmation`
+- `createdAt`
+
+Rules:
+
+- Project participants can read logs for their project.
+- Browser create/update/delete denied. Server routes own persistence and audit.
+
+Recommended indexes:
+
+- `projectId ASC, status ASC, createdAt DESC`
+
+### `ai_review_queue/{itemId}`
+
+Governance queue for low-confidence or flagged AI outputs.
+
+Common fields:
+
+- `projectId`
+- `actionLogId`
+- `target`
+- `priority`
+- `status`
+- `assignedRole`
+- `flags[]`
+- `createdAt`
+- `resolvedAt`, optional
+
+Rules:
+
+- Admins and project participants can read queue items for their project.
+- Browser create/update/delete denied. Resolution must go through audited API routes.
+
+Recommended indexes:
+
+- `projectId ASC, status ASC, priority ASC, createdAt DESC`
+
+### `human_signoffs/{signoffId}`
+
+Human-only sign-off records created when an authorized human confirms a governed workflow item.
+
+Common fields:
+
+- `domain`
+- `actorUid`
+- `actorRole`
+- `target.projectId`
+- `declaration`
+- `aiActionLogIds[]`
+- `humanConfirmed`
+- `aiMayNotSign`
+- `createdAt`
+
+Rules:
+
+- Admins and project participants can read sign-offs for their project.
+- Browser create/update/delete denied so AI/system actors cannot self-certify from the client.
+
+Recommended indexes:
+
+- `target.projectId ASC, domain ASC, createdAt DESC`
+
 ## Related audit/access collections
 
 - `audit_logs/{auditId}` remains append-only and admin-readable.

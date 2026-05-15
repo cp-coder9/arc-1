@@ -48,4 +48,15 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolutionStatus', 'assigneeNotes', 'updatedAt'])");
   });
 
+  it('keeps AI governance logs, queues, and human signoffs server-owned', () => {
+    expect(rules).toContain('match /ai_action_logs/{logId}');
+    expect(rules).toContain('match /ai_review_queue/{itemId}');
+    expect(rules).toContain('match /human_signoffs/{signoffId}');
+    expect(rules).toContain('allow read: if canReadProject(resource.data.projectId);');
+    expect(rules).toContain('allow read: if isAdmin() || canReadProject(resource.data.projectId);');
+    expect(rules).toContain('allow read: if isAdmin() || canReadProject(resource.data.target.projectId);');
+    const serverOwnedRuleCount = rules.match(/allow create, update, delete: if false;/g)?.length || 0;
+    expect(serverOwnedRuleCount).toBeGreaterThanOrEqual(4);
+  });
+
 });
