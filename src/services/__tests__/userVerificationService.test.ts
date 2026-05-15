@@ -66,6 +66,26 @@ describe('userVerificationService', () => {
     vi.useRealTimers();
   });
 
+  it('copies evidence arrays so later caller mutations cannot alter persisted verification records', () => {
+    const evidenceUrls = ['https://files.public.blob.vercel-storage.com/cert.pdf'];
+    const evidenceDocumentIds = ['doc-1'];
+    const verification = buildUserVerification({
+      userId: 'user-1',
+      submittedBy: 'user-1',
+      subjectType: 'bep',
+      evidenceUrls,
+      evidenceDocumentIds,
+    });
+
+    evidenceUrls.push('https://files.public.blob.vercel-storage.com/later.pdf');
+    evidenceDocumentIds.push('doc-2');
+
+    expect(verification.evidenceUrls).toEqual(['https://files.public.blob.vercel-storage.com/cert.pdf']);
+    expect(verification.evidenceDocumentIds).toEqual(['doc-1']);
+    expect(verification.evidenceUrls).not.toBe(evidenceUrls);
+    expect(verification.evidenceDocumentIds).not.toBe(evidenceDocumentIds);
+  });
+
   it('applies audited admin review decisions and requires rejection reasons', () => {
     vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
     const base = buildUserVerification({ userId: 'user-1', submittedBy: 'user-1', subjectType: 'supplier' });

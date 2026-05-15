@@ -45,6 +45,24 @@ describe('marketplaceWorkflowService', () => {
     expect(() => buildProposalComparison({ briefId: 'brief-1', clientId: 'client-1', createdBy: 'client-1', proposalIds: ['p1'] })).toThrow(/At least two/);
   });
 
+  it('keeps proposal comparison advisory and does not mutate caller arrays or auto-appoint a provider', () => {
+    const proposalIds = [' p1 ', 'p2', ''];
+    const criteria = [' fee ', 'programme'];
+    const comparison = buildProposalComparison({ briefId: 'brief-1', clientId: 'client-1', createdBy: 'client-1', proposalIds, criteria });
+
+    proposalIds.push('p3');
+    criteria.push('availability');
+
+    expect(proposalIds).toEqual([' p1 ', 'p2', '', 'p3']);
+    expect(criteria).toEqual([' fee ', 'programme', 'availability']);
+    expect(comparison.proposalIds).toEqual(['p1', 'p2']);
+    expect(comparison.criteria).toEqual(['fee', 'programme']);
+    expect(comparison.advisoryOnly).toBe(true);
+    expect(comparison.limitations).toContain('Client human confirmation is required before appointment.');
+    expect(comparison).not.toHaveProperty('appointmentId');
+    expect(comparison).not.toHaveProperty('appointedProfessionalId');
+  });
+
   it('normalizes comparison proposal ids before enforcing minimum proposal count', () => {
     expect(() => buildProposalComparison({ briefId: 'brief-1', clientId: 'client-1', createdBy: 'client-1', proposalIds: ['p1', '  '] })).toThrow(/At least two/);
   });

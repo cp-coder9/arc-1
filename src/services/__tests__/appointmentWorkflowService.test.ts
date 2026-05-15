@@ -34,6 +34,40 @@ describe('appointmentWorkflowService', () => {
     expect(() => buildAppointmentIdempotencyKey({ briefId: ' ', clientId: 'client-1', professionalId: 'bep-1' })).toThrow(/briefId/);
   });
 
+  it('does not mutate supplied appointment input or auto-accept legal/provider gates', () => {
+    const input = {
+      briefId: ' brief-1 ',
+      proposalId: ' proposal-1 ',
+      clientId: 'client-1',
+      professionalId: ' bep-1 ',
+      verificationId: ' verification-1 ',
+      createdBy: 'client-1',
+      contractDraftId: 'draft-1',
+    };
+
+    const appointment = buildAppointmentRecord(input);
+
+    expect(input).toEqual({
+      briefId: ' brief-1 ',
+      proposalId: ' proposal-1 ',
+      clientId: 'client-1',
+      professionalId: ' bep-1 ',
+      verificationId: ' verification-1 ',
+      createdBy: 'client-1',
+      contractDraftId: 'draft-1',
+    });
+    expect(appointment).toMatchObject({
+      briefId: 'brief-1',
+      proposalId: 'proposal-1',
+      professionalId: 'bep-1',
+      verificationId: 'verification-1',
+      status: 'pending_acceptance',
+      legalAcceptanceRequired: true,
+      humanAcceptanceRequired: true,
+    });
+    expect(appointment.status).not.toBe('accepted');
+  });
+
   it('builds immutable project stage history entries', () => {
     expect(buildProjectStageHistoryEntry({ projectId: 'project-1', actorId: 'client-1', stage: 'appointed', note: 'Appointment created' })).toMatchObject({
       projectId: 'project-1',

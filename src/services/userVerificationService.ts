@@ -33,6 +33,10 @@ export interface ProviderVerificationResult {
 const SUBJECT_TYPES: VerificationSubjectType[] = ['bep', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'];
 const REVIEW_STATUSES: VerificationReviewInput['status'][] = ['verified', 'rejected', 'expired'];
 
+function copyStringArray(value?: string[]): string[] {
+  return Array.isArray(value) ? [...value] : [];
+}
+
 export function assertVerificationSubjectType(value: unknown): asserts value is VerificationSubjectType {
   if (!SUBJECT_TYPES.includes(value as VerificationSubjectType)) {
     throw Object.assign(new Error('Unsupported verification subject type'), { status: 400 });
@@ -84,8 +88,8 @@ export function buildUserVerification(input: VerificationSubmissionInput, provid
     source: providerResult?.source || input.source || 'document_upload',
     registrationNumber,
     statutoryBody,
-    evidenceDocumentIds: input.evidenceDocumentIds || [],
-    evidenceUrls: input.evidenceUrls || [],
+    evidenceDocumentIds: copyStringArray(input.evidenceDocumentIds),
+    evidenceUrls: copyStringArray(input.evidenceUrls),
     submittedAt: now,
     submittedBy: input.submittedBy,
     lastVerifiedAt: providerResult?.status === 'verified' ? now : undefined,
