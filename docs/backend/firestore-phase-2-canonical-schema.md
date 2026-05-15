@@ -1,6 +1,6 @@
 # Firestore Phase 2 Canonical Schema
 
-This note records the canonical Firestore collections used by the Phase 2 profile, brief, marketplace, proposal, and appointment service modules. Trusted API routes and Admin SDK jobs may perform writes that browser security rules intentionally deny.
+This note records the canonical Firestore collections used by the Phase 2 profile, brief, marketplace, proposal, and appointment service modules. Trusted API routes and Admin SDK jobs may perform writes that browser security rules intentionally deny. Migration and dual-write planning from compatibility collections is documented in `docs/backend/phase-2-canonical-migration-strategy.md`.
 
 ## Collections
 
