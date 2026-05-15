@@ -1139,6 +1139,74 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'project.command_centre_viewed')).toBe(true);
   });
 
+  it('persists Phase 3 project workflow writes with audit trails and immutable document versions', async () => {
+    const app = await buildApp();
+    seedVerifiedBepVerification('architect-1');
+    mockAdminDb.seed('projects/project-workflow-1', {
+      id: 'project-workflow-1',
+      projectCode: 'ARC-20260102-WF001',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [
+        { userId: 'client-1', role: 'client', status: 'active' },
+        { userId: 'architect-1', role: 'architect', discipline: 'architecture', status: 'active', verificationId: 'ver-1' },
+      ],
+    });
+
+    const blocked = await request(app)
+      .post('/api/projects/project-workflow-1/tasks')
+      .set(authHeader('intruder'))
+      .send({ title: 'Intruder task' });
+    const documentResponse = await request(app)
+      .post('/api/projects/project-workflow-1/documents')
+      .set(authHeader('architect'))
+      .send({ title: 'Submission drawing pack', documentType: 'drawing_register', discipline: 'architecture', revision: 'P01', fileUrl: 'https://files.public.blob.vercel-storage.com/a100.pdf', fileName: 'A100.pdf' });
+    const documentId = documentResponse.body.document.id;
+    const versionResponse = await request(app)
+      .post('/api/projects/project-workflow-1/document-versions')
+      .set(authHeader('architect'))
+      .send({ documentId, revision: 'P02', fileUrl: 'https://files.public.blob.vercel-storage.com/a100-p02.pdf', fileName: 'A100-P02.pdf' });
+    const taskResponse = await request(app)
+      .post('/api/projects/project-workflow-1/tasks')
+      .set(authHeader('architect'))
+      .send({ title: 'Coordinate fire notes', assigneeId: 'architect-1', dueDate: '2026-01-05T00:00:00.000Z', linkedItems: [{ id: documentId, type: 'document', label: 'Drawing pack' }] });
+    const approvalResponse = await request(app)
+      .post('/api/projects/project-workflow-1/approvals')
+      .set(authHeader('architect'))
+      .send({ title: 'Client approve submission pack', approverId: 'client-1', linkedItems: [{ id: versionResponse.body.version.id, type: 'document_version' }] });
+    const threadResponse = await request(app)
+      .post('/api/projects/project-workflow-1/message-threads')
+      .set(authHeader('architect'))
+      .send({ subject: 'Submission coordination', contextType: 'approval', contextId: approvalResponse.body.approval.id, participantIds: ['client-1'] });
+    const messageResponse = await request(app)
+      .post('/api/projects/project-workflow-1/messages')
+      .set(authHeader('architect'))
+      .send({ threadId: threadResponse.body.thread.id, body: 'Please review the updated submission pack.', attachments: [{ id: versionResponse.body.version.id, type: 'document_version' }] });
+    const transmittalResponse = await request(app)
+      .post('/api/projects/project-workflow-1/transmittals')
+      .set(authHeader('architect'))
+      .send({ title: 'Issue P02 to client', recipientIds: ['client-1'], documentVersionIds: [versionResponse.body.version.id], purpose: 'Client review' });
+
+    expect(blocked.status).toBe(403);
+    expect(documentResponse.status).toBe(201);
+    expect(documentResponse.body.document).toMatchObject({ projectId: 'project-workflow-1', title: 'Submission drawing pack', currentVersionId: 'v1', currentRevision: 'P01' });
+    expect(documentResponse.body.version).toMatchObject({ versionNumber: 1, revision: 'P01', createdBy: 'architect-1' });
+    expect(versionResponse.status).toBe(201);
+    expect(versionResponse.body.version).toMatchObject({ documentId, versionNumber: 2, revision: 'P02', supersedesVersionId: 'v1' });
+    expect(mockAdminDb.getDoc(`projects/project-workflow-1/documents/${documentId}`)).toMatchObject({ currentVersionId: 'v2', currentRevision: 'P02' });
+    expect(mockAdminDb.getDoc(`projects/project-workflow-1/documents/${documentId}/versions/v1`)).toMatchObject({ revision: 'P01' });
+    expect(taskResponse.body.task).toMatchObject({ title: 'Coordinate fire notes', status: 'open', assigneeId: 'architect-1' });
+    expect(approvalResponse.body.approval).toMatchObject({ title: 'Client approve submission pack', status: 'requested', approverId: 'client-1' });
+    expect(threadResponse.body.thread).toMatchObject({ subject: 'Submission coordination', contextType: 'approval', participantIds: ['architect-1', 'client-1'], unreadFor: ['client-1'] });
+    expect(messageResponse.body.message).toMatchObject({ threadId: threadResponse.body.thread.id, body: 'Please review the updated submission pack.', contextType: 'approval' });
+    expect(mockAdminDb.getDoc(`projects/project-workflow-1/message_threads/${threadResponse.body.thread.id}`)).toMatchObject({ lastMessageId: messageResponse.body.message.id, unreadFor: ['client-1'] });
+    expect(transmittalResponse.body.transmittal).toMatchObject({ title: 'Issue P02 to client', status: 'issued', documentVersionIds: [versionResponse.body.version.id] });
+    const auditActions = mockAdminDb.listCollection('audit_logs').map(({ data }) => data.action);
+    expect(auditActions).toEqual(expect.arrayContaining(['document.created', 'document.version_created', 'task.created', 'approval.requested', 'message.thread_created', 'message.created', 'transmittal.issued']));
+  });
+
   it('routes AI drawing issues to verified assignees and tracks resolution review', async () => {
     const app = await buildApp();
     mockAdminDb.seed('projects/project-1', {

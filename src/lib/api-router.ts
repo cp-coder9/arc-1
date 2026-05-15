@@ -1044,6 +1044,32 @@ function sanitizeChecklistItems(value: unknown, maxItems = 80) {
   return value.slice(0, maxItems).map(sanitizeChecklistItem);
 }
 
+const PROJECT_TASK_STATUSES = ['open', 'in_progress', 'blocked', 'submitted', 'complete', 'closed'] as const;
+const PROJECT_APPROVAL_STATUSES = ['requested', 'in_review', 'approved', 'rejected', 'withdrawn'] as const;
+const PROJECT_MESSAGE_CONTEXT_TYPES = ['task', 'drawing', 'document', 'approval', 'rfi', 'invoice', 'municipal_submission', 'claim', 'snag', 'contract', 'payment_hold', 'compliance_flag', 'transmittal', 'general'] as const;
+const PROJECT_TRANSMITTAL_STATUSES = ['draft', 'issued', 'acknowledged', 'superseded'] as const;
+
+function sanitizeProjectWorkflowStatus<T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]): T[number] {
+  const candidate = sanitizeCoordinationString(value, 80);
+  return allowed.includes(candidate as T[number]) ? candidate as T[number] : fallback;
+}
+
+function sanitizeProjectWorkflowLinks(value: unknown, maxItems = 30) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, maxItems).map((item, index) => {
+    const record: Record<string, unknown> = item && typeof item === 'object' ? item as Record<string, unknown> : { id: item };
+    return {
+      id: sanitizeCoordinationString(record.id, 160) || `link-${index + 1}`,
+      type: sanitizeCoordinationString(record.type, 80) || 'general',
+      label: sanitizeCoordinationString(record.label || record.title, 240),
+    };
+  });
+}
+
+function sanitizeMessageContextType(value: unknown) {
+  return sanitizeProjectWorkflowStatus(value, PROJECT_MESSAGE_CONTEXT_TYPES, 'general');
+}
+
 const CLIENT_BRIEF_SUPPORT_NEEDS = new Set(['plans', 'approvals', 'construction_pricing', 'full_delivery_support', 'unsure']);
 const CLIENT_BRIEF_URGENCY = new Set(['not_urgent', 'standard', 'urgent', 'emergency']);
 const CLIENT_BRIEF_BUDGET = new Set(['unknown', 'exploring', 'limited', 'moderate', 'comfortable', 'fixed']);
@@ -1756,6 +1782,182 @@ router.get("/projects/:projectId/command-centre", async (req, res) => {
       metadata: { viewerProjectRole, taskCount: tasks.length, approvalCount: approvals.length, documentCount: documents.length },
     });
     res.json({ commandCentre });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/documents", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const title = sanitizeCoordinationString(req.body.title || req.body.name, 240);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const now = new Date().toISOString();
+    const documentRef = adminDb.collection('projects').doc(projectId).collection('documents').doc();
+    const firstVersionRef = documentRef.collection('versions').doc('v1');
+    const version = {
+      id: firstVersionRef.id,
+      documentId: documentRef.id,
+      projectId,
+      versionNumber: 1,
+      revision: sanitizeCoordinationString(req.body.revision, 80) || 'P01',
+      fileUrl: sanitizeCoordinationString(req.body.fileUrl, 1200) || null,
+      fileName: sanitizeCoordinationString(req.body.fileName, 240) || null,
+      checksum: sanitizeCoordinationString(req.body.checksum, 160) || null,
+      notes: sanitizeCoordinationString(req.body.notes, 2000),
+      createdBy: authContext.uid,
+      createdAt: now,
+    };
+    const document = {
+      id: documentRef.id,
+      projectId,
+      title,
+      documentType: sanitizeCoordinationString(req.body.documentType || req.body.type, 120) || 'general',
+      discipline: sanitizeCoordinationString(req.body.discipline, 120) || null,
+      status: sanitizeCoordinationString(req.body.status, 80) || 'active',
+      currentVersionId: firstVersionRef.id,
+      currentRevision: version.revision,
+      latestFileUrl: version.fileUrl,
+      tags: sanitizeCoordinationStringArray(req.body.tags, 20),
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await documentRef.set(document);
+    await firstVersionRef.set(version);
+    await recordAuditEvent(req, { category: 'document', action: 'document.created', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'document', id: documentRef.id, projectId }, metadata: { versionId: firstVersionRef.id, revision: version.revision } });
+    res.status(201).json({ document, version });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/document-versions", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const documentId = sanitizeCoordinationString(req.body.documentId, 160);
+    if (!documentId) return res.status(400).json({ error: 'documentId is required' });
+    const documentRef = adminDb.collection('projects').doc(projectId).collection('documents').doc(documentId);
+    const documentSnap = await documentRef.get();
+    if (!documentSnap.exists) return res.status(404).json({ error: 'Document not found' });
+    const versionsSnap = await documentRef.collection('versions').get();
+    const versionNumber = versionsSnap.size + 1;
+    const now = new Date().toISOString();
+    const versionRef = documentRef.collection('versions').doc(`v${versionNumber}`);
+    const version = {
+      id: versionRef.id,
+      documentId,
+      projectId,
+      versionNumber,
+      revision: sanitizeCoordinationString(req.body.revision, 80) || `R${versionNumber}`,
+      fileUrl: sanitizeCoordinationString(req.body.fileUrl, 1200) || null,
+      fileName: sanitizeCoordinationString(req.body.fileName, 240) || null,
+      checksum: sanitizeCoordinationString(req.body.checksum, 160) || null,
+      notes: sanitizeCoordinationString(req.body.notes, 2000),
+      supersedesVersionId: (documentSnap.data() as any)?.currentVersionId || null,
+      createdBy: authContext.uid,
+      createdAt: now,
+    };
+    await versionRef.set(version);
+    await documentRef.set({ currentVersionId: versionRef.id, currentRevision: version.revision, latestFileUrl: version.fileUrl, updatedAt: now }, { merge: true });
+    await recordAuditEvent(req, { category: 'document', action: 'document.version_created', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'document_version', id: versionRef.id, projectId }, metadata: { documentId, versionNumber, revision: version.revision, supersedesVersionId: version.supersedesVersionId } });
+    res.status(201).json({ version });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/tasks", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const title = sanitizeCoordinationString(req.body.title, 240);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const now = new Date().toISOString();
+    const taskRef = adminDb.collection('projects').doc(projectId).collection('tasks').doc();
+    const task = { id: taskRef.id, projectId, title, description: sanitizeCoordinationString(req.body.description, 4000), status: sanitizeProjectWorkflowStatus(req.body.status, PROJECT_TASK_STATUSES, 'open'), assigneeId: sanitizeCoordinationString(req.body.assigneeId, 160) || null, dueDate: sanitizeCoordinationString(req.body.dueDate, 80) || null, linkedItems: sanitizeProjectWorkflowLinks(req.body.linkedItems), createdBy: authContext.uid, createdAt: now, updatedAt: now };
+    await taskRef.set(task);
+    await recordAuditEvent(req, { category: 'project', action: 'task.created', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'task', id: taskRef.id, projectId }, metadata: { status: task.status, assigneeId: task.assigneeId } });
+    res.status(201).json({ task });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/approvals", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const title = sanitizeCoordinationString(req.body.title, 240);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const now = new Date().toISOString();
+    const approvalRef = adminDb.collection('projects').doc(projectId).collection('approvals').doc();
+    const approval = { id: approvalRef.id, projectId, title, description: sanitizeCoordinationString(req.body.description, 4000), status: sanitizeProjectWorkflowStatus(req.body.status, PROJECT_APPROVAL_STATUSES, 'requested'), requestedBy: authContext.uid, approverId: sanitizeCoordinationString(req.body.approverId, 160) || null, dueDate: sanitizeCoordinationString(req.body.dueDate, 80) || null, linkedItems: sanitizeProjectWorkflowLinks(req.body.linkedItems), history: [{ status: 'requested', by: authContext.uid, at: now, note: 'Approval requested' }], createdAt: now, updatedAt: now };
+    await approvalRef.set(approval);
+    await recordAuditEvent(req, { category: 'approval', action: 'approval.requested', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'approval', id: approvalRef.id, projectId }, metadata: { approverId: approval.approverId, linkedItemCount: approval.linkedItems.length } });
+    res.status(201).json({ approval });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/message-threads", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const subject = sanitizeCoordinationString(req.body.subject, 240);
+    if (!subject) return res.status(400).json({ error: 'subject is required' });
+    const now = new Date().toISOString();
+    const threadRef = adminDb.collection('projects').doc(projectId).collection('message_threads').doc();
+    const participantIds = Array.from(new Set([authContext.uid, ...sanitizeCoordinationStringArray(req.body.participantIds, 40)]));
+    const thread = { id: threadRef.id, projectId, subject, contextType: sanitizeMessageContextType(req.body.contextType), contextId: sanitizeCoordinationString(req.body.contextId, 160) || null, participantIds, unreadFor: participantIds.filter(id => id !== authContext.uid), createdBy: authContext.uid, createdAt: now, updatedAt: now };
+    await threadRef.set(thread);
+    await recordAuditEvent(req, { category: 'message', action: 'message.thread_created', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'message_thread', id: threadRef.id, projectId }, metadata: { contextType: thread.contextType, participantCount: participantIds.length } });
+    res.status(201).json({ thread });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/messages", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const threadId = sanitizeCoordinationString(req.body.threadId, 160);
+    const body = sanitizeCoordinationString(req.body.body || req.body.message, 8000);
+    if (!threadId || !body) return res.status(400).json({ error: 'threadId and body are required' });
+    const projectDoc = adminDb.collection('projects').doc(projectId);
+    const threadRef = projectDoc.collection('message_threads').doc(threadId);
+    const threadSnap = await threadRef.get();
+    if (!threadSnap.exists) return res.status(404).json({ error: 'Message thread not found' });
+    const thread = threadSnap.data() as Record<string, any>;
+    const now = new Date().toISOString();
+    const messageRef = projectDoc.collection('messages').doc();
+    const message = { id: messageRef.id, projectId, threadId, body, contextType: thread.contextType || sanitizeMessageContextType(req.body.contextType), contextId: thread.contextId || sanitizeCoordinationString(req.body.contextId, 160) || null, attachments: sanitizeProjectWorkflowLinks(req.body.attachments, 20), createdBy: authContext.uid, createdAt: now };
+    const unreadFor = Array.isArray(thread.participantIds) ? thread.participantIds.filter((id: string) => id !== authContext.uid) : [];
+    await messageRef.set(message);
+    await threadRef.set({ lastMessageId: messageRef.id, lastMessageAt: now, lastMessageBy: authContext.uid, unreadFor, updatedAt: now }, { merge: true });
+    await recordAuditEvent(req, { category: 'message', action: 'message.created', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'message', id: messageRef.id, projectId }, metadata: { threadId, contextType: message.contextType } });
+    res.status(201).json({ message });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/transmittals", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext } = await getProjectCoordinatorContext(req, projectId);
+    const title = sanitizeCoordinationString(req.body.title, 240);
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const now = new Date().toISOString();
+    const transmittalRef = adminDb.collection('projects').doc(projectId).collection('transmittals').doc();
+    const transmittal = { id: transmittalRef.id, projectId, title, status: sanitizeProjectWorkflowStatus(req.body.status, PROJECT_TRANSMITTAL_STATUSES, 'issued'), recipientIds: sanitizeCoordinationStringArray(req.body.recipientIds, 40), documentVersionIds: sanitizeCoordinationStringArray(req.body.documentVersionIds, 80), purpose: sanitizeCoordinationString(req.body.purpose, 1000), issuedBy: authContext.uid, issuedAt: now, createdAt: now, updatedAt: now };
+    await transmittalRef.set(transmittal);
+    await recordAuditEvent(req, { category: 'document', action: 'transmittal.issued', actor: decodedAuditActor(authContext.decoded, authContext.role), target: { type: 'transmittal', id: transmittalRef.id, projectId }, metadata: { status: transmittal.status, documentVersionCount: transmittal.documentVersionIds.length, recipientCount: transmittal.recipientIds.length } });
+    res.status(201).json({ transmittal });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
   }
