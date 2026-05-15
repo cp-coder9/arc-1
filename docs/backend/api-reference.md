@@ -547,6 +547,8 @@ Content-Type: application/json
 
 ## Work package APIs
 
+Deterministic request/response examples for freelancer work package creation, application, assignment, submission, and review routes are maintained in `docs/backend/work-package-api-contract-examples.md`.
+
 ### `POST /projects/:projectId/work-packages`
 
 Creates a freelancer work package.
