@@ -25,6 +25,7 @@ import {
   type ProviderVerificationResult,
 } from "../services/userVerificationService";
 import { runVerificationBrowserAgent, type VerificationAgentInput } from "../services/verificationAgentService";
+import { analyzeBrief } from "../services/agents/briefingAgent";
 
 import { UserRole, MunicipalityType, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -910,6 +911,156 @@ async function projectDirectoryProfile(userId: string, profile: Record<string, a
   return projection;
 }
 
+const CLIENT_BRIEF_SUPPORT_NEEDS = new Set(['plans', 'approvals', 'construction_pricing', 'full_delivery_support', 'unsure']);
+const CLIENT_BRIEF_URGENCY = new Set(['not_urgent', 'standard', 'urgent', 'emergency']);
+const CLIENT_BRIEF_BUDGET = new Set(['unknown', 'exploring', 'limited', 'moderate', 'comfortable', 'fixed']);
+const TECHNICAL_BRIEF_FEEDS = ['bep_proposal', 'fee_calculator', 'contract_builder', 'drawing_register', 'sans_compliance_forms', 'municipal_tracker', 'project_programme', 'design_team_setup', 'procurement_planning', 'ai_workflows'];
+
+function sanitizeBriefText(value: unknown, maxLength = 2400) {
+  return typeof value === 'string' ? value.replace(/[<>]/g, '').trim().slice(0, maxLength) : '';
+}
+
+function sanitizeBriefBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function sanitizeBriefStringArray(value: unknown, maxItems = 20, maxLength = 240) {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => sanitizeBriefText(item, maxLength)).filter(Boolean).slice(0, maxItems);
+}
+
+function sanitizeEvidenceUploads(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 30).map((item) => {
+    if (!item || typeof item !== 'object') return null;
+    const record = item as Record<string, unknown>;
+    const url = sanitizeBriefText(record.url, 1200);
+    if (url && !isAllowedBlobUrl(url)) return null;
+    return {
+      name: sanitizeBriefText(record.name || record.fileName, 180) || 'Evidence upload',
+      url: url || null,
+      type: sanitizeBriefText(record.type || record.contentType, 120) || null,
+      description: sanitizeBriefText(record.description, 500) || null,
+    };
+  }).filter(Boolean);
+}
+
+function sanitizeClientBriefPayload(body: Record<string, any>) {
+  const supportNeeds = sanitizeBriefStringArray(body.supportNeeds || body.requiredSupport, 8).filter(item => CLIENT_BRIEF_SUPPORT_NEEDS.has(item));
+  const urgency = sanitizeBriefText(body.urgency, 80);
+  const budgetComfortLevel = sanitizeBriefText(body.budgetComfortLevel || body.budget, 80);
+  return {
+    projectGoal: sanitizeBriefText(body.projectGoal || body.goal || body.description, 4000),
+    selectedOption: sanitizeBriefText(body.selectedOption || body.projectOption, 240),
+    siteAddress: sanitizeBriefText(body.siteAddress || body.location, 500),
+    hasExistingPlans: sanitizeBriefBoolean(body.hasExistingPlans),
+    workExistsAlready: sanitizeBriefBoolean(body.workExistsAlready),
+    urgency: CLIENT_BRIEF_URGENCY.has(urgency) ? urgency : 'standard',
+    budgetComfortLevel: CLIENT_BRIEF_BUDGET.has(budgetComfortLevel) ? budgetComfortLevel : 'unknown',
+    supportNeeds,
+    evidenceUploads: sanitizeEvidenceUploads(body.evidenceUploads || body.uploadedEvidence || body.documents),
+    notes: sanitizeBriefText(body.notes || body.additionalContext, 3000),
+  };
+}
+
+function buildBriefPrompt(brief: Record<string, any>) {
+  return [
+    brief.selectedOption,
+    brief.projectGoal,
+    brief.siteAddress ? `Site/address: ${brief.siteAddress}` : '',
+    brief.hasExistingPlans !== null ? `Has existing plans: ${brief.hasExistingPlans ? 'yes' : 'no'}` : '',
+    brief.workExistsAlready !== null ? `Work exists already: ${brief.workExistsAlready ? 'yes' : 'no'}` : '',
+    `Urgency: ${brief.urgency}`,
+    `Budget comfort: ${brief.budgetComfortLevel}`,
+    brief.supportNeeds?.length ? `Support needed: ${brief.supportNeeds.join(', ')}` : '',
+    brief.notes,
+  ].filter(Boolean).join('\n');
+}
+
+function inferBriefRoute(brief: Record<string, any>, requirements: string[]) {
+  const text = `${brief.selectedOption || ''} ${brief.projectGoal || ''} ${brief.supportNeeds?.join(' ') || ''} ${requirements.join(' ')}`.toLowerCase();
+  if (/selling|updated plans|as built|as-built/.test(text)) return 'As-built documentation and approval status check';
+  if (/construction price|pricing|quote|tender/.test(text)) return 'Technical scope confirmation followed by contractor pricing';
+  if (/approval|council|municipal/.test(text)) return 'BEP appointment for drawings and municipal approval submission';
+  if (/renovat|addition|extension|house/.test(text)) return 'BEP feasibility review, measured information check, drawings, approvals, then pricing if required';
+  return 'BEP review to confirm scope, approvals, documents, and next professional steps';
+}
+
+function inferApprovalRequirements(brief: Record<string, any>, category: string) {
+  const text = `${brief.projectGoal || ''} ${brief.selectedOption || ''} ${brief.supportNeeds?.join(' ') || ''}`.toLowerCase();
+  const approvals = ['A registered professional must confirm municipal submission requirements.'];
+  if (/approval|plans|council|municipal|addition|extension|renovat|existing/.test(text)) approvals.push('Likely municipal building plan approval or as-built regularisation review.');
+  if (/title|zoning|departure|coverage|height|heritage/.test(text)) approvals.push('Town planning, title deed, zoning, or heritage constraints may need review.');
+  if (category === 'Commercial' || category === 'Industrial') approvals.push('Fire, occupancy, accessibility, and specialist compliance checks may apply.');
+  return approvals;
+}
+
+function inferBriefRiskFlags(brief: Record<string, any>) {
+  const risks: string[] = [];
+  if (brief.workExistsAlready === true) risks.push('Existing or completed work may require as-built verification and possible regularisation.');
+  if (brief.hasExistingPlans === false) risks.push('No existing plans may increase measured survey and documentation effort.');
+  if (brief.urgency === 'urgent' || brief.urgency === 'emergency') risks.push('Urgent timeline may be constrained by statutory approval periods.');
+  if (brief.budgetComfortLevel === 'limited' || brief.budgetComfortLevel === 'fixed') risks.push('Budget constraints should be checked against professional fees, approval costs, and construction scope.');
+  if (!brief.siteAddress) risks.push('Site address or erf details are missing and will be needed for statutory checks.');
+  return risks;
+}
+
+async function buildClientBriefInterpretation(brief: Record<string, any>) {
+  const prompt = buildBriefPrompt(brief);
+  const analysis = await analyzeBrief(prompt);
+  const riskFlags = inferBriefRiskFlags(brief);
+  return {
+    clientSummary: sanitizeBriefText(`${brief.selectedOption ? `${brief.selectedOption}: ` : ''}${brief.projectGoal || 'Client is still defining the project.'}`, 1200),
+    possibleProjectRoute: inferBriefRoute(brief, analysis.requirements),
+    likelyProfessionalRequirements: Array.from(new Set(['Verified BEP or architect to confirm scope', ...analysis.requirements])).slice(0, 10),
+    likelyApprovalRequirements: inferApprovalRequirements(brief, analysis.suggestedCategory),
+    riskFlags,
+    suggestedNextAction: riskFlags.length ? 'Invite a verified BEP to review the brief, confirm missing information, and advise on approvals before pricing.' : 'Invite verified BEPs to review and convert this into a technical brief.',
+    recommendation: 'Invite verified BEPs before relying on pricing, approvals, or construction decisions.',
+    aiAnalysis: analysis,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function canReadClientBrief(authContext: any, brief: Record<string, any>) {
+  if (authContext.isAdmin || brief.clientId === authContext.uid) return true;
+  return Array.isArray(brief.assignedBepIds) && brief.assignedBepIds.includes(authContext.uid);
+}
+
+function assertClientBriefOwner(authContext: any, brief: Record<string, any>) {
+  if (!authContext.isAdmin && brief.clientId !== authContext.uid) {
+    const error: any = new Error('Only the brief owner or admin can perform this action');
+    error.status = 403;
+    throw error;
+  }
+}
+
+function assertAssignedBep(authContext: any, brief: Record<string, any>) {
+  const role = normalizeUserRole(authContext.role);
+  if (authContext.isAdmin) return;
+  if ((role === 'bep') && Array.isArray(brief.assignedBepIds) && brief.assignedBepIds.includes(authContext.uid)) return;
+  const error: any = new Error('Only an assigned verified BEP can edit the technical brief');
+  error.status = 403;
+  throw error;
+}
+
+function sanitizeTechnicalBriefPayload(body: Record<string, any>) {
+  const missingInformation = sanitizeBriefStringArray(body.missingInformation, 30, 300);
+  return {
+    technicalClassification: sanitizeBriefText(body.technicalClassification, 300),
+    requiredProfessionals: sanitizeBriefStringArray(body.requiredProfessionals, 20, 180),
+    likelyApprovals: sanitizeBriefStringArray(body.likelyApprovals, 20, 240),
+    projectScope: sanitizeBriefStringArray(body.projectScope || body.scope, 40, 400),
+    deliverables: sanitizeBriefStringArray(body.deliverables, 40, 300),
+    exclusions: sanitizeBriefStringArray(body.exclusions, 30, 300),
+    assumptions: sanitizeBriefStringArray(body.assumptions, 30, 300),
+    missingInformation,
+    riskFlags: sanitizeBriefStringArray(body.riskFlags || body.risks, 30, 300),
+    downstreamFeeds: TECHNICAL_BRIEF_FEEDS,
+    tasks: missingInformation.map((title, index) => ({ id: `missing_${index + 1}`, title, status: 'open', source: 'technical_brief_missing_information' })),
+  };
+}
+
 function withGuardrails(systemInstruction?: string) {
   // Guardrails are added at the proxy boundary so client helpers do not prepend them twice.
   return `${SYSTEM_GUARDRAILS}\n\n${systemInstruction || ''}`.trim();
@@ -1058,6 +1209,176 @@ router.put("/admin/users/:userId/profile", async (req, res) => {
       metadata: { fields: Object.keys(profileData), directoryProjected: Boolean(directoryProfile) },
     });
     res.json({ profile: updatedProfile, directoryProfile });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/client-briefs", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = normalizeUserRole(authContext.role);
+    if (!authContext.isAdmin && role !== 'client') return res.status(403).json({ error: 'Only clients can create guided briefs' });
+    const payload = sanitizeClientBriefPayload(req.body || {});
+    if (!payload.projectGoal || payload.projectGoal.length < 10) return res.status(400).json({ error: 'Project goal must explain what the client is trying to achieve' });
+    const now = new Date().toISOString();
+    const briefRef = adminDb.collection('client_briefs').doc();
+    const interpretation = await buildClientBriefInterpretation(payload);
+    const brief = {
+      id: briefRef.id,
+      clientId: authContext.uid,
+      clientName: authContext.userData?.displayName || authContext.decoded.displayName || authContext.decoded.email || 'Client',
+      status: 'ai_interpreted',
+      ...payload,
+      interpretation,
+      assignedBepIds: [],
+      technicalBriefId: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await briefRef.set(brief);
+    await recordAuditEvent(req, {
+      category: 'brief',
+      action: 'brief.client_created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'client_brief', id: briefRef.id },
+      metadata: { status: brief.status, supportNeeds: payload.supportNeeds },
+    });
+    res.status(201).json({ brief });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/client-briefs/:briefId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const briefSnap = await adminDb.collection('client_briefs').doc(req.params.briefId).get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Client brief not found' });
+    const brief = { id: req.params.briefId, ...briefSnap.data() } as Record<string, any>;
+    if (!canReadClientBrief(authContext, brief)) return res.status(403).json({ error: 'Not authorized to view this brief' });
+    const technicalSnap = await adminDb.collection('technical_briefs').doc(req.params.briefId).get();
+    res.json({ brief, technicalBrief: technicalSnap.exists ? { id: req.params.briefId, ...technicalSnap.data() } : null });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put("/client-briefs/:briefId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const briefRef = adminDb.collection('client_briefs').doc(req.params.briefId);
+    const briefSnap = await briefRef.get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Client brief not found' });
+    const existing = { id: req.params.briefId, ...briefSnap.data() } as Record<string, any>;
+    assertClientBriefOwner(authContext, existing);
+    if (existing.status === 'technical_finalized') return res.status(409).json({ error: 'Finalized technical briefs cannot be changed from the client wizard' });
+    const payload = sanitizeClientBriefPayload({ ...existing, ...(req.body || {}) });
+    if (!payload.projectGoal || payload.projectGoal.length < 10) return res.status(400).json({ error: 'Project goal must explain what the client is trying to achieve' });
+    const interpretation = await buildClientBriefInterpretation(payload);
+    const update = { ...payload, interpretation, status: existing.assignedBepIds?.length ? 'ready_for_bep' : 'ai_interpreted', updatedAt: new Date().toISOString() };
+    await briefRef.set(update, { merge: true });
+    const updated = { ...existing, ...update };
+    await recordAuditEvent(req, {
+      category: 'brief',
+      action: 'brief.client_updated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'client_brief', id: req.params.briefId },
+      metadata: { status: updated.status },
+    });
+    res.json({ brief: updated });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/client-briefs/:briefId/assign-bep", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const briefRef = adminDb.collection('client_briefs').doc(req.params.briefId);
+    const briefSnap = await briefRef.get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Client brief not found' });
+    const brief = { id: req.params.briefId, ...briefSnap.data() } as Record<string, any>;
+    assertClientBriefOwner(authContext, brief);
+    const targetBepId = sanitizeBriefText(req.body.targetBepId || req.body.bepId, 160);
+    if (!targetBepId) return res.status(400).json({ error: 'targetBepId is required' });
+    const [targetSnap, verification] = await Promise.all([
+      adminDb.collection('users').doc(targetBepId).get(),
+      getDirectoryVerification(targetBepId, 'bep'),
+    ]);
+    if (!targetSnap.exists) return res.status(404).json({ error: 'BEP profile not found' });
+    const targetProfile = targetSnap.data() as Record<string, any>;
+    if (normalizeUserRole(targetProfile.role) !== 'bep') return res.status(400).json({ error: 'Only verified BEPs can be assigned to technical brief editing' });
+    if (!verification) return res.status(403).json({ error: 'Assigned BEP must be verified before technical brief editing', verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    const assignedBepIds = Array.from(new Set([...(Array.isArray(brief.assignedBepIds) ? brief.assignedBepIds : []), targetBepId]));
+    const now = new Date().toISOString();
+    await briefRef.set({ assignedBepIds, status: 'ready_for_bep', updatedAt: now }, { merge: true });
+    await notificationService.sendNotification(targetBepId, 'message', `${brief.clientName || 'A client'} assigned you a guided brief to refine.`, { briefId: req.params.briefId, notificationKind: 'brief_assignment' } as any);
+    await recordAuditEvent(req, {
+      category: 'brief',
+      action: 'brief.bep_assigned',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'client_brief', id: req.params.briefId },
+      metadata: { targetBepId, verificationId: verification.id },
+    });
+    res.json({ brief: { ...brief, assignedBepIds, status: 'ready_for_bep', updatedAt: now }, assignedBepId: targetBepId, verificationId: verification.id });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put("/client-briefs/:briefId/technical-brief", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const briefRef = adminDb.collection('client_briefs').doc(req.params.briefId);
+    const briefSnap = await briefRef.get();
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Client brief not found' });
+    const brief = { id: req.params.briefId, ...briefSnap.data() } as Record<string, any>;
+    assertAssignedBep(authContext, brief);
+    if (!authContext.isAdmin) {
+      const activeBepVerification = await getDirectoryVerification(authContext.uid, 'bep');
+      if (!activeBepVerification) return res.status(403).json({ error: 'Active BEP verification is required before editing technical briefs', verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    }
+    const payload = sanitizeTechnicalBriefPayload(req.body || {});
+    if (!payload.technicalClassification && payload.projectScope.length === 0 && payload.deliverables.length === 0) {
+      return res.status(400).json({ error: 'Technical classification, scope, or deliverables are required' });
+    }
+    const finalize = req.body.status === 'finalized' || req.body.finalize === true;
+    if (finalize && (payload.requiredProfessionals.length === 0 || payload.deliverables.length === 0)) {
+      return res.status(400).json({ error: 'Final technical briefs require professionals and deliverables' });
+    }
+    const now = new Date().toISOString();
+    const technicalRef = adminDb.collection('technical_briefs').doc(req.params.briefId);
+    const existingTech = await technicalRef.get();
+    if (existingTech.exists && (existingTech.data() as any).status === 'finalized') {
+      return res.status(409).json({ error: 'Finalized technical briefs are immutable; create a future revision workflow before changing this brief' });
+    }
+    const technicalBrief = {
+      id: req.params.briefId,
+      clientBriefId: req.params.briefId,
+      clientId: brief.clientId,
+      bepId: authContext.uid,
+      status: finalize ? 'finalized' : 'draft',
+      sourceClientBrief: {
+        clientSummary: brief.interpretation?.clientSummary || brief.projectGoal,
+        possibleProjectRoute: brief.interpretation?.possibleProjectRoute || null,
+        evidenceUploads: brief.evidenceUploads || [],
+      },
+      ...payload,
+      createdAt: existingTech.exists ? (existingTech.data() as any).createdAt : now,
+      updatedAt: now,
+      finalizedAt: finalize ? now : null,
+    };
+    await technicalRef.set(technicalBrief, { merge: true });
+    await briefRef.set({ technicalBriefId: req.params.briefId, status: finalize ? 'technical_finalized' : 'technical_draft', updatedAt: now }, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'brief',
+      action: finalize ? 'brief.technical_finalized' : 'brief.technical_updated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'technical_brief', id: req.params.briefId },
+      metadata: { clientBriefId: req.params.briefId, downstreamFeeds: payload.downstreamFeeds, taskCount: payload.tasks.length },
+    });
+    res.json({ technicalBrief, brief: { ...brief, technicalBriefId: req.params.briefId, status: finalize ? 'technical_finalized' : 'technical_draft', updatedAt: now } });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

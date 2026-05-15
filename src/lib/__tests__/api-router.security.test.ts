@@ -235,7 +235,7 @@ vi.mock('../../services/verificationAgentService', () => ({
   })),
 }));
 vi.mock('../municipalAutomation', () => ({ runMunicipalBrowserAutomation, trackMunicipalityStatus }));
-vi.mock('../../services/notificationService', () => ({ notificationService: { create: vi.fn() } }));
+vi.mock('../../services/notificationService', () => ({ notificationService: { create: vi.fn(), sendNotification: vi.fn() } }));
 
 async function buildApp() {
   const router = (await import('../api-router')).default;
@@ -793,6 +793,137 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.getDoc('users/contractor-1')).not.toHaveProperty('cpdRecords');
     expect(mockAdminDb.getDoc('directory_profiles/contractor-1')).toMatchObject({ company: 'BuildCo Updated', normalizedRole: 'contractor', trade: 'general building', region: 'Gauteng', verificationStatus: 'verified' });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'profile.admin_updated')).toBe(true);
+  });
+
+  it('persists guided client briefs with AI interpretation and sanitized evidence', async () => {
+    const app = await buildApp();
+
+    const blocked = await request(app)
+      .post('/api/client-briefs')
+      .set(authHeader('architect'))
+      .send({ projectGoal: 'I need plans approved for an existing house addition.' });
+
+    const response = await request(app)
+      .post('/api/client-briefs')
+      .set(authHeader('client'))
+      .send({
+        selectedOption: 'I need plans approved.',
+        projectGoal: 'I built a small house extension and need plans approved by council.',
+        siteAddress: '12 Main Road, Cape Town',
+        hasExistingPlans: false,
+        workExistsAlready: true,
+        urgency: 'urgent',
+        budgetComfortLevel: 'limited',
+        supportNeeds: ['plans', 'approvals', 'not-a-real-option'],
+        evidenceUploads: [
+          { name: 'photo.jpg', url: 'https://files.public.blob.vercel-storage.com/photo.jpg', type: 'image/jpeg' },
+          { name: 'evil.jpg', url: 'https://evil.example/evil.jpg', type: 'image/jpeg' },
+        ],
+      });
+
+    expect(blocked.status).toBe(403);
+    expect(response.status).toBe(201);
+    expect(response.body.brief).toMatchObject({ clientId: 'client-1', status: 'ai_interpreted', selectedOption: 'I need plans approved.' });
+    expect(response.body.brief.interpretation.clientSummary).toContain('plans approved');
+    expect(response.body.brief.interpretation.riskFlags.length).toBeGreaterThan(0);
+    expect(response.body.brief.supportNeeds).toEqual(['plans', 'approvals']);
+    expect(response.body.brief.evidenceUploads).toHaveLength(1);
+    expect(mockAdminDb.getDoc('client_briefs/client_briefs_1')).toMatchObject({ clientId: 'client-1', status: 'ai_interpreted' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'brief.client_created')).toBe(true);
+  });
+
+  it('assigns verified BEPs and lets only assigned BEPs finalize technical briefs', async () => {
+    const app = await buildApp();
+    seedVerifiedBepVerification('architect-1');
+    mockAdminDb.seed('client_briefs/brief-1', {
+      id: 'brief-1',
+      clientId: 'client-1',
+      clientName: 'Client One',
+      status: 'ai_interpreted',
+      selectedOption: 'I want to renovate or add to my house.',
+      projectGoal: 'We need a residential addition with council approvals.',
+      evidenceUploads: [],
+      interpretation: { clientSummary: 'Residential addition', possibleProjectRoute: 'BEP feasibility review' },
+      assignedBepIds: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const unassigned = await request(app)
+      .put('/api/client-briefs/brief-1/technical-brief')
+      .set(authHeader('architect'))
+      .send({ technicalClassification: 'Residential additions', deliverables: ['Sketch plan'] });
+
+    const assigned = await request(app)
+      .post('/api/client-briefs/brief-1/assign-bep')
+      .set(authHeader('client'))
+      .send({ targetBepId: 'architect-1' });
+
+    const finalized = await request(app)
+      .put('/api/client-briefs/brief-1/technical-brief')
+      .set(authHeader('architect'))
+      .send({
+        finalize: true,
+        technicalClassification: 'Residential additions and municipal regularisation',
+        requiredProfessionals: ['Architectural professional', 'Structural engineer'],
+        likelyApprovals: ['Municipal building plan approval'],
+        projectScope: ['Measured survey', 'Council submission drawings'],
+        deliverables: ['Technical brief', 'Submission drawing pack'],
+        exclusions: ['Construction contract administration'],
+        assumptions: ['Client can provide title deed'],
+        missingInformation: ['Confirm erf number', 'Upload title deed'],
+        riskFlags: ['Existing work may need regularisation'],
+      });
+
+    const readAsBep = await request(app)
+      .get('/api/client-briefs/brief-1')
+      .set(authHeader('architect'));
+
+    expect(unassigned.status).toBe(403);
+    expect(assigned.status).toBe(200);
+    expect(assigned.body).toMatchObject({ assignedBepId: 'architect-1' });
+    expect(mockAdminDb.getDoc('client_briefs/brief-1')?.assignedBepIds).toEqual(['architect-1']);
+    expect(finalized.status).toBe(200);
+    expect(finalized.body.technicalBrief).toMatchObject({ status: 'finalized', clientBriefId: 'brief-1', bepId: 'architect-1' });
+    expect(finalized.body.technicalBrief.tasks.map((task: any) => task.title)).toEqual(['Confirm erf number', 'Upload title deed']);
+    expect(finalized.body.technicalBrief.downstreamFeeds).toEqual(expect.arrayContaining(['contract_builder', 'drawing_register', 'municipal_tracker', 'ai_workflows']));
+    expect(mockAdminDb.getDoc('client_briefs/brief-1')).toMatchObject({ status: 'technical_finalized', technicalBriefId: 'brief-1' });
+    expect(mockAdminDb.getDoc('technical_briefs/brief-1')).toMatchObject({ technicalClassification: 'Residential additions and municipal regularisation', status: 'finalized' });
+    expect(readAsBep.status).toBe(200);
+    expect(readAsBep.body.technicalBrief.status).toBe('finalized');
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'brief.bep_assigned')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'brief.technical_finalized')).toBe(true);
+
+    const overwriteFinal = await request(app)
+      .put('/api/client-briefs/brief-1/technical-brief')
+      .set(authHeader('architect'))
+      .send({ technicalClassification: 'Changed after final', deliverables: ['Changed'] });
+    expect(overwriteFinal.status).toBe(409);
+  });
+
+  it('revalidates assigned BEP verification before technical brief edits', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('client_briefs/brief-unverified', {
+      id: 'brief-unverified',
+      clientId: 'client-1',
+      clientName: 'Client One',
+      status: 'ready_for_bep',
+      projectGoal: 'Need professional scope confirmation for alterations.',
+      evidenceUploads: [],
+      interpretation: { clientSummary: 'Alterations' },
+      assignedBepIds: ['architect-1'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const response = await request(app)
+      .put('/api/client-briefs/brief-unverified/technical-brief')
+      .set(authHeader('architect'))
+      .send({ technicalClassification: 'Residential alteration', deliverables: ['Scope note'] });
+
+    expect(response.status).toBe(403);
+    expect(response.body.verificationRequired).toMatchObject({ subjectType: 'bep', statutoryBody: 'SACAP' });
+    expect(mockAdminDb.getDoc('technical_briefs/brief-unverified')).toBeUndefined();
   });
 
   it('returns profile-backed manual directory results without exposing private or unverified-only filtered records', async () => {

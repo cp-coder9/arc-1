@@ -4,6 +4,7 @@ export type AuditEventCategory =
   | 'auth'
   | 'access'
   | 'profile'
+  | 'brief'
   | 'role'
   | 'verification'
   | 'project'
