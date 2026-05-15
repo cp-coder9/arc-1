@@ -153,6 +153,13 @@ type DashboardPage = {
   backedBy: string[];
 };
 
+type DashboardResourceLink = {
+  title: string;
+  description: string;
+  href: string;
+  roles?: UserRole[];
+};
+
 const DESIGN_TEAM_ROLES: UserRole[] = ['bep', 'architect'];
 
 const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
@@ -194,12 +201,53 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
 
+const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
+  toolbox: [
+    { title: 'Guided brief to appointment', description: 'Workflow map for turning intake data into appointment-ready project records.', href: '/docs/workflows/guided-brief-to-appointment.md' },
+    { title: 'Project command centre workflow', description: 'Canonical project coordination flow for files, decisions, and status updates.', href: '/docs/workflows/project-command-centre.md' },
+  ],
+  journey: [
+    { title: 'Project command centre workflow', description: 'Stage-by-stage reference for lifecycle navigation and next actions.', href: '/docs/workflows/project-command-centre.md' },
+    { title: 'Phase 3 workflow APIs', description: 'Implementation report for project workflow write APIs and stage operations.', href: '/docs/phase-reports/phase-3-project-workflow-write-apis.md' },
+  ],
+  tasks: [
+    { title: 'Command centre projection', description: 'Explains how role-filtered project activity is projected into dashboards.', href: '/docs/phase-reports/phase-3-command-centre-projection.md' },
+    { title: 'Audit log taxonomy', description: 'Governance reference for review, approval, and handoff audit trails.', href: '/docs/backend/audit-log-taxonomy.md' },
+  ],
+  'directory-search': [
+    { title: 'Directory and invitations', description: 'Real implementation notes for verified directory search and invitation flows.', href: '/docs/phase-reports/phase-3-directory-and-invitations.md' },
+    { title: 'Role profile projection', description: 'How role-specific profile fields support matching and directory views.', href: '/docs/phase-reports/phase-4-role-profile-projection.md' },
+  ],
+  ai: [
+    { title: 'AI governance and human sign-off', description: 'Required review model for AI-assisted project support.', href: '/docs/backend/ai-governance-human-signoff.md' },
+    { title: 'Guided technical briefs', description: 'Phase report for AI-assisted brief drafting and review surfaces.', href: '/docs/phase-reports/phase-5-guided-technical-briefs.md' },
+  ],
+  knowledge: [
+    { title: 'CPD service slice', description: 'Backend service notes for CPD and knowledge workflows.', href: '/docs/phase-reports/phase-7-cpd-service-slice.md' },
+    { title: 'Service domain models', description: 'Domain reference for knowledge, CPD, and project service boundaries.', href: '/docs/backend/service-domain-models.md' },
+  ],
+  'resource-centre': [
+    { title: 'Resource booking service slice', description: 'Current service notes for resource-centre and booking workflows.', href: '/docs/phase-reports/phase-7-resource-booking-service-slice.md' },
+    { title: 'Dashboard alignment report', description: 'Reference for linking dashboard shells to real documentation and components.', href: '/docs/phase-reports/backend-html-dashboard-alignment.md' },
+  ],
+  procurement: [
+    { title: 'Package readiness service', description: 'Implementation notes for package readiness, procurement, and supplier handoffs.', href: '/docs/phase-reports/phase-6-package-readiness-service.md' },
+  ],
+  packages: [
+    { title: 'Package readiness service', description: 'Implementation notes for subcontractor package readiness and supplier scope.', href: '/docs/phase-reports/phase-6-package-readiness-service.md' },
+  ],
+};
+
 function pagesForRole(role: UserRole) {
   return CANONICAL_DASHBOARD_PAGES.filter((page) => page.roles.includes(role));
 }
 
 function pageById(pageId: string) {
   return CANONICAL_DASHBOARD_PAGES.find((page) => page.id === pageId);
+}
+
+function resourcesForShell(pageId: string, role: UserRole) {
+  return (DASHBOARD_RESOURCE_LINKS[pageId] ?? []).filter((resource) => !resource.roles || resource.roles.includes(role));
 }
 
 export default function App() {
@@ -824,6 +872,7 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
 
   const roleLabel = user.role === 'bep' || user.role === 'architect' ? 'design team' : user.role;
   const shellFocus = getDashboardShellFocus(pageId, roleLabel);
+  const resourceLinks = resourcesForShell(pageId, user.role);
 
   return (
     <div className="space-y-6">
@@ -857,6 +906,36 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
               {page.backedBy.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
             </div>
           </div>
+          {resourceLinks.length > 0 && (
+            <div className="lg:col-span-3 rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-heading text-lg font-bold">Relevant implementation resources</h3>
+                  <p className="text-sm text-muted-foreground">Links to existing project documentation behind this shell, opened without new backend APIs.</p>
+                </div>
+                <Badge variant="outline">real docs</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {resourceLinks.map((resource) => (
+                  <a
+                    key={resource.href}
+                    href={resource.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group rounded-xl border border-border bg-background/80 p-4 transition-colors hover:border-primary/50 hover:bg-background"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-sm group-hover:text-primary">{resource.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{resource.description}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary shrink-0" />
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
