@@ -199,6 +199,8 @@ Checks whether a submitted proposal currently satisfies appointment precondition
 
 ## AI governance APIs
 
+Deterministic request/response examples for project-scoped AI issue routing, resolution, and human review routes are maintained in `docs/backend/ai-issue-review-api-contract-examples.md`.
+
 ### `POST /ai/action-logs`
 
 Persists an AI action log and optionally creates a review queue item.
