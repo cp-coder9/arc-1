@@ -14,6 +14,7 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `1277cdec` | Sensitive workflow guard | Added default-off guard helper and tests for payment, escrow, appointment, statutory, provider, procurement, resource, and email launch flags. |
 | `c8881e2f` | Phase 2 migration docs | Added canonical collection migration/dual-read/dual-write strategy with dry-run, idempotency, reconciliation, and human-signoff gates. |
 | `f03837bf` | Sensitive workflow flags | Defined default-off launch flags and dry-run posture for payments, escrow, appointments, e-signature, municipal, CPD, provider verification, procurement, resource provisioning, and email. |
 | `e47f11b2` | Phase 2 read contracts | Added deterministic read-only API contract examples for project briefs, marketplace opportunities, and proposals. |
@@ -62,7 +63,9 @@ The phase reports and commit history record the following validation categories:
 - API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic read-only Phase 2 API examples now cover project brief list/detail, opportunity detail, and proposal detail responses.
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
 - Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 50 test files / 371 tests, and `npm run build` passed without the previous Vite circular chunk warning.
+- Sensitive workflow guard validation: `npm test -- src/lib/__tests__/sensitiveWorkflowGuards.test.ts` passed 5/5, `npm run lint` passed, `npm run lint:tests` passed, and `npm run build` passed after adding the default-off guard helper.
 - CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
+
 - Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs, ran `git diff --check`, and confirmed `backend.html` remains untouched.
 
 ## Remaining Blockers Requiring Human Confirmation
@@ -89,7 +92,7 @@ These tasks are safe because they avoid irreversible external actions, live paym
 3. Extend docs with request/response examples for canonical profile/directory/admin review endpoints not yet covered by dedicated contract examples.
 4. Keep browser smoke tests current for dashboard shells using `backend.html` as read-only reference, and extend them only with deterministic local mocks.
 5. Build read-only admin review queue views for verification, CPD sync status, municipal evidence status, and provider integration readiness without enabling external submission.
-6. Convert the sensitive workflow launch flag guidance into server-side helper tests before enabling any workflow that could later interact with payments, statutory systems, provider APIs, or outbound transactional email.
+6. Wire the sensitive workflow guard helper into future live-effect route handlers, but only after the corresponding product/legal/provider confirmations are complete.
 7. Convert the Phase 2 migration design into dry-run mapper tests only after a human confirms compatibility-only, dual-read, dual-write, or canonical-only mode.
 8. Periodically rerun browser validation of dashboard surfaces after dashboard role/page changes, especially against `backend.html` parity assumptions.
 
