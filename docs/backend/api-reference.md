@@ -219,7 +219,7 @@ Resolves an AI review queue item and, where supplied, records human sign-off.
 
 ## Canonical API examples
 
-Examples use the `/api` mount and omit unrelated headers. IDs and timestamps are illustrative.
+Examples use the `/api` mount and omit unrelated headers. IDs and timestamps are illustrative. Additional deterministic read-only Phase 2 examples for `GET /api/project-briefs`, `GET /api/project-briefs/:briefId`, `GET /api/marketplace/opportunities/:id`, and `GET /api/proposals/:proposalId` are maintained in `docs/backend/phase-2-read-api-contract-examples.md`.
 
 ### Project briefs
 
