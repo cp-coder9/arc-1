@@ -72,6 +72,23 @@ describe('cpdService', () => {
     expect(result.passed).toBe(false);
   });
 
+  test('rejects assessments with invalid pass marks before scoring', () => {
+    expect(() =>
+      scoreCPDAttempt(
+        { ...assessment, passMarkPercent: 101 },
+        {
+          userId: 'bep-1',
+          assessmentId: 'assessment-1',
+          submittedAt: '2026-05-15T10:00:00.000Z',
+          answers: {
+            q1: ['a'],
+            q2: ['b', 'c'],
+          },
+        }
+      )
+    ).toThrow('CPD assessment passMarkPercent must be between 0 and 100.');
+  });
+
   test('creates tamper-resistant certificate verification fields', () => {
     const certificate = {
       userId: 'bep-1',
