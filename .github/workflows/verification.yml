@@ -42,5 +42,8 @@ jobs:
       - name: Run test suite
         run: npm test
 
+      - name: Validate API contract docs
+        run: npm run docs:api-contracts
+
       - name: Build production bundle
         run: npm run build
