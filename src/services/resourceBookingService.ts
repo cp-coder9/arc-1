@@ -22,6 +22,14 @@ export interface ResourceBookingConflict {
   status: ResourceBookingStatus;
 }
 
+export interface ResourceBookingConflictAudit {
+  request: ResourceBookingRequest;
+  conflicts: ResourceBookingConflict[];
+  canConfirm: boolean;
+  checkedAt: string;
+  reason: 'no_conflict' | 'active_booking_overlap';
+}
+
 export interface ResourceUsageLogInput {
   bookingId: string;
   resourceId: string;
@@ -54,6 +62,12 @@ export interface ResourceUsageBillingResult {
   formula: string;
 }
 
+export interface ResourceUsageLedgerEntry extends ResourceUsageBillingResult {
+  usageLogId: string;
+  occurredAt: string;
+  notes?: string;
+}
+
 export interface ResourcePayoutRecordInput {
   resourceId: string;
   ownerId: string;
@@ -73,6 +87,7 @@ export interface ResourcePayoutRecord {
   currency: string;
   status: 'pending';
   createdAt: string;
+  idempotencyKey: string;
 }
 
 const ACTIVE_BOOKING_STATUSES = new Set<ResourceBookingStatus>(['pending', 'confirmed']);
@@ -137,6 +152,22 @@ export const canConfirmResourceBooking = (
   return { canConfirm: true, conflicts: [] };
 };
 
+export const buildResourceBookingConflictAudit = (
+  request: ResourceBookingRequest,
+  existingBookings: ResourceBookingWindow[],
+  checkedAt: string
+): ResourceBookingConflictAudit => {
+  const conflicts = findResourceBookingConflicts(request, existingBookings);
+
+  return {
+    request,
+    conflicts,
+    canConfirm: conflicts.length === 0,
+    checkedAt,
+    reason: conflicts.length === 0 ? 'no_conflict' : 'active_booking_overlap',
+  };
+};
+
 export const calculateResourceUsageBilling = (
   usage: ResourceUsageLogInput,
   policy: ResourceUsageBillingPolicy
@@ -189,6 +220,52 @@ export const calculateResourceUsageBilling = (
   };
 };
 
+export const buildResourceUsageLedgerEntry = (
+  usageLogId: string,
+  usage: ResourceUsageLogInput,
+  policy: ResourceUsageBillingPolicy,
+  occurredAt: string
+): ResourceUsageLedgerEntry => {
+  if (!usageLogId.trim()) {
+    throw new Error('usageLogId is required to build a resource usage ledger entry.');
+  }
+
+  return {
+    ...calculateResourceUsageBilling(usage, policy),
+    usageLogId,
+    occurredAt,
+    notes: usage.notes,
+  };
+};
+
+export const assertResourceUsageMatchesBooking = (
+  usage: ResourceUsageLogInput,
+  booking: ResourceBookingWindow
+): void => {
+  if (usage.bookingId !== booking.id || usage.resourceId !== booking.resourceId) {
+    throw new Error('Resource usage must reference the same booking and resource.');
+  }
+
+  if (booking.status !== 'confirmed' && booking.status !== 'completed') {
+    throw new Error('Resource usage can only be logged against confirmed or completed bookings.');
+  }
+
+  assertValidResourceBookingWindow({ startsAt: usage.startedAt, endsAt: usage.endedAt });
+
+  const usageStartedAt = toMillis(usage.startedAt, 'startedAt');
+  const usageEndedAt = toMillis(usage.endedAt, 'endedAt');
+  const bookingStartsAt = toMillis(booking.startsAt, 'booking.startsAt');
+  const bookingEndsAt = toMillis(booking.endsAt, 'booking.endsAt');
+
+  if (usageStartedAt < bookingStartsAt || usageEndedAt > bookingEndsAt) {
+    throw new Error('Resource usage must fall within the booked time window.');
+  }
+};
+
+const buildPayoutIdempotencyKey = (resourceId: string, ownerId: string, payoutBatchId: string, bookingIds: string[]): string => (
+  [resourceId, ownerId, payoutBatchId, [...bookingIds].sort().join(',')].join('|')
+);
+
 export const buildResourcePayoutRecord = ({
   resourceId,
   ownerId,
@@ -221,5 +298,11 @@ export const buildResourcePayoutRecord = ({
     currency: usageBillingResults[0].currency,
     status: 'pending',
     createdAt,
+    idempotencyKey: buildPayoutIdempotencyKey(
+      resourceId,
+      ownerId,
+      payoutBatchId,
+      usageBillingResults.map((result) => result.bookingId)
+    ),
   };
 };

@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
+  assertResourceUsageMatchesBooking,
+  buildResourceBookingConflictAudit,
   buildResourcePayoutRecord,
+  buildResourceUsageLedgerEntry,
   calculateResourceUsageBilling,
   canConfirmResourceBooking,
   findResourceBookingConflicts,
@@ -88,6 +91,25 @@ describe('resourceBookingService', () => {
     expect(result.conflicts).toHaveLength(1);
   });
 
+  test('builds a durable conflict audit without mutating booking state', () => {
+    const audit = buildResourceBookingConflictAudit(
+      {
+        resourceId: 'resource-1',
+        startsAt: '2026-05-15T11:00:00.000Z',
+        endsAt: '2026-05-15T12:00:00.000Z',
+      },
+      existingBookings,
+      '2026-05-15T09:00:00.000Z'
+    );
+
+    expect(audit).toMatchObject({
+      canConfirm: false,
+      checkedAt: '2026-05-15T09:00:00.000Z',
+      reason: 'active_booking_overlap',
+    });
+    expect(audit.conflicts.map((conflict) => conflict.bookingId)).toEqual(['booking-1']);
+  });
+
   test('calculates hourly usage billing with minimum minutes and owner payout', () => {
     const billing = calculateResourceUsageBilling(
       {
@@ -139,6 +161,64 @@ describe('resourceBookingService', () => {
     expect(billing.ownerPayoutCents).toBe(1_575);
   });
 
+  test('validates usage belongs to the booked resource window before ledgering', () => {
+    const usage = {
+      bookingId: 'booking-1',
+      resourceId: 'resource-1',
+      userId: 'freelancer-1',
+      startedAt: '2026-05-15T10:15:00.000Z',
+      endedAt: '2026-05-15T11:45:00.000Z',
+      notes: 'Used meeting room for client workshop',
+    };
+
+    expect(() => assertResourceUsageMatchesBooking(usage, existingBookings[0])).not.toThrow();
+
+    const ledgerEntry = buildResourceUsageLedgerEntry(
+      'usage-log-1',
+      usage,
+      { billingMode: 'hourly', hourlyRateCents: 8_000, platformFeeBps: 1250, currency: 'ZAR' },
+      '2026-05-15T11:50:00.000Z'
+    );
+
+    expect(ledgerEntry).toMatchObject({
+      usageLogId: 'usage-log-1',
+      bookingId: 'booking-1',
+      occurredAt: '2026-05-15T11:50:00.000Z',
+      notes: 'Used meeting room for client workshop',
+      grossAmountCents: 12_000,
+      platformFeeCents: 1_500,
+      ownerPayoutCents: 10_500,
+    });
+  });
+
+  test('rejects usage outside booking window or against inactive bookings', () => {
+    expect(() =>
+      assertResourceUsageMatchesBooking(
+        {
+          bookingId: 'booking-1',
+          resourceId: 'resource-1',
+          userId: 'freelancer-1',
+          startedAt: '2026-05-15T09:59:00.000Z',
+          endedAt: '2026-05-15T10:30:00.000Z',
+        },
+        existingBookings[0]
+      )
+    ).toThrow('within the booked time window');
+
+    expect(() =>
+      assertResourceUsageMatchesBooking(
+        {
+          bookingId: 'booking-2',
+          resourceId: 'resource-1',
+          userId: 'freelancer-1',
+          startedAt: '2026-05-15T12:05:00.000Z',
+          endedAt: '2026-05-15T12:30:00.000Z',
+        },
+        existingBookings[1]
+      )
+    ).toThrow('confirmed or completed');
+  });
+
   test('builds traceable owner payout records from usage billing results', () => {
     const first = calculateResourceUsageBilling(
       {
@@ -180,6 +260,7 @@ describe('resourceBookingService', () => {
       currency: 'ZAR',
       status: 'pending',
       createdAt: '2026-05-16T00:00:00.000Z',
+      idempotencyKey: 'resource-1|owner-1|batch-1|booking-1,booking-2',
     });
   });
 
