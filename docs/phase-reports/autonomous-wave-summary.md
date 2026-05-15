@@ -62,10 +62,9 @@ The phase reports and commit history record the following validation categories:
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
 - API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources; deterministic read-only Phase 2 API examples now cover project brief list/detail, opportunity detail, and proposal detail responses.
 - Browser dashboard validation: focused sidebar harness passed 5/5 in Chromium after aligning assertions to the canonical role navigation, and full Chromium E2E passed 18/18 with a non-hanging line reporter.
-- Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 50 test files / 371 tests, and `npm run build` passed without the previous Vite circular chunk warning.
-- Sensitive workflow guard validation: `npm test -- src/lib/__tests__/sensitiveWorkflowGuards.test.ts` passed 5/5, `npm run lint` passed, `npm run lint:tests` passed, and `npm run build` passed after adding the default-off guard helper.
+- Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 51 test files / 377 tests, and `npm run build` passed without the previous Vite circular chunk warning.
+- Sensitive workflow guard validation: focused guard coverage passed 6/6, including the docs/constants drift regression; the full checkpoint also passed `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` after the guard work.
 - CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
-
 - Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, validated markdown JSON fences for new docs, ran `git diff --check`, and confirmed `backend.html` remains untouched.
 
 ## Remaining Blockers Requiring Human Confirmation
