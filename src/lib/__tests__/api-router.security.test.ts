@@ -1458,6 +1458,89 @@ describe('api-router security and high-value integration routes', () => {
     expect(blocked.body.error).toContain('not eligible');
   });
 
+  it('lets verified lead BEPs manage municipal tracker records and publishes client insights', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    seedVerifiedBepVerification();
+
+    const created = await request(app)
+      .post('/api/projects/project-1/municipal/submissions')
+      .set(authHeader('architect'))
+      .send({
+        municipality: 'City of Cape Town',
+        submissionReference: 'BP-123',
+        status: 'submitted',
+        aiExtractedStatus: 'Payment received',
+        clientUpdate: 'Plans submitted to council.',
+        contractorImpact: 'No site start until approval.',
+        expectedNextStep: 'Await first plan examiner comments.',
+        actionItems: ['Client to keep rates account active'],
+        evidenceUrls: ['https://files.public.blob.vercel-storage.com/receipt.pdf'],
+        linkedDrawingIds: ['drawing-1'],
+        linkedComplianceFormIds: ['sans-form-1'],
+        linkedSubmissionPackId: 'pack-1',
+      });
+    const submissionId = created.body.submission.id;
+    const updated = await request(app)
+      .post(`/api/projects/project-1/municipal/submissions/${submissionId}/status`)
+      .set(authHeader('architect'))
+      .send({ status: 'under_review', confirmAiStatus: true, clientUpdate: 'Council has started review.', contractorImpact: 'Procurement can continue, but site start remains blocked.', expectedNextStep: 'Respond to examiner comments.', actionItems: ['BEP to monitor portal'], note: 'Confirmed from portal screenshot' });
+    const clientView = await request(app)
+      .get('/api/projects/project-1/municipal/status')
+      .set(authHeader('client'));
+    const leadView = await request(app)
+      .get('/api/projects/project-1/municipal/status')
+      .set(authHeader('architect'));
+
+    expect(created.status).toBe(201);
+    expect(created.body.submission).toMatchObject({ municipality: 'City of Cape Town', status: 'submitted', aiStatusConfirmed: false, linkedSubmissionPackId: 'pack-1' });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({ status: 'under_review', aiStatusConfirmed: true, clientUpdate: 'Council has started review.' });
+    expect(clientView.status).toBe(200);
+    expect(clientView.body).toMatchObject({ controlView: false });
+    expect(clientView.body.submissions[0]).toMatchObject({ municipality: 'City of Cape Town', status: 'under_review', expectedNextStep: 'Respond to examiner comments.' });
+    expect(clientView.body.submissions[0]).not.toHaveProperty('evidenceUrls');
+    expect(leadView.body).toMatchObject({ controlView: true });
+    expect(leadView.body.submissions[0]).toHaveProperty('evidenceUrls');
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'municipal.submission_created')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'municipal.status_updated')).toBe(true);
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'municipal.insight_viewed')).toBe(true);
+  });
+
+  it('blocks clients from editing municipal tracker control records', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const clientCreate = await request(app)
+      .post('/api/projects/project-1/municipal/submissions')
+      .set(authHeader('client'))
+      .send({ municipality: 'City of Cape Town', status: 'submitted' });
+    const intruderView = await request(app)
+      .get('/api/projects/project-1/municipal/status')
+      .set(authHeader('intruder'));
+
+    expect(clientCreate.status).toBe(403);
+    expect(intruderView.status).toBe(403);
+  });
+
   it('delegates municipal automation, OCR, heatmap, and shadow-tracker routes after auth', async () => {
     const app = await buildApp();
     mockAdminDb.seed('municipal_credentials/client-1_city_of_cape_town', { userId: 'client-1', municipality: 'city_of_cape_town' });

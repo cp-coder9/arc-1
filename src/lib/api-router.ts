@@ -3919,6 +3919,131 @@ router.post("/payment/notify", async (req, res) => {
 
 // ── Municipal Tracker Routes ───────────────────────────────────────────────
 
+// Project municipal tracker: BEP control + client/contractor insight views.
+router.post("/projects/:projectId/municipal/submissions", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext, project } = await getProjectLeadContext(req, projectId);
+    const municipality = sanitizeCoordinationString(req.body.municipality, 160);
+    if (!municipality) return res.status(400).json({ error: 'municipality is required' });
+    const now = new Date().toISOString();
+    const submissionRef = adminDb.collection('projects').doc(projectId).collection('municipal_submissions').doc();
+    const submission = {
+      id: submissionRef.id,
+      projectId,
+      jobId: project.jobId || null,
+      municipality,
+      submissionReference: sanitizeCoordinationString(req.body.submissionReference, 160) || null,
+      status: sanitizeCoordinationString(req.body.status, 80) || 'draft',
+      aiExtractedStatus: sanitizeCoordinationString(req.body.aiExtractedStatus, 160) || null,
+      aiStatusConfirmed: false,
+      clientUpdate: sanitizeCoordinationString(req.body.clientUpdate, 2000),
+      contractorImpact: sanitizeCoordinationString(req.body.contractorImpact, 2000),
+      expectedNextStep: sanitizeCoordinationString(req.body.expectedNextStep, 1000),
+      actionItems: sanitizeCoordinationStringArray(req.body.actionItems, 25),
+      evidenceUrls: sanitizeEvidenceUrls(req.body.evidenceUrls),
+      linkedDrawingIds: sanitizeCoordinationStringArray(req.body.linkedDrawingIds, 25),
+      linkedComplianceFormIds: sanitizeCoordinationStringArray(req.body.linkedComplianceFormIds, 25),
+      linkedSubmissionPackId: sanitizeCoordinationString(req.body.linkedSubmissionPackId, 160) || null,
+      visibility: 'published',
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+      statusHistory: [{ status: sanitizeCoordinationString(req.body.status, 80) || 'draft', at: now, by: authContext.uid, note: 'Municipal tracker record created' }],
+    };
+    await submissionRef.set(submission);
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'municipal.submission_created',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'municipal_submission', id: submissionRef.id, projectId },
+      metadata: { municipality, status: submission.status, evidenceCount: submission.evidenceUrls.length, actionItemCount: submission.actionItems.length },
+    });
+    res.status(201).json({ submission });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/municipal/submissions/:submissionId/status", async (req, res) => {
+  try {
+    const { projectId, submissionId } = req.params;
+    const { authContext } = await getProjectLeadContext(req, projectId);
+    const status = sanitizeCoordinationString(req.body.status, 80);
+    if (!status) return res.status(400).json({ error: 'status is required' });
+    const submissionRef = adminDb.collection('projects').doc(projectId).collection('municipal_submissions').doc(submissionId);
+    const submissionSnap = await submissionRef.get();
+    if (!submissionSnap.exists) return res.status(404).json({ error: 'Municipal submission not found' });
+    const existing = submissionSnap.data() as Record<string, any>;
+    const now = new Date().toISOString();
+    const update = {
+      status,
+      aiExtractedStatus: sanitizeCoordinationString(req.body.aiExtractedStatus, 160) || existing.aiExtractedStatus || null,
+      aiStatusConfirmed: req.body.confirmAiStatus === true ? true : existing.aiStatusConfirmed === true,
+      clientUpdate: sanitizeCoordinationString(req.body.clientUpdate, 2000) || existing.clientUpdate || '',
+      contractorImpact: sanitizeCoordinationString(req.body.contractorImpact, 2000) || existing.contractorImpact || '',
+      expectedNextStep: sanitizeCoordinationString(req.body.expectedNextStep, 1000) || existing.expectedNextStep || '',
+      actionItems: Array.isArray(req.body.actionItems) ? sanitizeCoordinationStringArray(req.body.actionItems, 25) : (existing.actionItems || []),
+      evidenceUrls: Array.isArray(req.body.evidenceUrls) ? sanitizeEvidenceUrls(req.body.evidenceUrls) : (existing.evidenceUrls || []),
+      updatedAt: now,
+      statusHistory: [
+        ...(Array.isArray(existing.statusHistory) ? existing.statusHistory : []),
+        { status, at: now, by: authContext.uid, note: sanitizeCoordinationString(req.body.note, 500) || 'Municipal status updated' },
+      ],
+    };
+    await submissionRef.set(update, { merge: true });
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'municipal.status_updated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'municipal_submission', id: submissionId, projectId },
+      metadata: { status, aiStatusConfirmed: update.aiStatusConfirmed, actionItemCount: update.actionItems.length },
+    });
+    res.json({ id: submissionId, ...update });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.get("/projects/:projectId/municipal/status", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const authContext = await getAuthContext(req.headers);
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) return res.status(404).json({ error: 'Project not found' });
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Record<string, any>;
+    const canView = authContext.isAdmin || project.clientId === authContext.uid || project.leadArchitectId === authContext.uid || isActiveProjectTeamMember(project, authContext.uid);
+    if (!canView) return res.status(403).json({ error: 'Only project participants can view municipal status insight' });
+    const isControlView = authContext.isAdmin || project.leadArchitectId === authContext.uid;
+    const snapshot = await adminDb.collection('projects').doc(projectId).collection('municipal_submissions').get();
+    const submissions = snapshot.docs.map(doc => {
+      const data = { id: doc.id, ...doc.data() } as Record<string, any>;
+      if (isControlView) return data;
+      return {
+        id: data.id,
+        projectId,
+        municipality: data.municipality,
+        status: data.status,
+        clientUpdate: data.clientUpdate,
+        contractorImpact: data.contractorImpact,
+        expectedNextStep: data.expectedNextStep,
+        actionItems: data.actionItems || [],
+        updatedAt: data.updatedAt,
+      };
+    });
+    await recordAuditEvent(req, {
+      category: 'access',
+      action: isControlView ? 'municipal.control_viewed' : 'municipal.insight_viewed',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project', id: projectId, projectId },
+      metadata: { resultCount: submissions.length },
+    });
+    res.json({ projectId, controlView: isControlView, submissions });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // Municipal tracking endpoint (scaffolded)
 router.post("/track-municipality", async (req, res) => {
   let decoded;
