@@ -115,9 +115,11 @@ function applyConstraints(items: any[], constraints: any[]) {
 }
 
 export const CACHE_SIZE_UNLIMITED = -1;
+export function memoryLocalCache() { return {}; }
 export function persistentLocalCache() { return {}; }
 export function persistentMultipleTabManager() { return {}; }
 export function initializeFirestore() { return { __mockDb: true }; }
+export function getFirestore() { return { __mockDb: true }; }
 
 export function collection(_db: unknown, path: string) {
   return { kind: 'collection', path, collectionName: path.split('/').pop() || path, constraints: [] as any[] };
