@@ -116,6 +116,7 @@ const UserSettings = lazyWithChunkRetry(() => import('./components/UserSettings'
 const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceManagement'));
 const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
 const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
+const MunicipalTracker = lazyWithChunkRetry(() => import('./components/MunicipalTracker'));
 
 type DashboardPage = {
   id: string;
@@ -738,12 +739,12 @@ export default function App() {
               {activeTab === 'files' && <FileManager user={user} />}
               {(activeTab === 'profile-settings' || activeTab === 'profile') && <UserSettings user={user} />}
               {activeTab === 'firm' && <FirmDashboard user={user} />}
-              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
+              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && <DashboardPageShell pageId={activeTab} user={user} />}
+              {(activeTab === 'command' || (activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab))) && (
                 <>
-                  {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
-                  {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
-                  {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
@@ -835,6 +836,7 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
 
       {(pageId === 'payments' || pageId === 'invoicing') && <InvoiceManagement user={user} />}
       {(pageId === 'toolbox' || pageId === 'drawing-checker' || pageId === 'freelancer-submissions') && <FileManager user={user} />}
+      {pageId === 'municipal-tracker' && <MunicipalTracker user={user} />}
     </div>
   );
 }
