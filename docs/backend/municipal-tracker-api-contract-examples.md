@@ -243,6 +243,47 @@ Non-participant block:
 }
 ```
 
+## `POST /api/track-municipality`
+
+Legacy/global municipal automation helper used by existing tooling. The route verifies the caller owns the referenced municipal credential, then delegates to the municipal tracking service. It does not create an official municipal submission and remains subject to portal permissions, credential consent, and sensitive-workflow launch controls.
+
+```http
+POST /api/track-municipality
+Authorization: Bearer <client-id-token>
+Content-Type: application/json
+
+{
+  "credentialId": "client-1_city_of_cape_town"
+}
+```
+
+```json
+{
+  "status": "Submitted",
+  "municipality": "city_of_cape_town",
+  "credentialId": "client-1_city_of_cape_town",
+  "source": "municipal_tracking_service",
+  "officialSubmissionCreated": false,
+  "requiresHumanConfirmation": true
+}
+```
+
+Missing credential response:
+
+```json
+{
+  "error": "credentialId is required"
+}
+```
+
+Wrong owner response:
+
+```json
+{
+  "error": "Unauthorized access to credentials"
+}
+```
+
 ## Audit events
 
 ```json

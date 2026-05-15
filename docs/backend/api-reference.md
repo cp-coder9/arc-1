@@ -229,7 +229,7 @@ Resolves an AI review queue item and, where supplied, records human sign-off.
 
 ## Canonical API examples
 
-Examples use the `/api` mount and omit unrelated headers. IDs and timestamps are illustrative. Additional deterministic read-only Phase 2 examples for `GET /api/project-briefs`, `GET /api/project-briefs/:briefId`, `GET /api/marketplace/opportunities/:id`, and `GET /api/proposals/:proposalId` are maintained in `docs/backend/phase-2-read-api-contract-examples.md`.
+Examples use the `/api` mount and omit unrelated headers. IDs and timestamps are illustrative. Additional deterministic read-only Phase 2 examples for `GET /api/project-briefs`, `GET /api/project-briefs/:briefId`, `GET /api/marketplace/opportunities/:id`, `GET /api/proposals/:proposalId`, and `GET /api/proposals/:proposalId/appointment-readiness` are maintained in `docs/backend/phase-2-read-api-contract-examples.md`.
 
 ### Project briefs
 
@@ -688,7 +688,7 @@ Returns project-level municipal tracker summary.
 
 ### Legacy/global municipal helpers
 
-The router also exposes operational municipal routes used by existing tooling:
+The router also exposes operational municipal routes used by existing tooling. Deterministic examples for the project-scoped tracker and `POST /api/track-municipality` legacy helper are maintained in `docs/backend/municipal-tracker-api-contract-examples.md`:
 
 | Method and path | Purpose | Durable collections / services | Notes |
 | --- | --- | --- | --- |

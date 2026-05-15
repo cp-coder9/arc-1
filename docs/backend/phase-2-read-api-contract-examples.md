@@ -231,6 +231,61 @@ Forbidden response:
 }
 ```
 
+## `GET /api/proposals/:proposalId/appointment-readiness`
+
+Checks appointment preconditions for a submitted proposal without creating an appointment, contract, signature, payment, audit event, or legal state transition. Only the proposal client owner or an admin can run the preflight.
+
+### Ready preflight
+
+```http
+GET /api/proposals/proposal-1/appointment-readiness
+Authorization: Bearer <client-id-token>
+```
+
+```json
+{
+  "ready": true,
+  "proposalId": "proposal-1",
+  "briefId": "brief-1",
+  "professionalId": "architect-1",
+  "verificationId": "architect-1_bep_SACAP_SACAP-123",
+  "requiredHumanActions": [
+    "client_contract_acceptance",
+    "professional_contract_acceptance"
+  ],
+  "createsAppointment": false,
+  "createsContract": false,
+  "createsSignature": false,
+  "createsPayment": false
+}
+```
+
+### Blocked preflight
+
+```json
+{
+  "ready": false,
+  "proposalId": "proposal-1",
+  "briefId": "brief-1",
+  "professionalId": "architect-1",
+  "verificationId": "architect-1_bep_SACAP_SACAP-123",
+  "blocker": "A professional has already been appointed for this brief",
+  "blockerStatus": 409,
+  "createsAppointment": false,
+  "createsContract": false,
+  "createsSignature": false,
+  "createsPayment": false
+}
+```
+
+Forbidden reader response:
+
+```json
+{
+  "error": "Only the client owner can check appointment readiness"
+}
+```
+
 ## Human confirmations still required
 
 These examples are contract documentation for local/dev integration only. Production behavior still requires the consolidated confirmations in `docs/phase-reports/human-confirmations-required.md`, especially:
