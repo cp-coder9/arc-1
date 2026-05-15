@@ -6,10 +6,10 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
-import { 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -29,13 +29,13 @@ import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Input } from './components/ui/input';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  FileText, 
-  Users, 
-  LogOut, 
-  Plus, 
+import {
+  LayoutDashboard,
+  Briefcase,
+  FileText,
+  Users,
+  LogOut,
+  Plus,
   Search,
   ShieldCheck,
   History,
@@ -117,6 +117,65 @@ const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceM
 const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
 const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
 
+type DashboardPage = {
+  id: string;
+  label: string;
+  roles: UserRole[];
+  group: 'Core workflow' | 'Client tools' | 'BEP tools' | 'Construction tools' | 'Freelancer tools' | 'Governance';
+  icon: React.ReactNode;
+  summary: string;
+  backedBy: string[];
+};
+
+const DESIGN_TEAM_ROLES: UserRole[] = ['bep', 'architect'];
+
+const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
+  { id: 'command', label: 'Command Centre', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <LayoutDashboard size={18} />, summary: 'Role-aware dashboard landing page for priorities, project state, and next decisions.', backedBy: ['role dashboards', 'active project data'] },
+  { id: 'profile', label: 'Profile Editor', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <UserCircle size={18} />, summary: 'Canonical profile surface reused for verification, contracts, invoices, procurement, matching, and governance.', backedBy: ['UserSettings', 'ProfileEditor'] },
+  { id: 'toolbox', label: 'Project Toolbox', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Files size={18} />, summary: 'Guided, role-aware project tools and checklists from the backend.html reference.', backedBy: ['FileManager', 'current project metadata'] },
+  { id: 'journey', label: 'Project Journey', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Workflow size={18} />, summary: 'Lifecycle navigation shell for stage progress, decisions, and next actions.', backedBy: ['StageProgressTracker', 'AdvanceStageButton'] },
+  { id: 'tasks', label: 'Tasks & Approvals', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <ClipboardCheck size={18} />, summary: 'Role-filtered task and approval command surface.', backedBy: ['delegatedTasks', 'job status workflows'] },
+  { id: 'messages', label: 'Project Messenger', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Mail size={18} />, summary: 'Job-linked communication shell using existing chat capabilities.', backedBy: ['Chat'] },
+  { id: 'programme', label: 'Programme / Gantt', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Workflow size={18} />, summary: 'Shared programme/Gantt surface with role-specific views.', backedBy: ['GanttChart'] },
+  { id: 'disputes', label: 'Dispute Resolution', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <ShieldCheck size={18} />, summary: 'Dispute centre shell linked to project/job dispute records.', backedBy: ['jobDisputes', 'AdminDashboard disputes'] },
+  { id: 'payments', label: 'Payments & Governance', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <CreditCard size={18} />, summary: 'Payment governance shell. Invoice handling is available separately while escrow/payment APIs mature.', backedBy: ['InvoiceManagement'] },
+  { id: 'contracts', label: 'Contracts & Signing', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <FileText size={18} />, summary: 'Contract/signing shell for scopes, proposals, packages, and work orders.', backedBy: ['project/job records'] },
+  { id: 'escrow', label: 'Escrow Service', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Landmark size={18} />, summary: 'Escrow allocation shell for milestone and package payments.', backedBy: ['FinancialDashboard'] },
+  { id: 'ai', label: 'AI Co-Pilot', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Bot size={18} />, summary: 'Contextual AI workflow shell connected to existing governance/audit concepts.', backedBy: ['AgentKnowledgeManager', 'AdminDashboard agents'] },
+  { id: 'client-intake', label: 'Guided Brief Wizard', roles: ['client'], group: 'Client tools', icon: <ClipboardCheck size={18} />, summary: 'Client-friendly intake shell aligned with backend.html guided brief requirements.', backedBy: ['ClientDashboard post job flow'] },
+  { id: 'client-proposals', label: 'BEP Proposals', roles: ['client'], group: 'Client tools', icon: <Users size={18} />, summary: 'Proposal comparison shell for fit, fee, timeline, risk notes, and appointment decisions.', backedBy: ['job applications'] },
+  { id: 'directory-search', label: 'Directory Search', roles: ['client', 'bep', 'architect', 'contractor'], group: 'Client tools', icon: <Search size={18} />, summary: 'Manual verified directory search/invite shell.', backedBy: ['marketplace user profiles'] },
+  { id: 'municipal-tracker', label: 'Municipal Status', roles: ['client', 'bep', 'architect', 'contractor'], group: 'Client tools', icon: <MapPin size={18} />, summary: 'Municipal status shell backed by the existing tracker component/domain.', backedBy: ['MunicipalTracker'] },
+  { id: 'client-progress', label: 'Progress Reports', roles: ['client'], group: 'Client tools', icon: <Clock size={18} />, summary: 'Plain-language progress report shell for client decisions and risks.', backedBy: ['StageProgressTracker', 'GanttChart'] },
+  { id: 'design', label: 'Design & Compliance', roles: [...DESIGN_TEAM_ROLES, 'freelancer', 'admin'], group: 'BEP tools', icon: <Network size={18} />, summary: 'Design-team deliverables, registers, responsibility matrix, and compliance shell.', backedBy: ['ResponsibilityMatrix', 'TeamBuilder'] },
+  { id: 'drawing-checker', label: 'AI Drawing Checker', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Drawing quality/compliance checker placeholder pending upload/review API wiring.', backedBy: ['FileManager'] },
+  { id: 'sans-forms', label: 'SANS / Compliance Forms', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Compliance form autofill shell using project/profile/team data.', backedBy: ['ComplianceReport'] },
+  { id: 'technical-brief', label: 'Technical Brief Editor', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <Briefcase size={18} />, summary: 'BEP technical brief refinement shell after client intake.', backedBy: ['job brief data'] },
+  { id: 'bep-freelancers', label: 'Freelancer Jobs', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Plus size={18} />, summary: 'Controlled BEP-to-freelancer work package shell.', backedBy: ['delegatedTasks'] },
+  { id: 'snagging', label: 'Snagging / Close-Out', roles: [...DESIGN_TEAM_ROLES, 'contractor', 'admin'], group: 'Construction tools', icon: <CheckCircle2 size={18} />, summary: 'Snagging and close-out shell backed by existing closeout workflows.', backedBy: ['CloseoutWizard'] },
+  { id: 'construction', label: 'Construction OS', roles: ['contractor', 'admin'], group: 'Construction tools', icon: <Construction size={18} />, summary: 'Construction operations shell for site logs, RFIs, programme, and delivery controls.', backedBy: ['SiteLogManager', 'RFIManager'] },
+  { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management shell pending staff/wage/plant APIs.', backedBy: ['contractor profile/compliance records'] },
+  { id: 'procurement', label: 'BoQ / BoM Procurement', roles: ['contractor', 'subcontractor', 'supplier', ...DESIGN_TEAM_ROLES, 'admin'], group: 'Construction tools', icon: <Factory size={18} />, summary: 'BoQ/BoM procurement shell for contractor, package, and supplier workflows.', backedBy: ['package readiness services'] },
+  { id: 'packages', label: 'Subcontractor Packages', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Building2 size={18} />, summary: 'Package-layer shell for subcontractor/supplier scopes and progress.', backedBy: ['package readiness services'] },
+  { id: 'freelancer-work', label: 'Assigned Work', roles: ['freelancer'], group: 'Freelancer tools', icon: <Briefcase size={18} />, summary: 'Assigned freelancer work surface backed by current freelancer task cards.', backedBy: ['FreelancerDashboard'] },
+  { id: 'freelancer-submissions', label: 'Submissions & Feedback', roles: ['freelancer'], group: 'Freelancer tools', icon: <Send size={18} />, summary: 'Submission/revision/feedback shell for freelancer deliverables.', backedBy: ['delegatedTasks', 'FileManager'] },
+  { id: 'knowledge', label: 'Knowledge / CPD', roles: ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Governance', icon: <BookOpen size={18} />, summary: 'Knowledge and CPD shell backed by knowledge-source tooling.', backedBy: ['KnowledgeSources', 'AdminKnowledgeUploader'] },
+  { id: 'resource-sharing', label: 'Remote Desktop / Resources', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'Governance', icon: <HardDrive size={18} />, summary: 'Remote workstation/resource sharing shell pending booking/resource APIs.', backedBy: ['Resource library workflow'] },
+  { id: 'resource-centre', label: 'Resource Centre / Checklists', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'Governance', icon: <Database size={18} />, summary: 'Role-based resource centre and checklist shell.', backedBy: ['KnowledgeSources'] },
+  { id: 'cpd-assessment', label: 'CPD Assessment', roles: DESIGN_TEAM_ROLES, group: 'Governance', icon: <BookOpen size={18} />, summary: 'CPD assessment shell pending assessment workflow APIs.', backedBy: ['cpdService'] },
+  { id: 'admin-console', label: 'Admin Console', roles: ['admin'], group: 'Governance', icon: <Settings2 size={18} />, summary: 'Whole-system governance console backed by current admin dashboard tabs.', backedBy: ['AdminDashboard'] },
+];
+
+const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
+
+function pagesForRole(role: UserRole) {
+  return CANONICAL_DASHBOARD_PAGES.filter((page) => page.roles.includes(role));
+}
+
+function pageById(pageId: string) {
+  return CANONICAL_DASHBOARD_PAGES.find((page) => page.id === pageId);
+}
+
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
   const isAdminRoute = window.location.pathname === '/admin';
@@ -128,7 +187,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('command');
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>('selection');
@@ -320,7 +379,7 @@ export default function App() {
       setShowLogin(isAdminRoute);
       setAuthMode('selection');
       setRoleSelection(isAdminRoute ? 'admin' : null);
-      setActiveTab('overview');
+      setActiveTab('command');
       toast.success("Logged out successfully");
     } catch (error) {
       toast.error("Failed to logout");
@@ -489,16 +548,25 @@ export default function App() {
           </div>
 
           <nav className="flex-1 space-y-2">
-            <NavItem 
+            <NavItem
               icon={<LayoutDashboard size={18} />}
-              label="Overview"
-              active={activeTab === 'overview'}
-              onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
+              label="Command Centre"
+              active={activeTab === 'command'}
+              onClick={() => { setActiveTab('command'); setIsSidebarOpen(false); }}
             />
+            {pagesForRole(user!.role).filter((page) => page.id !== 'command').map((page) => (
+              <NavItem
+                key={page.id}
+                icon={page.icon}
+                label={page.label}
+                active={activeTab === page.id}
+                onClick={() => { setActiveTab(page.id); setIsSidebarOpen(false); }}
+              />
+            ))}
             {user!.role === 'client' && (
-              <NavItem 
+              <NavItem
                 icon={<Plus size={18} />}
-                label="Post a Job"
+                label="Post a Job (legacy)"
                 active={activeTab === 'post-job'}
                 onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }}
               />
@@ -520,7 +588,7 @@ export default function App() {
               />
             )}
             {user!.role === 'architect' && (
-              <NavItem 
+              <NavItem
                 icon={<Search size={18} />}
                 label="Marketplace"
                 active={activeTab === 'marketplace'}
@@ -528,7 +596,7 @@ export default function App() {
               />
             )}
             {user!.role === 'architect' && (
-              <NavItem 
+              <NavItem
                 icon={<Send size={18} />}
                 label="My Applications"
                 active={activeTab === 'applications'}
@@ -559,7 +627,7 @@ export default function App() {
                 onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
               />
             )}
-            <NavItem 
+            <NavItem
               icon={<FileText size={18} />}
               label="Active Projects"
               active={activeTab === 'projects'}
@@ -611,7 +679,7 @@ export default function App() {
                 />
               </>
             )}
-            <NavItem 
+            <NavItem
               icon={<History size={18} />}
               label="Audit Logs"
               active={activeTab === 'audit'}
@@ -668,9 +736,10 @@ export default function App() {
             <Suspense fallback={<DashboardFallback />}>
               {activeTab === 'invoices' && <InvoiceManagement user={user} />}
               {activeTab === 'files' && <FileManager user={user} />}
-              {activeTab === 'profile-settings' && <UserSettings user={user} />}
+              {(activeTab === 'profile-settings' || activeTab === 'profile') && <UserSettings user={user} />}
               {activeTab === 'firm' && <FirmDashboard user={user} />}
-              {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'firm') && (
+              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && <DashboardPageShell pageId={activeTab} user={user} />}
+              {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab} onTabChange={setActiveTab} />}
@@ -678,6 +747,7 @@ export default function App() {
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
+                  {(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="packages" user={user} />}
                 </>
               )}
             </Suspense>
@@ -708,6 +778,63 @@ function DashboardFallback() {
         <div className="lg:col-span-2 h-96 rounded-[2rem] bg-secondary/70" />
         <div className="h-96 rounded-[2rem] bg-secondary/50" />
       </div>
+    </div>
+  );
+}
+
+function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfile }) {
+  const page = pageById(pageId);
+
+  if (!page || !page.roles.includes(user.role)) {
+    return (
+      <Card className="rounded-[2rem] border-border bg-card/90 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl">Page unavailable</CardTitle>
+          <CardDescription>This dashboard page is not enabled for your current role.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const roleLabel = user.role === 'bep' || user.role === 'architect' ? 'design team' : user.role;
+
+  return (
+    <div className="space-y-6">
+      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
+        <CardHeader className="bg-primary/5 border-b border-border">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3">
+              <Badge variant="secondary" className="w-fit uppercase tracking-widest">{page.group}</Badge>
+              <div>
+                <CardTitle className="font-heading text-3xl flex items-center gap-3">
+                  <span className="rounded-2xl bg-primary/10 text-primary p-3">{page.icon}</span>
+                  {page.label}
+                </CardTitle>
+                <CardDescription className="mt-3 max-w-3xl text-base leading-relaxed">{page.summary}</CardDescription>
+              </div>
+            </div>
+            <Badge className="capitalize shrink-0">{roleLabel}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 rounded-2xl border border-border bg-background/70 p-5 space-y-3">
+            <h3 className="font-heading text-xl font-bold">Role-aware workflow shell</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This page is now surfaced from the backend.html role/page matrix while preserving existing APIs.
+              It gives {roleLabel} users a first-class navigation target without introducing unsafe backend changes.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/70 p-5 space-y-3">
+            <h3 className="font-heading text-lg font-bold">Backed by</h3>
+            <div className="flex flex-wrap gap-2">
+              {page.backedBy.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {(pageId === 'payments' || pageId === 'invoicing') && <InvoiceManagement user={user} />}
+      {(pageId === 'toolbox' || pageId === 'drawing-checker' || pageId === 'freelancer-submissions') && <FileManager user={user} />}
     </div>
   );
 }
