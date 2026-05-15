@@ -798,6 +798,7 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
   }
 
   const roleLabel = user.role === 'bep' || user.role === 'architect' ? 'design team' : user.role;
+  const shellFocus = getDashboardShellFocus(pageId, roleLabel);
 
   return (
     <div className="space-y-6">
@@ -834,11 +835,105 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
         </CardContent>
       </Card>
 
+      {shellFocus && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {shellFocus.map((item) => (
+            <Card key={item.title} className="rounded-2xl border-border bg-card/90 shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-xl bg-primary/10 text-primary p-2">{item.icon}</span>
+                  <CardTitle className="font-heading text-lg">{item.title}</CardTitle>
+                </div>
+                <CardDescription className="leading-relaxed">{item.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap gap-2">
+                  {item.badges.map((badge) => <Badge key={badge} variant="secondary">{badge}</Badge>)}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {(pageId === 'payments' || pageId === 'invoicing') && <InvoiceManagement user={user} />}
       {(pageId === 'toolbox' || pageId === 'drawing-checker' || pageId === 'freelancer-submissions') && <FileManager user={user} />}
       {pageId === 'municipal-tracker' && <MunicipalTracker user={user} />}
     </div>
   );
+}
+
+function getDashboardShellFocus(pageId: string, roleLabel: string) {
+  if (pageId === 'tasks') {
+    return [
+      {
+        icon: <ClipboardCheck size={18} />,
+        title: 'Role-filtered action queue',
+        description: `Surfaces ${roleLabel} task ownership, review handoffs, and approval checkpoints without adding new backend dependencies.`,
+        badges: ['delegated tasks', 'status workflows'],
+      },
+      {
+        icon: <CheckCircle2 size={18} />,
+        title: 'Approval decisions',
+        description: 'Frames approve, request changes, and waiting-on-party states for the canonical backend.html Tasks & Approvals page.',
+        badges: ['client sign-off', 'BEP review', 'contractor handoff'],
+      },
+      {
+        icon: <History size={18} />,
+        title: 'Audit-ready timeline',
+        description: 'Keeps the shell aligned to existing audit logs and job history until richer approval APIs are available.',
+        badges: ['audit logs', 'job history'],
+      },
+    ];
+  }
+
+  if (pageId === 'ai') {
+    return [
+      {
+        icon: <Bot size={18} />,
+        title: 'Governed assistant entry point',
+        description: `Introduces a clear ${roleLabel} AI co-pilot surface for brief, compliance, procurement, and delivery support.`,
+        badges: ['AI co-pilot', 'role context'],
+      },
+      {
+        icon: <ShieldCheck size={18} />,
+        title: 'Human sign-off required',
+        description: 'Makes governance expectations visible: AI output is advisory, reviewed by accountable project users, and traceable.',
+        badges: ['human review', 'governance'],
+      },
+      {
+        icon: <BookOpen size={18} />,
+        title: 'Knowledge-backed answers',
+        description: 'Points users toward current knowledge and admin agent tooling while avoiding new API-router or rules changes.',
+        badges: ['knowledge base', 'agent settings'],
+      },
+    ];
+  }
+
+  if (pageId === 'resource-centre') {
+    return [
+      {
+        icon: <Database size={18} />,
+        title: 'Checklist library shell',
+        description: 'Groups reusable checklists, templates, and project resources under the canonical Resource Centre navigation item.',
+        badges: ['checklists', 'templates'],
+      },
+      {
+        icon: <BookOpen size={18} />,
+        title: 'CPD and knowledge bridge',
+        description: 'Connects design-team and freelancer users to knowledge-source workflows already present in the application.',
+        badges: ['KnowledgeSources', 'CPD'],
+      },
+      {
+        icon: <HardDrive size={18} />,
+        title: 'Resource-ready navigation',
+        description: 'Keeps the page available as existing resource booking and sharing services mature.',
+        badges: ['resource sharing', 'future APIs'],
+      },
+    ];
+  }
+
+  return null;
 }
 
 function AdminLoginPage({
