@@ -105,6 +105,52 @@ describe('firestore security rules static regressions', () => {
     ])).toBe(true);
   });
 
+  it('covers canonical Phase 2 profile, brief, marketplace, proposal, and appointment collections', () => {
+    for (const collection of [
+      'role_profiles',
+      'project_briefs',
+      'project_attachments',
+      'brief_interpretations',
+      'marketplace_opportunities',
+      'proposals',
+      'proposal_comparisons',
+      'appointments',
+      'project_stage_history',
+    ]) {
+      expect(rules).toContain(`match /${collection}/`);
+      expect(indexes.indexes.some((index) => index.collectionGroup === collection)).toBe(true);
+    }
+
+    expect(rules).toContain("!('verificationStatus' in request.resource.data)");
+    expect(rules).toContain("resource.data.status == 'published' && (hasRole('architect') || hasRole('bep'))");
+    expect(rules).toContain('request.resource.data.humanReviewRequired == true');
+    expect(rules).toContain('match /proposal_comparisons/{comparisonId}');
+    expect(rules).toContain('match /appointments/{appointmentId}');
+    expect(rules).toContain('allow create, update, delete: if false;');
+  });
+
+  it('keeps Firestore indexes aligned with canonical Phase 2 workflow queries', () => {
+    expect(hasIndex('project_briefs', [
+      { fieldPath: 'clientId', order: 'ASCENDING' },
+      { fieldPath: 'status', order: 'ASCENDING' },
+      { fieldPath: 'updatedAt', order: 'DESCENDING' },
+    ])).toBe(true);
+    expect(hasIndex('marketplace_opportunities', [
+      { fieldPath: 'status', order: 'ASCENDING' },
+      { fieldPath: 'updatedAt', order: 'DESCENDING' },
+    ])).toBe(true);
+    expect(hasIndex('proposals', [
+      { fieldPath: 'opportunityId', order: 'ASCENDING' },
+      { fieldPath: 'status', order: 'ASCENDING' },
+      { fieldPath: 'updatedAt', order: 'DESCENDING' },
+    ])).toBe(true);
+    expect(hasIndex('appointments', [
+      { fieldPath: 'clientId', order: 'ASCENDING' },
+      { fieldPath: 'status', order: 'ASCENDING' },
+      { fieldPath: 'updatedAt', order: 'DESCENDING' },
+    ])).toBe(true);
+  });
+
   it('documents human-only AI signoff controls and verification recheck persistence', () => {
     expect(aiGovernanceDocs).toContain('AI and system actors cannot create human sign-off records');
     expect(aiGovernanceDocs).toContain('requiresHumanConfirmation');
