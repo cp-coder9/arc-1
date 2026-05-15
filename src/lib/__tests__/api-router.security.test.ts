@@ -1090,6 +1090,73 @@ describe('api-router security and high-value integration routes', () => {
     expect(duplicate.status).toBe(409);
   });
 
+  it('lets verified lead BEPs invite consultants and seed coordination deliverables', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('users/consultant-1', { role: 'bep', displayName: 'Structural Consultant', professionalDiscipline: 'structure' });
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    seedVerifiedBepVerification();
+    seedVerifiedBepVerification('consultant-1', { registrationNumber: 'SACAP-456' });
+
+    const response = await request(app)
+      .post('/api/projects/project-1/team-members')
+      .set(authHeader('architect'))
+      .send({ userId: 'consultant-1', discipline: 'structure', deliverables: ['Structural concept markups', 'Foundation input'], unsafe: 'ignored' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.teamMember).toMatchObject({ userId: 'consultant-1', discipline: 'structure', status: 'invited', verificationId: 'consultant-1_bep_SACAP_SACAP-123' });
+    expect(response.body.deliverables).toHaveLength(2);
+    expect(mockAdminDb.getDoc('projects/project-1')?.teamMembers).toEqual(expect.arrayContaining([expect.objectContaining({ userId: 'consultant-1', deliverables: ['Structural concept markups', 'Foundation input'] })]));
+    expect(mockAdminDb.listCollection('projects/project-1/coordination_items')).toHaveLength(2);
+    expect(mockAdminDb.listCollection('notifications')[0].data).toMatchObject({ userId: 'consultant-1', type: 'directory_invitation' });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({ action: 'coordination.team_member_invited', metadata: { targetUserId: 'consultant-1', discipline: 'structure', deliverableCount: 2 } });
+  });
+
+  it('persists coordination items only for verified project coordinators', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', {
+      id: 'project-1',
+      jobId: 'job-1',
+      clientId: 'client-1',
+      leadArchitectId: 'architect-1',
+      currentStage: 'coordination',
+      stageHistory: [],
+      teamMembers: [{ userId: 'architect-1', role: 'architect', discipline: 'architecture', joinedAt: '2026-01-01T00:00:00.000Z', status: 'active' }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const unverifiedLead = await request(app)
+      .post('/api/projects/project-1/coordination/items')
+      .set(authHeader('architect'))
+      .send({ itemType: 'rfi', title: 'Confirm roof loading' });
+
+    seedVerifiedBepVerification();
+    const forbiddenClient = await request(app)
+      .post('/api/projects/project-1/coordination/items')
+      .set(authHeader('client'))
+      .send({ itemType: 'rfi', title: 'Client cannot coordinate' });
+    const created = await request(app)
+      .post('/api/projects/project-1/coordination/items')
+      .set(authHeader('architect'))
+      .send({ itemType: 'rfi', title: 'Confirm roof loading', description: 'Need structural input', discipline: 'structure', assigneeId: 'consultant-1', dependsOnIds: ['drawing-A'], status: 'blocked' });
+
+    expect(unverifiedLead.status).toBe(403);
+    expect(unverifiedLead.body).toMatchObject({ verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    expect(forbiddenClient.status).toBe(403);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ itemType: 'rfi', title: 'Confirm roof loading', discipline: 'structure', assigneeId: 'consultant-1', status: 'blocked', dependsOnIds: ['drawing-A'] });
+    expect(mockAdminDb.listCollection('projects/project-1/coordination_items')[0].data).toMatchObject({ itemType: 'rfi', createdBy: 'architect-1' });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'coordination.rfi_created')).toBe(true);
+  });
+
   it('returns profile-backed manual directory results without exposing private or unverified-only filtered records', async () => {
     const app = await buildApp();
     mockAdminDb.seed('users/architect-2', { role: 'architect', displayName: 'Verified Architect', companyName: 'Studio A', region: 'Cape Town', professionalDiscipline: 'architecture', averageRating: 4.8, totalReviews: 12 });

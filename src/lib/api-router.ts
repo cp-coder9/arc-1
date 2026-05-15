@@ -28,7 +28,7 @@ import { runVerificationBrowserAgent, type VerificationAgentInput } from "../ser
 import { analyzeBrief } from "../services/agents/briefingAgent";
 import { DEFAULT_FEE_ESTIMATOR_SETTINGS, estimateArchitecturalFee, type FeeEstimatorInput } from "../services/feeEstimatorService";
 
-import { UserRole, MunicipalityType, type UserVerification, type VerificationSubjectType } from "../types";
+import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
 
 // ── Environment variables ─────────────────────────────────────────────────────
@@ -936,6 +936,42 @@ async function projectDirectoryProfile(userId: string, profile: Record<string, a
   return projection;
 }
 
+const COORDINATION_ITEM_TYPES = ['deliverable', 'dependency', 'rfi', 'comment_thread', 'transmittal', 'deadline', 'compliance_status', 'municipal_readiness'] as const;
+const COORDINATION_STATUSES = ['open', 'in_progress', 'blocked', 'submitted', 'resolved', 'closed'] as const;
+
+function sanitizeCoordinationString(value: unknown, maxLength = 1000): string {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+function sanitizeCoordinationStringArray(value: unknown, maxItems = 20): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map(item => item.trim().slice(0, 200))
+    .slice(0, maxItems);
+}
+
+function isActiveProjectTeamMember(project: Record<string, any>, userId: string): boolean {
+  return Array.isArray(project.teamMembers) && project.teamMembers.some((member: Record<string, any>) => member.userId === userId && member.status === 'active');
+}
+
+async function getProjectCoordinatorContext(req: express.Request, projectId: string) {
+  const authContext = await getAuthContext(req.headers);
+  const projectRef = adminDb.collection('projects').doc(projectId);
+  const projectSnap = await projectRef.get();
+  if (!projectSnap.exists) throw Object.assign(new Error('Project not found'), { status: 404 });
+  const project = { id: projectSnap.id, ...projectSnap.data() } as Record<string, any>;
+  const isCoordinator = authContext.isAdmin || project.leadArchitectId === authContext.uid || isActiveProjectTeamMember(project, authContext.uid);
+  if (!isCoordinator) throw Object.assign(new Error('Only the project lead BEP, active project team, or admin can coordinate this project'), { status: 403 });
+  if (!authContext.isAdmin && normalizeUserRole(authContext.role) === 'bep') {
+    const verification = await getActiveUserVerification(authContext.uid, 'bep', 'SACAP');
+    if (!verification) {
+      throw Object.assign(new Error('Active BEP verification is required for project coordination'), { status: 403, verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    }
+  }
+  return { authContext, projectRef, project };
+}
+
 const CLIENT_BRIEF_SUPPORT_NEEDS = new Set(['plans', 'approvals', 'construction_pricing', 'full_delivery_support', 'unsure']);
 const CLIENT_BRIEF_URGENCY = new Set(['not_urgent', 'standard', 'urgent', 'emergency']);
 const CLIENT_BRIEF_BUDGET = new Set(['unknown', 'exploring', 'limited', 'moderate', 'comfortable', 'fixed']);
@@ -1563,6 +1599,140 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
     res.status(201).json({ project, contract, escrowId: projectRef.id, paymentId: paymentRef.id, invoices });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/projects/:projectId/team-members", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext, projectRef, project } = await getProjectCoordinatorContext(req, projectId);
+    const targetUserId = sanitizeCoordinationString(req.body.userId, 128);
+    const discipline = sanitizeCoordinationString(req.body.discipline, 80) as Discipline;
+    const roleOverride = sanitizeCoordinationString(req.body.role, 80);
+    const deliverables = sanitizeCoordinationStringArray(req.body.deliverables, 20);
+    if (!targetUserId || !discipline) return res.status(400).json({ error: 'userId and discipline are required' });
+    if (targetUserId === authContext.uid) return res.status(400).json({ error: 'You cannot invite yourself to the coordination team' });
+
+    const targetDoc = await adminDb.collection('users').doc(targetUserId).get();
+    if (!targetDoc.exists) return res.status(404).json({ error: 'Target user profile not found' });
+    const targetProfile = targetDoc.data() as Record<string, any>;
+    const targetRole = normalizeUserRole(roleOverride || targetProfile.role) as DirectoryTargetRole;
+    if (!DIRECTORY_TARGET_ROLES.includes(targetRole)) return res.status(400).json({ error: 'Unsupported target role for project coordination' });
+
+    const verification = await getDirectoryVerification(targetUserId, targetRole);
+    if (!verification) {
+      await recordAuditEvent(req, {
+        category: 'access',
+        action: 'coordination.team_invitation_blocked_unverified',
+        actor: decodedAuditActor(authContext.decoded, authContext.role),
+        target: { type: 'project', id: projectId, projectId },
+        metadata: { targetUserId, targetRole, discipline },
+      });
+      return res.status(403).json({ error: 'Verified profile is required before joining a project coordination team', verificationRequired: { role: targetRole } });
+    }
+
+    const now = new Date().toISOString();
+    const existingTeam = Array.isArray(project.teamMembers) ? project.teamMembers : [];
+    const teamMember = {
+      userId: targetUserId,
+      role: roleOverride || targetProfile.role || targetRole,
+      discipline,
+      joinedAt: now,
+      status: 'invited',
+      invitedBy: authContext.uid,
+      invitedAt: now,
+      verificationId: verification.id,
+      deliverables,
+    };
+    const existingIndex = existingTeam.findIndex((member: Record<string, any>) => member.userId === targetUserId && member.discipline === discipline && member.status !== 'removed');
+    const teamMembers = existingIndex >= 0
+      ? existingTeam.map((member: Record<string, any>, index: number) => index === existingIndex ? { ...member, ...teamMember } : member)
+      : [...existingTeam, teamMember];
+
+    await projectRef.set({ teamMembers, updatedAt: now }, { merge: true });
+
+    const deliverableRecords = [];
+    for (const deliverable of deliverables) {
+      const itemRef = await projectRef.collection('coordination_items').add({
+        projectId,
+        jobId: project.jobId || null,
+        itemType: 'deliverable',
+        title: deliverable,
+        description: '',
+        discipline,
+        assigneeId: targetUserId,
+        status: 'open',
+        createdBy: authContext.uid,
+        createdAt: now,
+        updatedAt: now,
+      });
+      deliverableRecords.push({ id: itemRef.id, title: deliverable, assigneeId: targetUserId, discipline, status: 'open' });
+    }
+
+    await adminDb.collection('notifications').add({
+      userId: targetUserId,
+      type: 'directory_invitation',
+      title: 'Project coordination invitation',
+      body: `${authContext.userData?.displayName || authContext.decoded.displayName || 'A project coordinator'} invited you to join the design team as ${discipline}.`,
+      data: { projectId, jobId: project.jobId, senderId: authContext.uid, discipline },
+      isRead: false,
+      channels: ['in_app', 'email'],
+      createdAt: now,
+      deliveryStatus: 'pending',
+    });
+
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: 'coordination.team_member_invited',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'project', id: projectId, projectId },
+      metadata: { targetUserId, targetRole, discipline, verificationId: verification.id, deliverableCount: deliverables.length },
+    });
+
+    res.status(201).json({ teamMember, deliverables: deliverableRecords });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+router.post("/projects/:projectId/coordination/items", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { authContext, project } = await getProjectCoordinatorContext(req, projectId);
+    const itemType = sanitizeCoordinationString(req.body.itemType, 80) as typeof COORDINATION_ITEM_TYPES[number];
+    const title = sanitizeCoordinationString(req.body.title, 200);
+    if (!COORDINATION_ITEM_TYPES.includes(itemType)) return res.status(400).json({ error: 'Unsupported coordination item type' });
+    if (!title) return res.status(400).json({ error: 'title is required' });
+
+    const statusInput = sanitizeCoordinationString(req.body.status, 80) as typeof COORDINATION_STATUSES[number];
+    const status = COORDINATION_STATUSES.includes(statusInput) ? statusInput : 'open';
+    const now = new Date().toISOString();
+    const item = {
+      projectId,
+      jobId: project.jobId || null,
+      itemType,
+      title,
+      description: sanitizeCoordinationString(req.body.description, 2000),
+      discipline: sanitizeCoordinationString(req.body.discipline, 80) || null,
+      assigneeId: sanitizeCoordinationString(req.body.assigneeId, 128) || null,
+      dependsOnIds: sanitizeCoordinationStringArray(req.body.dependsOnIds, 20),
+      dueAt: sanitizeCoordinationString(req.body.dueAt, 80) || null,
+      status,
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const itemRef = await adminDb.collection('projects').doc(projectId).collection('coordination_items').add(item);
+    await recordAuditEvent(req, {
+      category: 'project',
+      action: `coordination.${itemType}_created`,
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'coordination_item', id: itemRef.id, projectId },
+      metadata: { itemType, assigneeId: item.assigneeId, discipline: item.discipline, status },
+    });
+    res.status(201).json({ id: itemRef.id, ...item });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
   }
 });
 
