@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   EXTERNAL_ACTIONS_DRY_RUN_FLAG,
@@ -9,8 +11,17 @@ import {
 } from '../sensitiveWorkflowGuards';
 
 const env = (values: SensitiveWorkflowEnv = {}) => values;
+const sensitiveWorkflowDocs = readFileSync(resolve(process.cwd(), 'docs/backend/sensitive-workflow-feature-flags.md'), 'utf8');
 
 describe('sensitive workflow guards', () => {
+  it('keeps the operational docs aligned with every sensitive workflow flag', () => {
+    expect(sensitiveWorkflowDocs).toContain(`${EXTERNAL_ACTIONS_DRY_RUN_FLAG}=true`);
+    for (const flagName of Object.values(SENSITIVE_WORKFLOW_FLAGS)) {
+      expect(sensitiveWorkflowDocs, `Expected docs to include default for ${flagName}`).toContain(`${flagName}=false`);
+      expect(sensitiveWorkflowDocs, `Expected docs to include launch flag reference for ${flagName}`).toContain(`${flagName}=true`);
+    }
+  });
+
   it('keeps every sensitive workflow default-off and in dry-run posture', () => {
     for (const [workflow, flagName] of Object.entries(SENSITIVE_WORKFLOW_FLAGS)) {
       const result = requireSensitiveWorkflowEnabled(workflow as keyof typeof SENSITIVE_WORKFLOW_FLAGS, env());
