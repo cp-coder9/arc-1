@@ -237,6 +237,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Access logs are server-owned request/correlation records. Backend/Admin SDK
+    // writes bypass rules; browser clients cannot forge access entries.
+    match /access_logs/{accessLogId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // Generalized user verification records for BEPs, contractors,
     // subcontractors, suppliers, freelancers, and admins.
     match /user_verifications/{verificationId} {
