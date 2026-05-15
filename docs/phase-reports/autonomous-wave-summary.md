@@ -2,11 +2,11 @@
 
 Date: 2026-05-15  
 Branch: `phase-2-verification-workflows`  
-Scope: final autonomous wave 7 documentation refresh summarizing recent implementation/documentation waves, validation evidence, remaining blockers, and safe next tasks. This report intentionally does not modify application code and leaves the untracked `backend.html` workspace artifact untouched.
+Scope: autonomous implementation and verification waves summarizing recent implementation/documentation/test work, validation evidence, remaining blockers, and safe next tasks. The untracked `backend.html` workspace artifact remains a read-only dashboard reference and was not modified.
 
 ## Executive Summary
 
-Recent autonomous waves converted several Phase 1 through Phase 7 plan areas from report-only gaps into concrete backend service slices, guarded API routes, Firestore rule/index coverage, dashboard wiring, and consolidated documentation. The branch now contains auditable support for verification workflows, project workflow APIs, role-scoped profiles, guided briefs, appointment/project initiation, package readiness, CPD tracking, resource booking domain logic, AI governance, dashboard knowledge content, and canonical Phase 2 read/write aliases.
+Recent autonomous waves converted several Phase 1 through Phase 7 plan areas from report-only gaps into concrete backend service slices, guarded API routes, Firestore rule/index coverage, dashboard wiring, consolidated documentation, and a passing full local verification baseline. The branch now contains auditable support for verification workflows, project workflow APIs, role-scoped profiles, guided briefs, appointment/project initiation, package readiness, CPD tracking, resource booking domain logic, AI governance, dashboard knowledge content, canonical Phase 2 read/write aliases, and CI enforcement of lint/test/build gates.
 
 Production sign-off is still blocked by human decisions around legal/commercial terms, provider agreements, statutory authority, POPIA/privacy ownership, external verification sources, and final dashboard/product matrix confirmation. Those blockers are consolidated in `docs/phase-reports/human-confirmations-required.md`.
 
@@ -14,6 +14,19 @@ Production sign-off is still blocked by human decisions around legal/commercial 
 
 | Recent commit | Wave area | Summary |
 |---|---|---|
+| `cb12e3e4` | CI verification | Added GitHub Actions workflow for app typecheck, test typecheck, full Vitest, and production build. |
+| `5440142c` | Full-suite stabilization | Stabilized deterministic component/service/integration tests and hardened legacy file/job metadata rendering. |
+| `62b6aa44` | OCR/PDF service tests | Added mocked OCR and PDF generation service coverage. |
+| `f200ac4a` | Build config | Fixed Vite manual chunk classification for `react-markdown` to remove the circular chunk warning. |
+| `9d06b017` | Scraper service tests | Added municipal scraper coverage with mocked credentials, no-network behavior, and status update paths. |
+| `16e3e3f7` | Agent/SACAP tests | Added agent selection and SACAP verification coverage, including trimmed name validation. |
+| `ecd6e2f4` | Closeout/shadow tests | Added closeout and shadow tracker service coverage. |
+| `a4352d6d` | Firm/knowledge tests | Added firm and knowledge service coverage. |
+| `9e6c5d0f` | Dashboard shell | Aligned shared-role dashboard shell fallback and unsafe-action advisory copy. |
+| `dd2946ea` | Phase 2 read APIs | Added safe read/list endpoints for project briefs, opportunities, proposals, and appointment readiness. |
+| `b64796cc` | Dashboard tests | Extended dashboard registry static coverage against `backend.html` canonical terms. |
+| `3ac582cc` | Phase 2 docs | Documented Phase 2 read/list endpoint behavior, gates, and query/index shapes. |
+| `0cf4ece4` | Service robustness | Hardened service workflow edge cases and mutation behavior. |
 | `19b7ebd8` | Phase 2 marketplace APIs | Added canonical marketplace proposal API routes. |
 | `2fe06805` | Phase 2 docs | Documented brief read endpoints and compatibility aliases. |
 | `d30028e8` | Dashboard shell | Added dashboard resource links. |
@@ -43,7 +56,9 @@ The phase reports and commit history record the following validation categories:
 - Firestore rules and index coverage, including governance verification index guards and AI governance collections.
 - API route documentation and endpoint coverage for canonical Phase 2 project briefs, marketplace proposals, profile/directory aliases, AI governance persistence, durable workflow writes, command centre projection, appointment initiation, and dashboard knowledge resources.
 - Source-level dashboard alignment checks against `backend.html`, with browser visual validation deferred because browser automation was unavailable in that slice.
-- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, and confirmed this refresh changes documentation only.
+- Full local validation baseline after the 5-hour wave work: `npm run lint`, `npm run lint:tests`, `npm test` passed 50 test files / 371 tests, and `npm run build` passed without the previous Vite circular chunk warning.
+- CI workflow validation: `.github/workflows/verification.yml` now runs `npm ci`, `npm run lint`, `npm run lint:tests`, `npm test`, and `npm run build` on pull requests and pushes to `main` / `phase-2-verification-workflows`.
+- Documentation validation in this wave: inspected `git status --short`, recent `git log --oneline`, existing `docs/phase-reports/*` headings, and confirmed `backend.html` remains untouched.
 
 ## Remaining Blockers Requiring Human Confirmation
 
@@ -64,10 +79,10 @@ The canonical blocker list remains `docs/phase-reports/human-confirmations-requi
 
 These tasks are safe because they avoid irreversible external actions, live payments, live statutory submissions, and automated purchasing:
 
-1. Keep expanding automated tests around existing service slices and route handlers using local mocks and deterministic fixtures.
+1. Keep expanding automated tests around existing route handlers, component shells, and Firestore/static rules using local mocks and deterministic fixtures.
 2. Add non-production API contract examples for documented endpoints, clearly marked as mock/dev fixtures.
 3. Extend docs with request/response examples for canonical Phase 2 brief/proposal/profile/directory endpoints.
-4. Add dashboard smoke tests or static route inventory checks that compare implemented React routes to the confirmed canonical matrix.
+4. Add browser smoke tests for dashboard shells once browser automation is stable, using `backend.html` as read-only reference.
 5. Build read-only admin review queue views for verification, CPD sync status, municipal evidence status, and provider integration readiness without enabling external submission.
 6. Add feature flags and environment guards for any workflow that could later interact with payments, statutory systems, provider APIs, or outbound transactional email.
 7. Prepare migration design notes for canonical Phase 2 collections versus compatibility stores before any data migration code is written.
@@ -75,4 +90,4 @@ These tasks are safe because they avoid irreversible external actions, live paym
 
 ## Workspace Note
 
-At the start of wave 7, `git status --short` showed only an untracked `backend.html` file. This file is treated as a pre-existing workspace artifact and was not modified by this documentation refresh.
+At the latest checkpoint, `git status --short` showed only an untracked `backend.html` file. This file is treated as a pre-existing workspace artifact and canonical dashboard reference and was not modified by the autonomous waves.
