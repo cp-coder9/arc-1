@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import {
   ApplicationCreateSchema,
+  ApplicationStatusEnum,
   JobCreateSchema,
   NotificationSchema,
   NotificationTypeEnum,
@@ -111,6 +112,10 @@ describe('Validation Schemas', () => {
 
       const result = validateForm(ApplicationCreateSchema, application);
       expect(result.success).toBe(false);
+    });
+
+    it('should accept withdrawn application status values used by the dashboard', () => {
+      expect(ApplicationStatusEnum.safeParse('withdrawn').success).toBe(true);
     });
   });
 
