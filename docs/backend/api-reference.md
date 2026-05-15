@@ -70,6 +70,8 @@ Accepts or declines an invitation.
 
 ### `GET /projects/:projectId/command-centre`
 
+Deterministic request/response examples for project command-centre projection, team-member invitation, and coordination item routes are maintained in `docs/backend/project-command-centre-coordination-api-contract-examples.md`.
+
 Builds and persists the caller's project command-centre projection.
 
 - **Auth:** required.
