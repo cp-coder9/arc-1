@@ -45,6 +45,7 @@ import {
   buildProposal,
   buildProposalComparison,
 } from "../services/marketplaceWorkflowService";
+import { assertAppointmentPreconditions } from "../services/appointmentWorkflowService";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -2890,6 +2891,60 @@ router.post("/proposals", async (req, res) => {
       metadata: { opportunityId, verificationId: verification?.id, humanReviewRequired: true, autoAppointment: false, canonicalRoute: true },
     });
     res.status(201).json({ proposal: { id: proposalRef.id, ...proposal, verificationId: verification?.id, advisoryOnly: true, autoAppointment: false } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/proposals/:proposalId/appointment-readiness", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { proposalId } = req.params;
+    const proposalSnap = await adminDb.collection('proposals').doc(proposalId).get();
+    if (!proposalSnap.exists) return res.status(404).json({ error: 'Proposal not found' });
+    const proposal = { id: proposalId, ...proposalSnap.data() } as Record<string, any>;
+    if (!authContext.isAdmin && proposal.clientId !== authContext.uid) return res.status(403).json({ error: 'Only the client owner can check appointment readiness' });
+
+    const [briefSnap, verification] = await Promise.all([
+      adminDb.collection('project_briefs').doc(String(proposal.briefId || '')).get(),
+      getActiveUserVerification(String(proposal.professionalId || ''), 'bep', 'SACAP'),
+    ]);
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Project brief not found' });
+    const brief = { id: briefSnap.id, ...briefSnap.data() } as Record<string, any>;
+
+    try {
+      assertAppointmentPreconditions({
+        brief: { id: brief.id, clientId: String(brief.clientId || ''), status: String(brief.status || ''), appointmentId: brief.appointmentId || brief.appointmentContractId || null },
+        proposal: { id: proposal.id, briefId: String(proposal.briefId || ''), clientId: String(proposal.clientId || ''), professionalId: String(proposal.professionalId || ''), status: String(proposal.status || '') },
+        verification: verification || { status: 'pending', expiresAt: null, subjectType: 'bep', statutoryBody: 'SACAP' },
+      });
+      return res.json({
+        ready: true,
+        proposalId,
+        briefId: brief.id,
+        professionalId: proposal.professionalId,
+        verificationId: verification?.id,
+        requiredHumanActions: ['client_contract_acceptance', 'professional_contract_acceptance'],
+        createsAppointment: false,
+        createsContract: false,
+        createsSignature: false,
+        createsPayment: false,
+      });
+    } catch (error: any) {
+      return res.json({
+        ready: false,
+        proposalId,
+        briefId: brief.id,
+        professionalId: proposal.professionalId,
+        verificationId: verification?.id,
+        blocker: error.message,
+        blockerStatus: error.status || 400,
+        createsAppointment: false,
+        createsContract: false,
+        createsSignature: false,
+        createsPayment: false,
+      });
+    }
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

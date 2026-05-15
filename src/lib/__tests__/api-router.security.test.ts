@@ -691,6 +691,65 @@ describe('api-router security and high-value integration routes', () => {
     expect(proposal).toMatchObject({ autoAppointment: false, humanReviewRequired: true });
   });
 
+  it('checks appointment readiness without creating contracts, signatures, payments, or audit writes', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'New house', description: 'Residential plans', status: 'published' });
+    mockAdminDb.seed('proposals/proposal-1', { briefId: 'brief-1', opportunityId: 'opp-1', clientId: 'client-1', professionalId: 'architect-1', feeAmount: 125000, scopeSummary: 'Stages 1 to 4', status: 'submitted' });
+    seedVerifiedBepVerification('architect-1', { expiresAt: '2099-01-01T00:00:00.000Z' });
+
+    const blocked = await request(app)
+      .get('/api/proposals/proposal-1/appointment-readiness')
+      .set(authHeader('intruder'));
+    expect(blocked.status).toBe(403);
+
+    const writesBefore = mockAdminDb.writes.length;
+    const response = await request(app)
+      .get('/api/proposals/proposal-1/appointment-readiness')
+      .set(authHeader('client'));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ready: true,
+      proposalId: 'proposal-1',
+      briefId: 'brief-1',
+      professionalId: 'architect-1',
+      verificationId: 'architect-1_bep_SACAP_SACAP-123',
+      createsAppointment: false,
+      createsContract: false,
+      createsSignature: false,
+      createsPayment: false,
+    });
+    expect(response.body.requiredHumanActions).toEqual(['client_contract_acceptance', 'professional_contract_acceptance']);
+    expect(mockAdminDb.writes).toHaveLength(writesBefore);
+    expect(mockAdminDb.listCollection('appointment_contracts')).toHaveLength(0);
+    expect(mockAdminDb.listCollection('payments')).toHaveLength(0);
+    expect(mockAdminDb.listCollection('audit_logs')).toHaveLength(0);
+  });
+
+  it('returns appointment readiness blockers without mutating state', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('project_briefs/brief-1', { clientId: 'client-1', title: 'New house', description: 'Residential plans', status: 'appointed', appointmentId: 'existing-appointment' });
+    mockAdminDb.seed('proposals/proposal-1', { briefId: 'brief-1', opportunityId: 'opp-1', clientId: 'client-1', professionalId: 'architect-1', feeAmount: 125000, scopeSummary: 'Stages 1 to 4', status: 'submitted' });
+    seedVerifiedBepVerification('architect-1', { expiresAt: '2099-01-01T00:00:00.000Z' });
+
+    const writesBefore = mockAdminDb.writes.length;
+    const response = await request(app)
+      .get('/api/proposals/proposal-1/appointment-readiness')
+      .set(authHeader('client'));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ready: false,
+      blocker: 'A professional has already been appointed for this brief',
+      blockerStatus: 409,
+      createsAppointment: false,
+      createsContract: false,
+      createsSignature: false,
+      createsPayment: false,
+    });
+    expect(mockAdminDb.writes).toHaveLength(writesBefore);
+  });
+
   it('creates advisory proposal comparisons only for the client owner', async () => {
     const app = await buildApp();
     mockAdminDb.seed('proposals/proposal-1', { briefId: 'brief-1', opportunityId: 'opp-1', clientId: 'client-1', professionalId: 'architect-1', feeAmount: 100000, scopeSummary: 'A', status: 'submitted' });
