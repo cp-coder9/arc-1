@@ -569,7 +569,7 @@ function sanitizeDirectoryInviteContext(value: unknown): Record<string, unknown>
   }, {});
 }
 
-router.get("/directory/search", async (req, res) => {
+const directorySearchHandler: express.RequestHandler = async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     const allowedRoles = getAllowedDirectoryTargetRoles(authContext.role);
@@ -642,7 +642,9 @@ router.get("/directory/search", async (req, res) => {
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }
-});
+};
+
+router.get(["/directory/search", "/api/directory/search"], directorySearchHandler);
 
 router.post("/directory/invitations", async (req, res) => {
   try {
@@ -1390,6 +1392,39 @@ router.put("/profile/me", async (req, res) => {
       actor: decodedAuditActor(authContext.decoded, role),
       target: { type: 'user', id: authContext.uid },
       metadata: { fields: Object.keys(profileData), directoryProjected: Boolean(directoryProfile) },
+    });
+    res.json({ profile: updatedProfile, directoryProfile });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put(["/users/:userId/profile", "/api/users/:userId/profile"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { userId } = req.params;
+    const isSelfUpdate = userId === authContext.uid;
+    if (!isSelfUpdate && !authContext.isAdmin) return res.status(403).json({ error: 'Admin access required to update another user profile' });
+
+    const userRef = adminDb.collection('users').doc(userId);
+    const userSnap = isSelfUpdate && authContext.userData ? null : await userRef.get();
+    if (!isSelfUpdate && !userSnap?.exists) return res.status(404).json({ error: 'User profile not found' });
+
+    const existing = (isSelfUpdate ? authContext.userData : userSnap?.data()) || {};
+    const role = existing.role || (isSelfUpdate ? authContext.role : undefined);
+    const profileData = sanitizeUserProfileData(req.body.profileData || req.body, role);
+    if (Object.keys(profileData).length === 0) return res.status(400).json({ error: 'No supported profile fields supplied' });
+    const now = new Date().toISOString();
+    await userRef.set({ ...profileData, updatedAt: now }, { merge: true });
+    const updatedSnap = await userRef.get();
+    const updatedProfile = { uid: userId, ...updatedSnap.data() } as Record<string, any>;
+    const directoryProfile = await projectDirectoryProfile(userId, updatedProfile);
+    await recordAuditEvent(req, {
+      category: 'profile',
+      action: isSelfUpdate ? 'profile.updated' : 'profile.admin_updated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'user', id: userId },
+      metadata: { fields: Object.keys(profileData), directoryProjected: Boolean(directoryProfile), canonicalRoute: true },
     });
     res.json({ profile: updatedProfile, directoryProfile });
   } catch (err: any) {

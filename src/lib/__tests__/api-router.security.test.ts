@@ -950,6 +950,33 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'profile.updated')).toBe(true);
   });
 
+  it('supports canonical user profile route without allowing self role escalation', async () => {
+    const app = await buildApp();
+
+    const response = await request(app)
+      .put('/api/users/client-1/profile')
+      .set(authHeader('client'))
+      .send({ profileData: { displayName: 'Canonical Client', residentialAddress: '1 Safe Street', role: 'admin', isAdmin: true, verificationStatus: 'verified' } });
+
+    expect(response.status).toBe(200);
+    expect(mockAdminDb.getDoc('users/client-1')).toMatchObject({ displayName: 'Canonical Client', residentialAddress: '1 Safe Street', role: 'client' });
+    expect(mockAdminDb.getDoc('users/client-1')).not.toHaveProperty('isAdmin');
+    expect(mockAdminDb.getDoc('users/client-1')).not.toHaveProperty('verificationStatus');
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'profile.updated' && data.metadata?.canonicalRoute === true)).toBe(true);
+  });
+
+  it('blocks non-admin canonical profile updates for other users', async () => {
+    const app = await buildApp();
+
+    const response = await request(app)
+      .put('/api/users/contractor-1/profile')
+      .set(authHeader('client'))
+      .send({ profileData: { companyName: 'Not Allowed' } });
+
+    expect(response.status).toBe(403);
+    expect(mockAdminDb.getDoc('users/contractor-1')?.companyName).toBe('BuildCo');
+  });
+
   it('allows admins to update role profiles with scoped fields and audit trail', async () => {
     const app = await buildApp();
     seedVerifiedDirectoryVerification('contractor-1', 'contractor', 'CIDB', 'CIDB-1');
@@ -964,6 +991,21 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.getDoc('users/contractor-1')).not.toHaveProperty('cpdRecords');
     expect(mockAdminDb.getDoc('directory_profiles/contractor-1')).toMatchObject({ company: 'BuildCo Updated', normalizedRole: 'contractor', trade: 'general building', region: 'Gauteng', verificationStatus: 'verified' });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'profile.admin_updated')).toBe(true);
+  });
+
+  it('aliases canonical api directory search to existing verified directory search', async () => {
+    const app = await buildApp();
+    seedDirectoryProfile('contractor-1', { role: 'contractor', companyName: 'BuildCo', region: 'Cape Town', contractorCategory: 'general contractor', registrationNumber: 'CIDB-1', verificationStatus: 'verified' });
+    seedVerifiedDirectoryVerification('contractor-1', 'contractor', 'CIDB', 'CIDB-1');
+
+    const response = await request(app)
+      .get('/api/api/directory/search?role=contractor&q=buildco&verificationStatus=verified')
+      .set(authHeader('client'));
+
+    expect(response.status).toBe(200);
+    expect(response.body.results).toHaveLength(1);
+    expect(response.body.results[0]).toMatchObject({ userId: 'contractor-1', normalizedRole: 'contractor', verificationStatus: 'verified', canInvite: true });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'directory.search')).toBe(true);
   });
 
   it('persists guided client briefs with AI interpretation and sanitized evidence', async () => {
