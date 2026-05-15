@@ -54,6 +54,24 @@ describe('permissionService', () => {
     expect(canUserPerform({ uid: 'supplier-1', role: 'supplier' }, 'project:update', project)).toBe(false);
   });
 
+  it('keeps subcontractor package assignees read/payment scoped without project mutation rights', () => {
+    const subcontractorProject = {
+      ...project,
+      memberships: [
+        ...project.memberships,
+        { userId: 'subcontractor-1', accessRole: 'subcontractor_package_assignee' as const, status: 'active' as const },
+        { userId: 'suspended-subcontractor', accessRole: 'subcontractor_package_assignee' as const, status: 'suspended' as const },
+      ],
+    };
+
+    expect(getActiveProjectAccessRoles({ uid: 'subcontractor-1', role: 'subcontractor' }, subcontractorProject)).toEqual(['subcontractor_package_assignee']);
+    expect(canUserPerform({ uid: 'subcontractor-1', role: 'subcontractor' }, 'project:read', subcontractorProject)).toBe(true);
+    expect(canUserPerform({ uid: 'subcontractor-1', role: 'subcontractor' }, 'payment:read', subcontractorProject)).toBe(true);
+    expect(canUserPerform({ uid: 'subcontractor-1', role: 'subcontractor' }, 'project:update', subcontractorProject)).toBe(false);
+    expect(canUserPerform({ uid: 'subcontractor-1', role: 'subcontractor' }, 'municipal:view_insight', subcontractorProject)).toBe(false);
+    expect(getActiveProjectAccessRoles({ uid: 'suspended-subcontractor', role: 'subcontractor' }, subcontractorProject)).toEqual([]);
+  });
+
   it('allows admins to perform governed actions regardless of project membership', () => {
     expect(canUserPerform({ uid: 'admin-1', role: 'admin' }, 'escrow:release', project)).toBe(true);
     expect(canUserPerform({ uid: 'claims-admin', admin: true }, 'admin:override', project)).toBe(true);
