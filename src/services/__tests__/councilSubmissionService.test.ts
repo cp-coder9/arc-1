@@ -4,14 +4,8 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { councilSubmissionService, Municipality } from '../councilSubmissionService';
-import { Job, UserProfile, CouncilSubmission } from '@/types';
-import { notificationService } from '@/services/notificationService';
-import { addDoc, getDoc, updateDoc } from 'firebase/firestore';
-
-const mockAddDoc = addDoc as jest.Mock<any>;
-const mockGetDoc = getDoc as jest.Mock<any>;
-const mockUpdateDoc = updateDoc as jest.Mock<any>;
+import type { Municipality } from '../councilSubmissionService';
+import type { Job, UserProfile, CouncilSubmission } from '@/types';
 
 const mockAddDoc = jest.fn(() => Promise.resolve({ id: 'new-submission-id' }));
 const mockCollection = jest.fn((_db: unknown, path: string) => ({ path }));
@@ -55,6 +49,8 @@ jest.mock('sonner', () => ({
     error: jest.fn(),
   },
 }));
+
+const { councilSubmissionService } = await import('../councilSubmissionService');
 
 describe('CouncilSubmissionService', () => {
   const mockJob: Job = {
@@ -167,7 +163,7 @@ describe('CouncilSubmissionService', () => {
     );
     expect(notificationService.notifyCouncilUpdate).toHaveBeenCalledWith(
       'client-1',
-      'Test Project',
+      'Test House',
       'Document package prepared',
       'job-1'
     );

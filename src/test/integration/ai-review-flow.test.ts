@@ -14,6 +14,11 @@ const mockFetch = jest.fn() as jest.Mock;
 const geminiTextResponse = (payload: unknown) => ({
   ok: true,
   json: async () => ({
+    choices: [{
+      message: {
+        content: typeof payload === 'string' ? payload : JSON.stringify(payload),
+      },
+    }],
     candidates: [{
       content: {
         parts: [{ text: typeof payload === 'string' ? payload : JSON.stringify(payload) }],

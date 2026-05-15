@@ -1015,7 +1015,7 @@ export default function AdminDashboard({
                   <h3 className="font-bold mb-2">{job.title}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
                   <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
-                    <span>Budget: R {job.budget.toLocaleString()}</span>
+                    <span>Budget: R {(job.budget ?? 0).toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
                   </div>
                   <div className="mt-4 flex flex-wrap justify-end gap-2">

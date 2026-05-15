@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import FileManager from '../FileManager';
 import { UserProfile } from '../../types';
 
 const mockFile = {
@@ -103,9 +102,27 @@ jest.mock('../ui/badge', () => ({
   badgeVariants: () => 'badge',
 }));
 
-jest.mock('lucide-react', () => new Proxy({}, {
-  get: () => () => <span />,
-}));
+jest.mock('lucide-react', () => {
+  const Icon = () => <span />;
+  return {
+    File: Icon,
+    FileText: Icon,
+    Image: Icon,
+    FileCode: Icon,
+    Download: Icon,
+    Trash2: Icon,
+    Search: Icon,
+    Filter: Icon,
+    Clock: Icon,
+    User: Icon,
+    ExternalLink: Icon,
+    Loader2: Icon,
+    FileArchive: Icon,
+    HardDrive: Icon,
+  };
+});
+
+const { default: FileManager } = await import('../FileManager');
 
 describe('FileManager quick scan workflow', () => {
   const architect: UserProfile = {

@@ -7,8 +7,6 @@ import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import { NotificationType } from '../../types';
 import * as firestore from 'firebase/firestore';
 
-const { notificationService } = await import('../notificationService');
-
 const mockAddDoc = jest.fn<(...args: any[]) => Promise<{ id: string }>>(() => Promise.resolve({ id: 'new-notification-id' }));
 const mockCollection = jest.fn<(...args: any[]) => { path: string }>((_db: any, path: string) => ({ path }));
 const mockDoc = jest.fn<(...args: any[]) => { path: string; id: string }>((_db: any, path: string, id: string) => ({ path, id }));
@@ -48,6 +46,8 @@ jest.mock('firebase/firestore', () => ({
 jest.mock('sonner', () => ({
   toast: jest.fn(),
 }));
+
+const { notificationService } = await import('../notificationService');
 
 describe('NotificationService', () => {
   let notificationWrites: any[];

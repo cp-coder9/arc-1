@@ -342,10 +342,24 @@ export default function FileManager({ user }: FileManagerProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const filteredFiles = files.filter(f => 
-    f.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    f.context.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const normalizedSearchTerm = searchTerm.toLowerCase();
+  const filteredFiles = files.filter(f => {
+    const legacyFilename = (f as UploadedFile & { filename?: string }).filename;
+    const fileName = (f.fileName ?? legacyFilename ?? '').toLowerCase();
+    const context = (f.context ?? '').toLowerCase();
+    return fileName.includes(normalizedSearchTerm) || context.includes(normalizedSearchTerm);
+  });
+
+  const displayFileName = (file: UploadedFile) => {
+    const legacyFilename = (file as UploadedFile & { filename?: string }).filename;
+    return file.fileName ?? legacyFilename ?? 'Untitled file';
+  };
+
+  const displayFileType = (file: UploadedFile) => {
+    const legacyType = (file as UploadedFile & { type?: string; contentType?: string }).type;
+    const legacyContentType = (file as UploadedFile & { type?: string; contentType?: string }).contentType;
+    return file.fileType ?? legacyType ?? legacyContentType ?? 'application/octet-stream';
+  };
 
   if (loading) {
     return (
@@ -413,16 +427,16 @@ export default function FileManager({ user }: FileManagerProps) {
         {filteredFiles.map((file) => (
           <Card key={file.id} className="group overflow-hidden rounded-[1.5rem] border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white">
             <div className="aspect-video bg-secondary/30 flex items-center justify-center relative group-hover:bg-secondary/10 transition-colors">
-              {file.fileType.startsWith('image/') ? (
+              {displayFileType(file).startsWith('image/') ? (
                 <img 
                   src={file.url} 
-                  alt={file.fileName} 
+                  alt={displayFileName(file)}
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                   referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="p-6 bg-white rounded-2xl shadow-sm border border-border">
-                  {getFileIcon(file.fileType)}
+                  {getFileIcon(displayFileType(file))}
                 </div>
               )}
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
@@ -457,11 +471,11 @@ export default function FileManager({ user }: FileManagerProps) {
             </div>
             <CardContent className="p-5">
               <div className="flex flex-col gap-1 mb-3">
-                <h4 className="font-bold text-sm truncate" title={file.fileName}>{file.fileName}</h4>
+                <h4 className="font-bold text-sm truncate" title={displayFileName(file)}>{displayFileName(file)}</h4>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   <span className="font-medium">{formatSize(file.fileSize)}</span>
                   <span>•</span>
-                  <span>{file.fileType?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                  <span>{displayFileType(file).split('/')[1]?.toUpperCase() || 'FILE'}</span>
                 </div>
               </div>
               
@@ -471,7 +485,7 @@ export default function FileManager({ user }: FileManagerProps) {
                   {safeFormat(file.uploadedAt, 'MMM d, yyyy')}
                 </div>
                 <div className="flex items-center gap-2">
-                  {user.role === 'architect' && (file.fileType === 'application/pdf' || file.fileType.startsWith('image/')) && (
+                  {user.role === 'architect' && (displayFileType(file) === 'application/pdf' || displayFileType(file).startsWith('image/')) && (
                     <Button
                       variant="ghost"
                       size="sm"
