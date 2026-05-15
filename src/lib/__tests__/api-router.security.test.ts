@@ -446,6 +446,68 @@ describe('api-router security and high-value integration routes', () => {
     });
   });
 
+  it('creates persisted fee proposals for verified BEPs using estimator snapshots', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open', category: 'Residential' });
+    seedVerifiedBepVerification();
+
+    const feeInput = {
+      projectType: 'residential',
+      constructionValue: 1000000,
+      areaSqm: 120,
+      complexity: 'medium',
+      municipality: 'Cape Town',
+      urgency: 'standard',
+      serviceStages: ['inception', 'concept', 'design'],
+      deliverables: ['conceptDesign'],
+      includeCouncilAdmin: false,
+      includePlatformFee: true,
+      vatApplicable: false,
+    };
+
+    const response = await request(app)
+      .post('/api/jobs/job-1/fee-proposals')
+      .set(authHeader('architect'))
+      .send({ feeInput, scopeSummary: 'Concept to design development', terms: 'Valid for 14 days' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.proposal).toMatchObject({
+      id: 'architect-1',
+      jobId: 'job-1',
+      bepId: 'architect-1',
+      clientId: 'client-1',
+      status: 'submitted',
+      scopeSummary: 'Concept to design development',
+      terms: 'Valid for 14 days',
+      verificationId: 'architect-1_bep_SACAP_SACAP-123',
+      sacapNumber: 'SACAP-123',
+    });
+    expect(response.body.proposal.total).toBeGreaterThan(0);
+    expect(mockAdminDb.getDoc('jobs/job-1/fee_proposals/architect-1')).toMatchObject({ verificationId: 'architect-1_bep_SACAP_SACAP-123' });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
+      category: 'project',
+      action: 'marketplace.fee_proposal_submitted',
+      metadata: { jobId: 'job-1', verificationId: 'architect-1_bep_SACAP_SACAP-123' },
+    });
+  });
+
+  it('blocks unverified BEPs from creating fee proposals and audits the gate', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
+
+    const response = await request(app)
+      .post('/api/jobs/job-1/fee-proposals')
+      .set(authHeader('architect'))
+      .send({ feeInput: { projectType: 'residential' } });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({ verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
+      category: 'access',
+      action: 'marketplace.fee_proposal_blocked_unverified_bep',
+    });
+  });
+
   it('allows architects to apply once to open jobs and notifies the client', async () => {
     const app = await buildApp();
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open' });
