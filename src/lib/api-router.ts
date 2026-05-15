@@ -1061,6 +1061,53 @@ function sanitizeTechnicalBriefPayload(body: Record<string, any>) {
   };
 }
 
+function sanitizeMoneyCents(value: unknown) {
+  const amount = Math.round(Number(value));
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function buildProjectCode(now = new Date()) {
+  const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+  return `ARC-${stamp}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+function buildAppointmentMilestones(totalProfessionalFee: number, now: string) {
+  const definitions = [
+    { id: 'appointment', name: 'Appointment and brief confirmation', percentage: 15, releaseConditions: ['Appointment contract accepted', 'Technical brief confirmed'] },
+    { id: 'concept', name: 'Concept and design development', percentage: 25, releaseConditions: ['Concept deliverables submitted', 'Client review completed'] },
+    { id: 'approval', name: 'Municipal approval package', percentage: 30, releaseConditions: ['Submission drawing package prepared', 'Approval route confirmed'] },
+    { id: 'procurement', name: 'Procurement and construction pricing support', percentage: 20, releaseConditions: ['Pricing/tender support completed where applicable'] },
+    { id: 'closeout', name: 'Close-out and handover support', percentage: 10, releaseConditions: ['Close-out deliverables accepted'] },
+  ];
+  let allocated = 0;
+  return definitions.map((definition, index) => {
+    const amount = index === definitions.length - 1 ? totalProfessionalFee - allocated : Math.round(totalProfessionalFee * (definition.percentage / 100));
+    allocated += amount;
+    return { ...definition, amount, status: 'pending', createdAt: now };
+  });
+}
+
+function buildAppointmentInvoices(projectId: string, clientId: string, bepId: string, milestones: Array<Record<string, any>>, now: string) {
+  return milestones.map((milestone, index) => ({
+    id: `${projectId}_${milestone.id}`,
+    invoiceNumber: `INV-${projectId}-${String(index + 1).padStart(2, '0')}`,
+    projectId,
+    clientId,
+    architectId: bepId,
+    milestoneId: milestone.id,
+    items: [{ description: milestone.name, quantity: 1, unitPrice: milestone.amount, total: milestone.amount }],
+    subtotal: milestone.amount,
+    taxAmount: 0,
+    taxRate: 0,
+    totalAmount: milestone.amount,
+    currency: 'R',
+    status: 'draft',
+    dueDate: new Date(Date.parse(now) + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    notes: `Generated from appointment milestone ${milestone.name}`,
+    createdAt: now,
+  }));
+}
+
 function withGuardrails(systemInstruction?: string) {
   // Guardrails are added at the proxy boundary so client helpers do not prepend them twice.
   return `${SYSTEM_GUARDRAILS}\n\n${systemInstruction || ''}`.trim();
@@ -1379,6 +1426,116 @@ router.put("/client-briefs/:briefId/technical-brief", async (req, res) => {
       metadata: { clientBriefId: req.params.briefId, downstreamFeeds: payload.downstreamFeeds, taskCount: payload.tasks.length },
     });
     res.json({ technicalBrief, brief: { ...brief, technicalBriefId: req.params.briefId, status: finalize ? 'technical_finalized' : 'technical_draft', updatedAt: now } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const briefRef = adminDb.collection('client_briefs').doc(req.params.briefId);
+    const technicalRef = adminDb.collection('technical_briefs').doc(req.params.briefId);
+    const [briefSnap, technicalSnap] = await Promise.all([briefRef.get(), technicalRef.get()]);
+    if (!briefSnap.exists) return res.status(404).json({ error: 'Client brief not found' });
+    if (!technicalSnap.exists) return res.status(404).json({ error: 'Finalized technical brief not found' });
+    const brief = { id: req.params.briefId, ...briefSnap.data() } as Record<string, any>;
+    const technicalBrief = { id: req.params.briefId, ...technicalSnap.data() } as Record<string, any>;
+    assertClientBriefOwner(authContext, brief);
+    if (technicalBrief.status !== 'finalized') return res.status(400).json({ error: 'Technical brief must be finalized before appointment' });
+    if (brief.status === 'appointed' || brief.appointmentContractId) return res.status(409).json({ error: 'A BEP has already been appointed for this brief' });
+    const bepId = sanitizeBriefText(req.body.bepId || technicalBrief.bepId, 160);
+    if (!bepId || !Array.isArray(brief.assignedBepIds) || !brief.assignedBepIds.includes(bepId)) return res.status(400).json({ error: 'BEP must be assigned to this brief before appointment' });
+    const [bepSnap, verification] = await Promise.all([
+      adminDb.collection('users').doc(bepId).get(),
+      getDirectoryVerification(bepId, 'bep'),
+    ]);
+    if (!bepSnap.exists) return res.status(404).json({ error: 'BEP profile not found' });
+    if (!verification) return res.status(403).json({ error: 'Appointed BEP must have active verification', verificationRequired: { subjectType: 'bep', statutoryBody: 'SACAP' } });
+    const professionalFee = sanitizeMoneyCents(req.body.professionalFee || req.body.totalProfessionalFee || req.body.amount);
+    if (!professionalFee) return res.status(400).json({ error: 'professionalFee is required in cents' });
+    const now = new Date().toISOString();
+    const projectRef = adminDb.collection('projects').doc();
+    const projectCode = buildProjectCode(new Date(now));
+    const milestones = buildAppointmentMilestones(professionalFee, now);
+    const invoices = buildAppointmentInvoices(projectRef.id, brief.clientId, bepId, milestones, now);
+    const platformFee = Math.round(professionalFee * PLATFORM_FEE_PERCENTAGE);
+    const totalEscrowAmount = professionalFee + platformFee;
+    const contractRef = adminDb.collection('appointment_contracts').doc(projectRef.id);
+    const escrowRef = adminDb.collection('escrow').doc(projectRef.id);
+    const paymentRef = adminDb.collection('payments').doc();
+    const batch = adminDb.batch();
+    const project = {
+      id: projectRef.id,
+      projectCode,
+      clientBriefId: req.params.briefId,
+      technicalBriefId: req.params.briefId,
+      clientId: brief.clientId,
+      leadArchitectId: bepId,
+      currentStage: 'appointment',
+      stageHistory: [{ stage: 'appointment', enteredAt: now, actorId: authContext.uid, note: 'BEP appointed from finalized technical brief' }],
+      teamMembers: [
+        { userId: brief.clientId, role: 'client', joinedAt: now, status: 'active' },
+        { userId: bepId, role: 'architect', discipline: technicalBrief.requiredProfessionals?.[0] || 'built_environment', joinedAt: now, status: 'active', verificationId: verification.id },
+      ],
+      milestones,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const contract = {
+      id: contractRef.id,
+      projectId: projectRef.id,
+      projectCode,
+      clientBriefId: req.params.briefId,
+      technicalBriefId: req.params.briefId,
+      clientId: brief.clientId,
+      bepId,
+      status: 'generated_pending_acceptance',
+      professionalFee,
+      platformFee,
+      totalEscrowAmount,
+      scope: technicalBrief.projectScope || [],
+      deliverables: technicalBrief.deliverables || [],
+      exclusions: technicalBrief.exclusions || [],
+      assumptions: technicalBrief.assumptions || [],
+      milestones: milestones.map(({ id, name, percentage, amount, releaseConditions }) => ({ id, name, percentage, amount, releaseConditions })),
+      downstreamFeeds: technicalBrief.downstreamFeeds || [],
+      verificationId: verification.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    batch.set(projectRef, project);
+    batch.set(contractRef, contract);
+    batch.set(escrowRef, {
+      projectId: projectRef.id,
+      linkedProjectId: projectRef.id,
+      clientBriefId: req.params.briefId,
+      technicalBriefId: req.params.briefId,
+      payerId: brief.clientId,
+      payeeId: bepId,
+      totalAmount: totalEscrowAmount,
+      heldAmount: 0,
+      releasedAmount: 0,
+      platformFeeAmount: platformFee,
+      status: 'pending',
+      paymentId: paymentRef.id,
+      milestones: milestones.map(({ id, name, percentage, amount, releaseConditions }) => ({ id, name, stage: id, percentage, amount, status: 'pending', releaseConditions })),
+      createdAt: now,
+      updatedAt: now,
+    });
+    batch.set(paymentRef, { projectId: projectRef.id, payerId: brief.clientId, payeeId: bepId, amount: totalEscrowAmount, type: 'escrow_deposit', status: 'pending', metadata: { platformFee, professionalFee, clientBriefId: req.params.briefId }, createdAt: now, updatedAt: now });
+    invoices.forEach((invoice) => batch.set(adminDb.collection('invoices').doc(invoice.id), invoice));
+    batch.update(briefRef, { status: 'appointed', projectId: projectRef.id, projectCode, appointmentContractId: contractRef.id, updatedAt: now });
+    batch.update(technicalRef, { projectId: projectRef.id, appointmentContractId: contractRef.id, updatedAt: now });
+    await batch.commit();
+    await recordAuditEvent(req, {
+      category: 'contract',
+      action: 'contract.appointment_generated',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'appointment_contract', id: contractRef.id, projectId: projectRef.id },
+      metadata: { clientBriefId: req.params.briefId, bepId, projectCode, professionalFee, platformFee, invoiceCount: invoices.length, escrowId: projectRef.id },
+    });
+    res.status(201).json({ project, contract, escrowId: projectRef.id, paymentId: paymentRef.id, invoices });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

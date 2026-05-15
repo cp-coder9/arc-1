@@ -926,6 +926,69 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.getDoc('technical_briefs/brief-unverified')).toBeUndefined();
   });
 
+  it('creates appointment contract, project code, milestones, invoices, and escrow from a finalized technical brief', async () => {
+    const app = await buildApp();
+    seedVerifiedBepVerification('architect-1');
+    mockAdminDb.seed('client_briefs/brief-appoint', {
+      id: 'brief-appoint',
+      clientId: 'client-1',
+      clientName: 'Client One',
+      status: 'technical_finalized',
+      projectGoal: 'Residential addition requiring approvals.',
+      assignedBepIds: ['architect-1'],
+      evidenceUploads: [],
+      interpretation: { clientSummary: 'Residential addition' },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockAdminDb.seed('technical_briefs/brief-appoint', {
+      id: 'brief-appoint',
+      clientBriefId: 'brief-appoint',
+      clientId: 'client-1',
+      bepId: 'architect-1',
+      status: 'finalized',
+      technicalClassification: 'Residential additions and municipal submission',
+      requiredProfessionals: ['Architectural professional', 'Structural engineer'],
+      projectScope: ['Measured survey', 'Submission drawings'],
+      deliverables: ['Technical brief', 'Drawing pack'],
+      exclusions: ['Construction administration'],
+      assumptions: ['Client supplies title deed'],
+      downstreamFeeds: ['contract_builder', 'drawing_register', 'municipal_tracker'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const forbidden = await request(app)
+      .post('/api/client-briefs/brief-appoint/appoint-bep')
+      .set(authHeader('intruder'))
+      .send({ professionalFee: 200000 });
+    const response = await request(app)
+      .post('/api/client-briefs/brief-appoint/appoint-bep')
+      .set(authHeader('client'))
+      .send({ professionalFee: 200000 });
+    const duplicate = await request(app)
+      .post('/api/client-briefs/brief-appoint/appoint-bep')
+      .set(authHeader('client'))
+      .send({ professionalFee: 200000 });
+
+    expect(forbidden.status).toBe(403);
+    expect(response.status).toBe(201);
+    expect(response.body.project.projectCode).toMatch(/^ARC-20260102-/);
+    expect(response.body.project).toMatchObject({ clientBriefId: 'brief-appoint', technicalBriefId: 'brief-appoint', clientId: 'client-1', leadArchitectId: 'architect-1', currentStage: 'appointment' });
+    expect(response.body.contract).toMatchObject({ status: 'generated_pending_acceptance', professionalFee: 200000, platformFee: 10000, totalEscrowAmount: 210000, verificationId: 'architect-1_bep_SACAP_SACAP-123' });
+    expect(response.body.contract.milestones).toHaveLength(5);
+    expect(response.body.invoices).toHaveLength(5);
+    expect(response.body.invoices.reduce((sum: number, invoice: any) => sum + invoice.totalAmount, 0)).toBe(200000);
+    expect(mockAdminDb.listCollection('projects')).toHaveLength(1);
+    const projectId = response.body.project.id;
+    expect(mockAdminDb.getDoc(`appointment_contracts/${projectId}`)).toMatchObject({ projectId, clientBriefId: 'brief-appoint' });
+    expect(mockAdminDb.getDoc(`escrow/${projectId}`)).toMatchObject({ totalAmount: 210000, platformFeeAmount: 10000, status: 'pending', payeeId: 'architect-1' });
+    expect(mockAdminDb.getDoc('client_briefs/brief-appoint')).toMatchObject({ status: 'appointed', projectId, appointmentContractId: projectId });
+    expect(mockAdminDb.getDoc('technical_briefs/brief-appoint')).toMatchObject({ projectId, appointmentContractId: projectId });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'contract.appointment_generated')).toBe(true);
+    expect(duplicate.status).toBe(409);
+  });
+
   it('returns profile-backed manual directory results without exposing private or unverified-only filtered records', async () => {
     const app = await buildApp();
     mockAdminDb.seed('users/architect-2', { role: 'architect', displayName: 'Verified Architect', companyName: 'Studio A', region: 'Cape Town', professionalDiscipline: 'architecture', averageRating: 4.8, totalReviews: 12 });
