@@ -163,6 +163,7 @@ describe('phase5FinancialDomain', () => {
 
     expect(breakdown).toEqual({ grossAmount: 10000, platformFeeAmount: 200, vatAmount: 30, netPayableAmount: 9770, feeScheduleId: 'fees-2026-v1', calculatedAt: '2026-01-01T00:00:00.000Z' });
     expect(Object.isFrozen(breakdown)).toBe(true);
+    expect(() => calculateFeeBreakdown({ grossAmount: 100, feeSchedule: { id: 'fees', name: 'Bad fees', version: '1', jurisdiction: 'ZA', platformFeePercentage: 1, vatPercentage: 1, effectiveFrom: '2026-01-01', createdBy: 'admin-1', status: 'active' } })).toThrow(/negative net payable/);
   });
 
   it('builds invoice and claim payment ledger entries with deterministic idempotency keys', () => {
@@ -198,5 +199,9 @@ describe('phase5FinancialDomain', () => {
     expect(evidence).toEqual(expect.objectContaining({ immutableReference: 'dispute-1:ledger_entry:ledger-1' }));
     expect(Object.isFrozen(evidence)).toBe(true);
     expect(() => buildDisputeEvidenceDraft({ ...evidence, sourceId: ' ' })).toThrow('Evidence source id is required');
+  });
+
+  it('rejects blank claim evidence ids before persistence', () => {
+    expect(() => buildClaimDraft({ projectId: 'project-1', jobId: 'job-1', claimantId: 'contractor-1', respondentId: 'client-1', amount: 1500, currency: 'ZAR', reason: 'Variation work completed', evidenceIds: ['evidence-1', ' '] })).toThrow('Evidence id is required');
   });
 });

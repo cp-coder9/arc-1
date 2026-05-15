@@ -161,6 +161,13 @@ describe('resourceBookingService', () => {
     expect(billing.ownerPayoutCents).toBe(1_575);
   });
 
+  test('rejects invalid usage billing policies and negative metered usage', () => {
+    expect(() => calculateResourceUsageBilling({ bookingId: 'booking-1', resourceId: 'resource-1', userId: 'user-1', startedAt: '2026-05-15T10:00:00.000Z', endedAt: '2026-05-15T10:30:00.000Z' }, { billingMode: 'hourly', platformFeeBps: 10_001, currency: 'ZAR' })).toThrow(/platformFeeBps/);
+    expect(() => calculateResourceUsageBilling({ bookingId: 'booking-1', resourceId: 'resource-1', userId: 'user-1', startedAt: '2026-05-15T10:00:00.000Z', endedAt: '2026-05-15T10:30:00.000Z' }, { billingMode: 'hourly', platformFeeBps: 0, currency: 'ZAR' })).toThrow(/hourlyRateCents/);
+    expect(() => calculateResourceUsageBilling({ bookingId: 'booking-1', resourceId: 'resource-1', userId: 'user-1', startedAt: '2026-05-15T10:00:00.000Z', endedAt: '2026-05-15T10:30:00.000Z', meteredUnits: -1 }, { billingMode: 'metered_unit', meteredUnitRateCents: 100, platformFeeBps: 0, currency: 'ZAR' })).toThrow(/meteredUnits/);
+    expect(() => calculateResourceUsageBilling({ bookingId: 'booking-1', resourceId: 'resource-1', userId: 'user-1', startedAt: '2026-05-15T10:00:00.000Z', endedAt: '2026-05-15T10:30:00.000Z' }, { billingMode: 'metered_unit', platformFeeBps: 0, currency: 'ZAR' })).toThrow(/meteredUnitRateCents/);
+  });
+
   test('validates usage belongs to the booked resource window before ledgering', () => {
     const usage = {
       bookingId: 'booking-1',
@@ -306,5 +313,15 @@ describe('resourceBookingService', () => {
         ],
       })
     ).toThrow('multiple currencies');
+
+    expect(() =>
+      buildResourcePayoutRecord({
+        resourceId: 'resource-1',
+        ownerId: 'owner-1',
+        payoutBatchId: 'batch-1',
+        createdAt: '2026-05-16T00:00:00.000Z',
+        usageBillingResults: [{ bookingId: 'booking-1', resourceId: 'resource-2', userId: 'user-1', billableMinutes: 60, meteredUnits: 0, grossAmountCents: 100, platformFeeCents: 10, ownerPayoutCents: 90, currency: 'ZAR', formula: 'test' }],
+      })
+    ).toThrow('another resource');
   });
 });

@@ -70,6 +70,17 @@ describe('aiGovernanceService', () => {
       assignedRole: 'admin',
       flags: ['legal_or_compliance_risk'],
     });
+    expect(log.flags).toEqual(['legal_or_compliance_risk']);
+  });
+
+  it('normalizes and sorts non-empty AI review flags', () => {
+    const log = buildAiActionLog({ ...baseAiAction, flags: [' zoning ', '', 'accessibility', 'zoning'] });
+
+    expect(log.flags).toEqual(['accessibility', 'zoning']);
+    expect(buildAiReviewQueueItem(log, 'ai-log-flags')).toMatchObject({
+      priority: 'low',
+      reason: 'AI output flagged for review: accessibility, zoning',
+    });
   });
 
   it('does not create a queue item for high-confidence unflagged advisory outputs', () => {
@@ -96,6 +107,24 @@ describe('aiGovernanceService', () => {
       target: { type: 'compliance_form', id: 'form-1', projectId: 'project-1' },
       declaration: 'I confirm the declaration as the responsible professional.',
     })).toThrow(/verified professional status/);
+  });
+
+  it('enforces domain-specific human sign-off roles', () => {
+    expect(() => buildHumanSignOffRecord({
+      domain: 'escrow_release',
+      actorUid: 'architect-1',
+      actorRole: 'architect',
+      target: { type: 'escrow', id: 'escrow-1', projectId: 'project-1' },
+      declaration: 'Release escrow.',
+    })).toThrow(/client or admin/);
+
+    expect(() => buildHumanSignOffRecord({
+      domain: 'professional_certificate',
+      actorUid: 'client-1',
+      actorRole: 'client',
+      target: { type: 'certificate', id: 'certificate-1', projectId: 'project-1' },
+      declaration: 'Certify works.',
+    })).toThrow(/verified BEP/);
   });
 
   it('builds immutable human sign-off records linked to advisory AI logs', () => {

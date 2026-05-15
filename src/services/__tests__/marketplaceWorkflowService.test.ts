@@ -27,12 +27,14 @@ describe('marketplaceWorkflowService', () => {
     expect(() => assertVerifiedParticipantForOpportunity({ verified: true })).not.toThrow();
     expect(() => assertVerifiedParticipantForOpportunity({ status: 'verified', expiresAt: '2099-01-01T00:00:00.000Z' })).not.toThrow();
     expect(() => assertVerifiedParticipantForOpportunity({ status: 'verified', expiresAt: '2000-01-01T00:00:00.000Z' })).toThrow(/Verified participant/);
+    expect(() => assertVerifiedParticipantForOpportunity(null)).toThrow(/Verified participant/);
   });
 
   it('builds human-reviewed proposals', () => {
-    const proposal = buildProposal({ opportunityId: 'opp-1', briefId: 'brief-1', clientId: 'client-1', professionalId: 'bep-1', feeAmount: 1000, scopeSummary: 'Design scope' });
-    expect(proposal).toMatchObject({ currency: 'ZAR', status: 'submitted', humanReviewRequired: true });
+    const proposal = buildProposal({ opportunityId: 'opp-1', briefId: 'brief-1', clientId: 'client-1', professionalId: 'bep-1', feeAmount: 1000, scopeSummary: 'Design scope', exclusions: [' travel ', '', 'printing'] });
+    expect(proposal).toMatchObject({ currency: 'ZAR', status: 'submitted', humanReviewRequired: true, exclusions: ['travel', 'printing'] });
     expect(() => buildProposal({ ...proposal, feeAmount: -1 })).toThrow(/feeAmount/);
+    expect(() => buildProposal({ ...proposal, feeAmount: Number.NaN })).toThrow(/feeAmount/);
   });
 
   it('builds advisory proposal comparisons requiring client ownership and multiple proposals', () => {
@@ -41,5 +43,9 @@ describe('marketplaceWorkflowService', () => {
     expect(comparison.limitations.join(' ')).toMatch(/does not automatically appoint/);
     expect(() => buildProposalComparison({ briefId: 'brief-1', clientId: 'client-1', createdBy: 'other', proposalIds: ['p1', 'p2'] })).toThrow(/client owner/);
     expect(() => buildProposalComparison({ briefId: 'brief-1', clientId: 'client-1', createdBy: 'client-1', proposalIds: ['p1'] })).toThrow(/At least two/);
+  });
+
+  it('normalizes comparison proposal ids before enforcing minimum proposal count', () => {
+    expect(() => buildProposalComparison({ briefId: 'brief-1', clientId: 'client-1', createdBy: 'client-1', proposalIds: ['p1', '  '] })).toThrow(/At least two/);
   });
 });

@@ -185,4 +185,22 @@ describe('contractorWorkflowService', () => {
     }));
     expect(result.canRequestCloseoutReview).toBe(false);
   });
+
+  it('warns on open non-overdue RFIs and incomplete programme tasks before approval', () => {
+    const result = assessContractorWorkflow({
+      ...baseInput,
+      programmeTasks: [{ ...completedTask, status: 'in_progress', progress: 50 }],
+      rfis: [{ ...closedRfi, status: 'open' }],
+    });
+
+    expect(result.gates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'programme_dependencies', status: 'warning', detail: '1 programme task must be completed or rebaselined.' }),
+      expect.objectContaining({ id: 'rfi_status', status: 'warning', detail: '1 open RFI should be answered before closeout.' }),
+    ]));
+    expect(result.canRequestProcurementApproval).toBe(false);
+    expect(result.nextActions).toEqual(expect.arrayContaining([
+      '1 programme task must be completed or rebaselined.',
+      '1 open RFI should be answered before closeout.',
+    ]));
+  });
 });

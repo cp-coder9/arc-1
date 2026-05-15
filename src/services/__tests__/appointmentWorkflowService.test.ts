@@ -11,6 +11,9 @@ describe('appointmentWorkflowService', () => {
     expect(() => assertAppointmentPreconditions({ brief, proposal, verification: { ...verification, status: 'pending' } })).toThrow(/Active BEP verification/);
     expect(() => assertAppointmentPreconditions({ brief, proposal: { ...proposal, clientId: 'other' }, verification })).toThrow(/client does not match/);
     expect(() => assertAppointmentPreconditions({ brief: { ...brief, appointmentId: 'appointment-1' }, proposal, verification })).toThrow(/already been appointed/);
+    expect(() => assertAppointmentPreconditions({ brief: { ...brief, status: 'draft' }, proposal, verification })).toThrow(/not ready/);
+    expect(() => assertAppointmentPreconditions({ brief, proposal: { ...proposal, briefId: 'other' }, verification })).toThrow(/does not belong/);
+    expect(() => assertAppointmentPreconditions({ brief, proposal: { ...proposal, status: 'withdrawn' }, verification })).toThrow(/not eligible/);
   });
 
   it('builds appointment records with human acceptance gates and deterministic idempotency', () => {
@@ -28,6 +31,7 @@ describe('appointmentWorkflowService', () => {
     expect(appointment.humanAcceptanceRequired).toBe(true);
     expect(appointment.idempotencyKey).toBe(buildAppointmentIdempotencyKey({ briefId: 'brief-1', clientId: 'client-1', professionalId: 'bep-1' }));
     expect(() => buildAppointmentRecord({ ...appointment, createdBy: 'other' })).toThrow(/Only the client owner/);
+    expect(() => buildAppointmentIdempotencyKey({ briefId: ' ', clientId: 'client-1', professionalId: 'bep-1' })).toThrow(/briefId/);
   });
 
   it('builds immutable project stage history entries', () => {
