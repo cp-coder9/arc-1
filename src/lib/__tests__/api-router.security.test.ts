@@ -448,6 +448,74 @@ describe('api-router security and high-value integration routes', () => {
     });
   });
 
+
+  it('persists AI action logs, creates review queue items, resolves with human sign-off, and audits both steps', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', { clientId: 'client-1', leadArchitectId: 'architect-1', teamMembers: [] });
+
+    const logged = await request(app)
+      .post('/api/ai/action-logs')
+      .set(authHeader('client'))
+      .send({
+        projectId: 'project-1',
+        actionKind: 'drawing_check',
+        target: { type: 'drawing_check_run', id: 'run-1' },
+        prompt: { provider: 'gemini', model: 'gemini-2.0-flash', promptVersion: 'drawing-check-v1' },
+        sourceReferences: [{ type: 'drawing', id: 'drawing-1', excerptHash: 'sha256:abc' }],
+        confidence: 0.41,
+        outputSummary: 'Possible compliance risk. Advisory only.',
+        flags: ['legal_or_compliance_risk'],
+      });
+
+    expect(logged.status).toBe(201);
+    expect(logged.body.actionLog).toMatchObject({ projectId: 'project-1', actorUid: 'client-1', status: 'requires_review', requiresHumanConfirmation: true, immutable: true });
+    expect(logged.body.reviewQueueItem).toMatchObject({ projectId: 'project-1', priority: 'critical', assignedRole: 'admin', status: 'open' });
+    expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
+      category: 'ai',
+      action: 'ai.action_logged_requires_review',
+      target: { type: 'ai_action_log', projectId: 'project-1' },
+      metadata: expect.objectContaining({ confidence: 0.41, reviewQueueId: logged.body.reviewQueueItem.id }),
+    });
+
+    const resolved = await request(app)
+      .post(`/api/admin/ai-review/${logged.body.reviewQueueItem.id}/resolve`)
+      .set(authHeader('admin'))
+      .send({
+        decision: 'resolved',
+        reason: 'Admin reviewed evidence and recorded responsible human confirmation.',
+        humanSignOff: {
+          domain: 'municipal_submission',
+          target: { type: 'municipal_submission', id: 'submission-1', projectId: 'project-1' },
+          declaration: 'I reviewed the municipal package and approve this governance resolution.',
+        },
+      });
+
+    expect(resolved.status).toBe(200);
+    expect(mockAdminDb.getDoc(`ai_review_queue/${logged.body.reviewQueueItem.id}`)).toMatchObject({ status: 'resolved', resolvedBy: 'admin-1', humanSignOffRecorded: true });
+    expect(mockAdminDb.getDoc(`ai_action_logs/${logged.body.actionLog.id}`)).toMatchObject({ status: 'human_confirmed', reviewedBy: 'admin-1', reviewDecision: 'resolved' });
+    expect(mockAdminDb.listCollection('human_signoffs')[0].data).toMatchObject({ actorUid: 'admin-1', actorRole: 'admin', humanConfirmed: true, aiMayNotSign: true, immutable: true, aiActionLogIds: [logged.body.actionLog.id] });
+    expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'ai.review_resolved_with_human_signoff' && data.category === 'approval')).toBe(true);
+  });
+
+  it('blocks non-participants from AI logs and non-admins from AI review resolution', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('projects/project-1', { clientId: 'client-1', leadArchitectId: 'architect-1', teamMembers: [] });
+    mockAdminDb.seed('ai_review_queue/queue-1', { id: 'queue-1', projectId: 'project-1', actionLogId: 'ai-log-1', target: { type: 'drawing', id: 'drawing-1' }, status: 'open' });
+
+    const logAttempt = await request(app)
+      .post('/api/ai/action-logs')
+      .set(authHeader('intruder'))
+      .send({ projectId: 'project-1', actionKind: 'drawing_check', target: { type: 'drawing', id: 'drawing-1' }, prompt: { provider: 'gemini', model: 'gemini-2.0-flash', promptVersion: 'v1' }, sourceReferences: [{ type: 'drawing', id: 'drawing-1' }], confidence: 0.9, outputSummary: 'Advisory only.' });
+    const resolveAttempt = await request(app)
+      .post('/api/admin/ai-review/queue-1/resolve')
+      .set(authHeader('client'))
+      .send({ decision: 'resolved', reason: 'not allowed' });
+
+    expect(logAttempt.status).toBe(403);
+    expect(resolveAttempt.status).toBe(403);
+    expect(mockAdminDb.getDoc('ai_review_queue/queue-1')).toMatchObject({ status: 'open' });
+  });
+
   it('creates persisted fee proposals for verified BEPs using estimator snapshots', async () => {
     const app = await buildApp();
     mockAdminDb.seed('jobs/job-1', { title: 'House plan', clientId: 'client-1', status: 'open', category: 'Residential' });

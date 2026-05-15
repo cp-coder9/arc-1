@@ -27,6 +27,13 @@ import {
 import { runVerificationBrowserAgent, type VerificationAgentInput } from "../services/verificationAgentService";
 import { analyzeBrief } from "../services/agents/briefingAgent";
 import { DEFAULT_FEE_ESTIMATOR_SETTINGS, estimateArchitecturalFee, type FeeEstimatorInput } from "../services/feeEstimatorService";
+import {
+  buildAiActionLog,
+  buildAiReviewQueueItem,
+  buildHumanSignOffRecord,
+  type AiActionLogInput,
+  type HumanSignOffInput,
+} from "../services/aiGovernanceService";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -2105,6 +2112,150 @@ router.post("/projects/:projectId/ai-issues/:issueId/review", async (req, res) =
     res.json({ id: issueId, ...update });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message, verificationRequired: err.verificationRequired });
+  }
+});
+
+// ── Phase 4 AI Governance Persistence Routes ───────────────────────────────
+
+router.post("/ai/action-logs", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const projectId = sanitizeCoordinationString(req.body.projectId, 160);
+    if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) return res.status(404).json({ error: 'Project not found' });
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Record<string, any>;
+    const canCreate = authContext.isAdmin || project.clientId === authContext.uid || project.leadArchitectId === authContext.uid || isActiveProjectTeamMember(project, authContext.uid);
+    if (!canCreate) return res.status(403).json({ error: 'Only project participants can create AI action logs' });
+
+    const target = req.body.target && typeof req.body.target === 'object' ? req.body.target as Record<string, unknown> : {};
+    const prompt = req.body.prompt && typeof req.body.prompt === 'object' ? req.body.prompt as Record<string, unknown> : {};
+    const input: AiActionLogInput = {
+      projectId,
+      actionKind: sanitizeCoordinationString(req.body.actionKind, 80) as AiActionLogInput['actionKind'],
+      actorUid: authContext.uid,
+      target: {
+        type: sanitizeCoordinationString(target.type, 120),
+        id: sanitizeCoordinationString(target.id, 160),
+      },
+      prompt: {
+        provider: sanitizeCoordinationString(prompt.provider, 80),
+        model: sanitizeCoordinationString(prompt.model, 120),
+        promptVersion: sanitizeCoordinationString(prompt.promptVersion, 120),
+        temperature: Number.isFinite(Number(prompt.temperature)) ? Number(prompt.temperature) : undefined,
+        requestId: sanitizeCoordinationString(prompt.requestId, 160) || undefined,
+        tokenUsage: prompt.tokenUsage && typeof prompt.tokenUsage === 'object' ? prompt.tokenUsage as AiActionLogInput['prompt']['tokenUsage'] : undefined,
+      },
+      sourceReferences: Array.isArray(req.body.sourceReferences) ? req.body.sourceReferences.map((source: Record<string, unknown>) => ({
+        type: sanitizeCoordinationString(source?.type, 80) as any,
+        id: sanitizeCoordinationString(source?.id, 160),
+        label: sanitizeCoordinationString(source?.label, 240) || undefined,
+        url: typeof source?.url === 'string' && isAllowedBlobUrl(source.url) ? source.url : undefined,
+        excerptHash: sanitizeCoordinationString(source?.excerptHash, 160) || undefined,
+      })).filter((source: { type: string; id: string }) => source.type && source.id).slice(0, 50) : [],
+      confidence: Number(req.body.confidence),
+      outputSummary: sanitizeCoordinationString(req.body.outputSummary, 4000),
+      flags: sanitizeCoordinationStringArray(req.body.flags, 25),
+    };
+
+    const actionLog = buildAiActionLog(input);
+    const actionLogRef = await adminDb.collection('ai_action_logs').add(actionLog as unknown as Record<string, unknown>);
+    const reviewQueueItem = buildAiReviewQueueItem(actionLog, actionLogRef.id);
+    let reviewQueueId: string | null = null;
+    if (reviewQueueItem) {
+      const queueRef = adminDb.collection('ai_review_queue').doc();
+      reviewQueueId = queueRef.id;
+      await queueRef.set({ id: queueRef.id, ...reviewQueueItem });
+    }
+
+    await recordAuditEvent(req, {
+      category: 'ai',
+      action: reviewQueueItem ? 'ai.action_logged_requires_review' : 'ai.action_logged_advisory',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'ai_action_log', id: actionLogRef.id, projectId },
+      metadata: { actionKind: actionLog.actionKind, status: actionLog.status, confidence: actionLog.confidence, reviewQueueId, flags: actionLog.flags || [] },
+    });
+
+    res.status(201).json({ actionLog: { id: actionLogRef.id, ...actionLog }, reviewQueueItem: reviewQueueItem ? { id: reviewQueueId, ...reviewQueueItem } : null });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+router.post("/admin/ai-review/:itemId/resolve", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.isAdmin) return res.status(403).json({ error: 'Only admins can resolve AI review queue items' });
+
+    const { itemId } = req.params;
+    const decision = sanitizeCoordinationString(req.body.decision, 40);
+    if (!['resolved', 'dismissed', 'rejected'].includes(decision)) return res.status(400).json({ error: 'decision must be resolved, dismissed, or rejected' });
+    const reason = sanitizeCoordinationString(req.body.reason, 1000);
+    if (!reason) return res.status(400).json({ error: 'reason is required' });
+
+    const queueRef = adminDb.collection('ai_review_queue').doc(itemId);
+    const queueSnap = await queueRef.get();
+    if (!queueSnap.exists) return res.status(404).json({ error: 'AI review queue item not found' });
+    const queueItem = queueSnap.data() as Record<string, any>;
+    if (queueItem.status !== 'open') return res.status(409).json({ error: 'AI review queue item is already resolved' });
+
+    const now = new Date().toISOString();
+    let humanSignOffRecord: Record<string, unknown> | null = null;
+    if (req.body.humanSignOff) {
+      const signOff = req.body.humanSignOff && typeof req.body.humanSignOff === 'object' ? req.body.humanSignOff as Record<string, unknown> : {};
+      const signOffTarget = signOff.target && typeof signOff.target === 'object' ? signOff.target as Record<string, unknown> : {};
+      const signOffInput: HumanSignOffInput = {
+        domain: sanitizeCoordinationString(signOff.domain, 80) as HumanSignOffInput['domain'],
+        actorUid: authContext.uid,
+        actorRole: String(authContext.role || ''),
+        actorVerificationStatus: authContext.isAdmin ? undefined : sanitizeCoordinationString(signOff.actorVerificationStatus, 80) || undefined,
+        target: {
+          type: sanitizeCoordinationString(signOffTarget.type || queueItem.target?.type, 120),
+          id: sanitizeCoordinationString(signOffTarget.id || queueItem.target?.id, 160),
+          projectId: sanitizeCoordinationString(signOffTarget.projectId || queueItem.projectId, 160) || undefined,
+        },
+        declaration: sanitizeCoordinationString(signOff.declaration, 2000),
+        aiActionLogIds: queueItem.actionLogId ? [queueItem.actionLogId] : [],
+        createdAt: now,
+      };
+      humanSignOffRecord = buildHumanSignOffRecord(signOffInput) as unknown as Record<string, unknown>;
+      await adminDb.collection('human_signoffs').add(humanSignOffRecord);
+    }
+
+    const update = {
+      status: decision === 'dismissed' ? 'dismissed' : 'resolved',
+      decision,
+      resolutionReason: reason,
+      resolvedBy: authContext.uid,
+      resolvedAt: now,
+      humanSignOffRecorded: humanSignOffRecord !== null,
+      updatedAt: now,
+    };
+    await queueRef.set(update, { merge: true });
+
+    if (queueItem.actionLogId) {
+      await adminDb.collection('ai_action_logs').doc(queueItem.actionLogId).set({
+        status: decision === 'rejected' ? 'rejected' : humanSignOffRecord ? 'human_confirmed' : 'advisory',
+        reviewedBy: authContext.uid,
+        reviewedAt: now,
+        reviewDecision: decision,
+        reviewReason: reason,
+      }, { merge: true });
+    }
+
+    await recordAuditEvent(req, {
+      category: humanSignOffRecord ? 'approval' : 'ai',
+      action: humanSignOffRecord ? 'ai.review_resolved_with_human_signoff' : 'ai.review_resolved',
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: 'ai_review_queue', id: itemId, projectId: queueItem.projectId },
+      metadata: { decision, actionLogId: queueItem.actionLogId || null, humanSignOffRecorded: humanSignOffRecord !== null },
+      reason,
+    });
+
+    res.json({ item: { id: itemId, ...queueItem, ...update }, humanSignOff: humanSignOffRecord });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
   }
 });
 
