@@ -20,7 +20,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { UserProfile, UserRole, Job, JobCategory } from './types';
+import { UserProfile, UserRole, Job, JobCategory, KnowledgeCitation } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
 import { Badge } from './components/ui/badge';
@@ -117,6 +117,31 @@ const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceM
 const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
 const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
 const MunicipalTracker = lazyWithChunkRetry(() => import('./components/MunicipalTracker'));
+const KnowledgeSources = lazyWithChunkRetry(() => import('./components/KnowledgeSources').then((module) => ({ default: module.KnowledgeSources })));
+
+const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
+  {
+    knowledgeId: 'dashboard-alignment-ai-copilot',
+    title: 'AI Co-Pilot canonical page requirement',
+    content: 'Contextual AI explanations, routing, reminders, preparation, and approval prompts should be exposed as a first-class shared dashboard page.',
+    source: 'documentation',
+    tags: ['AI Co-Pilot', 'dashboard alignment', 'governance'],
+  },
+  {
+    knowledgeId: 'dashboard-alignment-resource-centre',
+    title: 'Resource Centre / Checklists canonical page requirement',
+    content: 'Design-team and freelancer users need a Resource Centre / Checklists page for reusable checklists, templates, reference documents, and project resources.',
+    source: 'documentation',
+    tags: ['Resource Centre', 'checklists', 'templates'],
+  },
+  {
+    knowledgeId: 'ai-governance-human-signoff',
+    title: 'Human sign-off governance note',
+    content: 'AI-generated project support remains advisory and should be reviewed by accountable users before approvals, submissions, or downstream actions.',
+    source: 'documentation',
+    tags: ['human review', 'AI governance', 'auditability'],
+  },
+];
 
 type DashboardPage = {
   id: string;
@@ -859,6 +884,16 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
       {(pageId === 'payments' || pageId === 'invoicing') && <InvoiceManagement user={user} />}
       {(pageId === 'toolbox' || pageId === 'drawing-checker' || pageId === 'freelancer-submissions') && <FileManager user={user} />}
       {pageId === 'municipal-tracker' && <MunicipalTracker user={user} />}
+      {(pageId === 'ai' || pageId === 'resource-centre') && (
+        <KnowledgeSources
+          citations={DASHBOARD_ALIGNMENT_CITATIONS.filter((citation) => (
+            pageId === 'ai'
+              ? citation.tags.some((tag) => tag.includes('AI') || tag.includes('governance'))
+              : citation.tags.some((tag) => tag.includes('Resource Centre') || tag.includes('checklists') || tag.includes('templates'))
+          ))}
+          className="rounded-2xl"
+        />
+      )}
     </div>
   );
 }
