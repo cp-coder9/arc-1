@@ -1,16 +1,47 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, CACHE_SIZE_UNLIMITED, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  CACHE_SIZE_UNLIMITED,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  memoryLocalCache,
+} from 'firebase/firestore';
 import { getAnalytics, isSupported, logEvent, type Analytics } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    cacheSizeBytes: CACHE_SIZE_UNLIMITED,
-    tabManager: persistentMultipleTabManager(),
-  }),
-}, firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)' ? firebaseConfig.firestoreDatabaseId : undefined);
+const firestoreDatabaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId
+  : undefined;
+
+function canUsePersistentFirestoreCache() {
+  return typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
+}
+
+function initializeArchitexFirestore() {
+  try {
+    return initializeFirestore(app, {
+      localCache: canUsePersistentFirestoreCache()
+        ? persistentLocalCache({
+            cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+            tabManager: persistentMultipleTabManager(),
+          })
+        : memoryLocalCache(),
+    }, firestoreDatabaseId);
+  } catch (error) {
+    console.warn('Persistent Firestore cache unavailable; falling back to memory cache.', error);
+    try {
+      return initializeFirestore(app, { localCache: memoryLocalCache() }, firestoreDatabaseId);
+    } catch (fallbackError) {
+      console.warn('Firestore memory-cache initialization fallback failed; using existing Firestore instance.', fallbackError);
+      return getFirestore(app, firestoreDatabaseId);
+    }
+  }
+}
+
+export const db = initializeArchitexFirestore();
 export const auth = getAuth(app);
 
 const measurementId = firebaseConfig.measurementId?.trim();
