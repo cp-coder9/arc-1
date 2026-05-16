@@ -77,6 +77,9 @@ Hosting target: shared hosting with MySQL
 - Freelancer assigned work: routed `freelancer-work` to the existing production `FreelancerDashboard`, exposing live assigned job cards, task status updates, and project chat instead of the generic shell. Validation passed: `npm run lint`, dashboard registry static tests (28 tests), and `npm run build`.
 - Resource sharing: added `ResourceSharingPage` for `resource-sharing`, backed by live `resource_listings`, `resource_bookings`, and `resource_usage_logs`, using the production `resourceBookingService` for conflict audits and usage billing ledger entries. Booking confirmation, usage logging, and payment release remain human-governed. Validation passed: `npm run lint`, dashboard/resource booking tests (38 tests), and `npm run build`.
 
+- Final validation after latest workflow conversions: full `npm test` completed successfully with Vitest exit 0. Expected stderr/stdout appears from negative-path service tests.
+- Final deployment artifact refreshed: `npm run deploy:bundle` completed successfully after building 3044 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD Assessment UI remains blocked from direct browser integration because `src/services/cpdService.ts` currently imports Node `crypto`. A production CPD page should call a server/API wrapper or refactor certificate hashing to a browser-safe Web Crypto abstraction before exposing attempts/certificates in React.
