@@ -95,6 +95,9 @@ Hosting target: shared hosting with MySQL
 - Browser OS testing found a Chromium sidebar harness failure on Municipal Status because Vite fallback HTML was parsed as JSON by municipal API calls. Patched `MunicipalTracker` to only parse JSON responses when the content type is JSON and to treat unavailable API endpoints as a non-console-error empty state. Validation passed: `npm run lint`, dashboard registry static tests (33 tests), and `npm run build`.
 - Deployment artifact refreshed after registry cleanup: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz`.
 
+- Browser OS validation after MunicipalTracker guard: `PLAYWRIGHT_HTML_OPEN=never npx playwright test --project=chromium e2e/sidebar-harness.spec.ts --reporter=line` completed successfully with 5/5 Chromium sidebar harness checks passing.
+- Final deployment artifact refreshed after MunicipalTracker guard and browser validation: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.
