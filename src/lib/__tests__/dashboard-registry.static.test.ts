@@ -133,6 +133,13 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`activeTab !== 'technical-brief'`);
   });
 
+  it('routes directory search to the production directory workflow', () => {
+    expect(appSource).toContain("const DirectorySearch = lazyWithChunkRetry(() => import('./components/DirectorySearch'));"
+    );
+    expect(appSource).toContain(`activeTab === 'directory-search' && <DirectorySearch user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'directory-search'`);
+  });
+
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
     expect(appSource).toContain('Unsafe payment, escrow, signature, provider, and approval decisions');
     expect(appSource).toContain('human confirmation before anything is submitted');
