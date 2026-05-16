@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileText, Landmark, ListChecks, Loader2, WalletCards } from 'lucide-react';
 import { db } from '../lib/firebase';
 import type { Job, Project, UserProfile } from '../types';
@@ -14,44 +14,59 @@ type ProjectCommandCentreProps = {
 
 type CommandJob = Job & { project?: Project };
 
-type LoadState = 'loading' | 'ready' | 'error';
+type LoadState = 'loading' | 'ready';
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
+
+const canListProjectsByRole = (user: UserProfile) => ['client', 'architect', 'bep', 'admin'].includes(user.role);
+
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
 
 function jobQueryForUser(user: UserProfile) {
   const jobs = collection(db, 'jobs');
 
   if (user.role === 'client') {
-    return query(jobs, where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
+    return query(jobs, where('clientId', '==', user.uid), limit(25));
   }
 
   if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') {
-    return query(jobs, where('selectedArchitectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
+    return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
   }
 
   if (user.role === 'admin') {
-    return query(jobs, orderBy('createdAt', 'desc'), limit(15));
+    return query(jobs, limit(25));
   }
 
-  return query(jobs, where('status', 'in', ['open', 'in-progress']), orderBy('createdAt', 'desc'), limit(10));
+  return query(jobs, where('status', '==', 'open'), limit(25));
 }
 
 function projectQueryForUser(user: UserProfile) {
   const projects = collection(db, 'projects');
 
   if (user.role === 'client') {
-    return query(projects, where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
+    return query(projects, where('clientId', '==', user.uid), limit(25));
   }
 
   if (user.role === 'architect' || user.role === 'bep') {
-    return query(projects, where('leadArchitectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
+    return query(projects, where('leadArchitectId', '==', user.uid), limit(25));
   }
 
   if (user.role === 'admin') {
-    return query(projects, orderBy('createdAt', 'desc'), limit(15));
+    return query(projects, limit(25));
   }
 
-  return query(projects, orderBy('updatedAt', 'desc'), limit(15));
+  return null;
 }
 
 function resolveNextAction(user: UserProfile, activeJob?: CommandJob) {
@@ -96,22 +111,25 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   useEffect(() => {
     setState('loading');
     const unsubscribeJobs = onSnapshot(jobQueryForUser(user), (snapshot) => {
-      setJobs(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CommandJob)));
+      setJobs(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CommandJob))));
       setState('ready');
     }, (error) => {
-      console.error('Command centre job projection failed:', error);
-      setState('error');
+      console.warn('Command centre job projection unavailable; continuing without job context:', error);
+      setJobs([]);
+      setState('ready');
     });
 
-    const unsubscribeProjects = onSnapshot(projectQueryForUser(user), (snapshot) => {
-      setProjects(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project)));
+    const projectQuery = projectQueryForUser(user);
+    const unsubscribeProjects = projectQuery && canListProjectsByRole(user) ? onSnapshot(projectQuery, (snapshot) => {
+      setProjects(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project))));
     }, (error) => {
-      console.error('Command centre project projection failed:', error);
-    });
+      console.warn('Command centre project projection unavailable; continuing without project context:', error);
+      setProjects([]);
+    }) : null;
 
     return () => {
       unsubscribeJobs();
-      unsubscribeProjects();
+      unsubscribeProjects?.();
     };
   }, [user]);
 
@@ -139,7 +157,6 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
         </CardHeader>
         <CardContent className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
           {state === 'loading' && <div className="lg:col-span-3 flex items-center gap-3 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project state...</div>}
-          {state === 'error' && <div className="lg:col-span-3 text-destructive">Unable to load command-centre projection. Check Firestore rules and indexes for this role.</div>}
           <div className="lg:col-span-2 rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
             <div className="flex items-center gap-3">
               <ListChecks className="h-5 w-5 text-primary" />

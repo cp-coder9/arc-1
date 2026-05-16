@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 
 const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
 const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8');
+const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
+const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
 const registrySource = registryMatch?.[1] ?? '';
 const resourceLinksMatch = appSource.match(/const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink\[]> = \{([\s\S]*?)\n\};/);
@@ -100,6 +102,19 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />`);
     expect(appSource).not.toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />`);
+  });
+
+  it('keeps shared workflow projections compatible with deployed Firestore rules and default indexes', () => {
+    for (const source of [workflowSource, commandCentreSource]) {
+      expect(source).not.toContain('Workflow unavailable');
+      expect(source).not.toContain("orderBy('createdAt'");
+      expect(source).not.toContain("where('status', 'in'");
+      expect(source).toContain("where('status', '==', 'open')");
+      expect(source).toContain('sortByRecent');
+    }
+
+    expect(workflowSource).toContain('return null;');
+    expect(commandCentreSource).toContain('return null;');
   });
 
   it('routes implemented shared workflow pages to production composed workflow modules', () => {

@@ -49,6 +49,8 @@ Hosting target: shared hosting with MySQL
 - Continuing scoped implementation with remaining shell-to-production workflow conversions.
 
 ## Validation notes
+
+- Login workflow hotfix: removed `Workflow unavailable` failure path from shared workflow/command projections by replacing composite-index-dependent `where + orderBy` reads and broad project reads with Firestore rules-safe/default-index-safe queries plus client-side recent sorting. Validation passed: `npm run lint`, dashboard registry static tests (34 tests), `npm run build`, Chromium sidebar harness (5 passed), direct `api-router.security` rerun (62 passed), and clean FTP staging asset scan. Full `npm test` hit the known suite-level `api-router.security` timeout once, while the direct file rerun passed.
 - Full unit suite `npm test`: 53 test files passed, 396/396 tests passed after prioritizing `sameOriginGuard` before `apiLimiter` for cross-origin state-changing requests.
 - Targeted e2e `npm run test:e2e -- e2e/auth.spec.ts e2e/sidebar-harness.spec.ts`: 8 passed before host dependency failures for WebKit/Mobile Safari (`libgtk-4.so.1`, `libgraphene-1.0.so.0`, etc.) and Playwright report server timeout. Not treated as product pass.
 - Contractor bid flow: connected `ContractorDashboard` Prepare Bid to the real `BidSubmission` component and `tenderService.submitBid`, with attachment upload support via existing upload service. Validation passed: `npm run lint && npm run build`.

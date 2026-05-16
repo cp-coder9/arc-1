@@ -21,3 +21,11 @@ Date: 2026-05-16
 - The uploaded `_backend` bundle is not running as a Node process. It is a protected reference package for server setup.
 - Running the API requires Node process manager support and production env vars on the host.
 - MySQL credentials were stored outside the repo in local config only; no MySQL migration was applied because the current app uses Firebase/Firestore and Vercel Blob.
+
+## 2026-05-16 workflow projection hotfix
+- Fixed role dashboard workflow projections that could show `Workflow unavailable` after login when Firestore rejected composite-index or broad project queries.
+- Shared command/workflow pages now use rule-safe, default-index-safe Firestore reads and client-side recent sorting.
+- Contractor, subcontractor, and supplier workflows no longer attempt broad project list reads that Firestore rules deny; they continue from visible open jobs/packages and show an empty-state if no live records are visible.
+- Validation passed: `npm run lint`, dashboard registry regression tests, direct `api-router.security` rerun, `npm run build`, Chromium sidebar E2E across role harness (5 passed), and clean FTP staging check with no `Workflow unavailable` text in built assets.
+- Full `npm test` was also run: 413/414 tests passed; the single failure was the pre-existing flaky `api-router.security` cross-origin test timeout when run inside the full suite. Direct rerun of that exact test file passed 62/62.
+

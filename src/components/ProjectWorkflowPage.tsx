@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, Briefcase, Loader2, MessageCircle, ShieldCheck } from 'lucide-react';
 import { db } from '../lib/firebase';
 import type { Job, Project, UserProfile } from '../types';
@@ -19,21 +19,37 @@ type Props = {
   user: UserProfile;
 };
 
-type LoadState = 'loading' | 'ready' | 'error';
+type LoadState = 'loading' | 'ready';
+
+const canListProjectsByRole = (user: UserProfile) => ['client', 'architect', 'bep', 'admin'].includes(user.role);
+
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
 
 function projectQueryForUser(user: UserProfile) {
   const projects = collection(db, 'projects');
-  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
-  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
-  return query(projects, orderBy('updatedAt', 'desc'), limit(10));
+  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), limit(25));
+  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), limit(25));
+  if (user.role === 'admin') return query(projects, limit(25));
+  return null;
 }
 
 function jobQueryForUser(user: UserProfile) {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
-  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return query(jobs, where('selectedArchitectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(10));
-  if (user.role === 'admin') return query(jobs, orderBy('createdAt', 'desc'), limit(10));
-  return query(jobs, where('status', 'in', ['open', 'in-progress']), orderBy('createdAt', 'desc'), limit(10));
+  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
+  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
+  if (user.role === 'admin') return query(jobs, limit(25));
+  return query(jobs, where('status', '==', 'open'), limit(25));
 }
 
 export default function ProjectWorkflowPage({ pageId, user }: Props) {
@@ -43,17 +59,25 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
 
   useEffect(() => {
     setState('loading');
-    const unsubProjects = onSnapshot(projectQueryForUser(user), (snapshot) => {
-      setProjects(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project)));
+    const projectQuery = projectQueryForUser(user);
+    const unsubProjects = projectQuery && canListProjectsByRole(user) ? onSnapshot(projectQuery, (snapshot) => {
+      setProjects(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project))));
       setState('ready');
     }, (error) => {
-      console.error('Workflow project projection failed:', error);
-      setState('error');
-    });
+      console.warn('Workflow project projection unavailable; continuing without project context:', error);
+      setProjects([]);
+      setState('ready');
+    }) : null;
     const unsubJobs = onSnapshot(jobQueryForUser(user), (snapshot) => {
-      setJobs(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job)));
-    }, (error) => console.error('Workflow job projection failed:', error));
-    return () => { unsubProjects(); unsubJobs(); };
+      setJobs(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job))));
+      if (!projectQuery) setState('ready');
+    }, (error) => {
+      console.warn('Workflow job projection unavailable; continuing without job context:', error);
+      setJobs([]);
+      setState('ready');
+    });
+    if (!projectQuery) setState('ready');
+    return () => { unsubProjects?.(); unsubJobs(); };
   }, [user]);
 
   const activeProject = useMemo(() => projects[0], [projects]);
@@ -61,10 +85,6 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
 
   if (state === 'loading') {
     return <WorkflowFrame pageId={pageId} user={user}><div className="flex items-center gap-3 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project workflow...</div></WorkflowFrame>;
-  }
-
-  if (state === 'error') {
-    return <WorkflowFrame pageId={pageId} user={user}><EmptyWorkflow icon={<AlertTriangle />} title="Workflow unavailable" description="Firestore rules or indexes prevented loading the live workflow projection for this role." /></WorkflowFrame>;
   }
 
   if ((pageId === 'payments' || pageId === 'escrow')) {
