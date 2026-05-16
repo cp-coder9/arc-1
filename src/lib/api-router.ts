@@ -80,7 +80,6 @@ const apiLimiter = rateLimit({
 });
 
 const router = express.Router();
-router.use(apiLimiter);
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -107,6 +106,7 @@ function sameOriginGuard(req: express.Request, res: express.Response, next: expr
 }
 
 router.use(sameOriginGuard);
+router.use(apiLimiter);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ALLOWED_BLOB_HOSTS = ["public.blob.vercel-storage.com"];

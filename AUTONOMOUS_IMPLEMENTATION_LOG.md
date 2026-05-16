@@ -49,7 +49,7 @@ Hosting target: shared hosting with MySQL
 - Preparing next scoped feature slice from agent audits.
 
 ## Validation notes
-- Full unit suite `npm test`: 392/393 tests passed; one existing `src/lib/__tests__/api-router.security.test.ts` test timed out at 5s (`blocks cross-origin state-changing requests before route handlers run`). Targeted tests around current implementation pass.
+- Full unit suite `npm test`: 53 test files passed, 396/396 tests passed after prioritizing `sameOriginGuard` before `apiLimiter` for cross-origin state-changing requests.
 - Targeted e2e `npm run test:e2e -- e2e/auth.spec.ts e2e/sidebar-harness.spec.ts`: 8 passed before host dependency failures for WebKit/Mobile Safari (`libgtk-4.so.1`, `libgraphene-1.0.so.0`, etc.) and Playwright report server timeout. Not treated as product pass.
 - Contractor bid flow: connected `ContractorDashboard` Prepare Bid to the real `BidSubmission` component and `tenderService.submitBid`, with attachment upload support via existing upload service. Validation passed: `npm run lint && npm run build`.
 - Deployment prep: added `.env.production.example`, `scripts/predeploy-check.mjs`, and `npm run predeploy:check`. Validation passed: `npm run lint && npm run predeploy:check`.
@@ -57,6 +57,7 @@ Hosting target: shared hosting with MySQL
 - Upload bundle: added `npm run deploy:bundle` and generated `release/architex-co-za-upload-bundle.tgz` (1.5 MB) after successful build and predeploy checks.
 - BEP technical brief: added `TechnicalBriefEditor` for `technical-brief`, loading published `marketplace_opportunities`, writing `technical_briefs`, adding advisory interpretation records under `project_briefs/{briefId}/interpretations`, and marking opportunity technical brief status. Validation passed: `npm run lint`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/briefWorkflowService.test.ts` (21 tests), and `npm run build`.
 - Directory search: added `DirectorySearch` for `directory-search`, querying real `directoryProfiles`, filtering by role/region/free text, and writing human-review `directoryInvitations` for proposal/package/supplier/team invite flows. Validation passed: `npm run lint`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/roleProfileService.test.ts` (18 tests), and `npm run build`.
+- API security: moved `sameOriginGuard` before `apiLimiter` so cross-origin state-changing requests are rejected before route handlers and rate-limit side effects. Validation passed: targeted security test and full `npm run lint && npm test`.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
