@@ -46,7 +46,7 @@ Hosting target: shared hosting with MySQL
 - Validation passed after guided brief routing: `npm run build`.
 
 ## In progress
-- Preparing next scoped feature slice from agent audits.
+- Continuing scoped implementation with remaining shell-to-production workflow conversions.
 
 ## Validation notes
 - Full unit suite `npm test`: 53 test files passed, 396/396 tests passed after prioritizing `sameOriginGuard` before `apiLimiter` for cross-origin state-changing requests.
@@ -58,6 +58,7 @@ Hosting target: shared hosting with MySQL
 - BEP technical brief: added `TechnicalBriefEditor` for `technical-brief`, loading published `marketplace_opportunities`, writing `technical_briefs`, adding advisory interpretation records under `project_briefs/{briefId}/interpretations`, and marking opportunity technical brief status. Validation passed: `npm run lint`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/briefWorkflowService.test.ts` (21 tests), and `npm run build`.
 - Directory search: added `DirectorySearch` for `directory-search`, querying real `directoryProfiles`, filtering by role/region/free text, and writing human-review `directoryInvitations` for proposal/package/supplier/team invite flows. Validation passed: `npm run lint`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/roleProfileService.test.ts` (18 tests), and `npm run build`.
 - API security: moved `sameOriginGuard` before `apiLimiter` so cross-origin state-changing requests are rejected before route handlers and rate-limit side effects. Validation passed: targeted security test and full `npm run lint && npm test`.
+- Package/procurement workspace: added `PackageProcurementWorkspace` and routed `packages`/`procurement` to it. It subscribes to live `tender_packages`, bids, package procurement commitments, delivery evidence, RFIs, programme tasks, site logs, inspections, and snags; computes readiness through `assessContractorWorkflow`; supports BEP/admin tender creation through `TenderWizard`; and writes human-review procurement request records without issuing orders/payments/contracts automatically. Validation passed: `npm run lint`, targeted dashboard/package/contractor workflow tests (26 tests), and `npm run build`.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.

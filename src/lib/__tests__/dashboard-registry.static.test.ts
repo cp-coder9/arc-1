@@ -109,7 +109,15 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
-    expect(appSource).toContain('REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+  });
+
+  it('routes package and procurement pages to the production package workspace', () => {
+    expect(appSource).toContain("const PackageProcurementWorkspace = lazyWithChunkRetry(() => import('./components/PackageProcurementWorkspace'));"
+    );
+    expect(appSource).toContain(`(activeTab === 'packages' || activeTab === 'procurement') && <PackageProcurementWorkspace user={user} mode={activeTab as 'packages' | 'procurement'} />`);
+    expect(appSource).toContain(`'procurement'`);
+    expect(appSource).toContain(`'packages'`);
   });
 
   it('routes client intake to the production guided brief wizard', () => {

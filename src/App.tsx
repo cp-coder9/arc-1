@@ -124,6 +124,7 @@ const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBr
 const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));
 const TechnicalBriefEditor = lazyWithChunkRetry(() => import('./components/TechnicalBriefEditor'));
 const DirectorySearch = lazyWithChunkRetry(() => import('./components/DirectorySearch'));
+const PackageProcurementWorkspace = lazyWithChunkRetry(() => import('./components/PackageProcurementWorkspace'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -206,7 +207,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
+const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages']);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -854,7 +855,8 @@ export default function App() {
               {activeTab === 'client-proposals' && <ClientProposalComparison user={user} />}
               {activeTab === 'technical-brief' && <TechnicalBriefEditor user={user} />}
               {activeTab === 'directory-search' && <DirectorySearch user={user} />}
-              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {(activeTab === 'packages' || activeTab === 'procurement') && <PackageProcurementWorkspace user={user} mode={activeTab as 'packages' | 'procurement'} />}
+              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && activeTab !== 'technical-brief' && activeTab !== 'directory-search' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
