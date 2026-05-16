@@ -66,6 +66,7 @@ Hosting target: shared hosting with MySQL
 - Admin console routing: routed `admin-console` directly to the production `AdminDashboard` governance console instead of the generic shell. Validation passed: `npm run lint` and dashboard registry static tests (22 tests).
 - Design & compliance: added `DesignCompliancePage` for `design`, reusing production `ResponsibilityMatrix`, `TeamBuilder`, `subscribeToProjectByJobId`, `subscribeToTeam`, and `getDisciplineCoverage` to show live discipline gaps and team invitations. Validation passed: `npm run lint`, dashboard/team tests (28 tests), and `npm run build`.
 - Knowledge route: routed `knowledge` to the production `ResourceCentre` so role users see live `agent_knowledge` and checklist records instead of the generic shell. Validation passed: `npm run lint` and dashboard registry static tests (24 tests).
+- Project toolbox: added `ProjectToolboxPage` for `toolbox`, wrapping the production `FileManager` with role/governance context for traceable files, evidence, and drawing quick scans. Validation passed: `npm run lint` and dashboard/FileManager tests (27 tests).
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.

@@ -109,7 +109,7 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
   });
 
   it('routes package and procurement pages to the production package workspace', () => {
@@ -130,6 +130,13 @@ describe('canonical dashboard page registry', () => {
   it('routes admin console to the production admin governance dashboard', () => {
     expect(appSource).toContain(`activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />`);
     expect(appSource).toContain(`activeTab !== 'admin-console'`);
+  });
+
+  it('routes toolbox to the production project file toolbox', () => {
+    expect(appSource).toContain("const ProjectToolboxPage = lazyWithChunkRetry(() => import('./components/ProjectToolboxPage'));"
+    );
+    expect(appSource).toContain(`activeTab === 'toolbox' && <ProjectToolboxPage user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'toolbox'`);
   });
 
   it('routes knowledge to the production resource/knowledge workflow', () => {

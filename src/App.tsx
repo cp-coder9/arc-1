@@ -130,6 +130,7 @@ const AIDrawingChecker = lazyWithChunkRetry(() => import('./components/AIDrawing
 const TasksApprovalsPage = lazyWithChunkRetry(() => import('./components/TasksApprovalsPage'));
 const ResourceCentre = lazyWithChunkRetry(() => import('./components/ResourceCentre'));
 const DesignCompliancePage = lazyWithChunkRetry(() => import('./components/DesignCompliancePage'));
+const ProjectToolboxPage = lazyWithChunkRetry(() => import('./components/ProjectToolboxPage'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -212,7 +213,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge']);
+const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge', 'toolbox']);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -868,7 +869,8 @@ export default function App() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
-              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {activeTab === 'toolbox' && <ProjectToolboxPage user={user} />}
+              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && activeTab !== 'technical-brief' && activeTab !== 'directory-search' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
