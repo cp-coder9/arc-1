@@ -109,7 +109,7 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'admin-console' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
   });
 
   it('routes package and procurement pages to the production package workspace', () => {
@@ -118,6 +118,11 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`(activeTab === 'packages' || activeTab === 'procurement') && <PackageProcurementWorkspace user={user} mode={activeTab as 'packages' | 'procurement'} />`);
     expect(appSource).toContain(`'procurement'`);
     expect(appSource).toContain(`'packages'`);
+  });
+
+  it('routes admin console to the production admin governance dashboard', () => {
+    expect(appSource).toContain(`activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />`);
+    expect(appSource).toContain(`activeTab !== 'admin-console'`);
   });
 
   it('routes resource centre to the production resource/checklist workflow', () => {
