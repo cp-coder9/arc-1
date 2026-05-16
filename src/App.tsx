@@ -19,8 +19,8 @@ import {
   browserLocalPersistence,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { UserProfile, UserRole, Job, JobCategory, KnowledgeCitation } from './types';
+import { doc, getDoc } from 'firebase/firestore';
+import { UserProfile, UserRole, KnowledgeCitation } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
 import { Badge } from './components/ui/badge';
@@ -571,7 +571,7 @@ export default function App() {
                 {authMode === 'selection' ? 'Join Architex' : authMode === 'email-login' ? 'Welcome Back' : 'Create your account'}
               </CardTitle>
               <CardDescription className="text-base mt-2">
-                {authMode === 'selection' ? 'Select your role to access the marketplace' : 'Enter your details to continue'}
+                {authMode === 'selection' ? 'Select your role to access your workspace' : 'Enter your details to continue'}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 sm:p-10">
@@ -1271,311 +1271,284 @@ function NavItem({ icon, label, active, onClick, ...props }: any) {
 function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLogin: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [landingTab, setLandingTab] = useState<'home' | 'resources'>('home');
-  const [liveJobs, setLiveJobs] = useState<Job[]>([]);
   const prefersReducedMotion = useReducedMotion();
-  const fadeUp = prefersReducedMotion ? {} : { opacity: 0, y: 24 };
-  const visible = { opacity: 1, y: 0 };
 
   const goToTab = (tab: 'home' | 'resources') => {
     setLandingTab(tab);
     setIsMobileMenuOpen(false);
   };
 
-  useEffect(() => {
-    const q = query(
-      collection(db, 'jobs'),
-      where('status', '==', 'open'),
-      orderBy('createdAt', 'desc'),
-      limit(3)
-    );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLiveJobs(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job)));
-    }, (error) => {
-      console.error('Error loading live marketplace preview:', error);
-      setLiveJobs([]);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const navItems = [
+    { label: 'Signal', tab: 'home' as const },
+    { label: 'Resources', tab: 'resources' as const },
+  ];
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden relative text-foreground">
-      <AnimatedFloorPlan />
-      <nav className="h-20 sm:h-24 lg:h-28 border-b border-border px-4 sm:px-8 lg:px-20 flex items-center justify-between sticky top-0 bg-card/95 backdrop-blur-md z-50 shadow-sm">
-        <Logo showText iconClassName="w-16 h-16 sm:w-20 sm:h-20 lg:w-28 lg:h-28 object-contain" textClassName="font-heading font-bold text-2xl sm:text-3xl lg:text-5xl tracking-tighter text-foreground" />
-        <div className="hidden lg:flex items-center gap-6">
-          <button onClick={() => goToTab('home')} className={`text-sm font-bold underline-offset-4 hover:underline ${landingTab === 'home' ? 'text-primary' : 'text-foreground/80 hover:text-primary'}`}>Home</button>
-          <button onClick={() => goToTab('resources')} className={`text-sm font-bold underline-offset-4 hover:underline ${landingTab === 'resources' ? 'text-primary' : 'text-foreground/80 hover:text-primary'}`}>Resources</button>
-          <button onClick={onGetStarted} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
-          <button onClick={onLogin} className="text-sm font-bold text-foreground/80 hover:text-primary underline-offset-4 hover:underline">Login</button>
-          <Button onClick={onGetStarted} className="bg-primary text-primary-foreground px-6 rounded-full font-bold">Get Started</Button>
-        </div>
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</Button>
-        {isMobileMenuOpen && (
-          <div className="absolute top-20 left-3 right-3 bg-card border border-border rounded-[1.5rem] shadow-2xl p-5 sm:p-8 flex flex-col gap-5 sm:gap-6 lg:hidden">
-            <button onClick={() => goToTab('home')} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Home</button>
-            <button onClick={() => goToTab('resources')} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Resources</button>
-            <button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Marketplace</button>
-            <button onClick={() => { onLogin(); setIsMobileMenuOpen(false); }} className="text-lg font-bold hover:text-primary underline-offset-4 hover:underline">Login</button>
-            <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="bg-primary text-primary-foreground h-14 rounded-full font-bold">Get Started</Button>
+    <div className="min-h-screen overflow-x-hidden bg-[#04302c] text-[#F8FAFC] selection:bg-[#0f6b62] selection:text-[#04302c]">
+      <div aria-hidden="true" className="fixed inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(15,107,98,0.22),transparent_28%),radial-gradient(circle_at_82%_8%,rgba(120,166,154,0.18),transparent_25%),linear-gradient(180deg,#04302c_0%,#0f6b62_48%,#F8FAFC_48%,#F8FAFC_100%)]" />
+        <div className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(rgba(247,242,232,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(247,242,232,0.55)_1px,transparent_1px)] bg-[size:44px_44px]" />
+        {!prefersReducedMotion && (
+          <motion.div
+            className="absolute left-1/2 top-20 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full border border-[#0f6b62]/20"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 48, repeat: Infinity, ease: 'linear' }}
+          />
+        )}
+      </div>
+
+      <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#04302c]/80 px-4 py-4 backdrop-blur-2xl sm:px-8 lg:px-16">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+          <button onClick={() => goToTab('home')} className="group flex items-center gap-3 text-left" aria-label="Architex home">
+            <Logo iconClassName="h-12 w-12 text-[#0f6b62]" textClassName="hidden" />
+            <div>
+              <p className="font-heading text-xl font-black tracking-[-0.04em] text-[#F8FAFC]">Architex</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#F8FAFC]/45">built environment OS</p>
+            </div>
+          </button>
+
+          <div className="hidden items-center gap-2 lg:flex">
+            {navItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => goToTab(item.tab)}
+                className={`rounded-full px-5 py-2 text-sm font-bold transition-colors ${landingTab === item.tab ? 'bg-[#F8FAFC] text-[#04302c]' : 'text-[#F8FAFC]/70 hover:bg-white/10 hover:text-[#F8FAFC]'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+            <button onClick={onLogin} className="rounded-full px-5 py-2 text-sm font-bold text-[#F8FAFC]/70 transition-colors hover:bg-white/10 hover:text-[#F8FAFC]">Login</button>
+            <Button onClick={onGetStarted} className="ml-2 rounded-full bg-[#F8FAFC] px-6 font-black text-[#04302c] shadow-[0_0_30px_rgba(248,250,252,0.22)] hover:bg-white">
+              Join the network
+            </Button>
           </div>
+
+          <Button variant="ghost" size="icon" className="text-[#F8FAFC] hover:bg-white/10 hover:text-[#F8FAFC] lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle navigation menu" aria-expanded={isMobileMenuOpen}>
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </Button>
+        </div>
+        {isMobileMenuOpen && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-4 flex max-w-7xl flex-col gap-3 rounded-[2rem] border border-white/10 bg-[#04302c]/95 p-4 shadow-2xl lg:hidden">
+            {navItems.map((item) => <button key={item.label} onClick={() => goToTab(item.tab)} className="rounded-2xl px-4 py-3 text-left font-bold hover:bg-white/10">{item.label}</button>)}
+            <button onClick={() => { onLogin(); setIsMobileMenuOpen(false); }} className="rounded-2xl px-4 py-3 text-left font-bold hover:bg-white/10">Login</button>
+            <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="h-12 rounded-2xl bg-[#F8FAFC] font-black text-[#04302c] hover:bg-white">Join the network</Button>
+          </motion.div>
         )}
       </nav>
 
       <AnimatePresence mode="wait">
         {landingTab === 'resources' ? (
-          <motion.div
-            key="resources"
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -18 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-          >
+          <motion.div key="resources" initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} transition={{ duration: 0.35 }}>
             <ResourcesLanding onGetStarted={onGetStarted} />
           </motion.div>
         ) : (
-          <motion.div
-            key="home"
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -18 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-          >
-
-      {/* Hero Section */}
-      <section className="pt-16 sm:pt-24 lg:pt-32 pb-14 sm:pb-20 px-4 sm:px-6 lg:px-20 relative z-10 overflow-hidden bg-card">
-        <div className="max-w-7xl mx-auto min-h-[auto] lg:min-h-[680px] relative">
-          <motion.div
-            initial={fadeUp}
-            animate={visible}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-            className="pb-16 relative z-20 max-w-4xl"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              viewport={{ once: true }}
-            >
-              <Badge className="bg-primary/10 text-primary border-primary/20 mb-6 sm:mb-8 px-3 sm:px-4 py-1 text-[10px] sm:text-xs uppercase tracking-widest">Smarter projects. Stronger built environments.</Badge>
-            </motion.div>
-            <div className="space-y-2 sm:space-y-3 mb-8 sm:mb-10">
-              {[
-                { word: 'Discover', icon: <Search size={42} /> },
-                { word: 'Verify', icon: <ShieldCheck size={42} /> },
-                { word: 'Collaborate', icon: <Users size={42} /> }
-              ].map((item, index) => (
-                <motion.div
-                  key={item.word}
-                  initial={{ opacity: 0, x: -40 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.15 }}
-                  viewport={{ once: true }}
-                  className="hero-word-row flex items-center gap-3 sm:gap-5 border-b border-border pb-3 last:border-b-0 overflow-visible"
-                >
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className="h-12 w-12 sm:h-16 sm:w-16 lg:h-20 lg:w-20 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/20 [&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-8 sm:[&>svg]:w-8 lg:[&>svg]:h-[42px] lg:[&>svg]:w-[42px]"
-                  >
-                    {item.icon}
+          <motion.main key="home" initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} transition={{ duration: 0.35 }} className="relative z-10">
+            <section className="px-4 pb-16 pt-10 sm:px-8 sm:pb-24 sm:pt-16 lg:px-16">
+              <div className="mx-auto grid max-w-7xl items-center gap-12 lg:min-h-[calc(100vh-96px)] lg:grid-cols-[1.04fr_0.96fr]">
+                <div>
+                  <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-[#F8FAFC]/70 backdrop-blur">
+                    <span className="h-2 w-2 rounded-full bg-[#0f6b62] shadow-[0_0_18px_#0f6b62]" />
+                    South Africa's project coordination layer
                   </motion.div>
-                  <h1 className={`relative text-4xl min-[380px]:text-5xl md:text-7xl lg:text-8xl font-heading font-black leading-none tracking-[-0.07em] drop-shadow-sm break-words ${item.word === 'Collaborate' ? 'text-primary' : 'text-foreground'}`}>
-                    <span className="relative z-10">{item.word}</span>
-                  </h1>
-                </motion.div>
-              ))}
-            </div>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: true }}
-              className="text-base sm:text-xl lg:text-2xl text-muted-foreground mb-8 sm:mb-10 max-w-2xl leading-relaxed font-medium"
-            >
-              Architex connects clients with elite professionals and contractors through an AI-powered marketplace for the built environment. Providing tailored management and resource sharing tools to deliver projects end-to-end.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.45 }}
-              viewport={{ once: true }}
-              className="flex flex-wrap gap-3 sm:gap-4"
-            >
-              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground h-14 sm:h-16 px-8 sm:px-10 rounded-full text-base sm:text-lg font-bold shadow-xl hover:bg-primary-dark transition-colors">Post a Job <ArrowRight className="ml-2" /></Button>
-              <Button onClick={onGetStarted} variant="outline" size="lg" className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-full text-base sm:text-lg font-bold bg-card text-foreground border-border hover:bg-accent transition-colors">Browse Talent</Button>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+                  <motion.h1 initial={prefersReducedMotion ? false : { opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75, delay: 0.08 }} className="font-heading text-5xl font-black leading-[0.9] tracking-[-0.085em] text-[#F8FAFC] sm:text-7xl lg:text-[7.6rem]">
+                    Where projects stop leaking time.
+                  </motion.h1>
+                  <motion.p initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.22 }} className="mt-8 max-w-2xl text-lg font-medium leading-relaxed text-[#F8FAFC]/68 sm:text-xl">
+                    Architex turns the messy path from brief, team selection, compliance, tenders, site evidence, municipal tracking, payments, and close-out into one governed workspace for clients, architects, BEPs, contractors, suppliers, subcontractors, and freelancers.
+                  </motion.p>
+                  <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.34 }} className="mt-10 flex flex-col gap-3 sm:flex-row">
+                    <Button onClick={onGetStarted} size="lg" className="h-14 rounded-full bg-[#F8FAFC] px-8 text-base font-black text-[#04302c] shadow-[0_22px_70px_rgba(248,250,252,0.24)] hover:bg-white">
+                      Choose your role <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                    <Button onClick={onLogin} size="lg" variant="outline" className="h-14 rounded-full border-white/15 bg-white/5 px-8 text-base font-black text-[#F8FAFC] hover:bg-[#F8FAFC] hover:text-[#04302c]">
+                      Enter workspace
+                    </Button>
+                  </motion.div>
+                  <div className="mt-10 grid grid-cols-3 gap-3 max-w-2xl">
+                    {[
+                      ['7 roles', 'one project truth'],
+                      ['AI + audit', 'human sign-off'],
+                      ['SA ready', 'SACAP & SANS aware'],
+                    ].map(([value, label], index) => <SignalMetric key={value} value={value} label={label} index={index} />)}
+                  </div>
+                </div>
 
-      <ServicesInfographic prefersReducedMotion={Boolean(prefersReducedMotion)} onGetStarted={onGetStarted} />
-
-      {/* Marketplace Preview */}
-      <section className="py-12 bg-secondary px-4 sm:px-8 lg:px-20 relative z-10 border-y border-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 uppercase tracking-widest">Live Marketplace</Badge>
-              <h2 className="text-3xl md:text-5xl font-heading font-black tracking-tight text-foreground">Current open projects</h2>
-              <p className="mt-3 max-w-2xl text-muted-foreground font-medium">Browse live opportunities from clients looking for built-environment professionals.</p>
-            </div>
-            <Button onClick={onGetStarted} variant="outline" className="rounded-full font-bold">View Marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {liveJobs.length === 0 && (
-              <div className="md:col-span-3 rounded-3xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
-                No open marketplace projects are currently published. New client opportunities will appear here once persisted in the marketplace.
+                <ProjectSignal prefersReducedMotion={Boolean(prefersReducedMotion)} />
               </div>
-            )}
-            {liveJobs.map((job) => (
-              <motion.div
-                key={job.id}
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                viewport={{ once: true }}
-                className="rounded-3xl border border-border bg-card p-6 shadow-sm hover:shadow-lg transition-shadow flex flex-col min-h-[260px]"
-              >
-                <div className="flex items-center justify-between gap-3 mb-5">
-                  <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">{job.category || 'Project'}</Badge>
-                  <span className="text-sm font-bold text-primary font-mono">R {(job.budget || 0).toLocaleString()}</span>
-                </div>
-                <h3 className="text-xl font-heading font-black text-foreground mb-3">{job.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-6">{job.description}</p>
-                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-[10px] uppercase font-bold text-muted-foreground">
-                  <span className="flex items-center gap-1"><MapPin size={12} /> {job.location || 'South Africa'}</span>
-                  <span className="flex items-center gap-1"><Clock size={12} /> {job.deadline || 'Open'}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              ['AI-Powered Intelligence', 'SANS 10400 compliance checks for drawings and collaborative design workflows.'],
-              ['Built for the Built Environment', 'Purpose-built tools for every project stage.'],
-              ['Connected Ecosystem', 'Clients, professionals, and contractors working as one.']
-            ].map(([title, copy], idx) => (
-              <motion.div
-                key={title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: idx * 0.1 }}
-                viewport={{ once: true }}
-                className="rounded-3xl border border-border bg-card p-8 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <h2 className="text-lg font-black uppercase tracking-wide mb-3 text-foreground">{title}</h2>
-                <p className="text-muted-foreground leading-relaxed max-w-sm font-medium">{copy}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+            </section>
 
-          </motion.div>
+            <ProfessionOrbit onGetStarted={onGetStarted} />
+            <ProcessRail />
+            <section className="bg-[#04302c] px-4 py-16 text-[#F8FAFC] sm:px-8 lg:px-16">
+              <div className="mx-auto max-w-7xl rounded-[2.4rem] border border-white/10 bg-white/[0.04] p-8 shadow-2xl backdrop-blur md:p-12">
+                <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div>
+                    <p className="mb-4 text-xs font-black uppercase tracking-[0.28em] text-[#0f6b62]">No more fragmented delivery</p>
+                    <h2 className="font-heading text-4xl font-black tracking-[-0.06em] sm:text-6xl">A workspace that remembers every promise.</h2>
+                    <p className="mt-5 max-w-3xl text-lg leading-relaxed text-[#F8FAFC]/65">Every drawing check, appointment, package, site record, invoice, municipal submission, and AI recommendation is designed to sit beside its evidence and approval trail.</p>
+                  </div>
+                  <Button onClick={onGetStarted} className="h-14 rounded-full bg-[#F8FAFC] px-8 font-black text-[#04302c] hover:bg-white">Start with your role</Button>
+                </div>
+              </div>
+            </section>
+          </motion.main>
         )}
       </AnimatePresence>
 
-      <footer className="bg-card py-12 sm:py-16 lg:py-20 px-4 sm:px-8 lg:px-20 border-t border-border relative z-10 text-foreground">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-6 sm:gap-8">
-          <Logo showText iconClassName="w-14 h-14 sm:w-16 sm:h-16 object-contain" textClassName="font-heading font-bold text-xl sm:text-2xl lg:text-3xl" />
-          <p className="text-xs sm:text-sm text-muted-foreground">© 2026 Architex. South Africa's Premier Architectural Marketplace.</p>
+      <footer className="relative z-10 border-t border-[#04302c]/10 bg-[#F8FAFC] px-4 py-10 text-[#04302c] sm:px-8 lg:px-16">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 text-center md:flex-row md:items-center md:justify-between md:text-left">
+          <Logo showText iconClassName="h-12 w-12 text-[#04302c]" textClassName="font-heading text-2xl font-black tracking-[-0.04em]" />
+          <p className="text-sm font-medium text-[#04302c]/60">© 2026 Architex. Minimal interface, governed project intelligence.</p>
         </div>
       </footer>
     </div>
   );
 }
 
-function ServicesInfographic({ prefersReducedMotion, onGetStarted }: { prefersReducedMotion: boolean; onGetStarted: () => void }) {
-  const services = [
-    { title: 'Client Brief', copy: 'Capture scope, budget, site context, and project goals.', icon: <FileText size={22} /> },
-    { title: 'Smart Matching', copy: 'Connect with architects, freelancers, and contractors.', icon: <Network size={22} /> },
-    { title: 'AI Automation', copy: 'Orchestrated agents review drawings, risks, and next actions.', icon: <Bot size={22} /> },
-    { title: 'SANS Compliance', copy: 'Automated checks for walls, fenestration, fire, and area rules.', icon: <ClipboardCheck size={22} /> },
-    { title: 'Resource Sharing', copy: 'Centralise documents, knowledge, files, and project evidence.', icon: <Files size={22} /> },
-    { title: 'Delivery', copy: 'Move from concept to municipal-ready submission workflows.', icon: <Hammer size={22} /> },
+function SignalMetric({ value, label, index }: React.PropsWithChildren<{ value: string; label: string; index: number }>) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay: 0.45 + index * 0.08 }}
+      className="rounded-3xl border border-white/10 bg-white/[0.045] p-4 backdrop-blur"
+    >
+      <p className="font-heading text-2xl font-black tracking-[-0.04em] text-[#F8FAFC]">{value}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-[#F8FAFC]/45">{label}</p>
+    </motion.div>
+  );
+}
+
+function ProjectSignal({ prefersReducedMotion }: { prefersReducedMotion: boolean }) {
+  const nodes = [
+    { label: 'Brief', x: '12%', y: '24%', icon: <FileText size={18} /> },
+    { label: 'Team', x: '72%', y: '14%', icon: <Users size={18} /> },
+    { label: 'SANS', x: '80%', y: '56%', icon: <ShieldCheck size={18} /> },
+    { label: 'Site', x: '18%', y: '70%', icon: <Hammer size={18} /> },
+    { label: 'AI', x: '48%', y: '42%', icon: <Bot size={18} /> },
   ];
 
   return (
-    <section className="py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-20 relative z-10 bg-[linear-gradient(135deg,#021817_0%,#04302c_54%,#0f6b62_100%)] text-primary-foreground overflow-hidden">
-      <div aria-hidden="true" className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,white,transparent_24%),radial-gradient(circle_at_80%_70%,white,transparent_20%)]" />
-      <div className="max-w-7xl mx-auto relative z-10">
-        <div className="mb-10 sm:mb-14 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.18 }} className="relative mx-auto h-[34rem] w-full max-w-[34rem]">
+      <div className="absolute inset-0 rounded-[3rem] border border-white/10 bg-[#F8FAFC]/[0.035] shadow-[0_40px_120px_rgba(0,0,0,0.35)] backdrop-blur-xl" />
+      <div className="absolute inset-5 rounded-[2.4rem] border border-[#0f6b62]/20 bg-[radial-gradient(circle_at_center,rgba(15,107,98,0.14),transparent_55%)]" />
+      <svg className="absolute inset-0 h-full w-full" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path d="M18 28 C38 12 58 14 74 18" stroke="rgba(247,242,232,0.20)" strokeWidth="0.35" fill="none" />
+        <path d="M75 20 C86 34 85 48 82 58" stroke="rgba(247,242,232,0.20)" strokeWidth="0.35" fill="none" />
+        <path d="M80 60 C60 76 40 80 20 72" stroke="rgba(247,242,232,0.20)" strokeWidth="0.35" fill="none" />
+        <path d="M18 70 C8 50 8 38 16 26" stroke="rgba(247,242,232,0.20)" strokeWidth="0.35" fill="none" />
+        {!prefersReducedMotion && <motion.circle r="1.2" fill="#0f6b62" initial={{ offsetDistance: '0%' }} animate={{ offsetDistance: '100%' }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} style={{ offsetPath: 'path("M18 28 C38 12 58 14 74 18 C86 34 85 48 82 58 C60 76 40 80 20 72 C8 50 8 38 16 26")' }} />}
+      </svg>
+      {nodes.map((node, index) => <SignalNode key={node.label} {...node} index={index} prefersReducedMotion={prefersReducedMotion} />)}
+      <div className="absolute left-1/2 top-1/2 w-52 -translate-x-1/2 -translate-y-1/2 rounded-[2rem] border border-white/10 bg-[#04302c]/80 p-5 text-center shadow-2xl backdrop-blur">
+        <Workflow className="mx-auto mb-3 h-8 w-8 text-[#0f6b62]" />
+        <p className="font-heading text-2xl font-black tracking-[-0.05em]">Project signal</p>
+        <p className="mt-2 text-xs font-medium leading-relaxed text-[#F8FAFC]/55">Live roles, evidence, AI checks, approvals, and next actions moving as one.</p>
+      </div>
+    </motion.div>
+  );
+}
+
+function SignalNode({ label, x, y, icon, index, prefersReducedMotion }: React.PropsWithChildren<{ label: string; x: string; y: string; icon: React.ReactNode; index: number; prefersReducedMotion: boolean }>) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.75 }}
+      animate={prefersReducedMotion ? { opacity: 1, scale: 1 } : { opacity: 1, scale: [1, 1.06, 1] }}
+      transition={{ duration: prefersReducedMotion ? 0.4 : 3.2, repeat: prefersReducedMotion ? 0 : Infinity, delay: index * 0.18 }}
+      className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/10 bg-[#F8FAFC] px-3 py-2 text-[#04302c] shadow-xl"
+      style={{ left: x, top: y }}
+    >
+      <span className="rounded-full bg-[#04302c] p-2 text-[#0f6b62]">{icon}</span>
+      <span className="text-xs font-black uppercase tracking-[0.18em]">{label}</span>
+    </motion.div>
+  );
+}
+
+function ProfessionOrbit({ onGetStarted }: { onGetStarted: () => void }) {
+  const professions = [
+    { title: 'Clients', copy: 'Post a guided brief, compare verified proposals, and see the project without technical fog.', icon: <Users size={22} /> },
+    { title: 'Architects & BEPs', copy: 'Turn opportunity, design responsibility, compliance, teams, and evidence into one command centre.', icon: <Building2 size={22} /> },
+    { title: 'Contractors', copy: 'Tender packages, site logs, staff, plant, RFIs, snags, and payment evidence stay connected.', icon: <Construction size={22} /> },
+    { title: 'Freelancers', copy: 'Receive delegated work, submit deliverables, and build a traceable professional record.', icon: <Sparkles size={22} /> },
+    { title: 'Suppliers', copy: 'Connect products, deliveries, warranties, and procurement commitments to real project demand.', icon: <Factory size={22} /> },
+    { title: 'Subcontractors', copy: 'Manage trade packages, close-out proof, and on-site accountability in the same workspace.', icon: <Hammer size={22} /> },
+  ];
+
+  return (
+    <section className="bg-[#F8FAFC] px-4 py-16 text-[#04302c] sm:px-8 lg:px-16">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <Badge className="mb-5 bg-white/10 text-white border-white/20 uppercase tracking-widest text-[10px] sm:text-xs">Animated platform map</Badge>
-            <h2 className="text-3xl sm:text-4xl md:text-6xl font-heading font-black tracking-tight max-w-3xl">All services, AI automation, and delivery workflows in one connected hub.</h2>
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.28em] text-[#0f6b62]">Who feels the difference</p>
+            <h2 className="font-heading text-4xl font-black tracking-[-0.06em] sm:text-6xl">Every profession gets a reason to stay.</h2>
           </div>
-          <Button onClick={onGetStarted} variant="outline" className="w-full sm:w-auto rounded-full h-14 px-8 bg-white/10 border-white/25 text-white hover:bg-white hover:text-primary font-bold">
-            Start a project <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <Button onClick={onGetStarted} variant="outline" className="rounded-full border-[#04302c]/20 bg-transparent font-black hover:bg-[#04302c] hover:text-[#F8FAFC]">Find my role <ArrowRight className="ml-2 h-4 w-4" /></Button>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-5 sm:gap-6 items-center">
-          <div className="grid gap-5">
-            {services.slice(0, 3).map((service, index) => <ServiceNode key={service.title} service={service} index={index} />)}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            animate={prefersReducedMotion ? undefined : { boxShadow: ['0 0 0 rgba(255,255,255,0.10)', '0 0 70px rgba(255,255,255,0.28)', '0 0 0 rgba(255,255,255,0.10)'] }}
-            transition={{ duration: 2.8, repeat: prefersReducedMotion ? 0 : Infinity, ease: 'easeInOut' }}
-            viewport={{ once: true }}
-            className="relative mx-auto my-4 sm:my-6 lg:my-0 h-64 w-64 sm:h-80 sm:w-80 rounded-full border border-white/20 bg-white/10 backdrop-blur-md flex items-center justify-center shadow-2xl"
-          >
-            <div className="absolute inset-8 rounded-full border border-dashed border-white/30 animate-spin-slow" />
-            <div className="absolute inset-16 rounded-full bg-primary-dark/80 border border-white/20" />
-            <div className="relative z-10 text-center px-10">
-              <div className="mx-auto mb-4 h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-white text-primary flex items-center justify-center shadow-xl">
-                <Workflow className="h-8 w-8 sm:h-[34px] sm:w-[34px]" />
-              </div>
-              <h3 className="font-heading text-2xl sm:text-3xl font-black">Architex AI</h3>
-              <p className="mt-2 text-xs sm:text-sm text-white/75 font-medium">Multi-agent automation coordinates compliance, marketplace, files, teams, and project intelligence.</p>
-            </div>
-          </motion.div>
-
-          <div className="grid gap-5">
-            {services.slice(3).map((service, index) => <ServiceNode key={service.title} service={service} index={index + 3} />)}
-          </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {professions.map((profession, index) => <ProfessionCard key={profession.title} profession={profession} index={index} />)}
         </div>
       </div>
     </section>
   );
 }
 
-type ServiceNodeProps = {
-  service: { title: string; copy: string; icon: React.ReactNode };
-  index: number;
-};
-
-function ServiceNode({ service, index }: React.PropsWithChildren<ServiceNodeProps>) {
+function ProfessionCard({ profession, index }: React.PropsWithChildren<{ profession: { title: string; copy: string; icon: React.ReactNode }; index: number }>) {
   return (
-    <motion.div
+    <motion.article
       initial={{ opacity: 0, y: 22 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: index * 0.08 }}
-      viewport={{ once: true }}
-      className="group rounded-[1.5rem] sm:rounded-[2rem] border border-white/15 bg-white/10 p-4 sm:p-5 backdrop-blur-md hover:bg-white/15 transition-colors"
+      transition={{ duration: 0.5, delay: index * 0.05 }}
+      viewport={{ once: true, margin: '-80px' }}
+      className="group relative overflow-hidden rounded-[2rem] border border-[#04302c]/10 bg-white/55 p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-[#0f6b62]/50 hover:shadow-2xl"
     >
-      <div className="flex gap-3 sm:gap-4">
-        <div className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 rounded-2xl bg-white text-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-          {service.icon}
-        </div>
-        <div>
-          <h3 className="font-heading text-lg sm:text-xl font-black">{service.title}</h3>
-          <p className="mt-1 text-xs sm:text-sm text-white/75 leading-relaxed font-medium">{service.copy}</p>
-        </div>
-      </div>
-    </motion.div>
+      <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#0f6b62]/10 transition-transform group-hover:scale-150" />
+      <div className="relative z-10 mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#04302c] text-[#0f6b62] shadow-lg">{profession.icon}</div>
+      <h3 className="relative z-10 font-heading text-2xl font-black tracking-[-0.04em]">{profession.title}</h3>
+      <p className="relative z-10 mt-3 text-sm font-medium leading-relaxed text-[#04302c]/62">{profession.copy}</p>
+    </motion.article>
   );
 }
+
+function ProcessRail() {
+  const steps = [
+    ['Brief', 'A client story becomes structured scope, budget, files, and intent.'],
+    ['Match', 'Verified professionals, contractors, suppliers, and freelancers form the delivery network.'],
+    ['Check', 'AI and human review catch compliance, coordination, and documentation gaps early.'],
+    ['Build', 'Programme, RFIs, site logs, packages, payments, snags, and close-out stay traceable.'],
+  ];
+
+  return (
+    <section className="bg-[#F8FAFC] px-4 pb-16 text-[#04302c] sm:px-8 lg:px-16">
+      <div className="mx-auto max-w-7xl rounded-[2.5rem] bg-[#04302c] p-6 text-[#F8FAFC] sm:p-8 lg:p-10">
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#0f6b62]">The line of control</p>
+            <h2 className="mt-2 font-heading text-3xl font-black tracking-[-0.055em] sm:text-5xl">From first idea to accountable handover.</h2>
+          </div>
+          <Network className="hidden h-12 w-12 text-[#0f6b62] sm:block" />
+        </div>
+        <div className="grid gap-3 lg:grid-cols-4">
+          {steps.map(([title, copy], index) => (
+            <motion.div key={title} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} viewport={{ once: true }} className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
+              <span className="font-mono text-xs font-black text-[#0f6b62]">0{index + 1}</span>
+              <h3 className="mt-8 font-heading text-2xl font-black">{title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-[#F8FAFC]/58">{copy}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 function ResourcesLanding({ onGetStarted }: { onGetStarted: () => void }) {
   const resources = [
     { title: 'SANS 10400 Readiness Guide', copy: 'Understand the checks Architex AI performs across walls, fire, fenestration, area sizing, and documentation.', icon: <BookOpen size={24} />, tag: 'Compliance' },
     { title: 'Client Briefing Template', copy: 'Prepare scope, site details, inspiration, budget, and timeline before posting your project.', icon: <FileText size={24} />, tag: 'Clients' },
     { title: 'AI Review Checklist', copy: 'A practical list for title blocks, north points, scale bars, room schedules, and municipal submission basics.', icon: <ClipboardCheck size={24} />, tag: 'AI Automation' },
-    { title: 'Professional Onboarding', copy: 'Guidance for architects and freelancers setting up verified marketplace profiles.', icon: <Users size={24} />, tag: 'Professionals' },
+    { title: 'Professional Onboarding', copy: 'Guidance for architects and freelancers setting up verified professional profiles.', icon: <Users size={24} />, tag: 'Professionals' },
     { title: 'Resource Library Workflow', copy: 'Learn how shared files, knowledge sources, and project evidence support faster decisions.', icon: <Database size={24} />, tag: 'Knowledge' },
     { title: 'Project Delivery Playbook', copy: 'Coordinate teams from concept to approval using payments, files, reviews, and audit trails.', icon: <Lightbulb size={24} />, tag: 'Delivery' },
   ];
@@ -1590,7 +1563,7 @@ function ResourcesLanding({ onGetStarted }: { onGetStarted: () => void }) {
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-heading font-black tracking-[-0.06em] leading-none">Practical tools for smarter built-environment projects.</h1>
             <p className="mt-6 sm:mt-8 text-base sm:text-xl text-muted-foreground leading-relaxed font-medium max-w-2xl">Use these guides and templates to brief clearly, prepare compliant drawings, understand AI automation, and move faster from idea to approved project.</p>
             <div className="mt-8 sm:mt-10 flex flex-wrap gap-3 sm:gap-4">
-              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full bg-primary text-primary-foreground font-bold">Use the marketplace <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full bg-primary text-primary-foreground font-bold">Enter workspace <ArrowRight className="ml-2 h-4 w-4" /></Button>
               <Button variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 rounded-full font-bold">Browse guides</Button>
             </div>
           </div>
