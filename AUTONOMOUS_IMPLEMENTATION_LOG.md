@@ -98,6 +98,9 @@ Hosting target: shared hosting with MySQL
 - Browser OS validation after MunicipalTracker guard: `PLAYWRIGHT_HTML_OPEN=never npx playwright test --project=chromium e2e/sidebar-harness.spec.ts --reporter=line` completed successfully with 5/5 Chromium sidebar harness checks passing.
 - Final deployment artifact refreshed after MunicipalTracker guard and browser validation: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 
+- Broader browser OS validation: `PLAYWRIGHT_HTML_OPEN=never npx playwright test --project=chromium --reporter=line` completed successfully with 18/18 Chromium e2e tests passing.
+- Final unit regression after browser OS sweep: `npm test` completed successfully with 53 test files and 413/413 tests passing. Expected stderr/stdout appears from negative-path service tests only.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.
