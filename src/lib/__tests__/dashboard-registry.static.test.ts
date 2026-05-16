@@ -112,6 +112,13 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain('REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
   });
 
+  it('routes client intake to the production guided brief wizard', () => {
+    expect(appSource).toContain("const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBriefWizard'));"
+    );
+    expect(appSource).toContain(`activeTab === 'client-intake' && <GuidedBriefWizard user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'client-intake'`);
+  });
+
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
     expect(appSource).toContain('Unsafe payment, escrow, signature, provider, and approval decisions');
     expect(appSource).toContain('human confirmation before anything is submitted');

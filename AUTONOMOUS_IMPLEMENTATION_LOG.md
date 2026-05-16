@@ -39,9 +39,17 @@ Hosting target: shared hosting with MySQL
 - Validation passed after workflow routing: `npm run lint`.
 - Validation passed after workflow routing: `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts` (12 tests).
 - Validation passed after workflow routing: `npm run build`.
+- Added production `GuidedBriefWizard` for `client-intake`, persisting `project_briefs`, authenticated evidence uploads, attachment metadata, advisory interpretation, and optional `marketplace_opportunities` publication.
+- Extended uploaded file context typing to include `brief` evidence uploads.
+- Validation passed after guided brief routing: `npm run lint`.
+- Validation passed after guided brief routing: `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/briefWorkflowService.test.ts` (19 tests).
+- Validation passed after guided brief routing: `npm run build`.
 
 ## In progress
 - Preparing next scoped feature slice from agent audits.
+
+## Validation notes
+- Full unit suite `npm test`: 392/393 tests passed; one existing `src/lib/__tests__/api-router.security.test.ts` test timed out at 5s (`blocks cross-origin state-changing requests before route handlers run`). Targeted tests around current implementation pass.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.

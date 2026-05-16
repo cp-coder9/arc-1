@@ -769,7 +769,7 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'site_log';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'site_log' | 'brief';
   jobId?: string;
   submissionId?: string;
 };
