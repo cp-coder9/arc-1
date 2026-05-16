@@ -119,6 +119,13 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`activeTab !== 'client-intake'`);
   });
 
+  it('routes client proposals to the production comparison workflow', () => {
+    expect(appSource).toContain("const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));"
+    );
+    expect(appSource).toContain(`activeTab === 'client-proposals' && <ClientProposalComparison user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'client-proposals'`);
+  });
+
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
     expect(appSource).toContain('Unsafe payment, escrow, signature, provider, and approval decisions');
     expect(appSource).toContain('human confirmation before anything is submitted');

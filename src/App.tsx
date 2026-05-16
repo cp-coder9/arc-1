@@ -121,6 +121,7 @@ const KnowledgeSources = lazyWithChunkRetry(() => import('./components/Knowledge
 const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));
 const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));
 const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBriefWizard'));
+const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -848,8 +849,9 @@ export default function App() {
               {activeTab === 'firm' && <FirmDashboard user={user} />}
               {activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />}
               {activeTab === 'client-intake' && <GuidedBriefWizard user={user} />}
+              {activeTab === 'client-proposals' && <ClientProposalComparison user={user} />}
               {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
-              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
+              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}

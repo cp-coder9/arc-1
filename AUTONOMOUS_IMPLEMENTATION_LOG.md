@@ -53,6 +53,7 @@ Hosting target: shared hosting with MySQL
 - Targeted e2e `npm run test:e2e -- e2e/auth.spec.ts e2e/sidebar-harness.spec.ts`: 8 passed before host dependency failures for WebKit/Mobile Safari (`libgtk-4.so.1`, `libgraphene-1.0.so.0`, etc.) and Playwright report server timeout. Not treated as product pass.
 - Contractor bid flow: connected `ContractorDashboard` Prepare Bid to the real `BidSubmission` component and `tenderService.submitBid`, with attachment upload support via existing upload service. Validation passed: `npm run lint && npm run build`.
 - Deployment prep: added `.env.production.example`, `scripts/predeploy-check.mjs`, and `npm run predeploy:check`. Validation passed: `npm run lint && npm run predeploy:check`.
+- Client proposal comparison: added `ClientProposalComparison` for `client-proposals`, loading real client jobs/applications, building advisory comparison records via `marketplaceWorkflowService`, and using the existing human-confirmed `/api/jobs/:jobId/applications/:applicationId/accept` appointment/project-initiation API. Validation passed: `npm run lint`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/marketplaceWorkflowService.test.ts` (20 tests), and `npm run build`.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
