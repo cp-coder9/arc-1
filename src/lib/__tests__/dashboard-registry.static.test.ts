@@ -109,7 +109,7 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-freelancers' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
   });
 
   it('routes AI co-pilot to the production grounded AI governance page', () => {
@@ -124,6 +124,13 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'contractor-staff' && <ContractorStaffPlantPage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'contractor-staff'`);
+  });
+
+  it('routes BEP freelancer work packages to the production delegation workspace', () => {
+    expect(appSource).toContain("const BEPFreelancerJobsPage = lazyWithChunkRetry(() => import('./components/BEPFreelancerJobsPage'));"
+    );
+    expect(appSource).toContain(`activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'bep-freelancers'`);
   });
 
   it('routes package and procurement pages to the production package workspace', () => {
