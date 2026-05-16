@@ -79,6 +79,8 @@ Hosting target: shared hosting with MySQL
 
 - SANS/compliance forms: added `SANSComplianceFormsPage` for `sans-forms`, showing live stored `jobs/*/submissions` AI review records, findings, sign-off checklists, trace logs, and `ComplianceReport` output without auto-certifying forms. Validation passed: `npm run lint`, dashboard registry static tests (32 tests), and `npm run build`.
 - Final validation after latest workflow conversions: full `npm test` completed successfully with Vitest exit 0. Expected stderr/stdout appears from negative-path service tests.
+- Final validation after SANS forms register: full `npm test` completed successfully with Vitest exit 0.
+- Final deployment artifact refreshed after SANS forms register: `npm run deploy:bundle` completed successfully after building 3045 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 - Final deployment artifact refreshed: `npm run deploy:bundle` completed successfully after building 3044 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 
 ## Blockers / items requiring owner input later
