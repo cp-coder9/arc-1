@@ -109,7 +109,7 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
   });
 
   it('routes package and procurement pages to the production package workspace', () => {
@@ -118,6 +118,13 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`(activeTab === 'packages' || activeTab === 'procurement') && <PackageProcurementWorkspace user={user} mode={activeTab as 'packages' | 'procurement'} />`);
     expect(appSource).toContain(`'procurement'`);
     expect(appSource).toContain(`'packages'`);
+  });
+
+  it('routes drawing checker to the production AI drawing checker workflow', () => {
+    expect(appSource).toContain("const AIDrawingChecker = lazyWithChunkRetry(() => import('./components/AIDrawingChecker'));"
+    );
+    expect(appSource).toContain(`activeTab === 'drawing-checker' && <AIDrawingChecker user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'drawing-checker'`);
   });
 
   it('routes client progress to the production progress reports workflow', () => {
