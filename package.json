@@ -23,6 +23,7 @@
     "test:e2e:ui": "playwright test --ui",
     "docs:api-contracts": "node scripts/validate-api-contracts.mjs",
     "predeploy:check": "node scripts/predeploy-check.mjs",
+    "deploy:bundle": "npm run build && npm run predeploy:check && mkdir -p release && tar -czf release/architex-co-za-upload-bundle.tgz dist server.ts api src package.json package-lock.json firebase-applet-config.json docs/deployment .env.production.example",
     "install:deps": "npm install"
   },
   "dependencies": {

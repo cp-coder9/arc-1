@@ -54,6 +54,7 @@ Hosting target: shared hosting with MySQL
 - Contractor bid flow: connected `ContractorDashboard` Prepare Bid to the real `BidSubmission` component and `tenderService.submitBid`, with attachment upload support via existing upload service. Validation passed: `npm run lint && npm run build`.
 - Deployment prep: added `.env.production.example`, `scripts/predeploy-check.mjs`, and `npm run predeploy:check`. Validation passed: `npm run lint && npm run predeploy:check`.
 - Client proposal comparison: added `ClientProposalComparison` for `client-proposals`, loading real client jobs/applications, building advisory comparison records via `marketplaceWorkflowService`, and using the existing human-confirmed `/api/jobs/:jobId/applications/:applicationId/accept` appointment/project-initiation API. Validation passed: `npm run lint`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/services/__tests__/marketplaceWorkflowService.test.ts` (20 tests), and `npm run build`.
+- Upload bundle: added `npm run deploy:bundle` and generated `release/architex-co-za-upload-bundle.tgz` (1.5 MB) after successful build and predeploy checks.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
