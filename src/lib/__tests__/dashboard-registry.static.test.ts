@@ -126,6 +126,13 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`activeTab !== 'client-proposals'`);
   });
 
+  it('routes BEP technical briefs to the production technical brief editor', () => {
+    expect(appSource).toContain("const TechnicalBriefEditor = lazyWithChunkRetry(() => import('./components/TechnicalBriefEditor'));"
+    );
+    expect(appSource).toContain(`activeTab === 'technical-brief' && <TechnicalBriefEditor user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'technical-brief'`);
+  });
+
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
     expect(appSource).toContain('Unsafe payment, escrow, signature, provider, and approval decisions');
     expect(appSource).toContain('human confirmation before anything is submitted');
