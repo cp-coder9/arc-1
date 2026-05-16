@@ -128,6 +128,7 @@ const PackageProcurementWorkspace = lazyWithChunkRetry(() => import('./component
 const ClientProgressReports = lazyWithChunkRetry(() => import('./components/ClientProgressReports'));
 const AIDrawingChecker = lazyWithChunkRetry(() => import('./components/AIDrawingChecker'));
 const TasksApprovalsPage = lazyWithChunkRetry(() => import('./components/TasksApprovalsPage'));
+const ResourceCentre = lazyWithChunkRetry(() => import('./components/ResourceCentre'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -210,7 +211,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-checker', 'tasks']);
+const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-checker', 'tasks', 'resource-centre']);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -862,7 +863,8 @@ export default function App() {
               {activeTab === 'client-progress' && <ClientProgressReports user={user} />}
               {activeTab === 'drawing-checker' && <AIDrawingChecker user={user} />}
               {activeTab === 'tasks' && <TasksApprovalsPage user={user} />}
-              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {activeTab === 'resource-centre' && <ResourceCentre user={user} />}
+              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && activeTab !== 'technical-brief' && activeTab !== 'directory-search' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
