@@ -77,6 +77,7 @@ Hosting target: shared hosting with MySQL
 - Freelancer assigned work: routed `freelancer-work` to the existing production `FreelancerDashboard`, exposing live assigned job cards, task status updates, and project chat instead of the generic shell. Validation passed: `npm run lint`, dashboard registry static tests (28 tests), and `npm run build`.
 - Resource sharing: added `ResourceSharingPage` for `resource-sharing`, backed by live `resource_listings`, `resource_bookings`, and `resource_usage_logs`, using the production `resourceBookingService` for conflict audits and usage billing ledger entries. Booking confirmation, usage logging, and payment release remain human-governed. Validation passed: `npm run lint`, dashboard/resource booking tests (38 tests), and `npm run build`.
 
+- SANS/compliance forms: added `SANSComplianceFormsPage` for `sans-forms`, showing live stored `jobs/*/submissions` AI review records, findings, sign-off checklists, trace logs, and `ComplianceReport` output without auto-certifying forms. Validation passed: `npm run lint`, dashboard registry static tests (32 tests), and `npm run build`.
 - Final validation after latest workflow conversions: full `npm test` completed successfully with Vitest exit 0. Expected stderr/stdout appears from negative-path service tests.
 - Final deployment artifact refreshed: `npm run deploy:bundle` completed successfully after building 3044 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 
