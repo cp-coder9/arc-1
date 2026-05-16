@@ -84,6 +84,9 @@ Hosting target: shared hosting with MySQL
 - Final deployment artifact refreshed after SANS forms register: `npm run deploy:bundle` completed successfully after building 3045 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 - Final deployment artifact refreshed: `npm run deploy:bundle` completed successfully after building 3044 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 
+- Final validation after CPD assessment workflow: full `npm test` completed successfully with Vitest exit 0.
+- Final deployment artifact refreshed after CPD assessment workflow: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
-- CPD Assessment UI remains blocked from direct browser integration because `src/services/cpdService.ts` currently imports Node `crypto`. A production CPD page should call a server/API wrapper or refactor certificate hashing to a browser-safe Web Crypto abstraction before exposing attempts/certificates in React.
+- CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.
