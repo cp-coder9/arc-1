@@ -87,6 +87,11 @@ Hosting target: shared hosting with MySQL
 - Final validation after CPD assessment workflow: full `npm test` completed successfully with Vitest exit 0.
 - Final deployment artifact refreshed after CPD assessment workflow: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz` for architex.co.za upload preparation.
 
+- Additional OS validation: `npm run docs:api-contracts` completed successfully (58 routes mentioned, 12 contract docs, 118 JSON blocks validated, no uncovered documented routes requiring examples).
+- Additional OS validation: `npm run lint:tests` completed successfully with full project TypeScript `tsc --noEmit` exit 0.
+
+- Registry cleanup: removed stale “shell pending” summary text from implemented routes. Validation passed: `npm run lint`, dashboard registry static tests (33 tests), and `npm run build`.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.
