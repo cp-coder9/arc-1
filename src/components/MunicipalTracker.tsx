@@ -40,6 +40,12 @@ interface MunicipalTrackerProps {
   user: any;
 }
 
+const readJsonOrNull = async (response: Response) => {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return null;
+  return response.json();
+};
+
 export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const [submissions, setSubmissions] = useState<CouncilSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,10 +84,10 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
       const res = await fetch(`/api/municipal/heatmap/${muni}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
+      const data = await readJsonOrNull(res);
       setHeatmap(data);
     } catch (e) {
-      console.error(e);
+      setHeatmap(null);
     }
   };
 
@@ -97,7 +103,11 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
         },
         body: JSON.stringify({ municipality: activeMuni })
       });
-      const result = await res.json();
+      const result = await readJsonOrNull(res);
+      if (!result) {
+        toast.error('Portal automation endpoint is unavailable in this environment.');
+        return;
+      }
       if (result.success) {
         toast.success(`Portal automation found ${result.count} updates for ${activeMuni}`);
       } else {
@@ -132,7 +142,11 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
         })
       });
 
-      const result = await res.json();
+      const result = await readJsonOrNull(res);
+      if (!result) {
+        toast.error('Council login endpoint is unavailable in this environment.');
+        return;
+      }
       if (!result.success) {
         toast.error(result.error || 'Failed to save council login');
         return;
@@ -170,7 +184,11 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
         },
         body: JSON.stringify({ imageUrl: receiptUrl })
       });
-      const result = await res.json();
+      const result = await readJsonOrNull(res);
+      if (!result) {
+        toast.error('OCR endpoint is unavailable in this environment.');
+        return;
+      }
 
       if (result.success) {
         toast.success(`Extracted Reference: ${result.data.referenceNumber}`);

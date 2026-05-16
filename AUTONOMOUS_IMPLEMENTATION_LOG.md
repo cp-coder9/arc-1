@@ -92,6 +92,7 @@ Hosting target: shared hosting with MySQL
 
 - Registry cleanup: removed stale “shell pending” summary text from implemented routes. Validation passed: `npm run lint`, dashboard registry static tests (33 tests), and `npm run build`.
 
+- Browser OS testing found a Chromium sidebar harness failure on Municipal Status because Vite fallback HTML was parsed as JSON by municipal API calls. Patched `MunicipalTracker` to only parse JSON responses when the content type is JSON and to treat unavailable API endpoints as a non-console-error empty state. Validation passed: `npm run lint`, dashboard registry static tests (33 tests), and `npm run build`.
 - Deployment artifact refreshed after registry cleanup: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz`.
 
 ## Blockers / items requiring owner input later
