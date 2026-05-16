@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Briefcase, Building2, CheckCircle2, Clock, FileText, HardHat, Search, ShieldCheck, TrendingUp } from 'lucide-react';
+import BidSubmission from './BidSubmission';
 
 export default function ContractorDashboard({ user }: { user: UserProfile }) {
   const [publishedTenders, setPublishedTenders] = useState<TenderPackage[]>([]);
   const [myBids, setMyBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showBidSubmission, setShowBidSubmission] = useState(false);
 
   useEffect(() => {
     const unsubscribeTenders = onSnapshot(
@@ -106,7 +108,7 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
                   {tender.requiredDisciplines?.slice(0, 4).map((discipline) => <Badge key={discipline} variant="outline" className="text-[10px] uppercase tracking-widest">{discipline}</Badge>)}
-                  <Button size="sm" className="ml-auto rounded-full font-bold" disabled title="Bid preparation flow is not connected yet">Prepare Bid</Button>
+                  <Button size="sm" className="ml-auto rounded-full font-bold" onClick={() => setShowBidSubmission(true)}>Prepare Bid</Button>
                 </div>
               </div>
             ))}
@@ -118,6 +120,17 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
             )}
           </CardContent>
         </Card>
+
+        {showBidSubmission && (
+          <div className="lg:col-span-2">
+            <BidSubmission
+              tenders={publishedTenders}
+              contractorId={user.uid}
+              contractorName={user.displayName || user.email || 'Contractor'}
+              onSubmitted={() => setShowBidSubmission(false)}
+            />
+          </div>
+        )}
 
         <div className="space-y-6">
           <Card className="border-border shadow-sm bg-card rounded-3xl overflow-hidden">

@@ -50,6 +50,8 @@ Hosting target: shared hosting with MySQL
 
 ## Validation notes
 - Full unit suite `npm test`: 392/393 tests passed; one existing `src/lib/__tests__/api-router.security.test.ts` test timed out at 5s (`blocks cross-origin state-changing requests before route handlers run`). Targeted tests around current implementation pass.
+- Targeted e2e `npm run test:e2e -- e2e/auth.spec.ts e2e/sidebar-harness.spec.ts`: 8 passed before host dependency failures for WebKit/Mobile Safari (`libgtk-4.so.1`, `libgraphene-1.0.so.0`, etc.) and Playwright report server timeout. Not treated as product pass.
+- Contractor bid flow: connected `ContractorDashboard` Prepare Bid to the real `BidSubmission` component and `tenderService.submitBid`, with attachment upload support via existing upload service. Validation passed: `npm run lint && npm run build`.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
