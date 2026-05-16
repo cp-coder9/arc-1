@@ -92,6 +92,8 @@ Hosting target: shared hosting with MySQL
 
 - Registry cleanup: removed stale “shell pending” summary text from implemented routes. Validation passed: `npm run lint`, dashboard registry static tests (33 tests), and `npm run build`.
 
+- Deployment artifact refreshed after registry cleanup: `npm run deploy:bundle` completed successfully after building 3047 modules, passing `predeploy:check`, and regenerating `release/architex-co-za-upload-bundle.tgz`.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.
