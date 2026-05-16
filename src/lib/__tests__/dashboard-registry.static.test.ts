@@ -109,7 +109,7 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-submissions' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
   });
 
   it('routes package and procurement pages to the production package workspace', () => {
@@ -137,6 +137,13 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'freelancer-submissions' && <FreelancerSubmissionsPage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'freelancer-submissions'`);
+  });
+
+  it('routes resource sharing to the production resource booking workspace', () => {
+    expect(appSource).toContain("const ResourceSharingPage = lazyWithChunkRetry(() => import('./components/ResourceSharingPage'));"
+    );
+    expect(appSource).toContain(`activeTab === 'resource-sharing' && <ResourceSharingPage user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'resource-sharing'`);
   });
 
   it('routes toolbox to the production project file toolbox', () => {

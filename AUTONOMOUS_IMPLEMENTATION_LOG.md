@@ -69,6 +69,9 @@ Hosting target: shared hosting with MySQL
 - Project toolbox: added `ProjectToolboxPage` for `toolbox`, wrapping the production `FileManager` with role/governance context for traceable files, evidence, and drawing quick scans. Validation passed: `npm run lint` and dashboard/FileManager tests (27 tests).
 - Freelancer submissions: added `FreelancerSubmissionsPage` for `freelancer-submissions`, subscribing to live assigned task cards by `assigneeId`, persisting task status changes, and embedding production `FileManager` for deliverable uploads/evidence. Validation passed: `npm run lint`, dashboard/FileManager tests (28 tests), and `npm run build`.
 - Deployment bundle refreshed after latest committed UI changes: `npm run deploy:bundle` completed successfully and produced `release/architex-co-za-upload-bundle.tgz`; predeploy check passed and listed required production environment variables.
+- Full unit regression after latest route/workspace conversions: `npm test` completed successfully with Vitest exit 0. The stderr output is from expected negative-path AI parsing tests, not a product failure.
+
+- Resource sharing: added `ResourceSharingPage` for `resource-sharing`, backed by live `resource_listings`, `resource_bookings`, and `resource_usage_logs`, using the production `resourceBookingService` for conflict audits and usage billing ledger entries. Booking confirmation, usage logging, and payment release remain human-governed. Validation passed: `npm run lint`, dashboard/resource booking tests (38 tests), and `npm run build`.
 
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
