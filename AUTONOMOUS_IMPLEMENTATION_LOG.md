@@ -67,6 +67,7 @@ Hosting target: shared hosting with MySQL
 - Design & compliance: added `DesignCompliancePage` for `design`, reusing production `ResponsibilityMatrix`, `TeamBuilder`, `subscribeToProjectByJobId`, `subscribeToTeam`, and `getDisciplineCoverage` to show live discipline gaps and team invitations. Validation passed: `npm run lint`, dashboard/team tests (28 tests), and `npm run build`.
 - Knowledge route: routed `knowledge` to the production `ResourceCentre` so role users see live `agent_knowledge` and checklist records instead of the generic shell. Validation passed: `npm run lint` and dashboard registry static tests (24 tests).
 - Project toolbox: added `ProjectToolboxPage` for `toolbox`, wrapping the production `FileManager` with role/governance context for traceable files, evidence, and drawing quick scans. Validation passed: `npm run lint` and dashboard/FileManager tests (27 tests).
+- Freelancer submissions: added `FreelancerSubmissionsPage` for `freelancer-submissions`, subscribing to live assigned task cards by `assigneeId`, persisting task status changes, and embedding production `FileManager` for deliverable uploads/evidence. Validation passed: `npm run lint`, dashboard/FileManager tests (28 tests), and `npm run build`.
 - Deployment bundle refreshed after latest committed UI changes: `npm run deploy:bundle` completed successfully and produced `release/architex-co-za-upload-bundle.tgz`; predeploy check passed and listed required production environment variables.
 
 ## Blockers / items requiring owner input later
