@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "start": "NODE_ENV=production tsx server.ts",
     "build": "vite build",
     "vercel-build": "vite build",
     "preview": "vite preview",

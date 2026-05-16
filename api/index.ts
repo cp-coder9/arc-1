@@ -2,11 +2,8 @@ import express from "express";
 import cors from "cors";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-const firebaseAppletConfig = {
-  projectId: 'gen-lang-client-0880960511',
-  firestoreDatabaseId: 'ai-studio-2ae3d9c3-70e6-4323-8a95-9d566bd24635',
-};
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import firebaseAppletConfig from "../firebase-applet-config.json";
 
 const app = express();
 
@@ -57,20 +54,43 @@ function getAdminServices() {
 }
 
 const ADMIN_EMAILS = ['gm.tarb@gmail.com', 'leor@slutzkin.co.za'];
-const USER_PROFILE_FIELDS = [
-  'bio', 'budgetRange', 'cidbGrading', 'experienceYears', 'hasPIInsurance',
-  'mainSpecialization', 'nhbrcNumber', 'professionalLabel', 'projectType',
-  'region', 'sacapNumber', 'specializations', 'tradeLicense',
+const COMMON_PROFILE_FIELDS = [
+  'displayName', 'bio', 'mobileNumber', 'address', 'billingDetails', 'vatTaxDetails',
+  'digitalSignatureUrl', 'preferredNotificationMethod', 'projectRegion', 'directoryVisibility',
+  'directoryPrivacySettings',
 ];
+const ROLE_PROFILE_FIELDS: Record<string, readonly string[]> = {
+  client: [...COMMON_PROFILE_FIELDS, 'companyRegistration', 'residentialAddress', 'businessAddress', 'budgetRange', 'projectType'],
+  architect: [...COMMON_PROFILE_FIELDS, 'practiceName', 'professionalName', 'professionalDiscipline', 'statutoryBody', 'registrationNumber', 'practiceAddress', 'professionalIndemnityDetails', 'servicesOffered', 'region', 'availability', 'portfolio', 'sacapNumber', 'mainSpecialization', 'specializations', 'hasPIInsurance', 'experienceYears'],
+  bep: [...COMMON_PROFILE_FIELDS, 'practiceName', 'professionalName', 'professionalDiscipline', 'statutoryBody', 'registrationNumber', 'practiceAddress', 'professionalIndemnityDetails', 'servicesOffered', 'region', 'availability', 'portfolio', 'sacapNumber', 'mainSpecialization', 'specializations', 'hasPIInsurance', 'experienceYears'],
+  contractor: [...COMMON_PROFILE_FIELDS, 'companyName', 'contractorCategory', 'regionsServed', 'projectValueRange', 'companyRegistration', 'bankingPayoutDetails', 'insuranceDetails', 'healthSafetyDocuments', 'staffCapacity', 'trades', 'plantEquipmentCapability', 'portfolio', 'cidbGrading', 'nhbrcNumber'],
+  subcontractor: [...COMMON_PROFILE_FIELDS, 'businessName', 'tradeCategory', 'serviceRegion', 'packageType', 'bankingPayoutDetails', 'warrantySupportDetails', 'productCategories', 'deliveryCapacity', 'complianceDocuments', 'closeOutDocumentationRequirements', 'tradeLicense'],
+  supplier: [...COMMON_PROFILE_FIELDS, 'businessName', 'supplyCategory', 'serviceRegion', 'packageType', 'bankingPayoutDetails', 'warrantySupportDetails', 'productCategories', 'deliveryCapacity', 'complianceDocuments', 'closeOutDocumentationRequirements'],
+  freelancer: [...COMMON_PROFILE_FIELDS, 'skills', 'software', 'availability', 'portfolio', 'payoutDetails', 'professionalDiscipline', 'region'],
+  admin: [...COMMON_PROFILE_FIELDS, 'department', 'permissionLevel', 'auditIdentity', 'twoFactorStatus'],
+};
 
-function sanitizeUserProfileData(profileData: unknown) {
+function sanitizeUserProfileData(profileData: unknown, role: string) {
   if (!profileData || typeof profileData !== 'object') return {};
-  return USER_PROFILE_FIELDS.reduce<Record<string, unknown>>((safeData, field) => {
-    if (Object.prototype.hasOwnProperty.call(profileData, field)) {
-      safeData[field] = (profileData as Record<string, unknown>)[field];
-    }
+  const allowedFields = new Set([...(ROLE_PROFILE_FIELDS[role] ?? COMMON_PROFILE_FIELDS), 'professionalLabel']);
+  return Object.entries(profileData as Record<string, unknown>).reduce<Record<string, unknown>>((safeData, [field, value]) => {
+    if (allowedFields.has(field)) safeData[field] = value;
     return safeData;
   }, {});
+}
+
+async function projectDirectoryProfile(db: Firestore, uid: string, profile: Record<string, unknown>) {
+  const visible = profile.directoryVisibility !== false;
+  await db.collection('directoryProfiles').doc(uid).set({
+    uid,
+    role: profile.role,
+    displayName: profile.displayName ?? '',
+    region: profile.region ?? profile.projectRegion ?? profile.serviceRegion ?? '',
+    discipline: profile.professionalDiscipline ?? profile.tradeCategory ?? profile.supplyCategory ?? profile.mainSpecialization ?? '',
+    verificationStatus: profile.verificationStatus ?? 'pending',
+    visible,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
 }
 
 app.get('/api/health', (_req, res) => {
@@ -89,22 +109,24 @@ app.post('/api/auth/check-admin', async (req, res) => {
     const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
     const userRef = db.collection('users').doc(decoded.uid);
     const userDoc = await userRef.get();
-    const profileData = sanitizeUserProfileData(req.body.profileData);
-    const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor'].includes(req.body.role)
+    const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'].includes(req.body.role)
       ? req.body.role
       : 'client';
+    const assignedRole = isAdminEmail ? 'admin' : requestedRole;
+    const profileData = sanitizeUserProfileData(req.body.profileData, assignedRole);
 
     if (!userDoc.exists) {
       const newUser = {
         uid: decoded.uid,
         email: decoded.email || '',
         displayName: req.body.displayName || decoded.name || 'Anonymous',
-        role: isAdminEmail ? 'admin' : requestedRole,
+        role: assignedRole,
         ...profileData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await userRef.set(newUser);
+      await projectDirectoryProfile(db, decoded.uid, newUser);
       return res.json({ role: newUser.role, isAdmin: isAdminEmail, created: true });
     }
 

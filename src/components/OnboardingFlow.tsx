@@ -70,8 +70,8 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
       />
       <RoleCard
         icon={<Construction className="w-8 h-8" />}
-        title="BEP"
-        description="Built Environment Professional (Builder, Tiler, etc.)"
+        title="BEP / Design Team"
+        description="I am a built-environment professional or design-team lead"
         onClick={() => handleRoleSelect('bep')}
         data-testid="role-select-bep"
       />
@@ -81,6 +81,20 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
         description="I manage construction delivery, tenders, and site teams"
         onClick={() => handleRoleSelect('contractor')}
         data-testid="role-select-contractor"
+      />
+      <RoleCard
+        icon={<HardHat className="w-8 h-8" />}
+        title="Subcontractor"
+        description="I deliver trade packages, evidence, and close-out items"
+        onClick={() => handleRoleSelect('subcontractor')}
+        data-testid="role-select-subcontractor"
+      />
+      <RoleCard
+        icon={<Building2 className="w-8 h-8" />}
+        title="Supplier"
+        description="I supply products, deliveries, warranties, and support"
+        onClick={() => handleRoleSelect('supplier')}
+        data-testid="role-select-supplier"
       />
     </div>
   );
@@ -321,6 +335,41 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
     </div>
   );
 
+  const renderPackageParticipantOnboarding = () => {
+    const isSupplier = role === 'supplier';
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">{isSupplier ? 'Supply Category' : 'Trade Category'}</label>
+            <Input name={isSupplier ? 'supplyCategory' : 'tradeCategory'} placeholder={isSupplier ? 'e.g. windows, concrete, sanitaryware' : 'e.g. electrical, wet works, ceilings'} className="h-12 rounded-xl" onChange={handleInputChange} required />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Service Region</label>
+            <Input name="serviceRegion" placeholder="e.g. Gauteng, Cape Town" className="h-12 rounded-xl" onChange={handleInputChange} required />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Package Type</label>
+            <Input name="packageType" placeholder="e.g. labour-only, supply-and-install, product supply" className="h-12 rounded-xl" onChange={handleInputChange} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Warranty / Support Details</label>
+            <Input name="warrantySupportDetails" placeholder="Warranty period, product support, or workmanship guarantee" className="h-12 rounded-xl" onChange={handleInputChange} />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Compliance and close-out evidence you can provide</label>
+          <textarea name="closeOutDocumentationRequirements" className="w-full p-4 rounded-2xl border border-border bg-white text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="COCs, delivery notes, warranties, test certificates, photos, data sheets..." onChange={handleInputChange} />
+        </div>
+        <Button onClick={() => onComplete(formData)} className="w-full h-14 rounded-2xl font-bold text-lg group">
+          Complete {isSupplier ? 'Supplier' : 'Subcontractor'} Profile <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+        </Button>
+      </div>
+    );
+  };
+
   const renderFreelancerOnboarding = () => (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -409,6 +458,7 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
                 {step === 2 && role === 'architect' && renderArchitectOnboarding()}
                 {step === 2 && role === 'bep' && renderBEPOnboarding()}
                 {step === 2 && role === 'contractor' && renderContractorOnboarding()}
+                {step === 2 && (role === 'subcontractor' || role === 'supplier') && renderPackageParticipantOnboarding()}
                 {step === 2 && role === 'freelancer' && renderFreelancerOnboarding()}
               </motion.div>
             </AnimatePresence>

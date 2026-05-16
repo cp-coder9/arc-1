@@ -118,6 +118,8 @@ const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'))
 const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
 const MunicipalTracker = lazyWithChunkRetry(() => import('./components/MunicipalTracker'));
 const KnowledgeSources = lazyWithChunkRetry(() => import('./components/KnowledgeSources').then((module) => ({ default: module.KnowledgeSources })));
+const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));
+const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -200,6 +202,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
+const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -248,6 +251,18 @@ function pageById(pageId: string) {
 
 function resourcesForShell(pageId: string, role: UserRole) {
   return (DASHBOARD_RESOURCE_LINKS[pageId] ?? []).filter((resource) => !resource.roles || resource.roles.includes(role));
+}
+
+function dashboardSectionLabel(group: DashboardPage['group']) {
+  switch (group) {
+    case 'Core workflow': return 'Project';
+    case 'Client tools': return 'Client Tools';
+    case 'BEP tools': return 'BEP Tools';
+    case 'Construction tools': return 'Contractor Tools';
+    case 'Freelancer tools': return 'Freelancer Tools';
+    case 'Governance': return 'System';
+    default: return group;
+  }
 }
 
 export default function App() {
@@ -556,8 +571,10 @@ export default function App() {
                       <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
                       <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
                       <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
-                      <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP" description="Built Environment Professional (Builder, Tiler, etc.)" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                      <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP / Design Team" description="I am a built-environment professional or design-team lead" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
                       <AuthRoleCard data-testid="role-select-contractor" icon={<Factory className="w-8 h-8" />} title="Contractor" description="I manage construction delivery, tendering, and site work" active={roleSelection === 'contractor'} onClick={() => setRoleSelection('contractor')} />
+                      <AuthRoleCard data-testid="role-select-subcontractor" icon={<Hammer className="w-8 h-8" />} title="Subcontractor" description="I deliver a trade package, evidence, and close-out items" active={roleSelection === 'subcontractor'} onClick={() => setRoleSelection('subcontractor')} />
+                      <AuthRoleCard data-testid="role-select-supplier" icon={<Factory className="w-8 h-8" />} title="Supplier" description="I supply materials, products, deliveries, or warranties" active={roleSelection === 'supplier'} onClick={() => setRoleSelection('supplier')} />
                     </div>
                     <div className="space-y-3">
                       <Button onClick={handleGoogleLogin} className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={!roleSelection || isLoggingIn}>
@@ -621,21 +638,37 @@ export default function App() {
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-2" aria-label="Role workspace navigation">
+            <NavSectionLabel>Project</NavSectionLabel>
             <NavItem
               icon={<LayoutDashboard size={18} />}
               label="Command Centre"
               active={activeTab === 'command'}
               onClick={() => { setActiveTab('command'); setIsSidebarOpen(false); }}
+              data-testid="nav-page-command"
             />
-            {pagesForRole(user!.role).filter((page) => page.id !== 'command').map((page) => (
-              <NavItem
-                key={page.id}
-                icon={page.icon}
-                label={page.label}
-                active={activeTab === page.id}
-                onClick={() => { setActiveTab(page.id); setIsSidebarOpen(false); }}
-              />
+            {Object.entries(
+              pagesForRole(user!.role)
+                .filter((page) => page.id !== 'command')
+                .reduce<Record<string, DashboardPage[]>>((sections, page) => {
+                  const section = page.id === 'profile' ? 'Account' : dashboardSectionLabel(page.group);
+                  sections[section] = [...(sections[section] ?? []), page];
+                  return sections;
+                }, {})
+            ).map(([section, pages]) => (
+              <React.Fragment key={section}>
+                {section !== 'Project' && <NavSectionLabel>{section}</NavSectionLabel>}
+                {pages.map((page) => (
+                  <NavItem
+                    key={page.id}
+                    icon={page.icon}
+                    label={page.label}
+                    active={activeTab === page.id}
+                    onClick={() => { setActiveTab(page.id); setIsSidebarOpen(false); }}
+                    data-testid={`nav-page-${page.id}`}
+                  />
+                ))}
+              </React.Fragment>
             ))}
             {user!.role === 'client' && (
               <NavItem
@@ -812,8 +845,10 @@ export default function App() {
               {activeTab === 'files' && <FileManager user={user} />}
               {(activeTab === 'profile-settings' || activeTab === 'profile') && <UserSettings user={user} />}
               {activeTab === 'firm' && <FirmDashboard user={user} />}
-              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab === 'command' || (activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab))) && (
+              {activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />}
+              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
@@ -821,7 +856,6 @@ export default function App() {
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
-                  {(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />}
                 </>
               )}
             </Suspense>
@@ -897,11 +931,10 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
             <h3 className="font-heading text-xl font-bold">Role-aware workflow shell</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               This page is now surfaced from the backend.html role/page matrix while preserving existing APIs.
-              It gives {roleLabel} users a first-class navigation target without introducing unsafe backend changes.
+              It gives {roleLabel} users a first-class navigation target backed by existing services, documents, and role permissions while new write workflows are added incrementally.
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Placeholder actions stay read-only and advisory here. Payment, escrow, signature, provider, and approval
-              decisions still require the existing dedicated workflow plus human confirmation before anything is submitted.
+              Unsafe payment, escrow, signature, provider, and approval decisions remain routed through dedicated workflows with human confirmation before anything is submitted.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-background/70 p-5 space-y-3">
@@ -1179,12 +1212,17 @@ function AuthRoleCard({ icon, title, description, active, onClick, ...props }: {
   );
 }
 
-function NavItem({ icon, label, active, onClick }: any) {
+function NavSectionLabel({ children }: { children: React.ReactNode }) {
+  return <div className="px-4 pt-4 pb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">{children}</div>;
+}
+
+function NavItem({ icon, label, active, onClick, ...props }: any) {
   return (
     <button
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'}`}
+      {...props}
     >
       {icon} <span className="font-bold">{label}</span>
     </button>

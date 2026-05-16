@@ -86,15 +86,36 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab)');
   });
 
-  it('routes shared subcontractor and supplier command fallback to the canonical shell', () => {
-    expect(appSource).toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />`);
-    expect(appSource).not.toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="packages" user={user} />`);
+  it('exposes backend role navigation sections and deterministic page test ids', () => {
+    for (const heading of ['Account', 'Project', 'Client Tools', 'BEP Tools', 'Contractor Tools', 'Freelancer Tools', 'System']) {
+      expect(appSource).toContain(heading);
+    }
+    expect(appSource).toContain('function dashboardSectionLabel');
+    expect(appSource).toContain('data-testid="nav-page-command"');
+    expect(appSource).toContain('data-testid={`nav-page-${page.id}`}');
   });
 
-  it('keeps dashboard shell placeholders read-only, advisory, and human-confirmed for unsafe actions', () => {
-    expect(appSource).toContain('Placeholder actions stay read-only and advisory here.');
-    expect(appSource).toContain('Payment, escrow, signature, provider, and approval');
+  it('routes the shared command page to the real project command centre projection', () => {
+    expect(appSource).toContain("const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));"
+    );
+    expect(appSource).toContain(`activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />`);
+    expect(appSource).not.toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />`);
+  });
+
+  it('routes implemented shared workflow pages to production composed workflow modules', () => {
+    expect(appSource).toContain("const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));"
+    );
+    expect(appSource).toContain('const REAL_WORKFLOW_PAGE_IDS = new Set');
+    for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
+      expect(appSource).toContain(`'${pageId}'`);
+    }
+    expect(appSource).toContain('REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
+  });
+
+  it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
+    expect(appSource).toContain('Unsafe payment, escrow, signature, provider, and approval decisions');
     expect(appSource).toContain('human confirmation before anything is submitted');
+    expect(appSource).toContain('backed by existing services, documents, and role permissions');
   });
 });
 
