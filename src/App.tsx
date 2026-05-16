@@ -215,7 +215,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge', 'toolbox', 'freelancer-submissions', 'resource-sharing']);
+const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge', 'toolbox', 'freelancer-submissions', 'resource-sharing', 'freelancer-work']);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -872,9 +872,10 @@ export default function App() {
               {activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} />}
+              {activeTab === 'freelancer-work' && <FreelancerDashboard user={user} />}
               {activeTab === 'freelancer-submissions' && <FreelancerSubmissionsPage user={user} />}
               {activeTab === 'resource-sharing' && <ResourceSharingPage user={user} />}
-              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && activeTab !== 'technical-brief' && activeTab !== 'directory-search' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>

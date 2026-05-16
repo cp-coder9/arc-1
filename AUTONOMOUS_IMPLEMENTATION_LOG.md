@@ -71,6 +71,7 @@ Hosting target: shared hosting with MySQL
 - Deployment bundle refreshed after latest committed UI changes: `npm run deploy:bundle` completed successfully and produced `release/architex-co-za-upload-bundle.tgz`; predeploy check passed and listed required production environment variables.
 - Full unit regression after latest route/workspace conversions: `npm test` completed successfully with Vitest exit 0. The stderr output is from expected negative-path AI parsing tests, not a product failure.
 
+- Freelancer assigned work: routed `freelancer-work` to the existing production `FreelancerDashboard`, exposing live assigned job cards, task status updates, and project chat instead of the generic shell. Validation passed: `npm run lint`, dashboard registry static tests (28 tests), and `npm run build`.
 - Resource sharing: added `ResourceSharingPage` for `resource-sharing`, backed by live `resource_listings`, `resource_bookings`, and `resource_usage_logs`, using the production `resourceBookingService` for conflict audits and usage billing ledger entries. Booking confirmation, usage logging, and payment release remain human-governed. Validation passed: `npm run lint`, dashboard/resource booking tests (38 tests), and `npm run build`.
 
 ## Blockers / items requiring owner input later
