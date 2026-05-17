@@ -49,3 +49,5 @@ Scope: visual/layout/color redesign of dashboards using `12/` references. Preser
 - 01:04 UTC: Hardened admin-route detection for shared-hosting subpaths by accepting paths that end with `/admin`, and changed admin return link to a relative `./` path so it returns inside the deployed subpath.
 - 01:06 UTC: `npm run lint` and `npm run build` passed after admin-route hardening. First admin E2E rerun hit a navigation timeout on the first test, then the admin-only rerun passed 3/3 at 01:07 UTC.
 - 01:12 UTC: Deployment diagnosis showed the committed hardening only included the relative admin return link, not the `endsWith('/admin')` route detection. Reapplied the route detection explicitly for the shared-hosting subpath.
+- 01:15 UTC: Final relative-base production build passed; staged bundle contained both exact `/admin` and hosted-subpath `endsWith('/admin')` route checks; uploaded 74 files via explicit FTPS.
+- 01:17 UTC: Public verification passed for landing and `/admin` at `https://architex.co.za/architex.co.za/ai/`; no missing resources and no console errors on either route.
