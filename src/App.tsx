@@ -1263,7 +1263,7 @@ function AdminLoginPage({
               </div>
             )}
             <Button variant="link" asChild className="w-full text-muted-foreground">
-              <a href="/">Return to Marketplace</a>
+              <a href="./">Return to Marketplace</a>
             </Button>
           </CardContent>
         </Card>

@@ -45,3 +45,6 @@ Scope: visual/layout/color redesign of dashboards using `12/` references. Preser
 - 00:54 UTC: Admin E2E rerun alone passed 3/3, indicating the blank admin page was a transient first-run flake rather than a code regression.
 - 00:55 UTC: Started full Chromium E2E rerun with a non-hanging reporter.
 - 00:58 UTC: Full Chromium E2E rerun passed, 18/18 tests, using non-hanging line reporter.
+- 01:03 UTC: Public root deployment verification loaded the new build with no bad resources and no console errors; the first verification script failed only because it looked for mixed-case landing copy while browser text was uppercased by CSS.
+- 01:04 UTC: Hardened admin-route detection for shared-hosting subpaths by accepting paths that end with `/admin`, and changed admin return link to a relative `./` path so it returns inside the deployed subpath.
+- 01:06 UTC: `npm run lint` and `npm run build` passed after admin-route hardening. First admin E2E rerun hit a navigation timeout on the first test, then the admin-only rerun passed 3/3 at 01:07 UTC.
