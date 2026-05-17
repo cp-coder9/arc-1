@@ -195,9 +195,9 @@ describe('canonical dashboard page registry', () => {
     expect(disputeResolutionSource).not.toContain('orderBy(');
   });
 
-  it('backs package construction OS with package-linked live operations for contractor-side roles', () => {
+  it('backs package construction OS with package-linked live operations for contractor-side and admin roles', () => {
     expect(workflowSource).toContain("import PackageConstructionOpsPage from './PackageConstructionOpsPage';");
-    expect(workflowSource).toContain("pageId === 'construction' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)");
+    expect(workflowSource).toContain("pageId === 'construction' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)");
     expect(workflowSource).toContain('return <PackageConstructionOpsPage user={user} />;');
     for (const collection of ["'rfis'", "'site_logs'", "'gantt_tasks'", "'site_inspections'", "'package_snags'"]) {
       expect(packageConstructionSource).toContain(`collection(db, ${collection})`);

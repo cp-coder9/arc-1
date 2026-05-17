@@ -112,7 +112,7 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
     return <DisputeResolutionPage user={user} />;
   }
 
-  if (pageId === 'construction' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)) {
+  if (pageId === 'construction' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)) {
     return <PackageConstructionOpsPage user={user} />;
   }
 

@@ -351,3 +351,23 @@ Deployment and broad validation for admin governance tool-set pass:
 - Uploaded 74 production files to `https://test.architex.co.za/` by explicit FTPS.
 - Live verification passed for the landing route and `/admin` route with zero bad resources.
 - Direct deployed chunk verification passed for `assets/AdminDashboard-BC12cKUe.js`; it returned HTTP 200 and contained the new governance tool code.
+
+## 2026-05-17 Construction OS admin routing pass
+
+Scope followed from `backend.html`: make the canonical Construction OS page resolve to the existing live package operations workspace for all construction-governance roles, including admin, instead of sending admin through the generic project-only fallback.
+
+Implemented:
+
+- Updated `ProjectWorkflowPage` so `pageId === 'construction'` routes contractor, subcontractor, supplier, and admin users to `PackageConstructionOpsPage`.
+- Kept the existing live-data construction workspace unchanged: it reads package-linked RFIs, site logs, programme tasks, inspections, and snags, and preserves its role-gated capture behavior.
+- Updated the dashboard registry static test to assert that admin is included in the live Construction OS route.
+
+Validation completed for this pass:
+
+- `npm run lint`
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts --testTimeout 20000`
+- Result: 1 focused test file passed, 39 tests passed.
+
+Human review note:
+
+- This was a routing/integration fix only. It did not add new writes, payment actions, approvals, or Firestore rule changes.
