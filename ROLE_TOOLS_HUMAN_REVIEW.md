@@ -405,3 +405,18 @@ Validation completed for this pass so far:
 Human review note:
 
 - This slice creates document-control metadata and transmittal logs only. The human still needs to confirm any real-world issue/delivery outside the platform.
+
+Deployment and broad validation for Drawing Register and transmittal control pass:
+
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed.
+- Admin route Playwright isolation after a startup timing flake: `npx playwright test e2e/admin-review.spec.ts --project=chromium --reporter=line` passed, 3/3.
+- Full Chromium E2E rerun: `npx playwright test --project=chromium --reporter=line` passed, 22/22.
+- Production build: `npx vite build --base ./` passed, 3060 modules transformed.
+- Uploaded 75 production files to `https://test.architex.co.za/` by explicit FTPS.
+- Live verification passed for `https://test.architex.co.za/` with title `Architex | Built Environment OS` and zero bad resources.
+- Direct deployed chunk verification passed for `assets/DrawingRegisterPage-B_bj1Mj8.js`; it returned HTTP 200 and contained the Drawing Register, transmittals, documents, coordination_items, and external-delivery disclaimer strings.
+- Firestore rules deployed through the Firebase Rules API:
+  - Ruleset: `projects/gen-lang-client-0880960511/rulesets/b85bddcd-9ec9-4531-ab4f-f0a878110a45`
+  - SHA256: `4c1ba44d93fd61b0c73c149d2733b735cbc0e2864e5f46b8e2f8782425ea7455`
+  - Verification: deployed rules SHA matched local `firestore.rules`.
