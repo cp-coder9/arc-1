@@ -420,3 +420,35 @@ Deployment and broad validation for Drawing Register and transmittal control pas
   - Ruleset: `projects/gen-lang-client-0880960511/rulesets/b85bddcd-9ec9-4531-ab4f-f0a878110a45`
   - SHA256: `4c1ba44d93fd61b0c73c149d2733b735cbc0e2864e5f46b8e2f8782425ea7455`
   - Verification: deployed rules SHA matched local `firestore.rules`.
+
+## 2026-05-17 Programme Builder pass
+
+Scope followed from `backend.html`: expand the Programme / Gantt tool into a project programme builder with baseline/current/forecast dates, dependencies, look-ahead planning, recovery programme notes, and human-reviewed baseline changes.
+
+Implemented:
+
+- Upgraded the existing production `GanttChart` component into a `Programme Builder` while preserving its live `projects/{projectId}/gantt_tasks` data source through `constructionService`.
+- Added baseline start/end, current start/end, forecast end, dependency IDs, critical-path marker, recovery programme note, baseline-change reason, baseline review status, and human-approval flag fields to live programme task records.
+- Added programme control panels for critical/delayed tasks, 14-day look-ahead, dependency-linked tasks, recovery items, and pending baseline reviews.
+- Added a clear human-review disclaimer: the tool does not approve extensions of time, payment claims, or contract changes.
+- Extended `GanttTask` typing and Firestore rules for nested project programme tasks with bounded fields and role/project access checks.
+
+Validation completed for this pass:
+
+- Focused validation: `npm run lint && npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts src/services/__tests__/constructionService.test.ts --testTimeout 20000` passed, 3 files / 60 tests.
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed.
+- Admin route Playwright isolation after the known startup timing flake: `npx playwright test e2e/admin-review.spec.ts --project=chromium --reporter=line` passed, 3/3.
+- Full Chromium E2E rerun: `npx playwright test --project=chromium --reporter=line` passed, 22/22.
+- Production build: `npx vite build --base ./` passed, 3060 modules transformed.
+- Uploaded 75 production files to `https://test.architex.co.za/` by explicit FTPS.
+- Live verification passed for `https://test.architex.co.za/` with title `Architex | Built Environment OS` and zero bad resources.
+- Direct deployed chunk verification passed for `assets/CloseoutWizard-C2nuYmFS.js`; it returned HTTP 200 and contained Programme Builder, baselineStartDate, forecastEndDate, Critical path, humanApprovalRequired, and the no-automatic-approval disclaimer.
+- Firestore rules deployed through the Firebase Rules API:
+  - Ruleset: `projects/gen-lang-client-0880960511/rulesets/1e72418d-7da8-44a1-85a4-9c5a3dcb1883`
+  - SHA256: `2aefc2f93262623833b4c3de600ccaecba73f7d95ab713e7e37342f30aba3aa1`
+  - Verification: deployed rules SHA matched local `firestore.rules`.
+
+Human review note:
+
+- Baseline-change reasons are stored as pending human review metadata only. No extension-of-time, claim, payment, or contract variation is approved by this UI.
