@@ -484,3 +484,42 @@ Validation completed for this pass:
 Human review note:
 
 - Site instruction cost/programme impact fields are tracking metadata only. Any claim, variation, extension of time, payment release, or contractual instruction remains a human-controlled workflow outside this record.
+
+### 10. Construction OS Inspection Scheduling and Sign-Off
+Commit: `e2844c17 Add Construction OS inspection scheduling`
+
+- Added a package-linked `Inspection / sign-off` capture path inside `PackageConstructionOpsPage` for contractor, subcontractor, supplier, and admin construction workflows.
+- Writes real `site_inspections` records with:
+  - `packageId`, `projectId`, and `jobId` linkage.
+  - `inspectionType: custom`, scheduled `date`, `inspector`, checklist seed item, notes, and photos array.
+  - `signOffStatus: scheduled` and `humanReviewRequired: true` so inspections cannot auto-certify work.
+- Updated the construction capture copy to make the human-review boundary explicit: site instructions and inspections remain human-reviewed and do not auto-certify work.
+- Tightened Firestore `site_inspections` create rules so new inspection records require `humanReviewRequired == true` in addition to the existing owner/dashboard record gate.
+
+#### Inspection workflow validation and deployment
+
+- Focused validation passed:
+  - `npm run lint`
+  - `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts --testTimeout 20000`
+  - Result: 2 files passed, 54 tests passed.
+- Broad validation passed:
+  - `npm run lint:tests`
+  - `npm test -- --testTimeout 20000`
+  - Result: TypeScript project and unit regression passed.
+  - `npx playwright test e2e/admin-review.spec.ts --project=chromium --reporter=line`
+  - Result: 3 passed after isolating the known admin route startup flake.
+  - `npx playwright test --project=chromium --reporter=line`
+  - Result: 22 passed.
+- Production build/upload passed:
+  - `npx vite build --base ./`
+  - Uploaded 75 files by explicit FTPS to the test production root.
+- Live deployment verification passed:
+  - `https://test.architex.co.za/` returned no bad resources.
+  - Lazy chunk `https://test.architex.co.za/assets/ProjectWorkflowPage-CJ232BtD.js` returned HTTP 200 and contained `site_inspections`, `Inspection / sign-off`, `signOffStatus`, `humanReviewRequired`, and `do not auto-certify work`.
+- Firestore rules deployment passed through the direct Rules API:
+  - Previous ruleset: `projects/gen-lang-client-0880960511/rulesets/e808fd09-715c-435e-8830-d0128005906e`
+  - Active ruleset: `projects/gen-lang-client-0880960511/rulesets/6e708b76-0cf2-4cbb-aaad-f17b4f1e450c`
+  - Deployed rules SHA256: `020af8ba9fdfc2a5f7004d0417be7464ee521c7a46123e0d75b5a4bebd7915c7`
+  - Verification: deployed rules SHA matched local `firestore.rules`.
+
+Human review note: this tool schedules and records inspection intent only. It does not issue completion certificates, final approvals, payment release instructions, or statutory compliance sign-off without human review.
