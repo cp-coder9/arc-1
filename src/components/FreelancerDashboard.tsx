@@ -50,10 +50,10 @@ export default function FreelancerDashboard({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#165a4c' }}>
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Freelancer Portal</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Freelancer Portal</h1>
             <ProfileEditor user={user} />
           </div>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Collaborate with architects on high-end architectural projects.</p>
@@ -127,7 +127,7 @@ function FreelancerJobCard({ task, user }: { task: JobCard, user: UserProfile, k
   };
 
   return (
-    <Card className="interactive-card border-border shadow-sm bg-card overflow-hidden group flex flex-col rounded-3xl">
+    <Card className="beos-record-card overflow-hidden group flex flex-col">
       <div className="p-8 flex-1 space-y-6">
         <div className="flex justify-between items-start">
           <div className="space-y-2">
@@ -233,14 +233,14 @@ function StatCard({ label, value, icon, tone = "default" }: { label: string, val
   }[tone];
 
   return (
-    <Card className="interactive-card border-border shadow-sm bg-card rounded-3xl overflow-hidden group">
+    <Card className="beos-stat-card group">
       <CardContent className="p-6 flex items-center gap-4">
         <div className={`p-3 rounded-2xl ${toneClass}`}>
           {icon}
         </div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-          <p className="text-2xl font-heading font-bold tracking-tight">{value}</p>
+          <p className="beos-label-caps text-muted-foreground">{label}</p>
+          <p className="text-2xl font-heading font-black tracking-[-0.04em]">{value}</p>
         </div>
       </CardContent>
     </Card>

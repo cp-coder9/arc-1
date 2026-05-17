@@ -122,16 +122,16 @@ export default function ClientDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 md:p-10 rounded-[2.5rem] border border-primary/10 shadow-2xl shadow-primary/5 relative overflow-hidden group transition-all duration-500 hover:shadow-primary/10">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-4xl md:text-6xl font-heading font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Welcome, {user.displayName}</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Welcome, {user.displayName}</h1>
             <ProfileEditor user={user} />
           </div>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed font-medium">Manage your projects and connect with elite architectural experts.</p>
         </div>
         <Dialog open={isPosting} onOpenChange={setIsPosting}>
-          <DialogTrigger render={<Button className="rounded-2xl h-14 md:h-16 px-8 md:px-10 font-bold tracking-wide text-lg shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all duration-300"><Plus className="mr-2" /> Post New Job</Button>} />
+          <DialogTrigger render={<Button className="rounded-full h-14 px-8 font-bold tracking-wide text-base beos-button-shadow hover:scale-[1.02] transition-all duration-300"><Plus className="mr-2" /> Post New Job</Button>} />
           <DialogContent className="sm:max-w-[500px] rounded-3xl">
              <DialogHeader>
                 <DialogTitle>Post a New Job</DialogTitle>
@@ -161,14 +161,14 @@ export default function ClientDashboard({
                   <PaginationControls page={jobPage} totalPages={jobPages} onPageChange={setJobPage} />
                 )}
                 {myJobs.length === 0 && !loading && (
-                  <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                  <div className="empty-state py-20 text-center">
                     <p className="text-muted-foreground italic">You haven't posted any jobs yet.</p>
                   </div>
                 )}
             </div>
           </div>
           <div className="space-y-8">
-            <Card className="border-primary/10 shadow-xl shadow-primary/5 bg-white/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500">
+            <Card className="beos-section-card">
                 <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent p-6 border-b border-border/50">
                   <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                     <Star size={16} className="text-yellow-500 fill-yellow-500" /> Professional Feedback
@@ -201,7 +201,7 @@ export default function ClientDashboard({
               <div key={job.id}><ClientJobCard job={job} user={user} /></div>
             ))}
             {myJobs.length === 0 && !loading && (
-              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+              <div className="empty-state col-span-full py-20 text-center">
                 <p className="text-muted-foreground italic">No projects found.</p>
               </div>
             )}
@@ -354,7 +354,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   };
 
   return (
-    <Card className="border-border shadow-sm bg-white overflow-hidden rounded-3xl hover:border-primary/30 transition-all group">
+    <Card className="beos-record-card overflow-hidden group">
       <div className="p-8 space-y-6">
         <div className="flex justify-between items-start">
           <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest font-bold">
@@ -413,7 +413,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
               <Users size={12} /> Architect Applications
             </p>
             {applications.map(application => (
-              <div key={application.id} className="rounded-xl bg-white border border-border p-4 space-y-3">
+              <div key={application.id} className="rounded-xl bg-card/95 border border-border p-4 space-y-3">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-bold text-foreground">{application.architectName}</p>
@@ -471,7 +471,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
 
 function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
       <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
       <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
       <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>

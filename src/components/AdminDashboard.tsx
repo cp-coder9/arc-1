@@ -832,9 +832,9 @@ export default function AdminDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#ba1a1a' }}>
         <div>
-          <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground flex items-center gap-4">
+          <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground flex items-center gap-4">
              <Shield className="text-primary w-12 h-12" /> Admin Command Center
           </h1>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl mt-2 leading-relaxed">Platform orchestration and agent supervision.</p>
@@ -857,7 +857,7 @@ export default function AdminDashboard({
         };
         onTabChange?.(reverseMapping[val] || val);
       }} className="w-full">
-        <div className="mb-8 rounded-[2rem] border border-border bg-white/80 p-3 shadow-sm">
+        <div className="mb-8 rounded-[1.25rem] border border-border beos-glass p-3 beos-soft-shadow">
           <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-[1.5rem] bg-secondary/40 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             <TabsTrigger value="submissions" className={tabTriggerClass}>
               <FileText size={16} /> Submissions
@@ -908,7 +908,7 @@ export default function AdminDashboard({
         </div>
 
         <TabsContent value="submissions">
-           <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-border space-y-6 shadow-sm">
+           <div className="beos-section-card p-5 md:p-8 space-y-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">Submissions Review Pipeline</h2>
@@ -951,7 +951,7 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="disputes">
-          <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
+          <div className="beos-section-card p-8 space-y-6">
             <h2 className="text-2xl font-bold">Dispute Mediation</h2>
             <div className="space-y-3">
               {pagedDisputes.map(dispute => <div key={dispute.id}><DisputeRow dispute={dispute} /></div>)}
@@ -1569,10 +1569,10 @@ function DisputeRow({ dispute }: { dispute: Dispute }) {
 
 function StatCard({ title, value }: { title: string; value: number }) {
   return (
-    <Card className="border-border shadow-sm bg-white rounded-3xl">
+    <Card className="beos-stat-card">
       <CardHeader>
-        <CardDescription className="uppercase text-[10px] tracking-widest font-bold">{title}</CardDescription>
-        <CardTitle className="text-3xl font-heading">{value}</CardTitle>
+        <CardDescription className="beos-label-caps text-muted-foreground">{title}</CardDescription>
+        <CardTitle className="beos-metric">{value}</CardTitle>
       </CardHeader>
     </Card>
   );
@@ -1580,7 +1580,7 @@ function StatCard({ title, value }: { title: string; value: number }) {
 
 function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
       <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
       <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
       <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>

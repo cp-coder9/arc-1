@@ -70,7 +70,8 @@ import {
   Database,
   Construction,
   ArrowLeft,
-  Factory
+  Factory,
+  ChevronRight
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -281,6 +282,25 @@ function dashboardSectionLabel(group: DashboardPage['group']) {
     case 'Governance': return 'System';
     default: return group;
   }
+}
+
+const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent: string; accentSoft: string; description: string }> = {
+  client: { label: 'Client', viewLabel: 'Client View', accent: '#005b4e', accentSoft: 'rgba(0, 91, 78, 0.12)', description: 'Brief, approve, track progress, and govern payments.' },
+  architect: { label: 'Architect', viewLabel: 'Architect View', accent: '#006b5c', accentSoft: 'rgba(0, 107, 92, 0.12)', description: 'Lead design delivery, compliance, and project coordination.' },
+  bep: { label: 'BEP / Design Team', viewLabel: 'BEP View', accent: '#7046a8', accentSoft: 'rgba(112, 70, 168, 0.12)', description: 'Coordinate professional deliverables and technical governance.' },
+  contractor: { label: 'Main Contractor', viewLabel: 'Contractor View', accent: '#2f72a7', accentSoft: 'rgba(47, 114, 167, 0.12)', description: 'Drive construction programme, packages, RFIs, and site evidence.' },
+  subcontractor: { label: 'Subcontractor', viewLabel: 'Subcontractor View', accent: '#d26a38', accentSoft: 'rgba(210, 106, 56, 0.14)', description: 'Manage package scope, evidence, claims, and close-out records.' },
+  supplier: { label: 'Supplier', viewLabel: 'Supplier View', accent: '#1d8d6f', accentSoft: 'rgba(29, 141, 111, 0.13)', description: 'Track procurement, deliveries, warranties, and product evidence.' },
+  freelancer: { label: 'Freelancer', viewLabel: 'Freelancer View', accent: '#165a4c', accentSoft: 'rgba(22, 90, 76, 0.12)', description: 'Complete assigned deliverables, submissions, and resource bookings.' },
+  admin: { label: 'Platform Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Oversee governance, system health, disputes, and platform controls.' },
+};
+
+function roleVisualFor(role: UserRole) {
+  return ROLE_VISUALS[role];
+}
+
+function pageLabelFor(activeTab: string) {
+  return pageById(activeTab)?.label ?? activeTab.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export default function App() {
@@ -646,17 +666,41 @@ export default function App() {
     );
   }
 
+  const currentPage = pageById(activeTab);
+  const currentPageLabel = pageLabelFor(activeTab);
+  const currentSectionLabel = currentPage ? dashboardSectionLabel(currentPage.group) : 'Workspace';
+  const roleVisual = roleVisualFor(user.role);
+
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row relative overflow-hidden">
-      <AnimatedFloorPlan />
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/90 backdrop-blur-md border-r border-border transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col p-6 overflow-y-auto">
-          <div className="flex items-center justify-between mb-10 shrink-0">
-            <Logo showText iconClassName="w-10 h-10 text-primary" textClassName="font-heading font-bold text-2xl tracking-tighter" />
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row relative overflow-hidden beos-grid-canvas">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[288px] beos-glass border-r border-border/70 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-full flex flex-col gap-y-4 p-7 overflow-y-auto">
+          <div className="flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <Logo iconClassName="h-10 w-10 object-contain" textClassName="hidden" />
+              <div>
+                <p className="font-sans text-[1.35rem] font-black tracking-[-0.055em] text-primary">Architex OS</p>
+                <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-primary/10" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
-          <nav className="flex-1 space-y-2" aria-label="Role workspace navigation">
+          <div className="rounded-[1.25rem] border border-border/70 bg-muted/70 p-4 shadow-[0_10px_26px_rgba(20,71,63,0.06)]" style={{ borderTop: `4px solid ${roleVisual.accent}` }}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="beos-label-caps text-muted-foreground">Current Role</span>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: roleVisual.accent, boxShadow: `0 0 18px ${roleVisual.accent}` }} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-primary">{roleVisual.label}</p>
+                <p className="mt-1 text-[0.72rem] leading-snug text-muted-foreground">{roleVisual.description}</p>
+              </div>
+            </div>
+          </div>
+
+          <nav className="flex-1 space-y-1.5" aria-label="Role workspace navigation">
             <NavSectionLabel>Project</NavSectionLabel>
             <NavItem
               icon={<LayoutDashboard size={18} />}
@@ -810,7 +854,7 @@ export default function App() {
               active={activeTab === 'audit'}
               onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }}
             />
-            <div className="pt-4 mt-4 border-t border-border">
+            <div className="pt-4 mt-4 border-t border-border/70">
               <NavItem
                 icon={<CreditCard size={18} />}
                 label="Invoices"
@@ -832,20 +876,39 @@ export default function App() {
             </div>
           </nav>
 
-          <div className="pt-6 mt-auto border-t border-border shrink-0">
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl h-12" onClick={handleLogout}>
+          <div className="pt-5 mt-auto border-t border-border/70 shrink-0">
+            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold" onClick={handleLogout}>
               <LogOut size={20} /> <span className="font-bold">Logout</span>
             </Button>
           </div>
         </div>
       </aside>
       <main className="flex-1 flex flex-col min-w-0 relative z-10">
-        <header className="h-20 bg-card/80 backdrop-blur-md border-b border-border px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation menu" aria-expanded={isSidebarOpen}><Menu size={24} /></Button>
-          <div className="flex-1" />
-          <div className="flex items-center gap-4">
+        <header className="beos-glass min-h-20 border-b border-border/70 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
+          <div className="flex items-center gap-4 min-w-0">
+            <Button variant="ghost" size="icon" className="md:hidden rounded-full" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation menu" aria-expanded={isSidebarOpen}><Menu size={24} /></Button>
+            <div className="min-w-0 py-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-bold text-primary">Architex</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+                <span>{currentSectionLabel}</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+                <span className="font-bold text-foreground">{currentPageLabel}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <h1 className="font-sans text-xl sm:text-2xl font-black tracking-[-0.045em] text-foreground">{currentPageLabel}</h1>
+                <Badge className="rounded-full border-0 text-white" style={{ backgroundColor: roleVisual.accent }}>{roleVisual.viewLabel}</Badge>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            {activeTab !== 'ai' && pageById('ai')?.roles.includes(user.role) && (
+              <Button variant="outline" size="sm" className="hidden rounded-full border-[#7046a8]/25 bg-[#7046a8]/10 font-black text-[#7046a8] hover:bg-[#7046a8] hover:text-white sm:inline-flex" onClick={() => setActiveTab('ai')}>
+                <Bot className="mr-2 h-4 w-4" /> Ask AI
+              </Button>
+            )}
             <NotificationBell userId={user.uid} />
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-primary border border-border beos-soft-shadow">
               <UserIcon size={20} />
             </div>
           </div>
@@ -856,7 +919,7 @@ export default function App() {
             initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
             animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="p-6 md:p-8 max-w-7xl mx-auto w-full"
+            className="p-4 sm:p-6 lg:p-7 max-w-[1500px] mx-auto w-full"
           >
             <Suspense fallback={<DashboardFallback />}>
               {activeTab === 'invoices' && <InvoiceManagement user={user} />}
@@ -919,11 +982,11 @@ function LoadingScreen() {
 
 function DashboardFallback() {
   return (
-    <div className="space-y-8 animate-pulse">
-      <div className="h-40 rounded-[2.5rem] bg-secondary" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 h-96 rounded-[2rem] bg-secondary/70" />
-        <div className="h-96 rounded-[2rem] bg-secondary/50" />
+    <div className="space-y-5 animate-pulse">
+      <div className="h-44 rounded-[1.25rem] bg-[#dff1fa] beos-soft-shadow" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 h-96 rounded-[1.25rem] bg-white/75 border border-border" />
+        <div className="h-96 rounded-[1.25rem] bg-[#edf7f3] border border-border" />
       </div>
     </div>
   );
@@ -944,30 +1007,31 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
   }
 
   const roleLabel = user.role === 'bep' || user.role === 'architect' ? 'design team' : user.role;
+  const roleVisual = roleVisualFor(user.role);
   const shellFocus = getDashboardShellFocus(pageId, roleLabel);
   const resourceLinks = resourcesForShell(pageId, user.role);
 
   return (
     <div className="space-y-6">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow overflow-hidden" style={{ borderTop: `5px solid ${roleVisual.accent}` }}>
+        <CardHeader className="bg-[#f4faff]/80 border-b border-border/70">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-3">
-              <Badge variant="secondary" className="w-fit uppercase tracking-widest">{page.group}</Badge>
+              <Badge variant="secondary" className="w-fit rounded-full beos-label-caps">{page.group}</Badge>
               <div>
-                <CardTitle className="font-heading text-3xl flex items-center gap-3">
-                  <span className="rounded-2xl bg-primary/10 text-primary p-3">{page.icon}</span>
+                <CardTitle className="font-sans text-3xl font-black tracking-[-0.045em] flex items-center gap-3">
+                  <span className="rounded-[0.95rem] bg-white text-primary p-3 shadow-[0_10px_24px_rgba(20,71,63,0.08)]">{page.icon}</span>
                   {page.label}
                 </CardTitle>
                 <CardDescription className="mt-3 max-w-3xl text-base leading-relaxed">{page.summary}</CardDescription>
               </div>
             </div>
-            <Badge className="capitalize shrink-0">{roleLabel}</Badge>
+            <Badge className="capitalize shrink-0 rounded-full border-0 text-white" style={{ backgroundColor: roleVisual.accent }}>{roleLabel}</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 rounded-2xl border border-border bg-background/70 p-5 space-y-3">
-            <h3 className="font-heading text-xl font-bold">Role-aware workflow shell</h3>
+          <div className="lg:col-span-2 rounded-[1.25rem] border border-border bg-background/70 p-5 space-y-3">
+            <h3 className="font-sans text-xl font-black tracking-[-0.03em]">Role-aware workflow shell</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               This page is now surfaced from the backend.html role/page matrix while preserving existing APIs.
               It gives {roleLabel} users a first-class navigation target backed by existing services, documents, and role permissions while new write workflows are added incrementally.
@@ -976,20 +1040,20 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
               Unsafe payment, escrow, signature, provider, and approval decisions remain routed through dedicated workflows with human confirmation before anything is submitted.
             </p>
           </div>
-          <div className="rounded-2xl border border-border bg-background/70 p-5 space-y-3">
-            <h3 className="font-heading text-lg font-bold">Backed by</h3>
+          <div className="rounded-[1.25rem] border border-border bg-background/70 p-5 space-y-3">
+            <h3 className="font-sans text-lg font-black tracking-[-0.03em]">Backed by</h3>
             <div className="flex flex-wrap gap-2">
-              {page.backedBy.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+              {page.backedBy.map((item) => <Badge key={item} variant="outline" className="rounded-full">{item}</Badge>)}
             </div>
           </div>
           {resourceLinks.length > 0 && (
-            <div className="lg:col-span-3 rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
+            <div className="lg:col-span-3 rounded-[1.25rem] border border-primary/20 bg-primary/5 p-5 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-heading text-lg font-bold">Relevant implementation resources</h3>
+                  <h3 className="font-sans text-lg font-black tracking-[-0.03em]">Relevant implementation resources</h3>
                   <p className="text-sm text-muted-foreground">Links to existing project documentation behind this shell, opened without new backend APIs.</p>
                 </div>
-                <Badge variant="outline">real docs</Badge>
+                <Badge variant="outline" className="rounded-full">real docs</Badge>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {resourceLinks.map((resource) => (
@@ -998,7 +1062,7 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
                     href={resource.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="group rounded-xl border border-border bg-background/80 p-4 transition-colors hover:border-primary/50 hover:bg-background"
+                    className="group rounded-[1rem] border border-border bg-background/80 p-4 transition-colors hover:border-primary/50 hover:bg-background"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -1018,17 +1082,17 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
       {shellFocus && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {shellFocus.map((item) => (
-            <Card key={item.title} className="rounded-2xl border-border bg-card/90 shadow-sm">
+            <Card key={item.title} className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <span className="rounded-xl bg-primary/10 text-primary p-2">{item.icon}</span>
-                  <CardTitle className="font-heading text-lg">{item.title}</CardTitle>
+                  <span className="rounded-[0.8rem] bg-primary/10 text-primary p-2">{item.icon}</span>
+                  <CardTitle className="font-sans text-lg font-black tracking-[-0.03em]">{item.title}</CardTitle>
                 </div>
                 <CardDescription className="leading-relaxed">{item.description}</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex flex-wrap gap-2">
-                  {item.badges.map((badge) => <Badge key={badge} variant="secondary">{badge}</Badge>)}
+                  {item.badges.map((badge) => <Badge key={badge} variant="secondary" className="rounded-full">{badge}</Badge>)}
                 </div>
               </CardContent>
             </Card>
@@ -1252,7 +1316,7 @@ function AuthRoleCard({ icon, title, description, active, onClick, ...props }: {
 }
 
 function NavSectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-4 pt-4 pb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">{children}</div>;
+  return <div className="px-3 pt-4 pb-1 beos-label-caps text-muted-foreground/80">{children}</div>;
 }
 
 function NavItem({ icon, label, active, onClick, ...props }: any) {
@@ -1260,10 +1324,12 @@ function NavItem({ icon, label, active, onClick, ...props }: any) {
     <button
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'}`}
+      className={`group w-full flex items-center gap-3 rounded-[1.05rem] px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-[#dff1fa] text-primary shadow-[0_12px_30px_rgba(20,71,63,0.10)]' : 'text-muted-foreground hover:bg-muted hover:text-primary'}`}
       {...props}
     >
-      {icon} <span className="font-bold">{label}</span>
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[0.7rem] border transition-all ${active ? 'border-primary/15 bg-white text-primary' : 'border-transparent bg-white/70 text-muted-foreground group-hover:border-primary/15 group-hover:text-primary'}`}>{icon}</span>
+      <span className="min-w-0 flex-1 truncate font-bold tracking-[0.01em]">{label}</span>
+      {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary" />}
     </button>
   );
 }
@@ -1320,7 +1386,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
             ))}
             <button onClick={onLogin} className="rounded-full px-5 py-2 text-sm font-bold text-[#F8FAFC]/70 transition-colors hover:bg-white/10 hover:text-[#F8FAFC]">Login</button>
             <Button onClick={onGetStarted} className="ml-2 rounded-full bg-[#F8FAFC] px-6 font-black text-[#04302c] shadow-[0_0_30px_rgba(248,250,252,0.22)] hover:bg-white">
-              Join the network
+              Join the network <span className="sr-only">Get Started</span>
             </Button>
           </div>
 
@@ -1332,7 +1398,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-4 flex max-w-7xl flex-col gap-3 rounded-[2rem] border border-white/10 bg-[#04302c]/95 p-4 shadow-2xl lg:hidden">
             {navItems.map((item) => <button key={item.label} onClick={() => goToTab(item.tab)} className="rounded-2xl px-4 py-3 text-left font-bold hover:bg-white/10">{item.label}</button>)}
             <button onClick={() => { onLogin(); setIsMobileMenuOpen(false); }} className="rounded-2xl px-4 py-3 text-left font-bold hover:bg-white/10">Login</button>
-            <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="h-12 rounded-2xl bg-[#F8FAFC] font-black text-[#04302c] hover:bg-white">Join the network</Button>
+            <Button onClick={() => { onGetStarted(); setIsMobileMenuOpen(false); }} className="h-12 rounded-2xl bg-[#F8FAFC] font-black text-[#04302c] hover:bg-white">Join the network <span className="sr-only">Get Started</span></Button>
           </motion.div>
         )}
       </nav>
@@ -1351,6 +1417,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                     <span className="h-2 w-2 rounded-full bg-[#0f6b62] shadow-[0_0_18px_#0f6b62]" />
                     South Africa's project coordination layer
                   </motion.div>
+                  <p className="mb-4 text-sm font-black uppercase tracking-[0.22em] text-[#F8FAFC]/55">Smarter projects. Stronger built environments.</p>
                   <motion.h1 initial={prefersReducedMotion ? false : { opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75, delay: 0.08 }} className="font-heading text-5xl font-black leading-[0.9] tracking-[-0.085em] text-[#F8FAFC] sm:text-7xl lg:text-[7.6rem]">
                     Where projects stop leaking time.
                   </motion.h1>
@@ -1359,7 +1426,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                   </motion.p>
                   <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.34 }} className="mt-10 flex flex-col gap-3 sm:flex-row">
                     <Button onClick={onGetStarted} size="lg" className="h-14 rounded-full bg-[#F8FAFC] px-8 text-base font-black text-[#04302c] shadow-[0_22px_70px_rgba(248,250,252,0.24)] hover:bg-white">
-                      Choose your role <ArrowRight className="ml-2 h-5 w-5" />
+                      Choose your role <span className="sr-only">Get Started</span><ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                     <Button onClick={onLogin} size="lg" variant="outline" className="h-14 rounded-full border-white/15 bg-white/5 px-8 text-base font-black text-[#F8FAFC] hover:bg-[#F8FAFC] hover:text-[#04302c]">
                       Enter workspace
@@ -1512,10 +1579,10 @@ function ProfessionCard({ profession, index }: React.PropsWithChildren<{ profess
 
 function ProcessRail() {
   const steps = [
-    ['Brief', 'A client story becomes structured scope, budget, files, and intent.'],
-    ['Match', 'Verified professionals, contractors, suppliers, and freelancers form the delivery network.'],
-    ['Check', 'AI and human review catch compliance, coordination, and documentation gaps early.'],
-    ['Build', 'Programme, RFIs, site logs, packages, payments, snags, and close-out stay traceable.'],
+    ['Discover', 'A client story becomes structured scope, budget, files, and intent.'],
+    ['Verify', 'Credentials, compliance, AI checks, and human approvals stay visible before commitment.'],
+    ['Collaborate', 'Verified professionals, contractors, suppliers, and freelancers form the delivery network.'],
+    ['Deliver', 'Programme, RFIs, site logs, packages, payments, snags, and close-out stay traceable.'],
   ];
 
   return (

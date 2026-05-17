@@ -57,12 +57,12 @@ export default function AICoPilotPage({ user, onNavigate }: { user: UserProfile;
 
   return (
     <div className="space-y-6" data-testid="ai-copilot-page">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow overflow-hidden" style={{ borderTop: '5px solid #7046a8' }}>
+        <CardHeader className="bg-accent/5 border-b border-border">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-              <Badge variant="secondary" className="uppercase tracking-widest">AI Co-Pilot</Badge>
-              <CardTitle className="font-heading text-3xl mt-3 flex items-center gap-3"><Bot className="h-7 w-7 text-primary" /> Grounded AI workflow hub</CardTitle>
+              <Badge variant="secondary" className="rounded-full beos-label-caps">AI Co-Pilot</Badge>
+              <CardTitle className="font-heading text-3xl mt-3 flex items-center gap-3 tracking-[-0.045em]"><Bot className="h-7 w-7 text-accent" /> Grounded AI workflow hub</CardTitle>
               <CardDescription className="mt-2 max-w-3xl text-base">Production AI surfaces with verified knowledge, human-review governance, and direct links to drawing checks, tasks, and resource workflows. This page does not invent chatbot answers or bypass professional sign-off.</CardDescription>
             </div>
             <Badge className="capitalize w-fit">{user.role}</Badge>
@@ -78,7 +78,7 @@ export default function AICoPilotPage({ user, onNavigate }: { user: UserProfile;
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="rounded-2xl border-border bg-card/90 shadow-sm lg:col-span-2">
+        <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow lg:col-span-2">
           <CardHeader><CardTitle className="font-heading text-xl">Grounded knowledge search</CardTitle><CardDescription>Search active `agent_knowledge` records used to ground agent output. Empty states mean no fake knowledge is being injected.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3">
@@ -97,7 +97,7 @@ export default function AICoPilotPage({ user, onNavigate }: { user: UserProfile;
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
+        <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow">
           <CardHeader><CardTitle className="font-heading text-xl">AI workflow routing</CardTitle><CardDescription>Open the real modules that perform governed AI-assisted work.</CardDescription></CardHeader>
           <CardContent className="space-y-3">
             <WorkflowButton label="AI drawing checker" description="Upload drawings and generate preliminary AI review reports." onClick={() => onNavigate?.('drawing-checker')} />
@@ -109,7 +109,7 @@ export default function AICoPilotPage({ user, onNavigate }: { user: UserProfile;
       </div>
 
       {user.role === 'admin' && (
-        <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
+        <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow">
           <CardHeader><CardTitle className="font-heading text-xl">Admin AI knowledge review</CardTitle><CardDescription>Admin-only production queue for approving, rejecting, editing, or deleting agent knowledge.</CardDescription></CardHeader>
           <CardContent><AgentKnowledgeManager user={user} /></CardContent>
         </Card>
@@ -119,9 +119,9 @@ export default function AICoPilotPage({ user, onNavigate }: { user: UserProfile;
 }
 
 function WorkflowButton({ label, description, onClick }: { label: string; description: string; onClick?: () => void }) {
-  return <Button type="button" variant="outline" className="h-auto w-full justify-start rounded-2xl p-4 text-left" onClick={onClick}><span><span className="block font-bold">{label}</span><span className="block text-xs font-normal text-muted-foreground">{description}</span></span></Button>;
+  return <Button type="button" variant="outline" className="h-auto w-full justify-start rounded-2xl p-4 text-left hover:border-accent/40 hover:bg-accent/5" onClick={onClick}><span><span className="block font-bold">{label}</span><span className="block text-xs font-normal text-muted-foreground">{description}</span></span></Button>;
 }
 
 function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
-  return <div className="rounded-2xl border border-border bg-background/70 p-4"><div className="flex items-center gap-2 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}<p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p></div><p className="mt-3 font-heading text-3xl font-black">{value}</p></div>;
+  return <div className="beos-stat-card p-4"><div className="flex items-center gap-2 text-accent [&>svg]:h-5 [&>svg]:w-5">{icon}<p className="beos-label-caps text-muted-foreground">{label}</p></div><p className="mt-3 beos-metric">{value}</p></div>;
 }

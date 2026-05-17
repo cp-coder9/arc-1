@@ -18,6 +18,17 @@ type LoadState = 'loading' | 'ready';
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
+const ROLE_COMMAND_VISUALS: Record<UserProfile['role'], { viewLabel: string; headline: string; description: string; accent: string; accentSoft: string }> = {
+  client: { viewLabel: 'Client View', headline: 'Always know what to do next.', description: 'A guided command centre for approvals, progress, payments, and accountable decisions.', accent: '#005b4e', accentSoft: 'rgba(0, 91, 78, 0.12)' },
+  architect: { viewLabel: 'Architect View', headline: 'Coordinate professional delivery.', description: 'Track design decisions, compliance blockers, and project handoffs without changing workflow data.', accent: '#006b5c', accentSoft: 'rgba(0, 107, 92, 0.12)' },
+  bep: { viewLabel: 'BEP View', headline: 'Manage your professional deliverables.', description: 'Professional oversight and coordination hub for live project records and next actions.', accent: '#7046a8', accentSoft: 'rgba(112, 70, 168, 0.12)' },
+  contractor: { viewLabel: 'Contractor View', headline: 'Drive the construction programme.', description: 'Manage critical path, site blockers, procurement approvals, and delivery evidence.', accent: '#2f72a7', accentSoft: 'rgba(47, 114, 167, 0.12)' },
+  subcontractor: { viewLabel: 'Subcontractor View', headline: 'Keep package delivery moving.', description: 'Focus package tasks, evidence, RFIs, claims, and close-out records from visible live work.', accent: '#d26a38', accentSoft: 'rgba(210, 106, 56, 0.14)' },
+  supplier: { viewLabel: 'Supplier View', headline: 'Make procurement traceable.', description: 'Track orders, deliveries, product records, warranties, and project commitments.', accent: '#1d8d6f', accentSoft: 'rgba(29, 141, 111, 0.13)' },
+  freelancer: { viewLabel: 'Freelancer View', headline: 'Deliver assigned work clearly.', description: 'Stay aligned to delegated tasks, submissions, comments, and resource bookings.', accent: '#165a4c', accentSoft: 'rgba(22, 90, 76, 0.12)' },
+  admin: { viewLabel: 'Admin View', headline: 'Whole-system platform oversight.', description: 'Monitor system health, governance queues, disputes, and operational controls.', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)' },
+};
+
 const canListProjectsByRole = (user: UserProfile) => ['client', 'architect', 'bep', 'admin'].includes(user.role);
 
 function timestampMs(value: unknown): number {
@@ -137,61 +148,69 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   const activeJob = joinedJobs.find((job) => job.status === 'in-progress') ?? joinedJobs[0];
   const activeProject = activeJob?.project ?? projects[0];
   const nextAction = resolveNextAction(user, activeJob);
+  const roleVisual = ROLE_COMMAND_VISUALS[user.role];
   const openApprovals = activeJob?.requirements?.filter(Boolean).length ?? 0;
   const atRisk = activeJob?.deadline && new Date(activeJob.deadline).getTime() < Date.now() && activeJob.status !== 'completed';
 
   return (
     <div className="space-y-6" data-testid="project-command-centre">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow overflow-hidden" style={{ borderTop: `5px solid ${roleVisual.accent}` }}>
+        <CardHeader className="bg-[#f4faff]/80 border-b border-border/70">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-              <Badge variant="secondary" className="uppercase tracking-widest">Project Command Centre</Badge>
-              <CardTitle className="font-heading text-3xl mt-3">{activeJob?.title ?? 'No active project selected'}</CardTitle>
-              <CardDescription className="mt-2 max-w-3xl text-base">
-                Role-aware live projection from Firestore jobs/projects for {user.role}. It never performs approval, payment, signature, or submission actions without the dedicated human-confirmed workflow.
+              <Badge variant="secondary" className="rounded-full beos-label-caps">Command Centre</Badge>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <CardTitle className="font-sans text-3xl sm:text-4xl font-black tracking-[-0.055em]">{activeJob?.title ?? roleVisual.headline}</CardTitle>
+                <Badge className="rounded-full border-0 text-white" style={{ backgroundColor: roleVisual.accent }}>{roleVisual.viewLabel}</Badge>
+              </div>
+              <CardDescription className="mt-3 max-w-3xl text-base leading-relaxed">
+                {activeJob ? roleVisual.description : `${roleVisual.description} No visible live project record is selected yet.`} It never performs approval, payment, signature, or submission actions without the dedicated human-confirmed workflow.
               </CardDescription>
             </div>
-            <Badge className="capitalize w-fit">{user.role}</Badge>
+            <div className="rounded-[1.1rem] border border-border bg-white/80 p-3 min-w-[180px]">
+              <p className="beos-label-caps text-muted-foreground">Live projection</p>
+              <p className="mt-2 text-2xl font-black tracking-[-0.055em]" style={{ color: roleVisual.accent }}>{joinedJobs.length}</p>
+              <p className="text-xs text-muted-foreground">visible job records</p>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
           {state === 'loading' && <div className="lg:col-span-3 flex items-center gap-3 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project state...</div>}
-          <div className="lg:col-span-2 rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
+          <div className="lg:col-span-2 rounded-[1.25rem] border p-5 space-y-4" style={{ borderColor: roleVisual.accent, backgroundColor: roleVisual.accentSoft }}>
             <div className="flex items-center gap-3">
-              <ListChecks className="h-5 w-5 text-primary" />
-              <h3 className="font-heading text-xl font-bold">Next Best Action</h3>
+              <span className="rounded-[0.8rem] bg-white p-2" style={{ color: roleVisual.accent }}><ListChecks className="h-5 w-5" /></span>
+              <h3 className="font-sans text-xl font-black tracking-[-0.03em]">Next Best Action</h3>
             </div>
-            <p className="text-lg font-semibold">{nextAction.label}</p>
+            <p className="text-2xl font-black tracking-[-0.045em]">{nextAction.label}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">{nextAction.detail}</p>
-            <Button onClick={() => onNavigate?.(nextAction.target)} className="rounded-xl gap-2">Take next action <ArrowRight className="h-4 w-4" /></Button>
+            <Button onClick={() => onNavigate?.(nextAction.target)} className="rounded-full gap-2 beos-button-shadow" style={{ backgroundColor: roleVisual.accent }}>Take next action <ArrowRight className="h-4 w-4" /></Button>
           </div>
-          <div className="rounded-2xl border border-border bg-background/70 p-5 space-y-2">
-            <h3 className="font-heading text-lg font-bold">Current Stage</h3>
-            <p className="text-2xl font-black capitalize">{activeProject?.currentStage?.replaceAll('-', ' ') ?? activeJob?.status ?? 'Not started'}</p>
+          <div className="rounded-[1.25rem] border border-border bg-background/70 p-5 space-y-2">
+            <h3 className="beos-label-caps text-muted-foreground">Current Stage</h3>
+            <p className="beos-metric capitalize">{activeProject?.currentStage?.replaceAll('-', ' ') ?? activeJob?.status ?? 'Not started'}</p>
             <p className="text-xs text-muted-foreground">From project lifecycle or job status records.</p>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-        <MetricCard icon={<CheckCircle2 />} label="Open approvals / requirements" value={openApprovals} detail="Requirements and decision points visible from the active job." />
-        <MetricCard icon={<AlertTriangle />} label="At risk / overdue" value={atRisk ? 1 : 0} detail={activeJob?.deadline ? `Deadline: ${activeJob.deadline}` : 'No deadline recorded.'} tone={atRisk ? 'danger' : 'default'} />
-        <MetricCard icon={<FileText />} label="Documents" value="Files" detail="Open the file manager/toolbox for project documents and evidence." target="toolbox" onNavigate={onNavigate} />
-        <MetricCard icon={<WalletCards />} label="Budget & payments" value={activeJob ? currency.format(activeJob.budget || 0) : 'No budget'} detail="Payments remain routed through invoice, escrow, and governance workflows." target="payments" onNavigate={onNavigate} />
+        <MetricCard icon={<CheckCircle2 />} label="Open approvals / requirements" value={openApprovals} detail="Requirements and decision points visible from the active job." accent={roleVisual.accent} />
+        <MetricCard icon={<AlertTriangle />} label="At risk / overdue" value={atRisk ? 1 : 0} detail={activeJob?.deadline ? `Deadline: ${activeJob.deadline}` : 'No deadline recorded.'} tone={atRisk ? 'danger' : 'default'} accent={roleVisual.accent} />
+        <MetricCard icon={<FileText />} label="Documents" value="Files" detail="Open the file manager/toolbox for project documents and evidence." target="toolbox" onNavigate={onNavigate} accent={roleVisual.accent} />
+        <MetricCard icon={<WalletCards />} label="Budget & payments" value={activeJob ? currency.format(activeJob.budget || 0) : 'No budget'} detail="Payments remain routed through invoice, escrow, and governance workflows." target="payments" onNavigate={onNavigate} accent={roleVisual.accent} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <Card className="lg:col-span-2 rounded-2xl border-border bg-card/90">
+        <Card className="lg:col-span-2 rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
           <CardHeader>
-            <CardTitle className="font-heading text-xl">AI Summary</CardTitle>
+            <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">AI Summary</CardTitle>
             <CardDescription>Generated deterministically from live project/job fields. Human review required.</CardDescription>
           </CardHeader>
           <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{buildAiSummary(user, activeJob, activeProject)}</p></CardContent>
         </Card>
-        <Card className="rounded-2xl border-border bg-card/90">
+        <Card className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
           <CardHeader>
-            <CardTitle className="font-heading text-xl">Key Dates</CardTitle>
+            <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">Key Dates</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> Deadline: {activeJob?.deadline ?? 'Not recorded'}</div>
@@ -200,16 +219,21 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
         </Card>
       </div>
 
-      <Card className="rounded-2xl border-border bg-card/90">
+      <Card className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
         <CardHeader>
-          <CardTitle className="font-heading text-xl">Recent Activity</CardTitle>
-          <CardDescription>Latest live jobs visible to this role. No mock activity is generated.</CardDescription>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">Recent Activity</CardTitle>
+              <CardDescription>Latest live jobs visible to this role. No mock activity is generated.</CardDescription>
+            </div>
+            <Badge variant="outline" className="w-fit rounded-full">live data</Badge>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {joinedJobs.length === 0 ? <p className="text-sm text-muted-foreground">No live job or project records are currently visible for this role.</p> : joinedJobs.slice(0, 5).map((job) => (
-            <div key={job.id} className="rounded-xl border border-border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div key={job.id} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div><p className="font-semibold">{job.title}</p><p className="text-xs text-muted-foreground">{job.location ?? 'Location not recorded'} · {job.createdAt}</p></div>
-              <Badge variant={job.status === 'in-progress' ? 'default' : 'secondary'}>{job.status}</Badge>
+              <Badge variant={job.status === 'in-progress' ? 'default' : 'secondary'} className="rounded-full">{job.status}</Badge>
             </div>
           ))}
         </CardContent>
@@ -218,16 +242,16 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   );
 }
 
-function MetricCard({ icon, label, value, detail, tone = 'default', target, onNavigate }: { icon: React.ReactNode; label: string; value: React.ReactNode; detail: string; tone?: 'default' | 'danger'; target?: string; onNavigate?: (pageId: string) => void }) {
+function MetricCard({ icon, label, value, detail, tone = 'default', target, onNavigate, accent }: { icon: React.ReactNode; label: string; value: React.ReactNode; detail: string; tone?: 'default' | 'danger'; target?: string; onNavigate?: (pageId: string) => void; accent: string }) {
   return (
-    <Card className={`rounded-2xl border-border bg-card/90 ${tone === 'danger' ? 'border-destructive/40' : ''}`}>
+    <Card className={`rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow ${tone === 'danger' ? 'border-destructive/40' : ''}`}>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-3 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}<CardTitle className="font-heading text-base">{label}</CardTitle></div>
+        <div className="flex items-center gap-3 [&>svg]:h-5 [&>svg]:w-5" style={{ color: tone === 'danger' ? '#d95747' : accent }}>{icon}<CardTitle className="font-sans text-base font-black tracking-[-0.02em] text-foreground">{label}</CardTitle></div>
       </CardHeader>
       <CardContent className="space-y-2">
-        <div className="text-2xl font-black">{value}</div>
+        <div className="beos-metric">{value}</div>
         <p className="text-xs text-muted-foreground leading-relaxed">{detail}</p>
-        {target && <Button variant="outline" size="sm" className="rounded-xl" onClick={() => onNavigate?.(target)}>Open</Button>}
+        {target && <Button variant="outline" size="sm" className="rounded-full" onClick={() => onNavigate?.(target)}>Open</Button>}
       </CardContent>
     </Card>
   );
