@@ -7,6 +7,8 @@ const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8
 const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
 const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
 const designComplianceSource = readFileSync(resolve(process.cwd(), 'src/components/DesignCompliancePage.tsx'), 'utf8');
+const bepMarketplaceSource = readFileSync(resolve(process.cwd(), 'src/components/BEPClientMarketplacePage.tsx'), 'utf8');
+const designTeamMatrixSource = readFileSync(resolve(process.cwd(), 'src/components/DesignTeamMatrixPage.tsx'), 'utf8');
 const tasksApprovalsSource = readFileSync(resolve(process.cwd(), 'src/components/TasksApprovalsPage.tsx'), 'utf8');
 const projectMessengerSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectMessengerPage.tsx'), 'utf8');
 const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/components/ContractSigningPage.tsx'), 'utf8');
@@ -81,6 +83,8 @@ describe('canonical dashboard page registry', () => {
     expectPage('design', 'Design & Compliance', ['bep', 'architect', 'freelancer', 'admin']);
     expectPage('drawing-checker', 'AI Drawing Checker', ['bep', 'architect', 'freelancer']);
     expectPage('procurement', 'BoQ / BoM Procurement', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
+    expectPage('bep-marketplace', 'Client Marketplace', ['bep', 'architect']);
+    expectPage('bep-team', 'Design Team Matrix', ['bep', 'architect']);
     expectPage('packages', 'Subcontractor Packages', ['contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('freelancer-work', 'Assigned Work', ['freelancer']);
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
@@ -140,7 +144,29 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("return <ProjectMessengerPage user={user} />;");
     expect(workflowSource).toContain("return <ContractSigningPage user={user} />;");
     expect(workflowSource).toContain("return <DisputeResolutionPage user={user} />;");
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-marketplace' && activeTab !== 'bep-team' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+  });
+
+  it('routes backend.html BEP marketplace and design team matrix to live production tools', () => {
+    expect(appSource).toContain("const BEPClientMarketplacePage = lazyWithChunkRetry(() => import('./components/BEPClientMarketplacePage'));");
+    expect(appSource).toContain("const DesignTeamMatrixPage = lazyWithChunkRetry(() => import('./components/DesignTeamMatrixPage'));");
+    expect(appSource).toContain(`activeTab === 'bep-marketplace' && <BEPClientMarketplacePage user={user} />`);
+    expect(appSource).toContain(`activeTab === 'bep-team' && <DesignTeamMatrixPage user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'bep-marketplace'`);
+    expect(appSource).toContain(`activeTab !== 'bep-team'`);
+
+    expect(bepMarketplaceSource).toContain("collection(db, 'jobs')");
+    expect(bepMarketplaceSource).toContain("where('status', '==', 'open')");
+    expect(bepMarketplaceSource).toContain("collection(db, `jobs/${selected.job.id}/applications`)");
+    expect(bepMarketplaceSource).toContain('architectId: user.uid');
+    expect(bepMarketplaceSource).not.toContain('orderBy(');
+
+    expect(designTeamMatrixSource).toContain("collection(db, 'projects')");
+    expect(designTeamMatrixSource).toContain("where('leadArchitectId', '==', user.uid)");
+    expect(designTeamMatrixSource).toContain("collection(db, 'users')");
+    expect(designTeamMatrixSource).toContain('<ResponsibilityMatrix');
+    expect(designTeamMatrixSource).toContain('<TeamBuilder');
+    expect(designTeamMatrixSource).not.toContain('orderBy(');
   });
 
   it('backs shared messenger, contract, and dispute tools with live Firestore records only', () => {
