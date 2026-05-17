@@ -452,3 +452,35 @@ Validation completed for this pass:
 Human review note:
 
 - Baseline-change reasons are stored as pending human review metadata only. No extension-of-time, claim, payment, or contract variation is approved by this UI.
+
+## 2026-05-18 Construction OS site instruction pass
+
+Scope followed from `backend.html`: add a site instruction tool separate from RFIs, with cost/programme impact tracking and audit-friendly human-review gating inside Construction OS.
+
+Implemented:
+
+- Extended the production `PackageConstructionOpsPage` to read/write live `site_instructions` records alongside package RFIs, site logs, programme tasks, inspections, and snags.
+- Added a separate `Site instruction` capture option for contractor, subcontractor, and admin roles. It writes title, instruction, issuedBy, assignedTo, due date, status, cost impact status, programme impact status, and `humanReviewRequired: true`.
+- Added a visible instructions metric card and included instructions in the selected package activity feed.
+- Kept instructions clearly separate from RFIs. Cost/programme impacts are recorded as potential/confirmed metadata only and do not approve claims, variations, extensions of time, payments, or contractual changes.
+- Extended Firestore rules for `site_instructions` with package-linked read access, creator/issuer checks, allowed status/impact enums, mandatory human review, and bounded update fields.
+
+Validation completed for this pass:
+
+- Focused validation: `npm run lint && npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts --testTimeout 20000` passed, 2 files / 54 tests.
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed.
+- Admin route Playwright isolation after the known startup timing flake: `npx playwright test e2e/admin-review.spec.ts --project=chromium --reporter=line` passed, 3/3.
+- Full Chromium E2E rerun: `npx playwright test --project=chromium --reporter=line` passed, 22/22.
+- Production build: `npx vite build --base ./` passed, 3060 modules transformed.
+- Uploaded 75 production files to `https://test.architex.co.za/` by explicit FTPS.
+- Live verification passed for `https://test.architex.co.za/` with title `Architex | Built Environment OS` and zero bad resources.
+- Direct deployed chunk verification passed for `assets/ProjectWorkflowPage--9KHi3S3.js`; it returned HTTP 200 and contained site_instructions, Site instruction, costImpactStatus, programmeImpactStatus, humanReviewRequired, and the separate-from-RFI disclaimer.
+- Firestore rules deployed through the Firebase Rules API:
+  - Ruleset: `projects/gen-lang-client-0880960511/rulesets/e808fd09-715c-435e-8830-d0128005906e`
+  - SHA256: `19f3e5f94fcf12ac0c34331371bbedbcb54ff17fa672e56a37edb2e507f693e0`
+  - Verification: deployed rules SHA matched local `firestore.rules`.
+
+Human review note:
+
+- Site instruction cost/programme impact fields are tracking metadata only. Any claim, variation, extension of time, payment release, or contractual instruction remains a human-controlled workflow outside this record.
