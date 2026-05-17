@@ -5,13 +5,17 @@ import { db } from '@/lib/firebase';
 import type { JobCard, UserProfile } from '@/types';
 import FileManager from './FileManager';
 import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Textarea } from './ui/textarea';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
 export default function FreelancerSubmissionsPage({ user }: { user: UserProfile }) {
   const [state, setState] = useState<LoadState>('loading');
   const [tasks, setTasks] = useState<JobCard[]>([]);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [submissionNotes, setSubmissionNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setState('loading');
@@ -29,14 +33,48 @@ export default function FreelancerSubmissionsPage({ user }: { user: UserProfile 
     total: tasks.length,
     inProgress: tasks.filter((task) => task.status === 'in-progress').length,
     completed: tasks.filter((task) => task.status === 'completed').length,
+    submitted: tasks.filter((task) => task.submissionStatus === 'submitted').length,
+    readyForInvoice: tasks.filter((task) => task.paymentStatus === 'ready_for_invoice').length,
   }), [tasks]);
 
+  const updateTaskRecords = async (task: JobCard, patch: Record<string, unknown>) => {
+    const taskDocId = task.jobTaskId ?? task.id;
+    await updateDoc(doc(db, `jobs/${task.jobId}/tasks`, taskDocId), patch);
+    await updateDoc(doc(db, 'delegatedTasks', taskDocId), patch).catch(() => undefined);
+  };
+
   const updateStatus = async (task: JobCard, status: JobCard['status']) => {
-    await updateDoc(doc(db, `jobs/${task.jobId}/tasks`, task.id), {
-      status,
-      updatedAt: new Date().toISOString(),
-      completedAt: status === 'completed' ? new Date().toISOString() : null,
-    });
+    setUpdatingTaskId(task.id);
+    try {
+      const now = new Date().toISOString();
+      await updateTaskRecords(task, {
+        status,
+        updatedAt: now,
+        completedAt: status === 'completed' ? now : null,
+        ...(status === 'in-progress' ? { submissionStatus: 'not_submitted', paymentStatus: 'not_ready' } : {}),
+      });
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const submitDeliverable = async (task: JobCard) => {
+    setUpdatingTaskId(task.id);
+    try {
+      const now = new Date().toISOString();
+      await updateTaskRecords(task, {
+        status: 'completed',
+        submissionStatus: 'submitted',
+        submittedAt: now,
+        completedAt: now,
+        updatedAt: now,
+        paymentStatus: 'review_pending',
+        notes: submissionNotes[task.id]?.trim() || task.notes,
+      });
+      setSubmissionNotes((current) => ({ ...current, [task.id]: '' }));
+    } finally {
+      setUpdatingTaskId(null);
+    }
   };
 
   return (
@@ -52,12 +90,14 @@ export default function FreelancerSubmissionsPage({ user }: { user: UserProfile 
             <Badge className="capitalize w-fit">{user.role}</Badge>
           </div>
         </CardHeader>
-        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {state === 'loading' && <div className="md:col-span-3 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading assigned work...</div>}
-          {state === 'error' && <div className="md:col-span-3 text-sm text-destructive">Unable to load assigned work. Check project/task access.</div>}
+        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+          {state === 'loading' && <div className="md:col-span-5 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading assigned work...</div>}
+          {state === 'error' && <div className="md:col-span-5 text-sm text-destructive">Unable to load assigned work. Check project/task access.</div>}
           <MetricCard icon={<FileText />} label="Assigned" value={stats.total} />
           <MetricCard icon={<Clock />} label="In progress" value={stats.inProgress} />
+          <MetricCard icon={<Send />} label="Submitted" value={stats.submitted} />
           <MetricCard icon={<CheckCircle2 />} label="Completed" value={stats.completed} />
+          <MetricCard icon={<CheckCircle2 />} label="Invoice ready" value={stats.readyForInvoice} />
         </CardContent>
       </Card>
 
@@ -68,9 +108,16 @@ export default function FreelancerSubmissionsPage({ user }: { user: UserProfile 
             <div key={task.id} className="rounded-xl border border-border p-4 text-sm">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                 <div><p className="font-semibold">{task.assigneeRole || 'Deliverable'}</p><p className="mt-1 text-xs text-muted-foreground">Due: {task.deadline || 'No deadline'} · {task.notes || 'No notes recorded'}</p></div>
-                <select value={task.status} onChange={(event) => updateStatus(task, event.target.value as JobCard['status'])} className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-bold uppercase tracking-widest">
-                  <option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="completed">Completed</option>
-                </select>
+                <div className="flex flex-wrap gap-2"><Badge>{task.status}</Badge>{task.submissionStatus && <Badge variant="secondary">{task.submissionStatus.replaceAll('_', ' ')}</Badge>}{task.paymentStatus && <Badge variant="outline">{task.paymentStatus.replaceAll('_', ' ')}</Badge>}</div>
+              </div>
+              {task.reviewFeedback && <p className="mt-3 rounded-lg bg-primary/5 p-3 text-xs text-primary">BEP feedback: {task.reviewFeedback}</p>}
+              <div className="mt-4 space-y-3">
+                <Textarea value={submissionNotes[task.id] ?? ''} onChange={(event) => setSubmissionNotes((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="Submission note, file references, revision notes, or deliverable checklist" />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" disabled={updatingTaskId === task.id} onClick={() => updateStatus(task, 'in-progress')}>Start / resume work</Button>
+                  <Button type="button" size="sm" className="gap-2" disabled={updatingTaskId === task.id} onClick={() => submitDeliverable(task)}>{updatingTaskId === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Submit for BEP review</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Submission marks this deliverable review-pending only. BEP approval and payment/invoice readiness remain human-confirmed.</p>
               </div>
             </div>
           ))}

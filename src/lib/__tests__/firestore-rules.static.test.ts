@@ -112,6 +112,20 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolutionStatus', 'assigneeNotes', 'updatedAt'])");
   });
 
+  it('allows only bounded freelancer deliverable submission and BEP review fields', () => {
+    expect(rules).toContain('match /delegatedTasks/{taskId}');
+    expect(rules).toContain("request.resource.data.humanApprovalRequired == true");
+    expect(rules).toContain('function isLegacyTaskStatusPatch()');
+    expect(rules).toContain('function isFreelancerDeliverableSubmissionPatch()');
+    expect(rules).toContain('function isBepDeliverableReviewPatch()');
+    expect(rules).toContain("resource.data.submissionStatus == 'submitted'");
+    expect(rules).toContain("request.resource.data.paymentStatus == 'ready_for_invoice'");
+    expect(rules).toContain("request.resource.data.paymentStatus == 'review_pending'");
+    expect(rules).toContain('match /tasks/{taskId}');
+    expect(rules).toContain('isFreelancerDeliverableSubmissionPatch() ||');
+    expect(rules).toContain('isBepDeliverableReviewPatch()');
+  });
+
   it('keeps AI governance logs, queues, and human signoffs server-owned', () => {
     expect(rules).toContain('match /ai_action_logs/{logId}');
     expect(rules).toContain('match /ai_review_queue/{itemId}');

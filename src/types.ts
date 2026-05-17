@@ -423,6 +423,7 @@ export interface SystemLog {
 export interface DelegatedTask {
   id: string;
   jobId: string;
+  jobTaskId?: string;
   architectId: string;
   assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
@@ -430,7 +431,14 @@ export interface DelegatedTask {
   deadline: string;
   notes: string;
   status: 'pending' | 'in-progress' | 'completed';
+  submissionStatus?: 'not_submitted' | 'submitted' | 'changes_requested' | 'approved';
+  submittedAt?: string | null;
+  completedAt?: string | null;
+  reviewFeedback?: string;
+  reviewedAt?: string;
+  paymentStatus?: 'not_ready' | 'review_pending' | 'ready_for_invoice' | 'invoice_created' | 'paid';
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface JobCard extends DelegatedTask {

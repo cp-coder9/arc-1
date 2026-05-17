@@ -231,3 +231,38 @@ Deployment and broad validation for package claims/evidence pass:
 - Production build: `npx vite build --base ./` passed, 3059 modules.
 - Uploaded 74 production files to the test host via explicit FTPS.
 - Live verification passed at `https://test.architex.co.za/` with title `Architex | Built Environment OS`, zero bad resources, and latest bundle `index-DPHAeQp9.js` present.
+
+## 2026-05-17 freelancer deliverable review and invoice-readiness pass
+
+Scope followed from `backend.html`: deepen BEP freelancer work packages, assigned freelancer work, task payments, and freelancer invoice readiness without auto-paying or bypassing human BEP review.
+
+Implemented:
+
+1. BEP-created freelancer work packages now mirror atomically
+   - `BEPFreelancerJobsPage` creates a single task id and writes it to both `jobs/{jobId}/tasks/{taskId}` and `delegatedTasks/{taskId}` in one Firestore batch.
+   - The mirrored records carry `jobTaskId`, `submissionStatus`, and `paymentStatus` so BEP and freelancer views stay aligned.
+
+2. Freelancer submission workflow
+   - `FreelancerSubmissionsPage` now lets freelancers start/resume work and submit deliverables for BEP review.
+   - Submission updates both the job task and delegated task record where available.
+   - Submitted deliverables are marked `submissionStatus: submitted` and `paymentStatus: review_pending` only. No invoice or payment is created.
+
+3. BEP review and invoice-readiness gate
+   - BEPs can request changes or approve submitted freelancer deliverables for invoice readiness.
+   - Approval sets `paymentStatus: ready_for_invoice` and records review feedback, but does not release funds or create a payable invoice.
+   - Review buttons stay disabled until the freelancer has submitted the deliverable.
+
+4. Firestore safety tightening
+   - Added explicit helper rules for legacy task status changes, freelancer submissions, and BEP deliverable review.
+   - Freelancers can only move deliverables to `review_pending` or back to `not_ready`; they cannot mark themselves `ready_for_invoice`.
+   - BEPs can only mark `ready_for_invoice` after the task is already `submitted`.
+
+Validation completed for this pass so far:
+
+- `npm run lint`
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts --testTimeout 20000`
+- Result: 2 focused test files passed, 52 tests passed.
+
+Human review note:
+
+- This slice intentionally stops at invoice readiness. Actual invoice creation, certification, escrow release, and payment remain separate human-confirmed flows.

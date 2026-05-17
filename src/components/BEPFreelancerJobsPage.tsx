@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
-import { Briefcase, Clock, Loader2, Plus, Send, Users } from 'lucide-react';
+import { collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { Briefcase, CheckCircle2, Clock, Loader2, Plus, Send, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, JobCard, UserProfile } from '@/types';
 import { Badge } from './ui/badge';
@@ -28,7 +28,9 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
   const [freelancers, setFreelancers] = useState<DirectoryProfile[]>([]);
   const [tasks, setTasks] = useState<JobCard[]>([]);
   const [saving, setSaving] = useState(false);
+  const [reviewingTaskId, setReviewingTaskId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [reviewFeedback, setReviewFeedback] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ jobId: '', freelancerId: '', assigneeRole: '', deadline: '', notes: '', priority: 'medium', estimatedHours: '' });
 
   useEffect(() => {
@@ -75,8 +77,12 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
     setFeedback(null);
     try {
       const now = new Date().toISOString();
+      const taskRef = doc(collection(db, `jobs/${selectedJob.id}/tasks`));
+      const delegatedTaskRef = doc(db, 'delegatedTasks', taskRef.id);
       const taskData = {
+        id: taskRef.id,
         jobId: selectedJob.id,
+        jobTaskId: taskRef.id,
         architectId: user.uid,
         assigneeId: selectedFreelancer.uid,
         assigneeName: selectedFreelancer.displayName || selectedFreelancer.email || 'Freelancer',
@@ -84,6 +90,8 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
         deadline: form.deadline,
         notes: form.notes.trim(),
         status: 'pending',
+        submissionStatus: 'not_submitted',
+        paymentStatus: 'not_ready',
         priority: form.priority,
         estimatedHours: form.estimatedHours ? Number(form.estimatedHours) : null,
         requirements: [],
@@ -91,8 +99,10 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
         updatedAt: now,
         humanApprovalRequired: true,
       };
-      await addDoc(collection(db, `jobs/${selectedJob.id}/tasks`), taskData);
-      await addDoc(collection(db, 'delegatedTasks'), taskData);
+      const batch = writeBatch(db);
+      batch.set(taskRef, taskData);
+      batch.set(delegatedTaskRef, taskData);
+      await batch.commit();
       setForm((current) => ({ ...current, assigneeRole: '', deadline: '', notes: '', priority: 'medium', estimatedHours: '' }));
       setFeedback('Freelancer work package created and mirrored to the delegated task register. Contract/payment approval remains separate.');
     } catch (error) {
@@ -100,6 +110,38 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
       setFeedback('Unable to create freelancer work package.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const reviewTask = async (task: JobCard, decision: 'changes_requested' | 'approved') => {
+    if (task.submissionStatus !== 'submitted') {
+      setFeedback('Freelancer deliverable must be submitted for BEP review before invoice readiness can be recorded.');
+      return;
+    }
+    setReviewingTaskId(task.id);
+    setFeedback(null);
+    try {
+      const now = new Date().toISOString();
+      const patch = {
+        status: decision === 'approved' ? 'completed' : 'in-progress',
+        submissionStatus: decision,
+        reviewFeedback: reviewFeedback[task.id]?.trim() || (decision === 'approved' ? 'Approved for invoice/payment readiness review.' : 'Changes requested by BEP.'),
+        reviewedAt: now,
+        updatedAt: now,
+        paymentStatus: decision === 'approved' ? 'ready_for_invoice' : 'not_ready',
+        completedAt: decision === 'approved' ? now : null,
+      } as const;
+      await updateDoc(doc(db, 'delegatedTasks', task.id), patch);
+      if (task.jobId) {
+        await updateDoc(doc(db, `jobs/${task.jobId}/tasks`, task.jobTaskId ?? task.id), patch).catch(() => undefined);
+      }
+      setReviewFeedback((current) => ({ ...current, [task.id]: '' }));
+      setFeedback(decision === 'approved' ? 'Deliverable approved for invoice readiness. No payment was released.' : 'Revision request recorded for the freelancer.');
+    } catch (error) {
+      console.error('Failed to review freelancer task:', error);
+      setFeedback('Unable to update freelancer review status.');
+    } finally {
+      setReviewingTaskId(null);
     }
   };
 
@@ -162,7 +204,10 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
       <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
         <CardHeader><CardTitle className="font-heading text-xl">Delegated task register</CardTitle><CardDescription>Tasks created from this BEP workspace and visible in freelancer assigned-work/submissions pages.</CardDescription></CardHeader>
         <CardContent className="space-y-3">
-          {tasks.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No delegated freelancer work packages are recorded yet.</p> : tasks.map((task) => <div key={task.id} className="rounded-xl border border-border p-4 text-sm"><div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3"><div><p className="font-semibold">{task.assigneeRole}</p><p className="text-xs text-muted-foreground">{task.assigneeName} · due {task.deadline} · {task.estimatedHours || 0}h estimated</p></div><Badge>{task.status}</Badge></div><p className="mt-3 text-muted-foreground">{task.notes}</p></div>)}
+          {tasks.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No delegated freelancer work packages are recorded yet.</p> : tasks.map((task) => {
+            const reviewEnabled = task.submissionStatus === 'submitted';
+            return <div key={task.id} className="rounded-xl border border-border p-4 text-sm"><div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3"><div><p className="font-semibold">{task.assigneeRole}</p><p className="text-xs text-muted-foreground">{task.assigneeName} · due {task.deadline} · {task.estimatedHours || 0}h estimated</p></div><div className="flex flex-wrap gap-2"><Badge>{task.status}</Badge>{task.submissionStatus && <Badge variant="secondary">{task.submissionStatus.replaceAll('_', ' ')}</Badge>}{task.paymentStatus && <Badge variant="outline">{task.paymentStatus.replaceAll('_', ' ')}</Badge>}</div></div><p className="mt-3 text-muted-foreground">{task.notes}</p>{task.reviewFeedback && <p className="mt-2 rounded-lg bg-primary/5 p-3 text-xs text-primary">BEP feedback: {task.reviewFeedback}</p>}<div className="mt-3 space-y-2"><Textarea value={reviewFeedback[task.id] ?? ''} onChange={(event) => setReviewFeedback((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="BEP review feedback for submitted deliverables" /><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" disabled={!reviewEnabled || reviewingTaskId === task.id} onClick={() => reviewTask(task, 'changes_requested')}>Request changes</Button><Button type="button" size="sm" className="gap-2" disabled={!reviewEnabled || reviewingTaskId === task.id} onClick={() => reviewTask(task, 'approved')}>{reviewingTaskId === task.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Approve for invoice readiness</Button></div>{!reviewEnabled && <p className="text-xs text-muted-foreground">BEP review actions unlock after the freelancer submits this deliverable.</p>}</div></div>;
+          })}
         </CardContent>
       </Card>
     </div>

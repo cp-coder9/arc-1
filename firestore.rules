@@ -245,6 +245,65 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt;
     }
 
+    function isLegacyTaskStatusPatch() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status',
+        'notes',
+        'updatedAt',
+        'submittedAt',
+        'completedAt'
+      ]);
+    }
+
+    function isFreelancerDeliverableSubmissionPatch() {
+      return resource.data.assigneeId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'notes',
+          'updatedAt',
+          'submittedAt',
+          'completedAt',
+          'submissionStatus',
+          'paymentStatus'
+        ]) && (
+          (
+            request.resource.data.status == 'in-progress' &&
+            request.resource.data.submissionStatus == 'not_submitted' &&
+            request.resource.data.paymentStatus == 'not_ready'
+          ) ||
+          (
+            request.resource.data.status == 'completed' &&
+            request.resource.data.submissionStatus == 'submitted' &&
+            request.resource.data.paymentStatus == 'review_pending'
+          )
+        );
+    }
+
+    function isBepDeliverableReviewPatch() {
+      return resource.data.architectId == request.auth.uid &&
+        resource.data.submissionStatus == 'submitted' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'updatedAt',
+          'completedAt',
+          'submissionStatus',
+          'reviewFeedback',
+          'reviewedAt',
+          'paymentStatus'
+        ]) && (
+          (
+            request.resource.data.status == 'completed' &&
+            request.resource.data.submissionStatus == 'approved' &&
+            request.resource.data.paymentStatus == 'ready_for_invoice'
+          ) ||
+          (
+            request.resource.data.status == 'in-progress' &&
+            request.resource.data.submissionStatus == 'changes_requested' &&
+            request.resource.data.paymentStatus == 'not_ready'
+          )
+        );
+    }
+
     function isContractorBidWithdrawal() {
       return request.auth.uid == resource.data.contractorId &&
         resource.data.status in ['submitted', 'shortlisted'] &&
@@ -447,8 +506,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (isAdmin() || resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.architectId == request.auth.uid &&
         request.resource.data.humanApprovalRequired == true;
-      allow update: if isAuthenticated() && (resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'notes', 'updatedAt', 'submittedAt', 'completedAt']);
+      allow update: if isAuthenticated() && (
+        ((resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid) && isLegacyTaskStatusPatch()) ||
+        isFreelancerDeliverableSubmissionPatch() ||
+        isBepDeliverableReviewPatch()
+      );
       allow delete: if isAdmin();
     }
 
@@ -739,10 +801,11 @@ service cloud.firestore {
           request.resource.data.architectId == request.auth.uid &&
           getJob(jobId).data.selectedArchitectId == request.auth.uid;
         allow update: if isAuthenticated() && (
-          resource.data.architectId == request.auth.uid ||
-          resource.data.assigneeId == request.auth.uid
+          ((resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid) && isLegacyTaskStatusPatch()) ||
+          isFreelancerDeliverableSubmissionPatch() ||
+          isBepDeliverableReviewPatch()
         );
-        allow delete: if isAuthenticated() && 
+        allow delete: if isAuthenticated() &&
           resource.data.architectId == request.auth.uid;
       }
     }

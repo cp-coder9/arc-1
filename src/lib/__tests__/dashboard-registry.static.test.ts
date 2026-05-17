@@ -19,6 +19,8 @@ const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/component
 const aiCoPilotSource = readFileSync(resolve(process.cwd(), 'src/components/AICoPilotPage.tsx'), 'utf8');
 const adminAIReviewQueueSource = readFileSync(resolve(process.cwd(), 'src/components/AdminAIReviewQueue.tsx'), 'utf8');
 const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
+const bepFreelancerJobsSource = readFileSync(resolve(process.cwd(), 'src/components/BEPFreelancerJobsPage.tsx'), 'utf8');
+const freelancerSubmissionsSource = readFileSync(resolve(process.cwd(), 'src/components/FreelancerSubmissionsPage.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
 const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
@@ -249,6 +251,12 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'bep-freelancers'`);
+    expect(bepFreelancerJobsSource).toContain("const delegatedTaskRef = doc(db, 'delegatedTasks', taskRef.id)");
+    expect(bepFreelancerJobsSource).toContain('batch.set(delegatedTaskRef, taskData)');
+    expect(bepFreelancerJobsSource).toContain('jobTaskId: taskRef.id');
+    expect(bepFreelancerJobsSource).toContain('Approve for invoice readiness');
+    expect(bepFreelancerJobsSource).toContain("task.submissionStatus !== 'submitted'");
+    expect(bepFreelancerJobsSource).toContain("paymentStatus: decision === 'approved' ? 'ready_for_invoice' : 'not_ready'");
   });
 
   it('routes SANS compliance forms to the production stored-report register', () => {
@@ -305,6 +313,10 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'freelancer-submissions' && <FreelancerSubmissionsPage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'freelancer-submissions'`);
+    expect(freelancerSubmissionsSource).toContain('Submit for BEP review');
+    expect(freelancerSubmissionsSource).toContain("submissionStatus: 'submitted'");
+    expect(freelancerSubmissionsSource).toContain("paymentStatus: 'review_pending'");
+    expect(freelancerSubmissionsSource).toContain("updateDoc(doc(db, 'delegatedTasks'");
   });
 
   it('routes freelancer assigned work to the production freelancer dashboard', () => {
