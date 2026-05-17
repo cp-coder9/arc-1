@@ -4,6 +4,7 @@ import type { AgentKnowledge, UserProfile } from '@/types';
 import { getAllAgentKnowledge } from '@/services/knowledgeService';
 import { SPECIALIZED_AGENTS } from '@/services/geminiService';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
+import AdminAIReviewQueue from './AdminAIReviewQueue';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -109,10 +110,16 @@ export default function AICoPilotPage({ user, onNavigate }: { user: UserProfile;
       </div>
 
       {user.role === 'admin' && (
-        <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow">
-          <CardHeader><CardTitle className="font-heading text-xl">Admin AI knowledge review</CardTitle><CardDescription>Admin-only production queue for approving, rejecting, editing, or deleting agent knowledge.</CardDescription></CardHeader>
-          <CardContent><AgentKnowledgeManager user={user} /></CardContent>
-        </Card>
+        <>
+          <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow">
+            <CardHeader><CardTitle className="font-heading text-xl">Admin AI output review queue</CardTitle><CardDescription>Admin-only production workflow for resolving AI action outputs that require human review. Resolutions go through the server API and can optionally record a human sign-off.</CardDescription></CardHeader>
+            <CardContent><AdminAIReviewQueue /></CardContent>
+          </Card>
+          <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow">
+            <CardHeader><CardTitle className="font-heading text-xl">Admin AI knowledge review</CardTitle><CardDescription>Admin-only production queue for approving, rejecting, editing, or deleting agent knowledge.</CardDescription></CardHeader>
+            <CardContent><AgentKnowledgeManager user={user} /></CardContent>
+          </Card>
+        </>
       )}
     </div>
   );

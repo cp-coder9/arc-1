@@ -16,6 +16,8 @@ const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/compone
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
 const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/components/PackageConstructionOpsPage.tsx'), 'utf8');
 const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/components/PackageCloseoutPage.tsx'), 'utf8');
+const aiCoPilotSource = readFileSync(resolve(process.cwd(), 'src/components/AICoPilotPage.tsx'), 'utf8');
+const adminAIReviewQueueSource = readFileSync(resolve(process.cwd(), 'src/components/AdminAIReviewQueue.tsx'), 'utf8');
 const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
 const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
@@ -87,6 +89,7 @@ describe('canonical dashboard page registry', () => {
     expectPage('bep-marketplace', 'Client Marketplace', ['bep', 'architect']);
     expectPage('bep-team', 'Design Team Matrix', ['bep', 'architect']);
     expectPage('invoicing', 'Invoicing', ['bep', 'architect', 'contractor', 'freelancer', 'admin']);
+    expectPage('snagging', 'Snagging / Close-Out', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('packages', 'Subcontractor Packages', ['contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('freelancer-work', 'Assigned Work', ['freelancer']);
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
@@ -214,6 +217,17 @@ describe('canonical dashboard page registry', () => {
     expect(packageCloseoutSource).toContain("status: 'submitted'");
     expect(packageCloseoutSource).toContain('humanReviewRequired: true');
     expect(packageCloseoutSource).not.toContain('orderBy(');
+  });
+
+  it('routes admin AI co-pilot to the production AI output review queue', () => {
+    expect(aiCoPilotSource).toContain("import AdminAIReviewQueue from './AdminAIReviewQueue';");
+    expect(aiCoPilotSource).toContain('<AdminAIReviewQueue />');
+    expect(adminAIReviewQueueSource).toContain("collection(db, 'ai_review_queue')");
+    expect(adminAIReviewQueueSource).toContain("where('status', '==', 'open')");
+    expect(adminAIReviewQueueSource).toContain("doc(db, 'ai_action_logs'");
+    expect(adminAIReviewQueueSource).toContain('/api/admin/ai-review/${selectedItem.id}/resolve');
+    expect(adminAIReviewQueueSource).toContain('humanSignOff');
+    expect(adminAIReviewQueueSource).not.toContain('orderBy(');
   });
 
   it('routes AI co-pilot to the production grounded AI governance page', () => {

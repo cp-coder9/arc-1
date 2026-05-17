@@ -164,3 +164,31 @@ Remaining large `backend.html` scope still worth future passes:
 2. Continue deepening payment release, digital signing, and escrow actions behind explicit human confirmations and provider integration checks.
 3. Reconcile long-term role taxonomy between `architect` and `bep`; this pass preserved compatibility by treating both as design-team roles.
 4. Remove obsolete FTP/rules temp scripts if they are no longer useful, but do not delete credentials or deployment helpers without human confirmation.
+
+## 2026-05-17 admin AI review and package close-out access pass
+
+Scope followed from `backend.html`: keep AI outputs governed by a human/admin queue and expose package close-out tooling to the package delivery roles without changing existing workflow semantics.
+
+Implemented:
+
+1. Admin AI output review queue
+   - Added `src/components/AdminAIReviewQueue.tsx` as a live admin-only queue for `ai_review_queue` records with `status == open`.
+   - Reads linked immutable `ai_action_logs` for context and sorts client-side to avoid composite-index dependency.
+   - Resolves queue items only through the production server endpoint `POST /api/admin/ai-review/:itemId/resolve` using the current Firebase ID token.
+   - Optional human sign-off capture posts `humanSignOff` to the server endpoint; the browser still does not write directly to `ai_review_queue`, `ai_action_logs`, or `human_signoffs`.
+   - Embedded the queue in the admin AI co-pilot above the existing admin knowledge review manager.
+
+2. Package close-out access alignment
+   - Expanded the canonical `Snagging / Close-Out` dashboard entry to include subcontractor and supplier roles in addition to design team, contractor, and admin.
+   - Kept the production `PackageCloseoutPage` workflow as the package-role route for close-out evidence, snagging status, and human review-required submissions.
+
+Validation completed for this pass:
+
+- `npm run lint`
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts src/lib/__tests__/api-router.security.test.ts --testTimeout 20000`
+- Result: 3 test files passed, 113 tests passed.
+
+Notes for human review:
+
+- Admin AI review queue will appear empty unless production has open `ai_review_queue` records.
+- Firestore rules intentionally block direct browser writes for AI governance records. Resolution must continue through the server API to preserve audit trails and human sign-off integrity.
