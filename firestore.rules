@@ -83,8 +83,15 @@ service cloud.firestore {
         isAdmin() ||
         projectData.clientId == request.auth.uid ||
         projectData.leadArchitectId == request.auth.uid ||
-        isProjectTeamMember(projectData)
+        isProjectTeamMember(projectData) ||
+        (projectData.firmAccessEnabled == true && isActiveFirmMember(projectData.firmId))
       );
+    }
+
+    function isActiveFirmMember(firmId) {
+      return isAuthenticated() && firmId is string &&
+        exists(/databases/$(database)/documents/firms/$(firmId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/firms/$(firmId)/members/$(request.auth.uid)).data.status == 'active';
     }
 
     function isParticipantLifecycleUpdate() {
@@ -157,7 +164,51 @@ service cloud.firestore {
 
     function isEligibleContractorForTender(tenderData) {
       return isAuthenticated() && tenderData.status == 'published' && !isTenderParticipant(tenderData) && (
-        hasRole('contractor') || hasRole('subcontractor')
+        hasRole('contractor') || hasRole('subcontractor') || hasRole('supplier')
+      );
+    }
+
+    function ownsDashboardRecord(data) {
+      return isAuthenticated() && (
+        data.userId == request.auth.uid ||
+        data.createdBy == request.auth.uid ||
+        data.requestedBy == request.auth.uid ||
+        data.ownerId == request.auth.uid ||
+        data.contractorId == request.auth.uid ||
+        data.architectId == request.auth.uid ||
+        data.assigneeId == request.auth.uid ||
+        data.clientId == request.auth.uid ||
+        data.professionalId == request.auth.uid ||
+        data.fromUserId == request.auth.uid ||
+        data.targetUserId == request.auth.uid ||
+        (data.participantIds is list && data.participantIds.hasAny([request.auth.uid]))
+      );
+    }
+
+    function canReadPackageLinkedRecord(data) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        ownsDashboardRecord(data) ||
+        (data.projectId is string && canReadProject(data.projectId)) ||
+        (data.packageId is string && exists(/databases/$(database)/documents/tender_packages/$(data.packageId)) &&
+          (isTenderParticipant(getTender(data.packageId).data) ||
+           getTender(data.packageId).data.awardedContractorId == request.auth.uid ||
+           isEligibleContractorForTender(getTender(data.packageId).data)))
+      );
+    }
+
+    function canCreateOwnedDashboardRecord(data) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        data.userId == request.auth.uid ||
+        data.createdBy == request.auth.uid ||
+        data.requestedBy == request.auth.uid ||
+        data.ownerId == request.auth.uid ||
+        data.contractorId == request.auth.uid ||
+        data.architectId == request.auth.uid ||
+        data.fromUserId == request.auth.uid ||
+        (data.participantIds is list && data.participantIds.hasAny([request.auth.uid])) ||
+        (data.projectId is string && canReadProject(data.projectId))
       );
     }
 
@@ -287,6 +338,19 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'category', 'location', 'budgetRange', 'targetStartDate', 'requirements', 'propertyDetails', 'status', 'appointmentId', 'updatedAt']))
       );
       allow delete: if false;
+
+      match /interpretations/{interpretationId} {
+        allow read: if isAuthenticated() && (
+          isAdmin() ||
+          get(/databases/$(database)/documents/project_briefs/$(briefId)).data.clientId == request.auth.uid ||
+          resource.data.createdBy == request.auth.uid
+        );
+        allow create: if isAuthenticated() && (hasRole('architect') || hasRole('bep') || isAdmin()) &&
+          request.resource.data.briefId == briefId &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.createdByRole in ['architect', 'bep', 'admin'];
+        allow update, delete: if false;
+      }
     }
 
     match /project_attachments/{attachmentId} {
@@ -345,6 +409,197 @@ service cloud.firestore {
         resource.data.professionalId == request.auth.uid
       );
       allow create, update, delete: if false;
+    }
+
+    match /directoryProfiles/{profileId} {
+      allow read: if isAuthenticated() && (isAdmin() || profileId == request.auth.uid || resource.data.visible == true);
+      allow create, update: if isAuthenticated() && profileId == request.auth.uid &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.role == getUserData().role &&
+        !('trustScore' in request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /directoryInvitations/{invitationId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.fromUserId == request.auth.uid || resource.data.targetUserId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.fromUserId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.humanReviewRequired == true;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.targetUserId == request.auth.uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
+    match /technical_briefs/{briefId} {
+      allow read: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow create: if isAuthenticated() && (hasRole('architect') || hasRole('bep') || isAdmin()) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdByRole in ['architect', 'bep', 'admin'] &&
+        request.resource.data.humanReviewRequired == true;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['professionalScope', 'deliverables', 'exclusions', 'assumptions', 'consultants', 'approvalRoute', 'riskLevel', 'missingInformation', 'status', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
+    match /delegatedTasks/{taskId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.architectId == request.auth.uid &&
+        request.resource.data.humanApprovalRequired == true;
+      allow update: if isAuthenticated() && (resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'notes', 'updatedAt', 'submittedAt', 'completedAt']);
+      allow delete: if isAdmin();
+    }
+
+    match /cpd_assessments/{assessmentId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /cpd_attempts/{attemptId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid &&
+        request.resource.data.humanReviewRequired == true;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /firms/{firmId} {
+      allow read: if isAdmin() || isActiveFirmMember(firmId) || resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAdmin() || isActiveFirmMember(firmId);
+      allow delete: if isAdmin();
+
+      match /members/{memberId} {
+        allow read: if isAdmin() || isActiveFirmMember(firmId) || memberId == request.auth.uid;
+        allow create, update: if isAdmin() || isActiveFirmMember(firmId);
+        allow delete: if isAdmin();
+      }
+
+      match /audit_events/{eventId} {
+        allow read: if isAdmin() || isActiveFirmMember(firmId);
+        allow create: if isAuthenticated() && isActiveFirmMember(firmId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /firm_invites/{inviteId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.invitedBy == request.auth.uid || resource.data.invitedUid == request.auth.uid || resource.data.email == request.auth.token.email);
+      allow create: if isAuthenticated() && isActiveFirmMember(request.resource.data.firmId) && request.resource.data.invitedBy == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.invitedBy == request.auth.uid || resource.data.invitedUid == request.auth.uid || resource.data.email == request.auth.token.email);
+      allow delete: if isAdmin();
+    }
+
+    match /project_progress_reports/{reportId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.clientId == request.auth.uid || resource.data.createdBy == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.humanApprovalRequired == true;
+      allow update: if isAdmin() || (resource.data.createdBy == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['humanApprovalRequired', 'approvedBy', 'approvedAt', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /resource_checklists/{checklistId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.createdBy == request.auth.uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
+    match /resource_listings/{listingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /resource_bookings/{bookingId} {
+      allow read: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid &&
+        request.resource.data.participantIds.hasAny([request.auth.uid]) &&
+        request.resource.data.humanApprovalRequired == true;
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data)) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /resource_usage_logs/{usageId} {
+      allow read: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow create: if isAuthenticated() && request.resource.data.participantIds.hasAny([request.auth.uid]) &&
+        request.resource.data.humanReviewRequired == true;
+      allow update, delete: if false;
+    }
+
+    match /contractor_staff_records/{recordId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.contractorId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.contractorId == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.contractorId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /contractor_plant_records/{recordId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.contractorId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.contractorId == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.contractorId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /contractor_wage_records/{recordId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.contractorId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.contractorId == request.auth.uid &&
+        request.resource.data.humanReviewRequired == true;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /package_procurement_commitments/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data) && request.resource.data.humanReviewRequired is bool;
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data)) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'note', 'updatedAt', 'approvedBy', 'approvedAt']);
+      allow delete: if isAdmin();
+    }
+
+    match /package_delivery_evidence/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /package_snags/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /rfis/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /gantt_tasks/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /site_logs/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /site_inspections/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
+      allow delete: if isAdmin();
     }
 
     match /project_stage_history/{historyId} {
@@ -598,7 +853,8 @@ service cloud.firestore {
     match /tender_packages/{tenderId} {
       allow read: if isAuthenticated() && (
         isTenderParticipant(resource.data) ||
-        isEligibleContractorForTender(resource.data)
+        isEligibleContractorForTender(resource.data) ||
+        resource.data.awardedContractorId == request.auth.uid
       );
       allow create: if isAuthenticated() &&
         request.resource.data.createdBy == request.auth.uid &&

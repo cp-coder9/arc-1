@@ -13,6 +13,9 @@ function getUsers() {
     { uid: 'admin-user', email: 'admin@example.test', displayName: 'Admin User', role: 'admin', createdAt: now },
     { uid: 'freelancer-user', email: 'freelancer@example.test', displayName: 'Freelancer User', role: 'freelancer', createdAt: now },
     { uid: 'bep-user', email: 'bep@example.test', displayName: 'BEP User', role: 'bep', createdAt: now },
+    { uid: 'contractor-user', email: 'contractor@example.test', displayName: 'Contractor User', role: 'contractor', createdAt: now, cidbGrading: '4GB' },
+    { uid: 'subcontractor-user', email: 'subcontractor@example.test', displayName: 'Subcontractor User', role: 'subcontractor', createdAt: now, tradeLicense: 'TR-123' },
+    { uid: 'supplier-user', email: 'supplier@example.test', displayName: 'Supplier User', role: 'supplier', createdAt: now, region: 'Gauteng' },
   ];
 }
 
@@ -51,6 +54,10 @@ const applications = [
   { id: 'app-1', jobId: 'job-1', architectId: 'architect-user', architectName: 'Architect User', proposal: 'I can complete this.', status: 'pending', createdAt: now },
 ];
 
+const projects = [
+  { id: 'project-1', jobId: 'job-2', clientId: 'client-user', leadArchitectId: 'architect-user', currentStage: 'coordination', stageHistory: [], teamMembers: [], createdAt: now, updatedAt: now },
+];
+
 const reviews = [
   { id: 'review-1', jobId: 'job-1', fromId: 'client-user', toId: 'architect-user', rating: 5, comment: 'Excellent work.', status: 'approved', type: 'client_to_architect', createdAt: now },
 ];
@@ -75,10 +82,25 @@ const delegatedTasks = [
 ];
 const invoices: unknown[] = [];
 const files: unknown[] = [];
+const directoryProfiles = getUsers().map(user => ({ ...user, uid: user.uid, visible: true, verificationStatus: 'verified', updatedAt: now }));
+const tenderPackages = [
+  { id: 'tender-1', projectId: 'project-1', jobId: 'job-2', title: 'Envelope package', description: 'Facade and envelope package.', scope: ['Supply and install'], status: 'published', createdBy: 'architect-user', estimatedBudget: 250000, deadline: '2026-08-01', createdAt: now, updatedAt: now },
+];
+const packageProcurementCommitments = [
+  { id: 'commitment-1', packageId: 'tender-1', projectId: 'project-1', jobId: 'job-2', type: 'supplier_quote', title: 'Window quote', status: 'draft', requestedBy: 'contractor-user', humanReviewRequired: false, createdAt: now, updatedAt: now },
+];
+const cpdAssessments = [
+  { id: 'cpd-1', courseId: 'course-1', title: 'SANS refresher', cpdPoints: 1, passMark: 60, questions: [{ id: 'q1', prompt: 'AI output requires human review.', type: 'true_false', correctOptionIds: ['true'] }], createdAt: now },
+];
+const resourceListings = [
+  { id: 'resource-1', ownerId: 'architect-user', name: 'BIM workstation', capability: 'Remote modelling', visibilityRoles: ['bep', 'architect', 'freelancer'], status: 'active', createdAt: now },
+];
 
 function dataForCollection(name: string) {
-  switch (name) {
+  const collectionName = name.split('/').pop() || name;
+  switch (collectionName) {
     case 'users': return getUsers();
+    case 'projects': return projects;
     case 'jobs': return jobs;
     case 'reviews': return reviews;
     case 'agents': return agents;
@@ -91,6 +113,33 @@ function dataForCollection(name: string) {
     case 'applications': return applications;
     case 'submissions': return submissions;
     case 'delegatedTasks': return delegatedTasks;
+    case 'tasks': return delegatedTasks;
+    case 'approvals': return [];
+    case 'directoryProfiles': return directoryProfiles;
+    case 'directoryInvitations': return [];
+    case 'tender_packages': return tenderPackages;
+    case 'bids': return [];
+    case 'package_procurement_commitments': return packageProcurementCommitments;
+    case 'package_delivery_evidence': return [];
+    case 'package_snags': return [];
+    case 'rfis': return [];
+    case 'gantt_tasks': return [];
+    case 'site_logs': return [];
+    case 'site_inspections': return [];
+    case 'project_progress_reports': return [];
+    case 'resource_checklists': return [];
+    case 'resource_listings': return resourceListings;
+    case 'resource_bookings': return [];
+    case 'resource_usage_logs': return [];
+    case 'cpd_assessments': return cpdAssessments;
+    case 'cpd_attempts': return [];
+    case 'technical_briefs': return [];
+    case 'marketplace_opportunities': return [];
+    case 'ledger': return [];
+    case 'escrow': return [];
+    case 'contractor_staff_records': return [];
+    case 'contractor_plant_records': return [];
+    case 'contractor_wage_records': return [];
     default: return [];
   }
 }
@@ -121,10 +170,6 @@ export function persistentMultipleTabManager() { return {}; }
 export function initializeFirestore() { return { __mockDb: true }; }
 export function getFirestore() { return { __mockDb: true }; }
 
-export function collection(_db: unknown, path: string) {
-  return { kind: 'collection', path, collectionName: path.split('/').pop() || path, constraints: [] as any[] };
-}
-
 export function collectionGroup(_db: unknown, collectionName: string) {
   return { kind: 'collectionGroup', collectionName, constraints: [] as any[] };
 }
@@ -145,8 +190,14 @@ export function limit(count: number) {
   return { kind: 'limit', count };
 }
 
-export function doc(_db: unknown, path: string, id?: string) {
-  return { kind: 'doc', path: id ? `${path}/${id}` : path, id: id || path.split('/').pop() };
+export function doc(_db: unknown, path: string, ...segments: string[]) {
+  const fullPath = [path, ...segments].filter(Boolean).join('/');
+  return { kind: 'doc', path: fullPath, id: fullPath.split('/').pop() };
+}
+
+export function collection(_db: unknown, path: string, ...segments: string[]) {
+  const fullPath = [path, ...segments].filter(Boolean).join('/');
+  return { kind: 'collection', path: fullPath, collectionName: fullPath.split('/').pop() || fullPath, constraints: [] as any[] };
 }
 
 export async function getDoc(ref: any) {
@@ -163,6 +214,10 @@ export async function getDocs(q: any) {
 }
 
 export function onSnapshot(q: any, callback: (snapshot: any) => void) {
+  if (q.kind === 'doc') {
+    queueMicrotask(async () => callback(await getDoc(q)));
+    return () => undefined;
+  }
   const collectionName = q.collectionName || q.path;
   const items = applyConstraints(dataForCollection(collectionName), q.constraints || []);
   queueMicrotask(() => callback({ docs: items.map(makeDoc), size: items.length }));

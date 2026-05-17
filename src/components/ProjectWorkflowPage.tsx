@@ -88,7 +88,7 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
   }
 
   if ((pageId === 'payments' || pageId === 'escrow')) {
-    return <WorkflowFrame pageId={pageId} user={user}><FinancialDashboard /></WorkflowFrame>;
+    return <WorkflowFrame pageId={pageId} user={user}><FinancialDashboard user={user} /></WorkflowFrame>;
   }
 
   if (pageId === 'municipal-tracker') {

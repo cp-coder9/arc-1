@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { EscrowV2, LedgerEntry, Project } from '@/types';
+import { EscrowV2, LedgerEntry, Project, UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -10,25 +10,102 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
-export default function FinancialDashboard() {
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
+
+function projectQueryForFinancialUser(user: UserProfile) {
+  const projects = collection(db, 'projects');
+  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), limit(100));
+  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), limit(100));
+  return null;
+}
+
+function jobQueryForFinancialUser(user: UserProfile) {
+  const jobs = collection(db, 'jobs');
+  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(100));
+  if (user.role === 'architect' || user.role === 'bep') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(100));
+  return null;
+}
+
+export default function FinancialDashboard({ user }: { user?: UserProfile }) {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [escrows, setEscrows] = useState<EscrowV2[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [visibleJobIds, setVisibleJobIds] = useState<string[]>([]);
   const [projectFilter, setProjectFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
   useEffect(() => {
-    const unsubLedger = onSnapshot(query(collection(db, 'ledger'), orderBy('createdAt', 'desc'), limit(500)), (snapshot) => {
-      setLedger(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as LedgerEntry)));
-    });
-    const unsubEscrow = onSnapshot(query(collection(db, 'escrow'), orderBy('updatedAt', 'desc'), limit(200)), (snapshot) => {
-      setEscrows(snapshot.docs.map((docSnap) => ({ jobId: docSnap.id, ...docSnap.data() } as EscrowV2)));
-    });
-    const unsubProjects = onSnapshot(query(collection(db, 'projects'), limit(200)), (snapshot) => {
-      setProjects(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)));
-    });
-    return () => { unsubLedger(); unsubEscrow(); unsubProjects(); };
-  }, []);
+    const unsubs: Array<() => void> = [];
+    const ledgerMap = new Map<string, LedgerEntry>();
+
+    if (!user || user.role === 'admin') {
+      unsubs.push(onSnapshot(query(collection(db, 'ledger'), orderBy('createdAt', 'desc'), limit(500)), (snapshot) => {
+        setLedger(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as LedgerEntry)));
+      }, (error) => { console.warn('Admin ledger projection unavailable:', error); setLedger([]); }));
+      unsubs.push(onSnapshot(query(collection(db, 'escrow'), orderBy('updatedAt', 'desc'), limit(200)), (snapshot) => {
+        setEscrows(snapshot.docs.map((docSnap) => ({ jobId: docSnap.id, ...docSnap.data() } as EscrowV2)));
+      }, (error) => { console.warn('Admin escrow projection unavailable:', error); setEscrows([]); }));
+      unsubs.push(onSnapshot(query(collection(db, 'projects'), limit(200)), (snapshot) => {
+        setProjects(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)));
+      }, (error) => { console.warn('Admin financial project projection unavailable:', error); setProjects([]); }));
+      return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    }
+
+    const mergeLedger = (snapshot: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
+      snapshot.docs.forEach((docSnap) => ledgerMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as LedgerEntry));
+      setLedger(sortByRecent(Array.from(ledgerMap.values())));
+    };
+
+    unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payerId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payer ledger projection unavailable:', error)));
+    unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payeeId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payee ledger projection unavailable:', error)));
+
+    const projectQuery = projectQueryForFinancialUser(user);
+    if (projectQuery) {
+      unsubs.push(onSnapshot(projectQuery, (snapshot) => {
+        setProjects(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project))));
+      }, (error) => { console.warn('Financial project projection unavailable:', error); setProjects([]); }));
+    } else {
+      setProjects([]);
+    }
+
+    const jobQuery = jobQueryForFinancialUser(user);
+    if (jobQuery) {
+      unsubs.push(onSnapshot(jobQuery, (snapshot) => {
+        setVisibleJobIds(snapshot.docs.map((docSnap) => docSnap.id));
+      }, (error) => { console.warn('Financial job projection unavailable:', error); setVisibleJobIds([]); }));
+    } else {
+      setVisibleJobIds([]);
+    }
+
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role === 'admin') return undefined;
+    if (!['client', 'architect', 'bep'].includes(user.role) || visibleJobIds.length === 0) {
+      setEscrows([]);
+      return undefined;
+    }
+
+    const escrowMap = new Map<string, EscrowV2>();
+    const unsubs = visibleJobIds.slice(0, 25).map((jobId) => onSnapshot(doc(db, 'escrow', jobId), (snapshot) => {
+      if (snapshot.exists()) escrowMap.set(snapshot.id, { jobId: snapshot.id, ...snapshot.data() } as EscrowV2);
+      else escrowMap.delete(jobId);
+      setEscrows(sortByRecent(Array.from(escrowMap.values())));
+    }, (error) => console.warn(`Escrow projection unavailable for job ${jobId}:`, error)));
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [user, visibleJobIds]);
 
   const filteredLedger = useMemo(() => ledger.filter((entry) => {
     const projectMatch = !projectFilter || entry.projectId.toLowerCase().includes(projectFilter.toLowerCase()) || entry.jobId.toLowerCase().includes(projectFilter.toLowerCase());

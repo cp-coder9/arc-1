@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, updateDoc, where, doc } from 'firebase/firestore';
+import { addDoc, collection, limit, onSnapshot, query, updateDoc, where, doc } from 'firebase/firestore';
 import { BookOpen, CheckCircle2, ClipboardList, ExternalLink, Loader2, Plus, Search } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { AgentKnowledge, Discipline, UserProfile } from '@/types';
@@ -12,6 +12,15 @@ import { Textarea } from './ui/textarea';
 type ChecklistItem = { id: string; title: string; discipline?: Discipline | string; municipality?: string; status: 'open' | 'in_progress' | 'complete'; requiredForSubmission?: boolean; createdBy: string; createdAt: string; completedAt?: string };
 
 const DISCIPLINE_OPTIONS = ['architecture', 'structure', 'fire', 'accessibility', 'energy', 'drainage', 'electrical', 'mechanical', 'planning', 'documentation', 'nhbrc', 'coordination'];
+
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
 
 export default function ResourceCentre({ user }: { user: UserProfile }) {
   const [knowledge, setKnowledge] = useState<AgentKnowledge[]>([]);
@@ -31,8 +40,8 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
       console.error('Failed to load resource centre knowledge:', error);
       setLoading(false);
     });
-    const unsubChecklists = onSnapshot(query(collection(db, 'resource_checklists'), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
-      setChecklists(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ChecklistItem)));
+    const unsubChecklists = onSnapshot(query(collection(db, 'resource_checklists'), limit(50)), (snapshot) => {
+      setChecklists(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ChecklistItem)).sort((a, b) => timestampMs(b.createdAt) - timestampMs(a.createdAt)));
     }, (error) => console.error('Failed to load resource checklists:', error));
     return () => { unsubKnowledge(); unsubChecklists(); };
   }, []);

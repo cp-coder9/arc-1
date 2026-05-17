@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, collectionGroup, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, Bot, CheckCircle2, Download, FileSearch, FileText, Loader2, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, Submission, UserProfile } from '@/types';
@@ -10,17 +10,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
+
 function jobQueryForDrawingChecker(user: UserProfile) {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, orderBy('createdAt', 'desc'), limit(25));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(25));
-  return query(jobs, where('selectedArchitectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(25));
+  if (user.role === 'admin') return query(jobs, limit(25));
+  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
+  return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
 }
 
 function submissionQueryForDrawingChecker(user: UserProfile) {
   const submissions = collectionGroup(db, 'submissions');
-  if (user.role === 'admin') return query(submissions, orderBy('createdAt', 'desc'), limit(50));
-  return query(submissions, where('architectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+  if (user.role === 'admin') return query(submissions, limit(50));
+  return query(submissions, where('architectId', '==', user.uid), limit(50));
 }
 
 function modeLabel(user: UserProfile) {
@@ -44,14 +57,14 @@ export default function AIDrawingChecker({ user }: { user: UserProfile }) {
   useEffect(() => {
     setState('loading');
     const unsubscribeJobs = onSnapshot(jobQueryForDrawingChecker(user), (snapshot) => {
-      setJobs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job)));
+      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
       setState('ready');
     }, (error) => {
       console.error('Failed to load drawing checker jobs:', error);
       setState('error');
     });
     const unsubscribeSubmissions = onSnapshot(submissionQueryForDrawingChecker(user), (snapshot) => {
-      setSubmissions(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Submission)));
+      setSubmissions(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Submission))));
     }, (error) => console.error('Failed to load drawing checker submissions:', error));
     return () => {
       unsubscribeJobs();

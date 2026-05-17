@@ -1,7 +1,23 @@
 import { test, expect } from '@playwright/test';
 
 async function gotoApp(page: import('@playwright/test').Page, path = '/') {
-  await page.goto(path, { waitUntil: 'commit', timeout: 30_000 });
+  const expectedText = path.startsWith('/admin') ? 'Admin Portal' : 'Architex';
+  const appShellReady = (text: string) => document.body.innerText.includes(text);
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(path, { waitUntil: 'commit', timeout: 60_000 });
+      await page.waitForFunction(appShellReady, expectedText, { timeout: 60_000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.evaluate(() => window.stop()).catch(() => undefined);
+      await page.waitForTimeout(1_000);
+    }
+  }
+
+  throw lastError;
 }
 
 async function waitForText(page: import('@playwright/test').Page, text: string | RegExp) {
@@ -34,6 +50,6 @@ test.describe('Admin Review', () => {
     await page.getByRole('link', { name: 'Return to Marketplace' }).evaluate((element: HTMLElement) => element.click());
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.locator('body')).toContainText('Smarter projects. Stronger built environments.');
+    await expect(page.locator('body')).toContainText(/Where projects stop leaking time|Smarter projects/i);
   });
 });

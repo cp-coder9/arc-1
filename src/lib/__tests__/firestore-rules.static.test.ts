@@ -54,10 +54,45 @@ describe('firestore security rules static regressions', () => {
   });
 
   it('requires active contractor verification references for tender bids', () => {
-    expect(rules).toContain("hasRole('contractor') || hasRole('subcontractor')");
+    expect(rules).toContain("hasRole('contractor') || hasRole('subcontractor') || hasRole('supplier')");
     expect(rules).toContain('function isActiveContractorBidVerification(verificationId)');
     expect(rules).toContain('isActiveContractorBidVerification(request.resource.data.verificationId)');
     expect(rules).toContain("'verificationId'");
+  });
+
+  it('covers production dashboard collections used by role workspaces', () => {
+    for (const collection of [
+      'directoryProfiles',
+      'directoryInvitations',
+      'technical_briefs',
+      'delegatedTasks',
+      'cpd_assessments',
+      'cpd_attempts',
+      'firms',
+      'firm_invites',
+      'project_progress_reports',
+      'resource_checklists',
+      'resource_listings',
+      'resource_bookings',
+      'resource_usage_logs',
+      'contractor_staff_records',
+      'contractor_plant_records',
+      'contractor_wage_records',
+      'package_procurement_commitments',
+      'package_delivery_evidence',
+      'package_snags',
+      'rfis',
+      'gantt_tasks',
+      'site_logs',
+      'site_inspections',
+    ]) {
+      expect(rules).toContain(`match /${collection}/`);
+    }
+
+    expect(rules).toContain('function canReadPackageLinkedRecord(data)');
+    expect(rules).toContain('function canCreateOwnedDashboardRecord(data)');
+    expect(rules).toContain('match /interpretations/{interpretationId}');
+    expect(rules).toContain('resource.data.awardedContractorId == request.auth.uid');
   });
 
   it('gates Phase 3/4 operational collections by project access and immutable identity fields', () => {

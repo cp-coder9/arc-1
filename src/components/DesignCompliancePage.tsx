@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, CheckCircle2, Loader2, Network, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, Project, ProjectTeamMember, UserProfile } from '@/types';
@@ -14,11 +14,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
+
 function jobsForUser(user: UserProfile) {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, orderBy('createdAt', 'desc'), limit(25));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(25));
-  return query(jobs, where('selectedArchitectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(25));
+  if (user.role === 'admin') return query(jobs, limit(25));
+  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
+  return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
 }
 
 export default function DesignCompliancePage({ user }: { user: UserProfile }) {
@@ -31,7 +44,7 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(jobsForUser(user), (snapshot) => {
-      setJobs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job)));
+      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
       setState('ready');
     }, (error) => {
       console.error('Failed to load design compliance jobs:', error);

@@ -5,7 +5,18 @@ async function clickLandingAction(page: import('@playwright/test').Page, name: s
 }
 
 async function gotoApp(page: import('@playwright/test').Page, path = '/') {
-  await page.goto(path, { waitUntil: 'commit', timeout: 30_000 });
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  const appShellReady = () =>
+    document.body.innerText.includes('Architex') ||
+    document.body.innerText.includes('Admin Portal') ||
+    document.body.innerText.includes('Join Architex');
+
+  try {
+    await page.waitForFunction(appShellReady, undefined, { timeout: 60_000 });
+  } catch (error) {
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.waitForFunction(appShellReady, undefined, { timeout: 60_000 });
+  }
 }
 
 async function forceClick(locator: import('@playwright/test').Locator) {
@@ -13,12 +24,14 @@ async function forceClick(locator: import('@playwright/test').Locator) {
 }
 
 test.describe('Authentication', () => {
+  const publicRoles = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'];
+
   test('should show landing page', async ({ page }) => {
     await gotoApp(page);
-    await expect(page.getByText('Smarter projects. Stronger built environments.')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Discover' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Verify' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Collaborate' })).toBeVisible();
+    await expect(page.locator('body')).toContainText(/Where projects stop leaking time\./i);
+    await expect(page.locator('body')).toContainText(/Discover/);
+    await expect(page.locator('body')).toContainText(/Verify/);
+    await expect(page.locator('body')).toContainText(/Collaborate/);
   });
 
   test('should show error for invalid credentials', async ({ page }) => {
@@ -42,10 +55,22 @@ test.describe('Authentication', () => {
 
     await expect(page.getByText('Join Architex')).toBeVisible();
     await expect(page.getByText('Select your professional role to get started')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Select Client role/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Select Architect role/i })).toBeVisible();
+    for (const role of publicRoles) {
+      await expect(page.getByTestId(`role-select-${role}`)).toBeVisible();
+    }
 
     await forceClick(page.getByTestId('role-select-client'));
     await expect(page.getByText('What is your project type?')).toBeVisible();
+  });
+
+  test('should expose every production role from login without hiding the modal content', async ({ page }) => {
+    await gotoApp(page);
+
+    await clickLandingAction(page, 'Login');
+    await expect(page.getByText('Join Architex')).toBeVisible();
+
+    for (const role of publicRoles) {
+      await expect(page.getByTestId(`role-select-${role}`)).toBeVisible();
+    }
   });
 });

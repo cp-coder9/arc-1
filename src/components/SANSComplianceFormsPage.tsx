@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collectionGroup, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collectionGroup, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, CheckCircle2, FileText, Loader2, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { AIReviewResult, Submission, UserProfile } from '@/types';
@@ -10,10 +10,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
+
 function submissionsQuery(user: UserProfile) {
   const submissions = collectionGroup(db, 'submissions');
-  if (user.role === 'admin') return query(submissions, orderBy('createdAt', 'desc'), limit(50));
-  return query(submissions, where('architectId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+  if (user.role === 'admin') return query(submissions, limit(50));
+  return query(submissions, where('architectId', '==', user.uid), limit(50));
 }
 
 function toAIReviewResult(submission: Submission): AIReviewResult {
@@ -45,7 +58,7 @@ export default function SANSComplianceFormsPage({ user }: { user: UserProfile })
   useEffect(() => {
     setState('loading');
     const unsubscribe = onSnapshot(submissionsQuery(user), (snapshot) => {
-      setSubmissions(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Submission)));
+      setSubmissions(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Submission))));
       setState('ready');
     }, (error) => {
       console.error('Failed to load SANS compliance submissions:', error);

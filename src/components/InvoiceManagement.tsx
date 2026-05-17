@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, orderBy, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { UserProfile, Job, Invoice, InvoiceItem } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
@@ -15,6 +15,19 @@ import { format } from 'date-fns';
 
 interface InvoiceManagementProps {
   user: UserProfile;
+}
+
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortInvoices(invoices: Invoice[]) {
+  return [...invoices].sort((a, b) => timestampMs(b.createdAt) - timestampMs(a.createdAt));
 }
 
 export default function InvoiceManagement({ user }: InvoiceManagementProps) {
@@ -33,13 +46,17 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
   useEffect(() => {
     // Invoices list
     const qInvoices = user.role === 'admin'
-      ? query(collection(db, 'invoices'), orderBy('createdAt', 'desc'))
+      ? query(collection(db, 'invoices'))
       : user.role === 'architect' 
-        ? query(collection(db, 'invoices'), where('architectId', '==', user.uid), orderBy('createdAt', 'desc'))
-        : query(collection(db, 'invoices'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'));
+        ? query(collection(db, 'invoices'), where('architectId', '==', user.uid))
+        : query(collection(db, 'invoices'), where('clientId', '==', user.uid));
 
     const unsubInvoices = onSnapshot(qInvoices, (snapshot) => {
-      setInvoices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice)));
+      setInvoices(sortInvoices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice))));
+      setLoading(false);
+    }, (error) => {
+      console.warn('Invoice projection unavailable; continuing with an empty invoice list:', error);
+      setInvoices([]);
       setLoading(false);
     });
 

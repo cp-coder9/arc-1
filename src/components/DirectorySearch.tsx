@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { addDoc, collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { Search, Send, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../lib/firebase';
@@ -22,6 +22,19 @@ type DirectoryProfile = {
 
 const targetRoles = ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer'];
 
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortProfiles(profiles: DirectoryProfile[]) {
+  return [...profiles].sort((a, b) => timestampMs(b.updatedAt) - timestampMs(a.updatedAt));
+}
+
 export default function DirectorySearch({ user }: { user: UserProfile }) {
   const [profiles, setProfiles] = useState<DirectoryProfile[]>([]);
   const [role, setRole] = useState('all');
@@ -31,10 +44,10 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     const constraints = role === 'all'
-      ? [where('visible', '==', true), orderBy('updatedAt', 'desc'), limit(100)]
-      : [where('visible', '==', true), where('role', '==', role), orderBy('updatedAt', 'desc'), limit(100)];
+      ? [where('visible', '==', true), limit(100)]
+      : [where('visible', '==', true), where('role', '==', role), limit(100)];
     const unsub = onSnapshot(query(collection(db, 'directoryProfiles'), ...constraints), (snapshot) => {
-      setProfiles(snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as DirectoryProfile)));
+      setProfiles(sortProfiles(snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as DirectoryProfile))));
     }, (error) => {
       console.error('Failed to load directory profiles:', error);
       toast.error('Failed to load directory profiles. Check Firestore indexes/rules.');

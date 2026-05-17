@@ -958,6 +958,7 @@ export default function App() {
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
+                  {(user.role === 'subcontractor' || user.role === 'supplier') && <RoleLegacyFallbackPage activeTab={activeTab} user={user} onNavigate={setActiveTab} />}
                 </>
               )}
             </Suspense>
@@ -988,6 +989,35 @@ function DashboardFallback() {
         <div className="lg:col-span-2 h-96 rounded-[1.25rem] bg-white/75 border border-border" />
         <div className="h-96 rounded-[1.25rem] bg-[#edf7f3] border border-border" />
       </div>
+    </div>
+  );
+}
+
+function RoleLegacyFallbackPage({ activeTab, user, onNavigate }: { activeTab: string; user: UserProfile; onNavigate: (pageId: string) => void }) {
+  const roleVisual = roleVisualFor(user.role);
+  const isAudit = activeTab === 'audit';
+
+  return (
+    <div className="space-y-6" data-testid={`role-legacy-fallback-${activeTab}`}>
+      <Card className="rounded-[1.5rem] border-border bg-card/95 beos-soft-shadow overflow-hidden" style={{ borderTop: `5px solid ${roleVisual.accent}` }}>
+        <CardHeader className="bg-[#f4faff]/80 border-b border-border/70">
+          <Badge variant="secondary" className="w-fit rounded-full beos-label-caps">{roleVisual.label}</Badge>
+          <CardTitle className="font-sans text-3xl font-black tracking-[-0.045em] flex items-center gap-3">
+            <span className="rounded-[0.95rem] bg-white text-primary p-3 shadow-[0_10px_24px_rgba(20,71,63,0.08)]">{isAudit ? <History size={18} /> : <Briefcase size={18} />}</span>
+            {isAudit ? 'Audit trail entry points' : 'Active package projects'}
+          </CardTitle>
+          <CardDescription className="max-w-3xl text-base leading-relaxed">
+            {isAudit
+              ? 'Audit-sensitive supplier and subcontractor actions are kept inside the governed package, procurement, invoice, file, and command-centre records they belong to.'
+              : 'Supplier and subcontractor project access is package-led. Use the live package/procurement workspace for visible tenders, commitments, RFIs, evidence, snags, and close-out readiness.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Button className="rounded-xl justify-start gap-2" onClick={() => onNavigate(user.role === 'supplier' ? 'procurement' : 'packages')}><Factory className="h-4 w-4" /> Open package workspace</Button>
+          <Button variant="outline" className="rounded-xl justify-start gap-2" onClick={() => onNavigate('command')}><LayoutDashboard className="h-4 w-4" /> Command Centre</Button>
+          <Button variant="outline" className="rounded-xl justify-start gap-2" onClick={() => onNavigate('files')}><Files className="h-4 w-4" /> Project files</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

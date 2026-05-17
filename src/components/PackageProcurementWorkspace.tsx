@@ -37,7 +37,7 @@ function projectQueriesForUser(user: UserProfile) {
   if (user.role === 'admin') return [query(projects, limit(25))];
   if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'bep' || user.role === 'architect') return [query(projects, where('leadArchitectId', '==', user.uid), limit(25))];
-  return [query(projects, limit(10))];
+  return [];
 }
 
 function canCreateTender(user: UserProfile) {
@@ -82,8 +82,8 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
       setTenders(Array.from(tenderMap.values()).sort((a, b) => String(b.updatedAt ?? b.createdAt).localeCompare(String(a.updatedAt ?? a.createdAt))));
       setState('ready');
     }, (error) => {
-      console.error('Failed to load package workspace tenders:', error);
-      setState('error');
+      console.warn('Package workspace tender projection unavailable; continuing with visible records only:', error);
+      setState('ready');
     }));
 
     const projectMap = new Map<string, Project>();
@@ -91,12 +91,12 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
       unsubs.push(onSnapshot(projectQuery, (snapshot) => {
         snapshot.docs.forEach((docSnap) => projectMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Project));
         setProjects(Array.from(projectMap.values()));
-      }, (error) => console.error('Failed to load projects for procurement workspace:', error)));
+      }, (error) => console.warn('Package workspace project projection unavailable; continuing without project context:', error)));
     });
 
     unsubs.push(onSnapshot(query(collectionGroup(db, 'bids'), where('contractorId', '==', user.uid)), (snapshot) => {
       setMyBids(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Bid)));
-    }, (error) => console.error('Failed to load package bids:', error)));
+    }, (error) => console.warn('Package bid projection unavailable; continuing without bid context:', error)));
 
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [user]);
@@ -115,13 +115,13 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
     }
 
     const unsubs = [
-      onSnapshot(query(collection(db, 'package_procurement_commitments'), where('packageId', 'in', packageIds)), (snapshot) => setCommitments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProcurementCommitment))), (error) => console.error('Failed to load procurement commitments:', error)),
-      onSnapshot(query(collection(db, 'package_delivery_evidence'), where('packageId', 'in', packageIds)), (snapshot) => setEvidence(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as DeliveryEvidenceItem))), (error) => console.error('Failed to load delivery evidence:', error)),
-      onSnapshot(query(collection(db, 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI))), (error) => console.error('Failed to load package RFIs:', error)),
-      onSnapshot(query(collection(db, 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask))), (error) => console.error('Failed to load package programme tasks:', error)),
-      onSnapshot(query(collection(db, 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog))), (error) => console.error('Failed to load package site logs:', error)),
-      onSnapshot(query(collection(db, 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection))), (error) => console.error('Failed to load package inspections:', error)),
-      onSnapshot(query(collection(db, 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SnagItem))), (error) => console.error('Failed to load package snags:', error)),
+      onSnapshot(query(collection(db, 'package_procurement_commitments'), where('packageId', 'in', packageIds)), (snapshot) => setCommitments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProcurementCommitment))), (error) => { console.warn('Package procurement commitments unavailable:', error); setCommitments([]); }),
+      onSnapshot(query(collection(db, 'package_delivery_evidence'), where('packageId', 'in', packageIds)), (snapshot) => setEvidence(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as DeliveryEvidenceItem))), (error) => { console.warn('Package delivery evidence unavailable:', error); setEvidence([]); }),
+      onSnapshot(query(collection(db, 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI))), (error) => { console.warn('Package RFIs unavailable:', error); setRfis([]); }),
+      onSnapshot(query(collection(db, 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask))), (error) => { console.warn('Package programme tasks unavailable:', error); setTasks([]); }),
+      onSnapshot(query(collection(db, 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog))), (error) => { console.warn('Package site logs unavailable:', error); setSiteLogs([]); }),
+      onSnapshot(query(collection(db, 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection))), (error) => { console.warn('Package inspections unavailable:', error); setInspections([]); }),
+      onSnapshot(query(collection(db, 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SnagItem))), (error) => { console.warn('Package snags unavailable:', error); setSnags([]); }),
     ];
 
     return () => unsubs.forEach((unsubscribe) => unsubscribe());

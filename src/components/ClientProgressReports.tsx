@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { addDoc, collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, CalendarClock, CheckCircle2, Download, FileText, Landmark, Loader2, Save } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { CouncilSubmission, GanttTask, Job, Project, UserProfile } from '@/types';
@@ -27,14 +27,27 @@ type ProgressSnapshot = {
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown; generatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.generatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.generatedAt ?? a.createdAt));
+}
+
 function jobQueryForClient(user: UserProfile) {
-  if (user.role === 'admin') return query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(25));
-  return query(collection(db, 'jobs'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(25));
+  if (user.role === 'admin') return query(collection(db, 'jobs'), limit(25));
+  return query(collection(db, 'jobs'), where('clientId', '==', user.uid), limit(25));
 }
 
 function projectQueryForClient(user: UserProfile) {
-  if (user.role === 'admin') return query(collection(db, 'projects'), orderBy('createdAt', 'desc'), limit(25));
-  return query(collection(db, 'projects'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'), limit(25));
+  if (user.role === 'admin') return query(collection(db, 'projects'), limit(25));
+  return query(collection(db, 'projects'), where('clientId', '==', user.uid), limit(25));
 }
 
 function statusFor(job?: Job, project?: Project, tasks: GanttTask[] = [], submissions: CouncilSubmission[] = []): ReportStatus {
@@ -139,17 +152,17 @@ export default function ClientProgressReports({ user }: { user: UserProfile }) {
   useEffect(() => {
     setState('loading');
     const unsubJobs = onSnapshot(jobQueryForClient(user), (snapshot) => {
-      setJobs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job)));
+      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
       setState('ready');
     }, (error) => {
       console.error('Failed to load client progress jobs:', error);
       setState('error');
     });
     const unsubProjects = onSnapshot(projectQueryForClient(user), (snapshot) => {
-      setProjects(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)));
+      setProjects(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project))));
     }, (error) => console.error('Failed to load client progress projects:', error));
     const unsubSnapshots = onSnapshot(query(collection(db, 'project_progress_reports'), where(user.role === 'admin' ? 'humanApprovalRequired' : 'clientId', '==', user.role === 'admin' ? true : user.uid), limit(25)), (snapshot) => {
-      setSnapshots(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProgressSnapshot)));
+      setSnapshots(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProgressSnapshot))));
     }, (error) => console.error('Failed to load progress report snapshots:', error));
     return () => {
       unsubJobs();
