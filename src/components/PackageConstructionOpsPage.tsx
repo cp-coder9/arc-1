@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, limit, onSnapshot, query, where } from 'firebase/firestore';
-import { AlertTriangle, CalendarDays, Camera, CheckCircle2, ClipboardCheck, Loader2, MessageSquarePlus, Plus } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Camera, CheckCircle2, ClipboardCheck, FileWarning, Loader2, MessageSquarePlus, Plus } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { GanttTask, RFI, SiteInspection, SiteLog, TenderPackage, UserProfile } from '@/types';
 import type { SnagItem } from '@/services/packageReadinessService';
@@ -12,9 +12,27 @@ import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 
 type LoadState = 'loading' | 'ready' | 'error';
-type CaptureType = 'rfi' | 'site_log' | 'programme_task';
+type CaptureType = 'rfi' | 'site_instruction' | 'site_log' | 'programme_task';
 
-type ConstructionRecord = RFI | SiteLog | GanttTask | SiteInspection | SnagItem;
+type SiteInstructionRecord = {
+  id: string;
+  packageId: string;
+  projectId: string;
+  jobId?: string;
+  title: string;
+  instruction: string;
+  issuedBy: string;
+  assignedTo?: string;
+  status: 'issued' | 'acknowledged' | 'closed';
+  dueDate: string;
+  costImpactStatus: 'none' | 'potential' | 'confirmed';
+  programmeImpactStatus: 'none' | 'potential' | 'confirmed';
+  humanReviewRequired: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+type ConstructionRecord = RFI | SiteLog | GanttTask | SiteInspection | SnagItem | SiteInstructionRecord;
 
 function timestampMs(value: unknown): number {
   if (!value) return 0;
@@ -70,6 +88,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
   const [tenders, setTenders] = useState<TenderPackage[]>([]);
   const [selectedTenderId, setSelectedTenderId] = useState('');
   const [rfis, setRfis] = useState<RFI[]>([]);
+  const [siteInstructions, setSiteInstructions] = useState<SiteInstructionRecord[]>([]);
   const [siteLogs, setSiteLogs] = useState<SiteLog[]>([]);
   const [tasks, setTasks] = useState<GanttTask[]>([]);
   const [inspections, setInspections] = useState<SiteInspection[]>([]);
@@ -101,6 +120,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
     const packageIds = tenders.map((tender) => tender.id).slice(0, 10);
     if (packageIds.length === 0) {
       setRfis([]);
+      setSiteInstructions([]);
       setSiteLogs([]);
       setTasks([]);
       setInspections([]);
@@ -110,6 +130,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
 
     const unsubs = [
       onSnapshot(query(collection(db, 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI)))), (error) => { console.warn('Package RFIs unavailable:', error); setRfis([]); }),
+      onSnapshot(query(collection(db, 'site_instructions'), where('packageId', 'in', packageIds)), (snapshot) => setSiteInstructions(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInstructionRecord)))), (error) => { console.warn('Package site instructions unavailable:', error); setSiteInstructions([]); }),
       onSnapshot(query(collection(db, 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog)))), (error) => { console.warn('Package site logs unavailable:', error); setSiteLogs([]); }),
       onSnapshot(query(collection(db, 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask)))), (error) => { console.warn('Package programme tasks unavailable:', error); setTasks([]); }),
       onSnapshot(query(collection(db, 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection)))), (error) => { console.warn('Package inspections unavailable:', error); setInspections([]); }),
@@ -121,8 +142,8 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
   const selectedRecords = useMemo(() => {
     if (!selectedTender) return [] as ConstructionRecord[];
     const byPackage = (record: any) => record.packageId === selectedTender.id || record.projectId === selectedTender.projectId;
-    return sortByRecent<ConstructionRecord>([...rfis, ...siteLogs, ...tasks, ...inspections, ...snags].filter(byPackage));
-  }, [inspections, rfis, selectedTender, siteLogs, snags, tasks]);
+    return sortByRecent<ConstructionRecord>([...rfis, ...siteInstructions, ...siteLogs, ...tasks, ...inspections, ...snags].filter(byPackage));
+  }, [inspections, rfis, selectedTender, siteInstructions, siteLogs, snags, tasks]);
 
   const submitCapture = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -148,6 +169,20 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
           dueDate,
           status: 'open',
           attachments: [],
+          createdAt: now,
+        });
+      } else if (captureType === 'site_instruction') {
+        await addDoc(collection(db, 'site_instructions'), {
+          ...common,
+          title: title.trim(),
+          instruction: details.trim() || title.trim(),
+          issuedBy: user.uid,
+          assignedTo: selectedTender.createdBy,
+          dueDate,
+          status: 'issued',
+          costImpactStatus: details.toLowerCase().includes('cost') ? 'potential' : 'none',
+          programmeImpactStatus: details.toLowerCase().includes('delay') || details.toLowerCase().includes('programme') ? 'potential' : 'none',
+          humanReviewRequired: true,
           createdAt: now,
         });
       } else if (captureType === 'site_log') {
@@ -196,7 +231,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
               <Badge variant="secondary" className="uppercase tracking-widest">Construction OS</Badge>
               <CardTitle className="font-heading text-3xl mt-3 flex items-center gap-3"><ClipboardCheck className="h-7 w-7 text-primary" /> Package construction controls</CardTitle>
               <CardDescription className="mt-2 max-w-3xl text-base">
-                Contractor, subcontractor, and supplier package operations backed by live RFIs, site logs, programme tasks, inspections, and snags. Nothing is fabricated when no package records exist.
+                Contractor, subcontractor, and supplier package operations backed by live RFIs, site instructions, site logs, programme tasks, inspections, and snags. Nothing is fabricated when no package records exist.
               </CardDescription>
             </div>
             <Badge className="capitalize w-fit">{user.role}</Badge>
@@ -213,8 +248,9 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
         <MetricCard icon={<MessageSquarePlus />} label="RFIs" value={rfis.length} />
+        <MetricCard icon={<FileWarning />} label="Instructions" value={siteInstructions.length} />
         <MetricCard icon={<Camera />} label="Site logs" value={siteLogs.length} />
         <MetricCard icon={<CalendarDays />} label="Programme tasks" value={tasks.length} />
         <MetricCard icon={<CheckCircle2 />} label="Inspections" value={inspections.length} />
@@ -240,11 +276,12 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
         </Card>
 
         <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
-          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Capture construction record</CardTitle><CardDescription>Writes a real package-linked record. Site logs and programme tasks are contractor/subcontractor/admin only.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Capture construction record</CardTitle><CardDescription>Writes a real package-linked record. Site instructions are separate from RFIs and require human review for cost or programme impact.</CardDescription></CardHeader>
           <CardContent>
             <form onSubmit={submitCapture} className="space-y-3">
               <select value={captureType} onChange={(event) => setCaptureType(event.target.value as CaptureType)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                 <option value="rfi">RFI</option>
+                {canCaptureSiteRecords(user.role) && <option value="site_instruction">Site instruction</option>}
                 {canCaptureSiteRecords(user.role) && <option value="site_log">Site log</option>}
                 {canCaptureSiteRecords(user.role) && <option value="programme_task">Programme task</option>}
               </select>

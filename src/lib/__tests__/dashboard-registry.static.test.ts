@@ -201,11 +201,16 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("import PackageConstructionOpsPage from './PackageConstructionOpsPage';");
     expect(workflowSource).toContain("pageId === 'construction' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)");
     expect(workflowSource).toContain('return <PackageConstructionOpsPage user={user} />;');
-    for (const collection of ["'rfis'", "'site_logs'", "'gantt_tasks'", "'site_inspections'", "'package_snags'"]) {
+    for (const collection of ["'rfis'", "'site_instructions'", "'site_logs'", "'gantt_tasks'", "'site_inspections'", "'package_snags'"]) {
       expect(packageConstructionSource).toContain(`collection(db, ${collection})`);
     }
     expect(packageConstructionSource).toContain("where('packageId', 'in', packageIds)");
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'rfis\')');
+    expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_instructions\')');
+    expect(packageConstructionSource).toContain('humanReviewRequired: true');
+    expect(packageConstructionSource).toContain('costImpactStatus');
+    expect(packageConstructionSource).toContain('programmeImpactStatus');
+    expect(packageConstructionSource).toContain('Site instructions are separate from RFIs');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_logs\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'gantt_tasks\')');
   });

@@ -82,6 +82,7 @@ describe('firestore security rules static regressions', () => {
       'package_delivery_evidence',
       'package_snags',
       'rfis',
+      'site_instructions',
       'gantt_tasks',
       'site_logs',
       'site_inspections',
@@ -94,6 +95,9 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain('data.assignedTo == request.auth.uid');
     expect(rules).toContain('match /interpretations/{interpretationId}');
     expect(rules).toContain('resource.data.awardedContractorId == request.auth.uid');
+    expect(rules).toContain("request.resource.data.status in ['issued', 'acknowledged', 'closed']");
+    expect(rules).toContain("request.resource.data.costImpactStatus in ['none', 'potential', 'confirmed']");
+    expect(rules).toContain("request.resource.data.programmeImpactStatus in ['none', 'potential', 'confirmed']");
   });
 
   it('gates Phase 3/4 operational collections by project access and immutable identity fields', () => {

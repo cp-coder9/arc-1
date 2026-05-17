@@ -644,6 +644,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /site_instructions/{recordId} {
+      allow read: if canReadPackageLinkedRecord(resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data) &&
+        request.resource.data.issuedBy == request.auth.uid &&
+        request.resource.data.status in ['issued', 'acknowledged', 'closed'] &&
+        request.resource.data.costImpactStatus in ['none', 'potential', 'confirmed'] &&
+        request.resource.data.programmeImpactStatus in ['none', 'potential', 'confirmed'] &&
+        request.resource.data.humanReviewRequired == true;
+      allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data)) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'costImpactStatus', 'programmeImpactStatus', 'assignedTo', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
     match /gantt_tasks/{recordId} {
       allow read: if canReadPackageLinkedRecord(resource.data);
       allow create: if canCreateOwnedDashboardRecord(request.resource.data);
