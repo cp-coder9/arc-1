@@ -104,6 +104,7 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain('match /resource_centre/{resourceId}');
     expect(rules).toContain('match /drawing_checklists/{checklistId}');
     expect(rules).toContain('match /municipal_submissions/{submissionId}');
+    expect(rules).toContain('match /gantt_tasks/{taskId}');
     expect(rules).toContain('match /documents/{documentId}');
     expect(rules).toContain('match /versions/{versionId}');
     expect(rules).toContain('match /transmittals/{transmittalId}');
@@ -111,6 +112,9 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain('match /ai_issues/{issueId}');
     expect(rules).toContain('match /coordination_items/{itemId}');
     expect(rules).toContain("request.resource.data.status in ['draft', 'active', 'issued', 'superseded', 'withdrawn']");
+    expect(rules).toContain("request.resource.data.status in ['not_started', 'in_progress', 'completed', 'delayed']");
+    expect(rules).toContain('baselineChangeStatus');
+    expect(rules).toContain('humanApprovalRequired');
     expect(rules).toContain("request.resource.data.status in ['draft', 'issued']");
     expect(rules).toContain("request.resource.data.keys().hasOnly(['id', 'documentId', 'projectId', 'versionNumber', 'revision', 'fileUrl', 'fileName', 'checksum', 'notes', 'issueStatus', 'supersedesVersionId', 'createdBy', 'createdAt'])");
     expect(rules).toContain('request.resource.data.humanConfirmed == false');

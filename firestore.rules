@@ -872,6 +872,19 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /gantt_tasks/{taskId} {
+        allow read: if canReadProject(projectId);
+        allow create: if canReadProject(projectId) &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.status in ['not_started', 'in_progress', 'completed', 'delayed'] &&
+          request.resource.data.keys().hasOnly(['projectId', 'title', 'phase', 'startDate', 'endDate', 'baselineStartDate', 'baselineEndDate', 'forecastEndDate', 'progress', 'dependsOn', 'assignedTo', 'status', 'isCritical', 'recoveryPlan', 'baselineChangeReason', 'baselineChangeStatus', 'humanApprovalRequired', 'color', 'createdAt', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['projectId', 'title', 'phase', 'startDate', 'endDate', 'progress', 'status', 'createdAt', 'updatedAt']);
+        allow update: if canReadProject(projectId) &&
+          request.resource.data.projectId == resource.data.projectId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'phase', 'startDate', 'endDate', 'baselineStartDate', 'baselineEndDate', 'forecastEndDate', 'progress', 'dependsOn', 'assignedTo', 'status', 'isCritical', 'recoveryPlan', 'baselineChangeReason', 'baselineChangeStatus', 'humanApprovalRequired', 'color', 'updatedAt']);
+        allow delete: if isAdmin();
+      }
+
       match /documents/{documentId} {
         allow read: if canReadProject(projectId);
         allow create: if canManageProject(projectId) &&

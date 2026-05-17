@@ -16,6 +16,7 @@ const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/compone
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
 const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/components/PackageConstructionOpsPage.tsx'), 'utf8');
 const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/components/PackageCloseoutPage.tsx'), 'utf8');
+const ganttChartSource = readFileSync(resolve(process.cwd(), 'src/components/GanttChart.tsx'), 'utf8');
 const aiCoPilotSource = readFileSync(resolve(process.cwd(), 'src/components/AICoPilotPage.tsx'), 'utf8');
 const adminAIReviewQueueSource = readFileSync(resolve(process.cwd(), 'src/components/AdminAIReviewQueue.tsx'), 'utf8');
 const adminDashboardSource = readFileSync(resolve(process.cwd(), 'src/components/AdminDashboard.tsx'), 'utf8');
@@ -207,6 +208,19 @@ describe('canonical dashboard page registry', () => {
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'rfis\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_logs\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'gantt_tasks\')');
+  });
+
+  it('upgrades programme builder with baseline, forecast, dependency, and human-review controls', () => {
+    expect(workflowSource).toContain("pageId === 'programme' && activeProject");
+    expect(workflowSource).toContain('<GanttChart projectId={activeProject.id} teamMembers={activeProject.teamMembers} />');
+    expect(ganttChartSource).toContain('Programme Builder');
+    expect(ganttChartSource).toContain('baselineStartDate');
+    expect(ganttChartSource).toContain('forecastEndDate');
+    expect(ganttChartSource).toContain('Critical path');
+    expect(ganttChartSource).toContain('Look-ahead');
+    expect(ganttChartSource).toContain('Recovery programme');
+    expect(ganttChartSource).toContain('humanApprovalRequired');
+    expect(ganttChartSource).toContain('This tool does not approve extensions of time, payment claims, or contract changes.');
   });
 
   it('routes backend.html invoicing and package close-out/snags to live production tools', () => {
