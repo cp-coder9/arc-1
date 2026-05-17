@@ -371,3 +371,13 @@ Validation completed for this pass:
 Human review note:
 
 - This was a routing/integration fix only. It did not add new writes, payment actions, approvals, or Firestore rule changes.
+
+Deployment and broad validation for Construction OS admin routing pass:
+
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed, 55 files / 430 tests.
+- Full Chromium E2E: `npx playwright test --project=chromium --reporter=line` passed, 22/22 tests.
+- Production build: `npx vite build --base ./` passed, 3059 modules transformed.
+- Uploaded 74 production files to `https://test.architex.co.za/` by explicit FTPS.
+- Live verification passed for `https://test.architex.co.za/` with title `Architex | Built Environment OS` and zero bad resources.
+- Direct deployed chunk verification passed for `assets/ProjectWorkflowPage-KO6qIE6i.js`; it returned HTTP 200 and contained the Construction OS, admin role, and package-linked collection strings.
