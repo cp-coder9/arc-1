@@ -51,3 +51,5 @@ Scope: visual/layout/color redesign of dashboards using `12/` references. Preser
 - 01:12 UTC: Deployment diagnosis showed the committed hardening only included the relative admin return link, not the `endsWith('/admin')` route detection. Reapplied the route detection explicitly for the shared-hosting subpath.
 - 01:15 UTC: Final relative-base production build passed; staged bundle contained both exact `/admin` and hosted-subpath `endsWith('/admin')` route checks; uploaded 74 files via explicit FTPS.
 - 01:17 UTC: Public verification passed for landing and `/admin` at `https://architex.co.za/architex.co.za/ai/`; no missing resources and no console errors on either route.
+- 01:20 UTC: Removed the remaining browser metadata wording that called Architex a marketplace; updated title/description to Built Environment OS language and made favicon loading subpath-safe.
+- 01:24 UTC: Final public metadata verification passed for landing and `/admin`; browser title is now `Architex | Built Environment OS`, with no missing resources and no console errors.
