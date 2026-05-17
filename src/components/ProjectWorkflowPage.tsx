@@ -16,6 +16,7 @@ import MunicipalTracker from './MunicipalTracker';
 import ProjectMessengerPage from './ProjectMessengerPage';
 import ContractSigningPage from './ContractSigningPage';
 import DisputeResolutionPage from './DisputeResolutionPage';
+import PackageConstructionOpsPage from './PackageConstructionOpsPage';
 
 type Props = {
   pageId: string;
@@ -108,6 +109,10 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
 
   if (pageId === 'disputes') {
     return <DisputeResolutionPage user={user} />;
+  }
+
+  if (pageId === 'construction' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)) {
+    return <PackageConstructionOpsPage user={user} />;
   }
 
   if (!activeProject && ['journey', 'programme', 'construction', 'snagging'].includes(pageId)) {

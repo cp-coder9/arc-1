@@ -12,6 +12,7 @@ const projectMessengerSource = readFileSync(resolve(process.cwd(), 'src/componen
 const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/components/ContractSigningPage.tsx'), 'utf8');
 const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
+const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/components/PackageConstructionOpsPage.tsx'), 'utf8');
 const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
 const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
@@ -158,6 +159,19 @@ describe('canonical dashboard page registry', () => {
     expect(disputeResolutionSource).toContain('filedAgainst');
     expect(disputeResolutionSource).toContain('status: \'open\'');
     expect(disputeResolutionSource).not.toContain('orderBy(');
+  });
+
+  it('backs package construction OS with package-linked live operations for contractor-side roles', () => {
+    expect(workflowSource).toContain("import PackageConstructionOpsPage from './PackageConstructionOpsPage';");
+    expect(workflowSource).toContain("pageId === 'construction' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)");
+    expect(workflowSource).toContain('return <PackageConstructionOpsPage user={user} />;');
+    for (const collection of ["'rfis'", "'site_logs'", "'gantt_tasks'", "'site_inspections'", "'package_snags'"]) {
+      expect(packageConstructionSource).toContain(`collection(db, ${collection})`);
+    }
+    expect(packageConstructionSource).toContain("where('packageId', 'in', packageIds)");
+    expect(packageConstructionSource).toContain('addDoc(collection(db, \'rfis\')');
+    expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_logs\')');
+    expect(packageConstructionSource).toContain('addDoc(collection(db, \'gantt_tasks\')');
   });
 
   it('routes AI co-pilot to the production grounded AI governance page', () => {
