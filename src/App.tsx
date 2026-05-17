@@ -563,38 +563,59 @@ export default function App() {
 
   if (!user && showLogin) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 backdrop-blur-sm fixed inset-0 z-50 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-[#04302c]/92 px-3 py-3 text-[#04302c] backdrop-blur-xl sm:px-4 sm:py-6">
         <AnimatedFloorPlan />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[0.09] bg-[linear-gradient(rgba(248,250,252,0.8)_1px,transparent_1px),linear-gradient(90deg,rgba(248,250,252,0.8)_1px,transparent_1px)] bg-[size:36px_36px]" />
         <motion.div
           initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-2xl w-full my-8 relative z-10"
+          className={`${authMode === 'selection' ? 'max-w-6xl' : 'max-w-4xl'} relative z-10 w-full pb-[max(env(safe-area-inset-bottom),0px)]`}
         >
-          <Card className="border-border shadow-2xl bg-white/95 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="text-center bg-primary/5 pb-10 pt-12 relative">
-              <div className="flex justify-between items-center mb-6 absolute top-6 left-6 right-6">
+          <Card className="overflow-hidden rounded-[1.6rem] border border-white/15 bg-[#F8FAFC]/96 shadow-[0_32px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[2.2rem]">
+            <CardHeader className="relative overflow-hidden bg-[#04302c] px-5 pb-5 pt-16 text-[#F8FAFC] sm:px-7 sm:pb-6 sm:pt-12">
+              <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,rgba(15,107,98,0.48),transparent_28%),radial-gradient(circle_at_86%_0%,rgba(248,250,252,0.12),transparent_28%)]" />
+              <div className="absolute left-4 right-4 top-4 flex items-center justify-between sm:left-6 sm:right-6 sm:top-6">
                 {authMode !== 'selection' ? (
-                  <Button variant="ghost" size="sm" onClick={() => setAuthMode('selection')} className="rounded-full hover:bg-white">
+                  <Button variant="ghost" size="sm" onClick={() => setAuthMode('selection')} className="rounded-full bg-white/10 px-3 text-[#F8FAFC] hover:bg-white hover:text-[#04302c]">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
                   </Button>
                 ) : (
                   <div />
                 )}
-                <Button variant="ghost" size="sm" onClick={() => { setShowLogin(false); setAuthMode('selection'); }} className="rounded-full hover:bg-white">
+                <Button variant="ghost" size="sm" onClick={() => { setShowLogin(false); setAuthMode('selection'); }} className="rounded-full bg-white/10 px-3 text-[#F8FAFC] hover:bg-white hover:text-[#04302c]">
                   Cancel
                 </Button>
               </div>
-              <div className="flex justify-center mb-5">
-                <Logo iconClassName="w-16 h-16 text-primary" />
+              <div className="relative grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+                <div className="text-left">
+                  <div className="mb-5 flex items-center gap-3">
+                    <Logo iconClassName="h-12 w-12 text-[#0f6b62] sm:h-14 sm:w-14" textClassName="hidden" />
+                    <div>
+                      <p className="font-heading text-2xl font-black tracking-[-0.055em]">Architex OS</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#F8FAFC]/45">Built Environment Access</p>
+                    </div>
+                  </div>
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#F8FAFC]/65">
+                    <span className="h-2 w-2 rounded-full bg-[#0f6b62] shadow-[0_0_16px_#0f6b62]" /> Secure workspace boot
+                  </div>
+                  <CardTitle className="font-heading text-3xl font-black tracking-[-0.055em] text-[#F8FAFC] sm:text-4xl">
+                    {authMode === 'selection' ? 'Join Architex' : authMode === 'email-login' ? 'Welcome Back' : 'Create your account'}
+                  </CardTitle>
+                  <CardDescription className="mt-2 max-w-2xl text-sm font-medium text-[#F8FAFC]/62 sm:text-base">
+                    {authMode === 'selection' ? 'Select a role profile to mount the correct command centre, evidence stream, and project controls.' : 'Authenticate into the selected Architex OS workspace.'}
+                  </CardDescription>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-left text-[10px] font-black uppercase tracking-[0.16em] text-[#F8FAFC]/55">
+                  {['Role kernel', 'Audit layer', 'AI co-pilot'].map((label) => (
+                    <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.055] p-3">
+                      <span className="mb-4 block h-1.5 w-8 rounded-full bg-[#0f6b62]" />
+                      {label}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <CardTitle className="text-4xl font-heading font-bold tracking-tight">
-                {authMode === 'selection' ? 'Join Architex' : authMode === 'email-login' ? 'Welcome Back' : 'Create your account'}
-              </CardTitle>
-              <CardDescription className="text-base mt-2">
-                {authMode === 'selection' ? 'Select your role to access your workspace' : 'Enter your details to continue'}
-              </CardDescription>
             </CardHeader>
-            <CardContent className="p-6 sm:p-10">
+            <CardContent className="p-4 sm:p-6 lg:p-8">
               <AnimatePresence mode="wait">
                 {authMode === 'selection' ? (
                   <motion.div
@@ -603,9 +624,9 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.3 }}
-                    className="space-y-6"
+                    className="space-y-4 sm:space-y-6"
                   >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
                       <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
                       <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
                       <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
@@ -614,11 +635,11 @@ export default function App() {
                       <AuthRoleCard data-testid="role-select-subcontractor" icon={<Hammer className="w-8 h-8" />} title="Subcontractor" description="I deliver a trade package, evidence, and close-out items" active={roleSelection === 'subcontractor'} onClick={() => setRoleSelection('subcontractor')} />
                       <AuthRoleCard data-testid="role-select-supplier" icon={<Factory className="w-8 h-8" />} title="Supplier" description="I supply materials, products, deliveries, or warranties" active={roleSelection === 'supplier'} onClick={() => setRoleSelection('supplier')} />
                     </div>
-                    <div className="space-y-3">
-                      <Button onClick={handleGoogleLogin} className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg" disabled={!roleSelection || isLoggingIn}>
+                    <div className="rounded-[1.25rem] border border-[#04302c]/10 bg-[#04302c]/[0.035] p-3 sm:p-4">
+                      <Button onClick={handleGoogleLogin} className="h-14 w-full rounded-2xl bg-[#04302c] text-base font-black text-[#F8FAFC] shadow-lg hover:bg-[#0f6b62]" disabled={!roleSelection || isLoggingIn}>
                         {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                       </Button>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
                         <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
                       </div>
@@ -648,7 +669,7 @@ export default function App() {
                       <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Password</label>
                       <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
                     </div>
-                    <Button type="submit" className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg mt-6" disabled={isLoggingIn}>
+                    <Button type="submit" className="mt-6 h-14 w-full rounded-2xl bg-[#04302c] text-lg font-black text-[#F8FAFC] shadow-lg hover:bg-[#0f6b62]" disabled={isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
                     </Button>
                     <Button type="button" variant="outline" className="w-full h-12 rounded-2xl font-bold" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
@@ -672,9 +693,9 @@ export default function App() {
   const roleVisual = roleVisualFor(user.role);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row relative overflow-hidden beos-grid-canvas">
+    <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
-      <aside className={`fixed inset-y-0 left-0 z-50 w-[288px] beos-glass border-r border-border/70 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:w-[288px] md:shrink-0 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col gap-y-4 p-7 overflow-y-auto">
           <div className="flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
@@ -883,8 +904,8 @@ export default function App() {
           </div>
         </div>
       </aside>
-      <main className="flex-1 flex flex-col min-w-0 relative z-10">
-        <header className="beos-glass min-h-20 border-b border-border/70 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40">
+      <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between border-b border-border/70 px-3 beos-glass sm:min-h-20 sm:px-8">
           <div className="flex items-center gap-4 min-w-0">
             <Button variant="ghost" size="icon" className="md:hidden rounded-full" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation menu" aria-expanded={isSidebarOpen}><Menu size={24} /></Button>
             <div className="min-w-0 py-3">
@@ -913,13 +934,13 @@ export default function App() {
             </div>
           </div>
         </header>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <motion.div
             key={`${user.role}-${activeTab}`}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
             animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="p-4 sm:p-6 lg:p-7 max-w-[1500px] mx-auto w-full"
+            className="mx-auto w-full max-w-[1500px] p-3 sm:p-6 lg:p-7"
           >
             <Suspense fallback={<DashboardFallback />}>
               {activeTab === 'invoices' && <InvoiceManagement user={user} />}
@@ -1244,16 +1265,16 @@ function AdminLoginPage({
   const isEmailLogin = authMode === 'email-login';
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="relative flex min-h-dvh items-start justify-center overflow-y-auto bg-[#0F172A] px-4 py-6 text-white sm:items-center sm:py-8">
       <div className="absolute inset-0 opacity-20">
         <AnimatedFloorPlan />
       </div>
-      <div className="max-w-md w-full relative z-10">
-        <div className="text-center mb-8">
-          <div className="mx-auto mb-5 h-20 w-20 rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center shadow-2xl">
-            <ShieldCheck className="h-10 w-10 text-primary" />
+      <div className="relative z-10 w-full max-w-md pb-[max(env(safe-area-inset-bottom),0px)]">
+        <div className="mb-5 text-center sm:mb-8">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/20 bg-white/10 shadow-2xl sm:mb-5 sm:h-20 sm:w-20">
+            <ShieldCheck className="h-8 w-8 text-primary sm:h-10 sm:w-10" />
           </div>
-          <h1 className="text-4xl font-heading font-bold mb-2">Admin Portal</h1>
+          <h1 className="mb-2 font-heading text-3xl font-bold sm:text-4xl">Admin Portal</h1>
           <p className="text-sm text-white/60 uppercase tracking-widest">Authorized Architex administrators only</p>
         </div>
 
@@ -1326,17 +1347,17 @@ function AuthRoleCard({ icon, title, description, active, onClick, ...props }: {
   return (
     <button
       onClick={onClick}
-      className={`group p-6 sm:p-8 text-left border rounded-3xl transition-all duration-300 flex flex-col gap-6 shadow-sm hover:shadow-xl ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
+      className={`group flex min-h-[118px] gap-4 rounded-3xl border p-4 text-left shadow-sm transition-all duration-300 hover:shadow-xl sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5 ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
       {...props}
     >
-      <div className={`p-4 rounded-2xl transition-all group-hover:scale-110 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all group-hover:scale-105 sm:h-14 sm:w-14 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
         {icon}
       </div>
-      <div className="space-y-2">
-        <h3 className="font-heading font-bold text-2xl">{title}</h3>
+      <div className="min-w-0 space-y-1.5 sm:space-y-2">
+        <h3 className="font-heading text-xl font-bold sm:text-2xl">{title}</h3>
         <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </div>
-      <div className="mt-auto pt-4 border-t border-border/50 w-full">
+      <div className="mt-auto hidden w-full border-t border-border/50 pt-3 sm:block">
         <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
           {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
         </span>
@@ -1440,7 +1461,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
           </motion.div>
         ) : (
           <motion.main key="home" initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} transition={{ duration: 0.35 }} className="relative z-10">
-            <section className="px-4 pb-16 pt-10 sm:px-8 sm:pb-24 sm:pt-16 lg:px-16">
+            <section className="px-4 pb-12 pt-8 sm:px-8 sm:pb-20 sm:pt-14 lg:px-16">
               <div className="mx-auto grid max-w-7xl items-center gap-12 lg:min-h-[calc(100vh-96px)] lg:grid-cols-[1.04fr_0.96fr]">
                 <div>
                   <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-[#F8FAFC]/70 backdrop-blur">
@@ -1448,10 +1469,10 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                     South Africa's project coordination layer
                   </motion.div>
                   <p className="mb-4 text-sm font-black uppercase tracking-[0.22em] text-[#F8FAFC]/55">Smarter projects. Stronger built environments.</p>
-                  <motion.h1 initial={prefersReducedMotion ? false : { opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75, delay: 0.08 }} className="font-heading text-5xl font-black leading-[0.9] tracking-[-0.085em] text-[#F8FAFC] sm:text-7xl lg:text-[7.6rem]">
+                  <motion.h1 initial={prefersReducedMotion ? false : { opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75, delay: 0.08 }} className="font-heading text-4xl font-black leading-[0.92] tracking-[-0.075em] text-[#F8FAFC] min-[420px]:text-5xl sm:text-7xl lg:text-[7.6rem]">
                     Where projects stop leaking time.
                   </motion.h1>
-                  <motion.p initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.22 }} className="mt-8 max-w-2xl text-lg font-medium leading-relaxed text-[#F8FAFC]/68 sm:text-xl">
+                  <motion.p initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.22 }} className="mt-6 max-w-2xl text-base font-medium leading-relaxed text-[#F8FAFC]/68 sm:mt-8 sm:text-xl">
                     Architex turns the messy path from brief, team selection, compliance, tenders, site evidence, municipal tracking, payments, and close-out into one governed workspace for clients, architects, BEPs, contractors, suppliers, subcontractors, and freelancers.
                   </motion.p>
                   <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.34 }} className="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -1462,7 +1483,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                       Enter workspace
                     </Button>
                   </motion.div>
-                  <div className="mt-10 grid grid-cols-3 gap-3 max-w-2xl">
+                  <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 min-[420px]:grid-cols-3 sm:mt-10">
                     {[
                       ['7 roles', 'one project truth'],
                       ['AI + audit', 'human sign-off'],
@@ -1527,7 +1548,7 @@ function ProjectSignal({ prefersReducedMotion }: { prefersReducedMotion: boolean
   ];
 
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.18 }} className="relative mx-auto h-[34rem] w-full max-w-[34rem]">
+    <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.18 }} className="relative mx-auto h-[24rem] w-full max-w-[34rem] sm:h-[30rem] lg:h-[34rem]">
       <div className="absolute inset-0 rounded-[3rem] border border-white/10 bg-[#F8FAFC]/[0.035] shadow-[0_40px_120px_rgba(0,0,0,0.35)] backdrop-blur-xl" />
       <div className="absolute inset-5 rounded-[2.4rem] border border-[#0f6b62]/20 bg-[radial-gradient(circle_at_center,rgba(15,107,98,0.14),transparent_55%)]" />
       <svg className="absolute inset-0 h-full w-full" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -1538,7 +1559,7 @@ function ProjectSignal({ prefersReducedMotion }: { prefersReducedMotion: boolean
         {!prefersReducedMotion && <motion.circle r="1.2" fill="#0f6b62" initial={{ offsetDistance: '0%' }} animate={{ offsetDistance: '100%' }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} style={{ offsetPath: 'path("M18 28 C38 12 58 14 74 18 C86 34 85 48 82 58 C60 76 40 80 20 72 C8 50 8 38 16 26")' }} />}
       </svg>
       {nodes.map((node, index) => <SignalNode key={node.label} {...node} index={index} prefersReducedMotion={prefersReducedMotion} />)}
-      <div className="absolute left-1/2 top-1/2 w-52 -translate-x-1/2 -translate-y-1/2 rounded-[2rem] border border-white/10 bg-[#04302c]/80 p-5 text-center shadow-2xl backdrop-blur">
+      <div className="absolute left-1/2 top-1/2 w-44 -translate-x-1/2 -translate-y-1/2 rounded-[1.5rem] border border-white/10 bg-[#04302c]/80 p-4 text-center shadow-2xl backdrop-blur sm:w-52 sm:rounded-[2rem] sm:p-5">
         <Workflow className="mx-auto mb-3 h-8 w-8 text-[#0f6b62]" />
         <p className="font-heading text-2xl font-black tracking-[-0.05em]">Project signal</p>
         <p className="mt-2 text-xs font-medium leading-relaxed text-[#F8FAFC]/55">Live roles, evidence, AI checks, approvals, and next actions moving as one.</p>

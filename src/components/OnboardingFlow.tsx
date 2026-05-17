@@ -46,7 +46,7 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
   };
 
   const renderRoleSelection = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
       <RoleCard
         icon={<Users className="w-8 h-8" />}
         title="Client"
@@ -418,33 +418,33 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 backdrop-blur-sm fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-secondary/30 px-3 py-3 backdrop-blur-sm sm:px-4 sm:py-6 lg:items-center">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl w-full my-8"
+        className={`${step === 1 ? 'max-w-5xl' : 'max-w-2xl'} w-full pb-[max(env(safe-area-inset-bottom),0px)] lg:my-8`}
       >
-        <Card className="border-border shadow-2xl bg-white/95 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
-          <CardHeader className="text-center bg-primary/5 pb-10 pt-12 relative">
-            <div className="flex justify-between items-center mb-6 absolute top-6 left-6 right-6">
+        <Card className="overflow-hidden rounded-[1.75rem] border-border bg-white/95 shadow-2xl backdrop-blur-md sm:rounded-[2.5rem]">
+          <CardHeader className="relative bg-primary/5 px-5 pb-6 pt-16 text-center sm:px-6 sm:pb-8 sm:pt-12">
+            <div className="absolute left-4 right-4 top-4 flex items-center justify-between sm:left-6 sm:right-6 sm:top-6">
               {step > 1 && (
-                <Button variant="ghost" size="sm" onClick={prevStep} className="rounded-full hover:bg-white">
+                <Button variant="ghost" size="sm" onClick={prevStep} className="rounded-full bg-white/55 px-3 hover:bg-white">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
               )}
               <div className="flex-1" />
-              <Button variant="ghost" size="sm" onClick={onCancel} className="rounded-full hover:bg-white">
+              <Button variant="ghost" size="sm" onClick={onCancel} className="rounded-full bg-white/55 px-3 hover:bg-white">
                 Cancel
               </Button>
             </div>
-            <CardTitle className="text-4xl font-heading font-bold tracking-tight">
+            <CardTitle className="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
               {step === 1 ? 'Join Architex' : `Welcome, ${role?.toUpperCase()}`}
             </CardTitle>
-            <CardDescription className="text-base mt-2">
-              {step === 1 ? 'Select your professional role to get started' : 'Complete your profile to access the marketplace'}
+            <CardDescription className="mt-2 text-sm sm:text-base">
+              {step === 1 ? 'Select your professional role to get started' : 'Complete your profile to access your workspace'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-10">
+          <CardContent className="p-4 sm:p-6 lg:p-8">
             <AnimatePresence mode="wait">
               <motion.div
                 key={step}
@@ -474,17 +474,17 @@ function RoleCard({ icon, title, description, onClick, ...props }: { icon: React
     <button
       onClick={onClick}
       aria-label={`Select ${title} role`}
-      className="group p-8 text-left border border-border rounded-3xl hover:border-primary hover:bg-primary/5 transition-all duration-300 flex flex-col gap-6 bg-white shadow-sm hover:shadow-xl"
+      className="group flex min-h-[118px] gap-4 rounded-3xl border border-border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-xl sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5"
       {...props}
     >
-      <div className="p-4 bg-secondary rounded-2xl group-hover:bg-primary/10 group-hover:text-primary transition-all group-hover:scale-110">
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-secondary transition-all group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary sm:h-14 sm:w-14">
         {icon}
       </div>
-      <div className="space-y-2">
-        <h3 className="font-heading font-bold text-2xl">{title}</h3>
+      <div className="min-w-0 space-y-1.5 sm:space-y-2">
+        <h3 className="font-heading text-xl font-bold sm:text-2xl">{title}</h3>
         <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </div>
-      <div className="mt-auto pt-4 border-t border-border/50 w-full">
+      <div className="mt-auto hidden w-full border-t border-border/50 pt-3 sm:block">
         <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
           Get Started <ArrowRight className="w-4 h-4" />
         </span>
