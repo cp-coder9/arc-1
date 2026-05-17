@@ -177,6 +177,7 @@ service cloud.firestore {
         data.contractorId == request.auth.uid ||
         data.architectId == request.auth.uid ||
         data.assigneeId == request.auth.uid ||
+        data.assignedTo == request.auth.uid ||
         data.clientId == request.auth.uid ||
         data.professionalId == request.auth.uid ||
         data.fromUserId == request.auth.uid ||

@@ -17,6 +17,7 @@ import ProjectMessengerPage from './ProjectMessengerPage';
 import ContractSigningPage from './ContractSigningPage';
 import DisputeResolutionPage from './DisputeResolutionPage';
 import PackageConstructionOpsPage from './PackageConstructionOpsPage';
+import PackageCloseoutPage from './PackageCloseoutPage';
 
 type Props = {
   pageId: string;
@@ -113,6 +114,10 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
 
   if (pageId === 'construction' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)) {
     return <PackageConstructionOpsPage user={user} />;
+  }
+
+  if (pageId === 'snagging' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)) {
+    return <PackageCloseoutPage user={user} />;
   }
 
   if (!activeProject && ['journey', 'programme', 'construction', 'snagging'].includes(pageId)) {

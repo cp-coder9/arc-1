@@ -50,6 +50,24 @@ Commit: `33c8648d Implement BEP marketplace and team matrix tools`
   - `bep-marketplace` / Client Marketplace
   - `bep-team` / Design Team Matrix
 
+### 4. Canonical Invoicing and Package Close-Out/Snagging
+Commit: `a025cb01 Implement package closeout and invoicing route`
+
+- Added the missing `backend.html` canonical `invoicing` dashboard page for BEP/design-team, contractor, freelancer, and admin users.
+- Routed `invoicing` through the existing production `InvoiceManagement` component instead of leaving it as a non-canonical legacy bottom-nav item.
+- Added `PackageCloseoutPage` for contractor-side package snagging and close-out workflows.
+- Reads live package-linked records from:
+  - `tender_packages`
+  - `package_snags`
+  - `package_delivery_evidence`
+  - `rfis`
+  - `gantt_tasks`
+  - `site_inspections`
+- Evaluates real close-out readiness with `evaluatePackageReadiness` so open RFIs, incomplete programme tasks, missing evidence, failed inspections, and open snags become explicit blockers/warnings.
+- Allows only the package creator, awarded contractor, or admin to create snag/evidence records.
+- Stores submitted close-out evidence as `status: submitted` with `humanReviewRequired: true`; evidence is never auto-approved.
+- Allows snag status updates only by admin, creator, or assigned/assignee user, with Firestore `assignedTo` ownership support added for package-linked records.
+
 ## Firestore rules deployment
 
 The current local `firestore.rules` was deployed through the Firebase Rules API because the Firebase CLI deploy path still lacks Service Usage permission.
@@ -109,6 +127,11 @@ All validation below passed after the role-tool changes:
    - Admin route loaded.
    - Existing architex AI path loaded.
    - No failed 4xx static resources.
+
+8. Focused invoicing and package close-out validation
+   - `npm run lint`
+   - `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts`
+   - Result: 50 focused tests passed.
 
 ## Files intentionally not committed
 

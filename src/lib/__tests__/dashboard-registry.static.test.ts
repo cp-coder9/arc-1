@@ -15,6 +15,7 @@ const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/component
 const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
 const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/components/PackageConstructionOpsPage.tsx'), 'utf8');
+const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/components/PackageCloseoutPage.tsx'), 'utf8');
 const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
 const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
@@ -85,6 +86,7 @@ describe('canonical dashboard page registry', () => {
     expectPage('procurement', 'BoQ / BoM Procurement', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('bep-marketplace', 'Client Marketplace', ['bep', 'architect']);
     expectPage('bep-team', 'Design Team Matrix', ['bep', 'architect']);
+    expectPage('invoicing', 'Invoicing', ['bep', 'architect', 'contractor', 'freelancer', 'admin']);
     expectPage('packages', 'Subcontractor Packages', ['contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('freelancer-work', 'Assigned Work', ['freelancer']);
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
@@ -135,7 +137,7 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));"
     );
     expect(appSource).toContain('const REAL_WORKFLOW_PAGE_IDS = new Set');
-    for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
+    for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
     expect(workflowSource).toContain("import ProjectMessengerPage from './ProjectMessengerPage';");
@@ -198,6 +200,20 @@ describe('canonical dashboard page registry', () => {
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'rfis\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_logs\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'gantt_tasks\')');
+  });
+
+  it('routes backend.html invoicing and package close-out/snags to live production tools', () => {
+    expect(workflowSource).toContain("import PackageCloseoutPage from './PackageCloseoutPage';");
+    expect(workflowSource).toContain("pageId === 'snagging' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)");
+    expect(workflowSource).toContain('return <PackageCloseoutPage user={user} />;');
+    expect(workflowSource).toContain("pageId === 'invoicing' && <InvoiceManagement user={user} />");
+
+    expect(packageCloseoutSource).toContain("collection(db, 'package_snags')");
+    expect(packageCloseoutSource).toContain("collection(db, 'package_delivery_evidence')");
+    expect(packageCloseoutSource).toContain('evaluatePackageReadiness');
+    expect(packageCloseoutSource).toContain("status: 'submitted'");
+    expect(packageCloseoutSource).toContain('humanReviewRequired: true');
+    expect(packageCloseoutSource).not.toContain('orderBy(');
   });
 
   it('routes AI co-pilot to the production grounded AI governance page', () => {

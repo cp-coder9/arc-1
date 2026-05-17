@@ -91,6 +91,7 @@ describe('firestore security rules static regressions', () => {
 
     expect(rules).toContain('function canReadPackageLinkedRecord(data)');
     expect(rules).toContain('function canCreateOwnedDashboardRecord(data)');
+    expect(rules).toContain('data.assignedTo == request.auth.uid');
     expect(rules).toContain('match /interpretations/{interpretationId}');
     expect(rules).toContain('resource.data.awardedContractorId == request.auth.uid');
   });
