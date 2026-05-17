@@ -305,7 +305,7 @@ function pageLabelFor(activeTab: string) {
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
-  const isAdminRoute = window.location.pathname === '/admin';
+  const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.endsWith('/admin');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
