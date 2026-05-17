@@ -19,3 +19,5 @@ Scope: continue after dashboard visual redesign with production-safe professiona
 - 01:31 UTC: Added service tests and static dashboard integration tests for the new drawing checklist tracker.
 - 01:32 UTC: `npm run lint` passed. Targeted tests passed: `drawingChecklistService.test.ts` 4 tests and `dashboard-registry.static.test.ts` 34 tests.
 - 01:33 UTC: `npm run build` passed with 3049 transformed modules.
+- 01:40 UTC: Hardened checklist creation to omit optional fields instead of writing undefined values to Firestore.
+- 01:49 UTC: Full validation passed after hardening: `npm run lint`, `npm run lint:tests`, `npm test -- --testTimeout 20000` (54 files / 418 tests), full Chromium E2E (18/18), and production build (3049 modules).

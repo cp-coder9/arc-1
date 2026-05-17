@@ -101,18 +101,22 @@ export async function createDrawingChecklistItem(projectId: string, input: Creat
   if (!title) throw new Error('Checklist title is required');
   try {
     const now = new Date().toISOString();
-    const ref = await addDoc(projectChecklistCollection(projectId), {
+    const checklistItem: Omit<DrawingChecklistItem, 'id'> = {
       projectId,
       title,
-      discipline: input.discipline || undefined,
-      status: 'open' satisfies DrawingChecklistStatus,
+      status: 'open',
       requiredForSubmission: input.requiredForSubmission ?? true,
       linkedDrawingIds: cleanStringList(input.linkedDrawingIds),
       notes: input.notes?.trim() || '',
       createdBy: input.createdBy,
-      createdByRole: input.createdByRole,
       createdAt: now,
       updatedAt: now,
+    };
+    if (input.discipline) checklistItem.discipline = input.discipline;
+    if (input.createdByRole) checklistItem.createdByRole = input.createdByRole;
+
+    const ref = await addDoc(projectChecklistCollection(projectId), {
+      ...checklistItem,
     });
     return ref.id;
   } catch (error) {
