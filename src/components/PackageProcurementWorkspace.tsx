@@ -6,6 +6,7 @@ import type { Bid, GanttTask, Project, RFI, SiteInspection, SiteLog, TenderPacka
 import { assessContractorWorkflow } from '@/services/contractorWorkflowService';
 import type { DeliveryEvidenceItem, ProcurementCommitment, SnagItem } from '@/services/packageReadinessService';
 import TenderWizard from './TenderWizard';
+import BidSubmission from './BidSubmission';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -46,6 +47,10 @@ function canCreateTender(user: UserProfile) {
 
 function canRequestCommitment(user: UserProfile) {
   return ['admin', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier'].includes(user.role);
+}
+
+function canSubmitPackageBid(user: UserProfile) {
+  return user.role === 'contractor' || user.role === 'subcontractor';
 }
 
 function statusTone(status: string) {
@@ -130,6 +135,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const selectedTender = useMemo(() => tenders.find((tender) => tender.id === selectedTenderId) ?? tenders[0], [selectedTenderId, tenders]);
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedTender?.projectId) ?? projects[0], [projects, selectedTender]);
   const activeBid = useMemo(() => myBids.find((bid) => bid.tenderPackageId === selectedTender?.id || bid.tenderPackageId === selectedTenderId), [myBids, selectedTender?.id, selectedTenderId]);
+  const tendersAvailableForBid = useMemo(() => tenders.filter((tender) => tender.status === 'published' && !myBids.some((bid) => bid.tenderPackageId === tender.id)), [myBids, tenders]);
   const selectedReadiness = useMemo(() => {
     if (!selectedTender) return null;
     return assessContractorWorkflow({
@@ -211,6 +217,19 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
 
       {canCreateTender(user) && selectedProject && (
         <TenderWizard projectId={selectedProject.id} jobId={selectedProject.jobId} createdBy={user.uid} onCreated={setSelectedTenderId} />
+      )}
+
+      {canSubmitPackageBid(user) && (
+        <BidSubmission tenders={tendersAvailableForBid} contractorId={user.uid} contractorName={user.displayName || user.email} onSubmitted={setSelectedTenderId} />
+      )}
+
+      {user.role === 'supplier' && (
+        <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
+          <CardHeader>
+            <CardTitle className="font-heading text-xl">Supplier quote path</CardTitle>
+            <CardDescription>Suppliers record quotes, delivery notes, warranties, and payment claims as procurement records against the selected package. Contractor/subcontractor bid submission remains CIDB/NHBRC-verification gated.</CardDescription>
+          </CardHeader>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-6">

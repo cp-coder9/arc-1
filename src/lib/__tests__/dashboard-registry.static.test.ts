@@ -8,6 +8,11 @@ const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/Proje
 const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
 const designComplianceSource = readFileSync(resolve(process.cwd(), 'src/components/DesignCompliancePage.tsx'), 'utf8');
 const tasksApprovalsSource = readFileSync(resolve(process.cwd(), 'src/components/TasksApprovalsPage.tsx'), 'utf8');
+const projectMessengerSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectMessengerPage.tsx'), 'utf8');
+const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/components/ContractSigningPage.tsx'), 'utf8');
+const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
+const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
+const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
 const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
@@ -128,7 +133,31 @@ describe('canonical dashboard page registry', () => {
     for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
+    expect(workflowSource).toContain("import ProjectMessengerPage from './ProjectMessengerPage';");
+    expect(workflowSource).toContain("import ContractSigningPage from './ContractSigningPage';");
+    expect(workflowSource).toContain("import DisputeResolutionPage from './DisputeResolutionPage';");
+    expect(workflowSource).toContain("return <ProjectMessengerPage user={user} />;");
+    expect(workflowSource).toContain("return <ContractSigningPage user={user} />;");
+    expect(workflowSource).toContain("return <DisputeResolutionPage user={user} />;");
     expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+  });
+
+  it('backs shared messenger, contract, and dispute tools with live Firestore records only', () => {
+    expect(projectMessengerSource).toContain("collection(db, 'messages')");
+    expect(projectMessengerSource).toContain('where(\'jobId\'');
+    expect(projectMessengerSource).toContain('addDoc(collection(db, \'messages\')');
+    expect(projectMessengerSource).not.toContain('orderBy(');
+
+    expect(contractSigningSource).toContain("collection(db, 'appointment_contracts')");
+    expect(contractSigningSource).toContain("doc(db, 'escrow'");
+    expect(contractSigningSource).toContain('This page does not execute signatures or payments');
+    expect(contractSigningSource).not.toContain('addDoc(');
+
+    expect(disputeResolutionSource).toContain("collection(db, 'disputes')");
+    expect(disputeResolutionSource).toContain('filedBy');
+    expect(disputeResolutionSource).toContain('filedAgainst');
+    expect(disputeResolutionSource).toContain('status: \'open\'');
+    expect(disputeResolutionSource).not.toContain('orderBy(');
   });
 
   it('routes AI co-pilot to the production grounded AI governance page', () => {
@@ -172,6 +201,11 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`(activeTab === 'packages' || activeTab === 'procurement') && <PackageProcurementWorkspace user={user} mode={activeTab as 'packages' | 'procurement'} />`);
     expect(appSource).toContain(`'procurement'`);
     expect(appSource).toContain(`'packages'`);
+    expect(packageWorkspaceSource).toContain("import BidSubmission from './BidSubmission';");
+    expect(packageWorkspaceSource).toContain('<BidSubmission tenders={tendersAvailableForBid} contractorId={user.uid} contractorName={user.displayName || user.email} onSubmitted={setSelectedTenderId} />');
+    expect(packageWorkspaceSource).toContain('Supplier quote path');
+    expect(bidSubmissionSource).toContain('submitBid(selectedTenderId');
+    expect(bidSubmissionSource).toContain('Upload bid attachments');
   });
 
   it('routes design to the production design compliance workflow with project drawing checklist tracking', () => {

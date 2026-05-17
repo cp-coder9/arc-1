@@ -103,8 +103,8 @@ export default function BidSubmission({ tenders, contractorId, contractorName, o
   return (
     <Card className="rounded-3xl border-border bg-white shadow-sm">
       <CardHeader className="border-b border-border p-6">
-        <CardTitle className="font-heading text-xl font-bold">Submit Contractor Bid</CardTitle>
-        <CardDescription>Select a published tender and provide pricing, timeline, and methodology.</CardDescription>
+        <CardTitle className="font-heading text-xl font-bold">Submit Package Bid</CardTitle>
+        <CardDescription>Select a published tender and provide verified pricing, timeline, methodology, and attachments.</CardDescription>
       </CardHeader>
       <CardContent className="p-6">
         {openTenders.length === 0 ? <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No open tenders are currently available.</p> : (

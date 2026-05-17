@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
-import { AlertTriangle, Briefcase, Loader2, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Briefcase, Loader2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import type { Job, Project, UserProfile } from '../types';
 import { Badge } from './ui/badge';
@@ -13,6 +13,9 @@ import FinancialDashboard from './FinancialDashboard';
 import CloseoutWizard from './CloseoutWizard';
 import InvoiceManagement from './InvoiceManagement';
 import MunicipalTracker from './MunicipalTracker';
+import ProjectMessengerPage from './ProjectMessengerPage';
+import ContractSigningPage from './ContractSigningPage';
+import DisputeResolutionPage from './DisputeResolutionPage';
 
 type Props = {
   pageId: string;
@@ -95,6 +98,18 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
     return <MunicipalTracker user={user} />;
   }
 
+  if (pageId === 'messages') {
+    return <ProjectMessengerPage user={user} />;
+  }
+
+  if (pageId === 'contracts') {
+    return <ContractSigningPage user={user} />;
+  }
+
+  if (pageId === 'disputes') {
+    return <DisputeResolutionPage user={user} />;
+  }
+
   if (!activeProject && ['journey', 'programme', 'construction', 'snagging'].includes(pageId)) {
     return <WorkflowFrame pageId={pageId} user={user}><EmptyWorkflow icon={<Briefcase />} title="No active project found" description="This page only renders live project operations. Create or appoint a project first, then this workflow will load lifecycle, programme, RFI, site-log, and close-out records." /></WorkflowFrame>;
   }
@@ -115,15 +130,6 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
         </div>
       )}
       {pageId === 'snagging' && activeProject && <CloseoutWizard projectId={activeProject.id} />}
-      {pageId === 'messages' && (
-        <EmptyWorkflow icon={<MessageCircle />} title="Project messenger uses live job conversations" description={activeJob ? `Messages for ${activeJob.title} are available from role dashboards where the counterparty is known. No mock conversation is rendered here.` : 'No live job conversation is available for this role yet.'} />
-      )}
-      {pageId === 'contracts' && (
-        <EmptyWorkflow icon={<ShieldCheck />} title="Contracts require human-confirmed signing workflow" description="Contract drafting/signing is intentionally not simulated. Use appointment/package records and verified profile data before enabling signature submission." />
-      )}
-      {pageId === 'disputes' && (
-        <EmptyWorkflow icon={<AlertTriangle />} title="Disputes are governed records" description="Dispute workflows require audit-backed evidence and human review. No live dispute record is currently selected for this role." />
-      )}
       {pageId === 'invoicing' && <InvoiceManagement user={user} />}
     </WorkflowFrame>
   );
