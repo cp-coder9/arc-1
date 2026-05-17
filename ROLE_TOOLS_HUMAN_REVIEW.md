@@ -311,3 +311,33 @@ Deployment and broad validation for freelancer review + procurement catalogue pa
   - Ruleset: `projects/gen-lang-client-0880960511/rulesets/ea480d08-b4e8-4081-a71e-1337b2b36364`
   - SHA256: `8901624179758a268a9f66722e84ae713b6d9ddebf0193c76ebb9a5f45a3fa73`
   - Verification: deployed rules SHA matched local `firestore.rules`.
+
+## 2026-05-17 admin governance tool-set pass
+
+Scope followed from `backend.html`: expose the admin Audit Trail Viewer, Tool Set Management, Payment Rate Settings, and AI Notification Feed as real admin-console surfaces without creating synthetic governance data or bypassing existing configuration workflows.
+
+Implemented:
+
+1. Admin governance tool hub
+   - Added `AdminGovernanceToolsPanel` inside the production `AdminDashboard`.
+   - Added a dedicated `Tool Sets` admin tab mapped by `governance-tools` so the route can be opened consistently from the dashboard shell.
+   - Uses only live admin data already loaded by the dashboard: `agents`, `system_logs`, `users`, and `jobs`.
+
+2. Audit Trail Viewer and AI Notification Feed
+   - Audit Trail Viewer reads the live `system_logs` projection and displays the latest visible events read-only.
+   - AI Notification Feed filters the same live log stream for AI, agent, LLM, review, sign-off, and governance events.
+   - Empty states are explicit and do not generate mock alerts.
+
+3. Tool Set Management and Payment Rate Settings bridge
+   - Tool Set Management summarizes live agent records, statuses, roles, and execution modes.
+   - Payment Rate Settings surfaces live user/job counts and role distribution, then links to the existing production fee settings tab instead of duplicating or fabricating rate data.
+
+Validation completed for this pass so far:
+
+- `npm run lint`
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts --testTimeout 20000`
+- Result: 1 focused test file passed, 39 tests passed.
+
+Human review note:
+
+- This slice is source/UI only and did not change Firestore rules. The payment settings card links to the existing fee editor and does not create or modify payment rates by itself.

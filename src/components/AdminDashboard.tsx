@@ -139,6 +139,100 @@ function createBlankAgent(): Agent {
   }, 'nvidia');
 }
 
+function AdminGovernanceToolsPanel({ agents, logs, users, jobs, onNavigate }: { agents: Agent[]; logs: SystemLog[]; users: UserProfile[]; jobs: Job[]; onNavigate?: (tab: string) => void }) {
+  const aiNotifications = logs.filter((log) => /ai|agent|llm|review|signoff|governance/i.test(`${log.source} ${log.message}`));
+  const toolSetRows = [
+    { label: 'Agent tool set', value: agents.length, detail: `${agents.filter((agent) => agent.status === 'online').length} online agents`, action: 'compliance' },
+    { label: 'Audit trail viewer', value: logs.length, detail: `${logs.filter((log) => log.level === 'error' || log.level === 'critical').length} errors or critical records`, action: 'audit' },
+    { label: 'Payment rate settings', value: 'Live', detail: 'Configured through admin FeeEstimator settings', action: 'fees' },
+    { label: 'AI notification feed', value: aiNotifications.length, detail: 'Filtered from live system log events', action: 'audit' },
+  ];
+  const roleCounts = users.reduce<Record<string, number>>((acc, profile) => {
+    acc[profile.role] = (acc[profile.role] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6" data-testid="admin-governance-tools-panel">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        {toolSetRows.map((row) => (
+          <Card key={row.label} className="rounded-2xl border-border bg-white shadow-sm">
+            <CardContent className="p-5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{row.label}</p>
+              <p className="mt-2 font-heading text-3xl font-black text-primary">{row.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{row.detail}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-4 rounded-xl" onClick={() => onNavigate?.(row.action)}>Open source tool</Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm overflow-hidden">
+          <CardHeader className="border-b border-border bg-primary/5">
+            <CardTitle className="font-heading text-2xl flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Audit Trail Viewer</CardTitle>
+            <CardDescription>Live `system_logs` stream for administrators. Records are read-only from the browser and remain append-only in governance rules.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-secondary/30">
+                <TableRow><TableHead>Level</TableHead><TableHead>Source</TableHead><TableHead>Message</TableHead><TableHead>Time</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.slice(0, 8).map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell><Badge variant={log.level === 'error' || log.level === 'critical' ? 'destructive' : 'outline'} className="uppercase text-[10px]">{log.level}</Badge></TableCell>
+                    <TableCell className="font-mono text-xs">{log.source}</TableCell>
+                    <TableCell className="text-xs">{log.message}</TableCell>
+                    <TableCell className="text-[10px] text-muted-foreground">{safeFormat(log.timestamp, 'MMM d, HH:mm')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {logs.length === 0 && <p className="p-6 text-sm text-muted-foreground">No system log records are currently visible.</p>}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader className="border-b border-border bg-primary/5">
+            <CardTitle className="font-heading text-2xl flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI Notification Feed</CardTitle>
+            <CardDescription>AI, agent, review, and governance notifications filtered from live system logs. No synthetic alerts are generated.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-5 space-y-3">
+            {aiNotifications.length === 0 ? <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No AI notification events are currently visible.</p> : aiNotifications.slice(0, 10).map((log) => (
+              <div key={log.id} className="rounded-xl border border-border bg-secondary/20 p-4 text-sm">
+                <div className="flex items-center justify-between gap-3"><Badge variant="outline" className="uppercase text-[10px]">{log.source}</Badge><span className="text-[10px] text-muted-foreground">{safeFormat(log.timestamp, 'MMM d, HH:mm')}</span></div>
+                <p className="mt-2 text-xs text-muted-foreground">{log.message}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Settings2 className="h-5 w-5 text-primary" /> Tool Set Management</CardTitle><CardDescription>Production coverage map from live agents, users, and jobs. Configuration actions stay in their dedicated admin tabs.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            {agents.slice(0, 8).map((agent) => <div key={agent.id} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm"><div><p className="font-semibold">{agent.name}</p><p className="text-xs text-muted-foreground">{agent.role} · {(agent.executionModes ?? []).join(', ') || 'No modes'}</p></div><Badge variant={agent.status === 'online' ? 'default' : 'outline'}>{agent.status}</Badge></div>)}
+            {agents.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No agent tool set records are currently visible.</p>}
+          </CardContent>
+        </Card>
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" /> Payment Rate Settings</CardTitle><CardDescription>Admin fee and payment settings are managed by the production FeeEstimator. This panel surfaces platform scale and links to the live editor.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Users</p><p className="text-2xl font-heading font-black">{users.length}</p></div>
+              <div className="rounded-xl border border-border p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Jobs</p><p className="text-2xl font-heading font-black">{jobs.length}</p></div>
+            </div>
+            <div className="flex flex-wrap gap-2">{Object.entries(roleCounts).map(([role, count]) => <Badge key={role} variant="outline" className="capitalize">{role}: {count}</Badge>)}</div>
+            <Button type="button" className="rounded-xl" onClick={() => onNavigate?.('fees')}>Open payment rate settings</Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // Agent Card Component
 function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent; key?: React.Key; isNew?: boolean; onCreated?: () => void; onCancel?: () => void }) {
   const [editing, setEditing] = useState(isNew);
@@ -532,6 +626,7 @@ export default function AdminDashboard({
     activeTab === 'financial' ? 'financial' :
     activeTab === 'firms' ? 'firms' :
     activeTab === 'verifications' ? 'verifications' :
+    activeTab === 'governance-tools' ? 'governance-tools' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
     'submissions';
@@ -853,6 +948,7 @@ export default function AdminDashboard({
           financial: 'financial',
           firms: 'firms',
           verifications: 'verifications',
+          'governance-tools': 'governance-tools',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
@@ -897,6 +993,9 @@ export default function AdminDashboard({
             </TabsTrigger>
             <TabsTrigger value="verifications" className={tabTriggerClass}>
               <ShieldCheck size={16} /> Verify
+            </TabsTrigger>
+            <TabsTrigger value="governance-tools" className={tabTriggerClass}>
+              <Settings2 size={16} /> Tool Sets
             </TabsTrigger>
             <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
@@ -1259,6 +1358,10 @@ export default function AdminDashboard({
             </div>
             {userVerifications.length === 0 && <p className="text-muted-foreground italic">No verification records have been submitted yet.</p>}
           </div>
+        </TabsContent>
+
+        <TabsContent value="governance-tools">
+          <AdminGovernanceToolsPanel agents={agents} logs={logs} users={allUsers} jobs={allJobs} onNavigate={onTabChange} />
         </TabsContent>
 
         <TabsContent value="firms">

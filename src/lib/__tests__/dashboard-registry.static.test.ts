@@ -18,6 +18,7 @@ const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/compo
 const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/components/PackageCloseoutPage.tsx'), 'utf8');
 const aiCoPilotSource = readFileSync(resolve(process.cwd(), 'src/components/AICoPilotPage.tsx'), 'utf8');
 const adminAIReviewQueueSource = readFileSync(resolve(process.cwd(), 'src/components/AdminAIReviewQueue.tsx'), 'utf8');
+const adminDashboardSource = readFileSync(resolve(process.cwd(), 'src/components/AdminDashboard.tsx'), 'utf8');
 const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
 const bepFreelancerJobsSource = readFileSync(resolve(process.cwd(), 'src/components/BEPFreelancerJobsPage.tsx'), 'utf8');
 const freelancerSubmissionsSource = readFileSync(resolve(process.cwd(), 'src/components/FreelancerSubmissionsPage.tsx'), 'utf8');
@@ -311,6 +312,13 @@ describe('canonical dashboard page registry', () => {
   it('routes admin console to the production admin governance dashboard', () => {
     expect(appSource).toContain(`activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />`);
     expect(appSource).toContain(`activeTab !== 'admin-console'`);
+    expect(adminDashboardSource).toContain('AdminGovernanceToolsPanel');
+    expect(adminDashboardSource).toContain('Audit Trail Viewer');
+    expect(adminDashboardSource).toContain('Tool Set Management');
+    expect(adminDashboardSource).toContain('Payment Rate Settings');
+    expect(adminDashboardSource).toContain('AI Notification Feed');
+    expect(adminDashboardSource).toContain("activeTab === 'governance-tools' ? 'governance-tools'");
+    expect(adminDashboardSource).toContain('data-testid="admin-governance-tools-panel"');
   });
 
   it('routes freelancer submissions to the production submissions workflow', () => {
