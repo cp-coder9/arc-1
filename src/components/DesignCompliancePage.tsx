@@ -8,6 +8,7 @@ import { subscribeToProjectByJobId } from '@/services/projectLifecycleService';
 import { getDisciplineCoverage, subscribeToTeam } from '@/services/teamService';
 import ResponsibilityMatrix from './ResponsibilityMatrix';
 import TeamBuilder from './TeamBuilder';
+import DrawingChecklistTracker from './DrawingChecklistTracker';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
@@ -104,6 +105,7 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
 
       {coverage.missing.length > 0 && <Card className="rounded-2xl border-border bg-card/90"><CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Network className="h-5 w-5 text-primary" /> Coverage gaps</CardTitle><CardDescription>These disciplines still need assignment, invitation acceptance, or professional confirmation.</CardDescription></CardHeader><CardContent className="flex flex-wrap gap-2">{coverage.missing.map((discipline) => <Badge key={discipline} variant="outline" className="border-dashed">{labelFor(discipline)}</Badge>)}</CardContent></Card>}
 
+      {selectedJob && project && <DrawingChecklistTracker project={project} job={selectedJob} user={user} />}
       {selectedJob && <ResponsibilityMatrix job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />}
       {selectedJob && <TeamBuilder job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />}
     </div>

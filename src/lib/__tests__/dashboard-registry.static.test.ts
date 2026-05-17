@@ -6,6 +6,8 @@ const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
 const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8');
 const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
 const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
+const designComplianceSource = readFileSync(resolve(process.cwd(), 'src/components/DesignCompliancePage.tsx'), 'utf8');
+const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
 const registrySource = registryMatch?.[1] ?? '';
 const resourceLinksMatch = appSource.match(/const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink\[]> = \{([\s\S]*?)\n\};/);
@@ -170,11 +172,15 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`'packages'`);
   });
 
-  it('routes design to the production design compliance workflow', () => {
+  it('routes design to the production design compliance workflow with project drawing checklist tracking', () => {
     expect(appSource).toContain("const DesignCompliancePage = lazyWithChunkRetry(() => import('./components/DesignCompliancePage'));"
     );
     expect(appSource).toContain(`activeTab === 'design' && <DesignCompliancePage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'design'`);
+    expect(designComplianceSource).toContain("import DrawingChecklistTracker from './DrawingChecklistTracker';");
+    expect(designComplianceSource).toContain('<DrawingChecklistTracker project={project} job={selectedJob} user={user} />');
+    expect(drawingChecklistServiceSource).toContain("'drawing_checklists'");
+    expect(drawingChecklistServiceSource).not.toContain('orderBy(');
   });
 
   it('routes admin console to the production admin governance dashboard', () => {
