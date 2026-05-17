@@ -36,6 +36,7 @@ Scope: user requested six-hour autonomous pass to check every role login/dashboa
 - 10:41 UTC: Live pre-upload smoke passed on `https://test.architex.co.za` and `https://architex.co.za/architex.co.za/ai`: landing, `/admin`, all seven public role cards, no bad resources, no console errors.
 - 10:43 UTC: Firebase rules deploy dry-run with local service-account authentication was blocked by IAM: the service account lacks permission to read Service Usage status for `firestore.googleapis.com` on project `gen-lang-client-0880960511`.
 - 10:45 UTC: Uploaded 73 verified production files to the shared-hosting FTPS target and reran live smoke. Both `test.architex.co.za` and the main hosted subpath passed landing, `/admin`, role login-card exposure, no bad resources, and no browser console errors.
+- 14:18 UTC: Deployed Firestore rules to the target database release via Firebase Rules API after user approval; read-back verification confirmed the active ruleset and remote SHA.
 
 ## Validation summary
 - PASS: `npm run lint`
@@ -47,12 +48,13 @@ Scope: user requested six-hour autonomous pass to check every role login/dashboa
 - PASS: `npx playwright test --project=chromium --reporter=line`, 22 tests
 - PASS: `npx vite build --base ./`
 - PASS: Live Playwright smoke for `https://test.architex.co.za` and `https://architex.co.za/architex.co.za/ai`
+- PASS: Firebase Rules API read-back for target Firestore release and deployed `firestore.rules` SHA256
 
-## Firebase rules deployment blocker
-The code and static rule coverage were updated, but the Firebase CLI cannot deploy or dry-run the rule file from this environment yet. A local service account is present, but Firebase CLI preflight fails with HTTP 403 on Service Usage inspection for `firestore.googleapis.com`. Required owner action: grant the deploy credential enough IAM to deploy Firestore rules, typically Firebase Rules Admin/Firestore Rules Admin plus Service Usage Viewer on project `gen-lang-client-0880960511`, or run:
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json npx firebase deploy --only firestore:rules --non-interactive
-```
-
-from an account with those permissions.
+## Firebase rules deployment status
+- 10:43 UTC: Firebase CLI deployment remained blocked by IAM Service Usage preflight: HTTP 403 while checking `firestore.googleapis.com` on project `gen-lang-client-0880960511`. This means future CLI deploys should still add Service Usage Viewer to the deploy credential or use an owner account.
+- 14:18 UTC: Firestore rules were deployed successfully through the Firebase Rules REST API, bypassing the CLI Service Usage preflight while still using the authenticated service account.
+- Target release: `projects/gen-lang-client-0880960511/releases/cloud.firestore/ai-studio-2ae3d9c3-70e6-4323-8a95-9d566bd24635`
+- Active ruleset: `projects/gen-lang-client-0880960511/rulesets/e017dc65-1c74-401b-8101-2a3b5925559c`
+- Release update time: `2026-05-17T14:18:31.714748Z`
+- Deployed `firestore.rules` SHA256: `f39cfedeb93beb68c315f95061c3dd387b2ab11ba648e4f16ad91dc8512c9f53`
+- 14:20 UTC: Read-back verification passed by fetching the active release and ruleset from Firebase Rules API and comparing the remote rules content SHA256 to the local `firestore.rules` file.
