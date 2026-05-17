@@ -75,16 +75,16 @@ The current local `firestore.rules` was deployed through the Firebase Rules API 
 - Project: `gen-lang-client-0880960511`
 - Database: `ai-studio-2ae3d9c3-70e6-4323-8a95-9d566bd24635`
 - Active release: `projects/gen-lang-client-0880960511/releases/cloud.firestore/ai-studio-2ae3d9c3-70e6-4323-8a95-9d566bd24635`
-- Active ruleset after this pass: `projects/gen-lang-client-0880960511/rulesets/c71ce7d6-4bd5-45db-a852-3715fb4e6038`
-- Deployed rules SHA256: `9da93a26f9c155f5ea8fce1fd48c7accdd777a5921a36b3589a92fad4ad01b91`
+- Active ruleset after latest pass: `projects/gen-lang-client-0880960511/rulesets/91b33553-e81d-48a4-b25e-8d95d01a7bc1`
+- Deployed rules SHA256: `f696ebe6753632375252ccca923ef750bc86b22f51d50bd4d7115849eafb2129`
 - Verification: deployed rules content SHA matched local `firestore.rules`.
 
-Note: an earlier direct PATCH attempt created ruleset `f413f40b-cd4d-4d52-b164-dc6bd0f177f4` but did not attach it to the release due to an incorrect payload shape. The corrected release now points to `c71ce7d6-4bd5-45db-a852-3715fb4e6038`.
+Note: an earlier direct PATCH attempt created ruleset `f413f40b-cd4d-4d52-b164-dc6bd0f177f4` but did not attach it to the release due to an incorrect payload shape. The close-out/invoicing pass deployed the corrected release to `91b33553-e81d-48a4-b25e-8d95d01a7bc1`.
 
 ## Production deployment
 
 - Built with relative Vite base: `npx vite build --base ./`
-- Uploaded 73 production files by explicit FTPS from `release/ftp-upload`.
+- Uploaded 74 production files by explicit FTPS from `release/ftp-upload` after adding `PackageCloseoutPage`.
 - Live verification passed for:
   - `https://test.architex.co.za/`
   - `https://test.architex.co.za/admin`
@@ -132,6 +132,16 @@ All validation below passed after the role-tool changes:
    - `npm run lint`
    - `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts`
    - Result: 50 focused tests passed.
+
+9. Latest close-out pass full validation and deployment
+   - `npm run lint:tests`: passed.
+   - `npm test -- --testTimeout 20000`: 55 test files passed, 426 tests passed.
+   - `npx playwright test e2e/admin-review.spec.ts --project=chromium --reporter=line`: 3 passed after isolating an admin-route timing flake.
+   - `npx playwright test --project=chromium --reporter=line`: 22 passed.
+   - `npx vite build --base ./`: passed, 3058 modules transformed.
+   - FTPS upload: 74 files uploaded to `https://test.architex.co.za/`.
+   - Live browser verification: `https://test.architex.co.za/` loaded with `BAD_RESOURCES none`.
+   - Firestore rules release patched to `projects/gen-lang-client-0880960511/rulesets/91b33553-e81d-48a4-b25e-8d95d01a7bc1`; deployed SHA matched local.
 
 ## Files intentionally not committed
 
