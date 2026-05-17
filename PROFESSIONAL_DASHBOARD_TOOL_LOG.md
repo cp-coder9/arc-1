@@ -23,3 +23,8 @@ Scope: continue after dashboard visual redesign with production-safe professiona
 - 01:49 UTC: Full validation passed after hardening: `npm run lint`, `npm run lint:tests`, `npm test -- --testTimeout 20000` (54 files / 418 tests), full Chromium E2E (18/18), and production build (3049 modules).
 - 01:55 UTC: Rebuilt with relative asset base and uploaded 73 production files through explicit FTPS to the shared-hosting docroot.
 - 01:55 UTC: Public deployment verification passed for landing and `/admin` at `https://architex.co.za/architex.co.za/ai/`: title `Architex | Built Environment OS`, required page copy present, no HTTP 4xx asset failures, and no browser console errors.
+- 01:58 UTC: Began second professional tool slice after deployment: Project Coordination Register for Tasks & Approvals.
+- 01:58 UTC: Completed focused research on construction RFIs, document-control registers, transmittals/submittals, and SA project-management accountability; chose `projects/{projectId}/coordination_items` because rules already permit live participant records.
+- 01:58 UTC: Appended implementation plan for the coordination register before coding.
+- 02:03 UTC: Implemented coordination register service/component and integrated it into `TasksApprovalsPage` for live project coordination items.
+- 02:03 UTC: Targeted validation passed: `npm run lint` and focused tests `coordinationRegisterService.test.ts` (4 tests) plus `dashboard-registry.static.test.ts` (34 tests).

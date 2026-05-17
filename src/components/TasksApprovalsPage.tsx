@@ -3,6 +3,7 @@ import { addDoc, collection, collectionGroup, limit, onSnapshot, orderBy, query,
 import { CheckCircle2, ClipboardCheck, Clock, Loader2, Plus, UserCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, JobCard, Project, UserProfile } from '@/types';
+import ProjectCoordinationRegister from './ProjectCoordinationRegister';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -79,6 +80,11 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
   }, [jobs, projects, user.role]);
 
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId) ?? jobs[0], [jobs, selectedJobId]);
+  const selectedProject = useMemo(() => {
+    if (projects.length === 0) return undefined;
+    if (!selectedJob) return projects[0];
+    return projects.find((project) => project.jobId === selectedJob.id) ?? projects[0];
+  }, [projects, selectedJob]);
   const visibleTasks = useMemo(() => selectedJob ? tasks.filter((task) => task.jobId === selectedJob.id) : tasks, [selectedJob, tasks]);
   const overdueCount = visibleTasks.filter((task) => task.status !== 'completed' && task.deadline && new Date(task.deadline).getTime() < Date.now()).length;
   const pendingApprovals = approvals.filter((approval) => !['approved', 'closed', 'rejected'].includes(String(approval.status))).length;
@@ -142,6 +148,8 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
         <MetricCard icon={<UserCheck />} label="Pending approvals" value={pendingApprovals} />
         <MetricCard icon={<CheckCircle2 />} label="Completed" value={visibleTasks.filter((task) => task.status === 'completed').length} />
       </div>
+
+      {selectedProject && <ProjectCoordinationRegister project={selectedProject} job={selectedJob} user={user} />}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
         <Card className="rounded-2xl border-border bg-card/90 shadow-sm">

@@ -41,3 +41,45 @@ Implement a **Project Drawing Checklist Tracker** inside the existing `Design & 
 - No AI generation or external AI calls.
 - No fake checklist templates or static metrics.
 - No payment, signature, municipal submission, or purchase-order automation.
+
+---
+
+# Slice 2 Plan: Project Coordination Register
+
+Start: 2026-05-17 01:58 UTC
+
+## Research inputs
+- Construction RFI best-practice references consistently recommend a register with status, priority/responsibility, due dates, responses, and review cadence to reduce delays and keep accountability visible.
+- Architectural document-control references highlight RFIs, submittals, transmittals, deadlines, and compliance/status registers as core professional-team coordination records.
+- South African project/construction-management references point to regulated professional coordination and traceability under SACPCMP/cidb-aligned built-environment practice, but do not justify any automated professional sign-off.
+- Existing backend API schema already defines `COORDINATION_ITEM_TYPES` such as `rfi`, `transmittal`, `deadline`, `compliance_status`, and `municipal_readiness`.
+- Existing `firestore.rules` already exposes `projects/{projectId}/coordination_items` for project participants, with creator/manager status updates and no delete path.
+
+## Chosen slice
+Add a **Project Coordination Register** to the existing `Tasks & Approvals` dashboard page.
+
+## Why this slice
+- Directly supports backend.html command-centre requirements: open approvals, RFIs, documents/transmittals, compliance status, recent activity, deadlines, and next actions.
+- Uses an existing allowed project subcollection instead of creating unsupported rules.
+- Fits the current Tasks & Approvals route without changing role options or existing task-card behaviour.
+- Can operate honestly with empty states and live records only.
+
+## Implementation plan
+1. Add a typed `coordinationRegisterService` for `projects/{projectId}/coordination_items`:
+   - subscribe without `orderBy`, sorting client-side to avoid index requirements.
+   - create sanitized item records aligned to backend API fields.
+   - update status/timestamps only.
+   - expose deterministic summary metrics.
+2. Add a `ProjectCoordinationRegister` component:
+   - render summary cards and live register rows.
+   - allow project participants to create coordination items.
+   - allow creators, design leads, and admins to update status.
+   - show AI/human-governance copy without provider calls or automated approvals.
+3. Integrate into `TasksApprovalsPage` when a live project is selected.
+4. Add focused service tests and static integration assertions.
+5. Validate with TypeScript, targeted tests, build, and E2E if time permits.
+
+## Non-goals
+- No automated RFI responses, transmittal issue approval, statutory submission, contract instruction, payment action, or professional sign-off.
+- No mock/sample register rows.
+- No new Firestore rules unless validation proves the existing rules are insufficient.

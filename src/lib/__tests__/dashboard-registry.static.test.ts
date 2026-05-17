@@ -7,7 +7,9 @@ const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8
 const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
 const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
 const designComplianceSource = readFileSync(resolve(process.cwd(), 'src/components/DesignCompliancePage.tsx'), 'utf8');
+const tasksApprovalsSource = readFileSync(resolve(process.cwd(), 'src/components/TasksApprovalsPage.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
+const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
 const registrySource = registryMatch?.[1] ?? '';
 const resourceLinksMatch = appSource.match(/const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink\[]> = \{([\s\S]*?)\n\};/);
@@ -226,11 +228,15 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`activeTab !== 'resource-centre'`);
   });
 
-  it('routes tasks to the production tasks and approvals workflow', () => {
+  it('routes tasks to the production tasks and approvals workflow with project coordination register', () => {
     expect(appSource).toContain("const TasksApprovalsPage = lazyWithChunkRetry(() => import('./components/TasksApprovalsPage'));"
     );
     expect(appSource).toContain(`activeTab === 'tasks' && <TasksApprovalsPage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'tasks'`);
+    expect(tasksApprovalsSource).toContain("import ProjectCoordinationRegister from './ProjectCoordinationRegister';");
+    expect(tasksApprovalsSource).toContain('<ProjectCoordinationRegister project={selectedProject} job={selectedJob} user={user} />');
+    expect(coordinationRegisterServiceSource).toContain("'coordination_items'");
+    expect(coordinationRegisterServiceSource).not.toContain('orderBy(');
   });
 
   it('routes drawing checker to the production AI drawing checker workflow', () => {
