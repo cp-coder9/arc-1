@@ -21,3 +21,5 @@ Scope: continue after dashboard visual redesign with production-safe professiona
 - 01:33 UTC: `npm run build` passed with 3049 transformed modules.
 - 01:40 UTC: Hardened checklist creation to omit optional fields instead of writing undefined values to Firestore.
 - 01:49 UTC: Full validation passed after hardening: `npm run lint`, `npm run lint:tests`, `npm test -- --testTimeout 20000` (54 files / 418 tests), full Chromium E2E (18/18), and production build (3049 modules).
+- 01:55 UTC: Rebuilt with relative asset base and uploaded 73 production files through explicit FTPS to the shared-hosting docroot.
+- 01:55 UTC: Public deployment verification passed for landing and `/admin` at `https://architex.co.za/architex.co.za/ai/`: title `Architex | Built Environment OS`, required page copy present, no HTTP 4xx asset failures, and no browser console errors.
