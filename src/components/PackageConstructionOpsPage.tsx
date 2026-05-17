@@ -12,7 +12,7 @@ import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 
 type LoadState = 'loading' | 'ready' | 'error';
-type CaptureType = 'rfi' | 'site_instruction' | 'site_log' | 'programme_task';
+type CaptureType = 'rfi' | 'site_instruction' | 'site_log' | 'programme_task' | 'inspection';
 
 type SiteInstructionRecord = {
   id: string;
@@ -197,6 +197,20 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
           photos: [],
           createdAt: now,
         });
+      } else if (captureType === 'inspection') {
+        await addDoc(collection(db, 'site_inspections'), {
+          ...common,
+          inspectionType: 'custom',
+          date: dueDate,
+          inspector: user.uid,
+          checklist: [{ item: title.trim(), result: 'na', comment: details.trim() || 'Scheduled for human inspection and sign-off.' }],
+          overallResult: 'conditional',
+          notes: details.trim() || title.trim(),
+          photos: [],
+          signOffStatus: 'scheduled',
+          humanReviewRequired: true,
+          createdAt: now,
+        });
       } else {
         await addDoc(collection(db, 'gantt_tasks'), {
           ...common,
@@ -276,7 +290,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
         </Card>
 
         <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
-          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Capture construction record</CardTitle><CardDescription>Writes a real package-linked record. Site instructions are separate from RFIs and require human review for cost or programme impact.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Capture construction record</CardTitle><CardDescription>Writes a real package-linked record. Site instructions and inspections remain human-reviewed and do not auto-certify work.</CardDescription></CardHeader>
           <CardContent>
             <form onSubmit={submitCapture} className="space-y-3">
               <select value={captureType} onChange={(event) => setCaptureType(event.target.value as CaptureType)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
@@ -284,6 +298,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
                 {canCaptureSiteRecords(user.role) && <option value="site_instruction">Site instruction</option>}
                 {canCaptureSiteRecords(user.role) && <option value="site_log">Site log</option>}
                 {canCaptureSiteRecords(user.role) && <option value="programme_task">Programme task</option>}
+                {canCaptureSiteRecords(user.role) && <option value="inspection">Inspection / sign-off</option>}
               </select>
               <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Record title / subject" required disabled={!selectedTender || saving} />
               <Textarea value={details} onChange={(event) => setDetails(event.target.value)} placeholder="Details, question, work completed, or programme note" disabled={!selectedTender || saving} />

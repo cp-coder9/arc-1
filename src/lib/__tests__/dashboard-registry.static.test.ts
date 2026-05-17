@@ -207,10 +207,15 @@ describe('canonical dashboard page registry', () => {
     expect(packageConstructionSource).toContain("where('packageId', 'in', packageIds)");
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'rfis\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_instructions\')');
+    expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_inspections\')');
     expect(packageConstructionSource).toContain('humanReviewRequired: true');
     expect(packageConstructionSource).toContain('costImpactStatus');
     expect(packageConstructionSource).toContain('programmeImpactStatus');
-    expect(packageConstructionSource).toContain('Site instructions are separate from RFIs');
+    expect(packageConstructionSource).toContain('Site instructions and inspections remain human-reviewed and do not auto-certify work.');
+    expect(packageConstructionSource).toContain("captureType === 'site_instruction'");
+    expect(packageConstructionSource).toContain("captureType === 'inspection'");
+    expect(packageConstructionSource).toContain('Inspection / sign-off');
+    expect(packageConstructionSource).toContain('do not auto-certify work');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_logs\')');
     expect(packageConstructionSource).toContain('addDoc(collection(db, \'gantt_tasks\')');
   });

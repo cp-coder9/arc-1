@@ -98,6 +98,7 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain("request.resource.data.status in ['issued', 'acknowledged', 'closed']");
     expect(rules).toContain("request.resource.data.costImpactStatus in ['none', 'potential', 'confirmed']");
     expect(rules).toContain("request.resource.data.programmeImpactStatus in ['none', 'potential', 'confirmed']");
+    expect(rules).toContain('request.resource.data.humanReviewRequired == true');
   });
 
   it('gates Phase 3/4 operational collections by project access and immutable identity fields', () => {

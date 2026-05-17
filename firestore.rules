@@ -673,7 +673,8 @@ service cloud.firestore {
 
     match /site_inspections/{recordId} {
       allow read: if canReadPackageLinkedRecord(resource.data);
-      allow create: if canCreateOwnedDashboardRecord(request.resource.data);
+      allow create: if canCreateOwnedDashboardRecord(request.resource.data) &&
+        request.resource.data.humanReviewRequired == true;
       allow update: if isAuthenticated() && (isAdmin() || ownsDashboardRecord(resource.data));
       allow delete: if isAdmin();
     }
