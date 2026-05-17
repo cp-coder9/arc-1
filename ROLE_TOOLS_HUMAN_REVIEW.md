@@ -341,3 +341,13 @@ Validation completed for this pass so far:
 Human review note:
 
 - This slice is source/UI only and did not change Firestore rules. The payment settings card links to the existing fee editor and does not create or modify payment rates by itself.
+
+Deployment and broad validation for admin governance tool-set pass:
+
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed, 55 files / 430 tests.
+- Full Chromium E2E: `npx playwright test --project=chromium --reporter=line` passed, 22/22 tests.
+- Production build: `npx vite build --base ./` passed, 3059 modules transformed.
+- Uploaded 74 production files to `https://test.architex.co.za/` by explicit FTPS.
+- Live verification passed for the landing route and `/admin` route with zero bad resources.
+- Direct deployed chunk verification passed for `assets/AdminDashboard-BC12cKUe.js`; it returned HTTP 200 and contained the new governance tool code.
