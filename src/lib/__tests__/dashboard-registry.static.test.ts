@@ -274,6 +274,12 @@ describe('canonical dashboard page registry', () => {
     expect(packageWorkspaceSource).toContain("import BidSubmission from './BidSubmission';");
     expect(packageWorkspaceSource).toContain('<BidSubmission tenders={tendersAvailableForBid} contractorId={user.uid} contractorName={user.displayName || user.email} onSubmitted={setSelectedTenderId} />');
     expect(packageWorkspaceSource).toContain('Supplier quote path');
+    expect(packageWorkspaceSource).toContain('Package claims, delivery and warranties');
+    expect(packageWorkspaceSource).toContain('payment_claim');
+    expect(packageWorkspaceSource).toContain('warranty');
+    expect(packageWorkspaceSource).toContain('payment_claim_evidence');
+    expect(packageWorkspaceSource).toContain("addDoc(collection(db, 'package_delivery_evidence')");
+    expect(packageWorkspaceSource).toContain('humanReviewRequired: true');
     expect(bidSubmissionSource).toContain('submitBid(selectedTenderId');
     expect(bidSubmissionSource).toContain('Upload bid attachments');
   });

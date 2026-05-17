@@ -192,3 +192,33 @@ Notes for human review:
 
 - Admin AI review queue will appear empty unless production has open `ai_review_queue` records.
 - Firestore rules intentionally block direct browser writes for AI governance records. Resolution must continue through the server API to preserve audit trails and human sign-off integrity.
+
+## 2026-05-17 package claims, delivery and warranty evidence pass
+
+Scope followed from `backend.html`: deepen subcontractor/supplier/package workflows without executing real payments, purchase orders, or approvals from the browser.
+
+Implemented:
+
+1. Package claims and payment applications
+   - Extended `PackageProcurementWorkspace` with a live package claims / delivery register sourced from `package_procurement_commitments`.
+   - Payment claim records remain `pending_approval` and clearly state that no invoice, escrow release, or payment is executed by the record.
+
+2. Supplier delivery, shop drawing, warranty, manual and certificate evidence
+   - Added package-linked evidence submission in `PackageProcurementWorkspace` for delivery notes, shop drawings, sample/material approvals, warranties, manuals, certificates, close-out documents, and payment claim support.
+   - Evidence writes to `package_delivery_evidence` with `status: submitted`, `humanReviewRequired: true`, and source metadata for auditability.
+   - Extended package close-out evidence types so package users can submit the same delivery/warranty/manual/certificate close-out evidence from the close-out page.
+
+3. Package readiness gate alignment
+   - Extended `DeliveryEvidenceType` to include `shop_drawing`, `sample_approval`, `warranty`, `manual`, `certificate`, and `payment_claim_evidence`.
+   - Warranty/manual/certificate/shop-drawing/sample evidence can be marked required for close-out and blocks readiness until approved.
+   - Payment claim support evidence is tracked, but does not become a close-out gate by default.
+
+Validation completed for this pass:
+
+- `npm run lint`
+- `npx vitest run src/services/__tests__/packageReadinessService.test.ts src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts --testTimeout 20000`
+- Result: 3 test files passed, 56 tests passed.
+
+Notes for human review:
+
+- This pass intentionally does not issue purchase orders, certify claims, create invoices, or release escrow. Those remain separate human-confirmed workflows.

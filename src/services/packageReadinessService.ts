@@ -9,6 +9,12 @@ export type DeliveryEvidenceType =
   | 'purchase_order'
   | 'wage_record'
   | 'plant_record'
+  | 'shop_drawing'
+  | 'sample_approval'
+  | 'warranty'
+  | 'manual'
+  | 'certificate'
+  | 'payment_claim_evidence'
   | 'snag'
   | 'closeout_document';
 

@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, ClipboardCheck, Factory, FileText, Loader2
 import { db } from '@/lib/firebase';
 import type { Bid, GanttTask, Project, RFI, SiteInspection, SiteLog, TenderPackage, UserProfile } from '@/types';
 import { assessContractorWorkflow } from '@/services/contractorWorkflowService';
-import type { DeliveryEvidenceItem, ProcurementCommitment, SnagItem } from '@/services/packageReadinessService';
+import type { DeliveryEvidenceItem, DeliveryEvidenceType, ProcurementCommitment, SnagItem } from '@/services/packageReadinessService';
 import TenderWizard from './TenderWizard';
 import BidSubmission from './BidSubmission';
 import { Badge } from './ui/badge';
@@ -23,6 +23,16 @@ type CommitmentType = ProcurementCommitment['type'];
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 const COMMITMENT_TYPES: CommitmentType[] = ['supplier_quote', 'purchase_order', 'delivery_note', 'subcontract_order', 'payment_claim'];
+const PACKAGE_EVIDENCE_TYPES: Array<{ value: DeliveryEvidenceType; label: string; requiredForCloseout?: boolean }> = [
+  { value: 'delivery_note', label: 'Delivery note', requiredForCloseout: true },
+  { value: 'shop_drawing', label: 'Shop drawing approval', requiredForCloseout: true },
+  { value: 'sample_approval', label: 'Sample / material approval', requiredForCloseout: true },
+  { value: 'warranty', label: 'Warranty certificate', requiredForCloseout: true },
+  { value: 'manual', label: 'Manual / O&M document', requiredForCloseout: true },
+  { value: 'certificate', label: 'Compliance certificate', requiredForCloseout: true },
+  { value: 'payment_claim_evidence', label: 'Payment claim evidence' },
+  { value: 'closeout_document', label: 'Close-out document', requiredForCloseout: true },
+];
 
 function tenderQueriesForUser(user: UserProfile) {
   const tenders = collection(db, 'tender_packages');
@@ -49,6 +59,10 @@ function canRequestCommitment(user: UserProfile) {
   return ['admin', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier'].includes(user.role);
 }
 
+function canSubmitPackageEvidence(user: UserProfile) {
+  return ['admin', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier'].includes(user.role);
+}
+
 function canSubmitPackageBid(user: UserProfile) {
   return user.role === 'contractor' || user.role === 'subcontractor';
 }
@@ -57,6 +71,23 @@ function statusTone(status: string) {
   if (['blocked', 'overdue', 'rejected', 'cancelled'].includes(status)) return 'destructive' as const;
   if (['ready_for_closeout', 'ready_for_review', 'approved', 'issued', 'delivered', 'awarded'].includes(status)) return 'default' as const;
   return 'secondary' as const;
+}
+
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T>(items: T[]) {
+  const timeFor = (item: T) => {
+    const record = item as Record<string, unknown>;
+    return timestampMs(record.updatedAt ?? record.createdAt ?? record.dueDate ?? record.deadline);
+  };
+  return [...items].sort((a, b) => timeFor(b) - timeFor(a));
 }
 
 export default function PackageProcurementWorkspace({ user, mode }: PackageProcurementWorkspaceProps) {
@@ -77,6 +108,11 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const [draftAmount, setDraftAmount] = useState('');
   const [draftDueDate, setDraftDueDate] = useState('');
   const [draftNote, setDraftNote] = useState('');
+  const [evidenceTitle, setEvidenceTitle] = useState('');
+  const [evidenceType, setEvidenceType] = useState<DeliveryEvidenceType>('delivery_note');
+  const [evidenceDueDate, setEvidenceDueDate] = useState('');
+  const [evidenceReference, setEvidenceReference] = useState('');
+  const [evidenceNote, setEvidenceNote] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -136,6 +172,8 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedTender?.projectId) ?? projects[0], [projects, selectedTender]);
   const activeBid = useMemo(() => myBids.find((bid) => bid.tenderPackageId === selectedTender?.id || bid.tenderPackageId === selectedTenderId), [myBids, selectedTender?.id, selectedTenderId]);
   const tendersAvailableForBid = useMemo(() => tenders.filter((tender) => tender.status === 'published' && !myBids.some((bid) => bid.tenderPackageId === tender.id)), [myBids, tenders]);
+  const selectedCommitments = useMemo(() => selectedTender ? sortByRecent(commitments.filter((item) => item.packageId === selectedTender.id)) : [], [commitments, selectedTender]);
+  const selectedEvidence = useMemo(() => selectedTender ? sortByRecent(evidence.filter((item) => item.packageId === selectedTender.id)) : [], [evidence, selectedTender]);
   const selectedReadiness = useMemo(() => {
     if (!selectedTender) return null;
     return assessContractorWorkflow({
@@ -185,6 +223,42 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
       setDraftAmount('');
       setDraftDueDate('');
       setDraftNote('');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitPackageEvidence = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedTender || !evidenceTitle.trim()) return;
+    setSaving(true);
+    try {
+      const now = new Date().toISOString();
+      const evidenceConfig = PACKAGE_EVIDENCE_TYPES.find((option) => option.value === evidenceType);
+      await addDoc(collection(db, 'package_delivery_evidence'), {
+        packageId: selectedTender.id,
+        projectId: selectedTender.projectId,
+        jobId: selectedTender.jobId,
+        type: evidenceType,
+        title: evidenceTitle.trim(),
+        status: 'submitted',
+        createdBy: user.uid,
+        requestedBy: user.uid,
+        requestedByRole: user.role,
+        createdAt: now,
+        updatedAt: now,
+        dueDate: evidenceDueDate || undefined,
+        requiredForCloseout: Boolean(evidenceConfig?.requiredForCloseout),
+        metadata: {
+          source: 'package-procurement-workspace',
+          reference: evidenceReference.trim() || undefined,
+          note: evidenceNote.trim() || undefined,
+          humanReviewRequired: true,
+        },
+      });
+      setEvidenceTitle('');
+      setEvidenceReference('');
+      setEvidenceNote('');
     } finally {
       setSaving(false);
     }
@@ -266,6 +340,50 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
           </CardContent>
         </Card>
 
+        <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
+          <CardHeader>
+            <CardTitle className="font-heading text-xl flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-primary" /> Package claims, delivery and warranties</CardTitle>
+            <CardDescription>{selectedTender ? selectedTender.title : 'Select a package to inspect payment claims, orders, delivery records, and close-out evidence.'}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-semibold">Procurement / payment records</h3>
+                <Badge variant="secondary">{selectedCommitments.length}</Badge>
+              </div>
+              {selectedCommitments.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No package claims, orders, or delivery commitments are recorded yet.</p> : selectedCommitments.map((item) => (
+                <div key={item.id} className="rounded-xl border border-border bg-background/70 p-4 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.type.replaceAll('_', ' ')} · {item.dueDate || 'No due date'}{item.amount ? ` · ${currency.format(item.amount)}` : ''}</p>
+                    </div>
+                    <Badge variant={statusTone(item.status)}>{item.status.replaceAll('_', ' ')}</Badge>
+                  </div>
+                  {item.type === 'payment_claim' && <p className="mt-3 text-xs font-semibold text-primary">Payment application is review-gated. No invoice, escrow release, or payment is executed by this record.</p>}
+                </div>
+              ))}
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-semibold">Delivery / close-out evidence</h3>
+                <Badge variant="secondary">{selectedEvidence.length}</Badge>
+              </div>
+              {selectedEvidence.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No delivery notes, warranties, manuals, certificates, or claim evidence are linked yet.</p> : selectedEvidence.map((item) => (
+                <div key={item.id} className="rounded-xl border border-border bg-background/70 p-4 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.type.replaceAll('_', ' ')} · {item.dueDate || item.createdAt || 'No date'}{item.requiredForCloseout ? ' · close-out required' : ''}</p>
+                    </div>
+                    <Badge variant={statusTone(item.status)}>{item.status.replaceAll('_', ' ')}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="space-y-6">
           <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
             <CardHeader>
@@ -323,6 +441,29 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
                   <Input type="date" value={draftDueDate} onChange={(event) => setDraftDueDate(event.target.value)} />
                   <Textarea value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Notes, supplier reference, delivery constraints, or claim basis" />
                   <Button type="submit" disabled={saving || !draftTitle.trim()} className="w-full rounded-xl gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Save procurement record</Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {canSubmitPackageEvidence(user) && selectedTender && (
+            <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
+              <CardHeader>
+                <CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Submit delivery / warranty evidence</CardTitle>
+                <CardDescription>Records real package-linked evidence for supplier deliveries, shop drawings, warranties, manuals, certificates, and payment claim support. Evidence is submitted for human review.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={submitPackageEvidence} className="space-y-3">
+                  <Input value={evidenceTitle} onChange={(event) => setEvidenceTitle(event.target.value)} placeholder="Evidence title" required />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select value={evidenceType} onChange={(event) => setEvidenceType(event.target.value as DeliveryEvidenceType)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+                      {PACKAGE_EVIDENCE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+                    </select>
+                    <Input type="date" value={evidenceDueDate} onChange={(event) => setEvidenceDueDate(event.target.value)} />
+                  </div>
+                  <Input value={evidenceReference} onChange={(event) => setEvidenceReference(event.target.value)} placeholder="Reference number, delivery note, certificate or claim ref" />
+                  <Textarea value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} placeholder="Evidence notes, delivery constraints, warranty period, or payment claim basis" />
+                  <Button type="submit" disabled={saving || !evidenceTitle.trim()} className="w-full rounded-xl gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Submit evidence for review</Button>
                 </form>
               </CardContent>
             </Card>

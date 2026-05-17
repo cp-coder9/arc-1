@@ -113,6 +113,29 @@ describe('packageReadinessService', () => {
     expect(result.requiredEvidence).toContain('wage_record');
   });
 
+  it('treats package warranty and claim support as review-gated evidence types', () => {
+    const result = evaluatePackageReadiness({
+      tender,
+      awardedBid,
+      programmeTasks: [completedTask],
+      rfis: [closedRfi],
+      siteLogs: [siteLog],
+      inspections: [passedInspection],
+      evidence: [
+        ...approvedEvidence,
+        { id: 'ev-warranty', type: 'warranty', title: 'Supplier warranty', status: 'submitted', requiredForCloseout: true, createdAt: '2026-07-31T00:00:00.000Z' },
+        { id: 'ev-claim', type: 'payment_claim_evidence', title: 'Measured work claim backup', status: 'submitted', createdAt: '2026-07-31T00:00:00.000Z' },
+      ],
+      asOf: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.requiredEvidence).toContain('warranty');
+    expect(result.requiredEvidence).not.toContain('payment_claim_evidence');
+    expect(result.missingEvidence).toContain('warranty');
+    expect(result.blockers).toContain('Missing approved close-out evidence: warranty.');
+  });
+
   it('blocks closeout when award, overdue RFI, inspection, and evidence gates are not satisfied', () => {
     const result = evaluatePackageReadiness({
       tender: { ...tender, status: 'closed', awardedBidId: undefined, awardedContractorId: undefined },
