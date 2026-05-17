@@ -222,3 +222,12 @@ Validation completed for this pass:
 Notes for human review:
 
 - This pass intentionally does not issue purchase orders, certify claims, create invoices, or release escrow. Those remain separate human-confirmed workflows.
+
+Deployment and broad validation for package claims/evidence pass:
+
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed, 55 files / 429 tests.
+- Chromium E2E: `npx playwright test --project=chromium --reporter=line` passed, 22/22 tests.
+- Production build: `npx vite build --base ./` passed, 3059 modules.
+- Uploaded 74 production files to the test host via explicit FTPS.
+- Live verification passed at `https://test.architex.co.za/` with title `Architex | Built Environment OS`, zero bad resources, and latest bundle `index-DPHAeQp9.js` present.
