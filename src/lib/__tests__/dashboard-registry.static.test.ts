@@ -23,6 +23,7 @@ const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/
 const bepFreelancerJobsSource = readFileSync(resolve(process.cwd(), 'src/components/BEPFreelancerJobsPage.tsx'), 'utf8');
 const freelancerSubmissionsSource = readFileSync(resolve(process.cwd(), 'src/components/FreelancerSubmissionsPage.tsx'), 'utf8');
 const drawingChecklistServiceSource = readFileSync(resolve(process.cwd(), 'src/services/drawingChecklistService.ts'), 'utf8');
+const drawingRegisterSource = readFileSync(resolve(process.cwd(), 'src/components/DrawingRegisterPage.tsx'), 'utf8');
 const coordinationRegisterServiceSource = readFileSync(resolve(process.cwd(), 'src/services/coordinationRegisterService.ts'), 'utf8');
 const registryMatch = appSource.match(/const CANONICAL_DASHBOARD_PAGES: DashboardPage\[\] = \[([\s\S]*?)\n\];/);
 const registrySource = registryMatch?.[1] ?? '';
@@ -152,7 +153,7 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("return <ProjectMessengerPage user={user} />;");
     expect(workflowSource).toContain("return <ContractSigningPage user={user} />;");
     expect(workflowSource).toContain("return <DisputeResolutionPage user={user} />;");
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-marketplace' && activeTab !== 'bep-team' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-register' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-marketplace' && activeTab !== 'bep-team' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
   });
 
   it('routes backend.html BEP marketplace and design team matrix to live production tools', () => {
@@ -238,6 +239,20 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'ai' && <AICoPilotPage user={user} onNavigate={setActiveTab} />`);
     expect(appSource).toContain(`activeTab !== 'ai'`);
+  });
+
+  it('routes drawing register and transmittals to live document-control records', () => {
+    expect(appSource).toContain("const DrawingRegisterPage = lazyWithChunkRetry(() => import('./components/DrawingRegisterPage'));"
+    );
+    expect(appSource).toContain(`{ id: 'drawing-register', label: 'Drawing Register'`);
+    expect(appSource).toContain(`activeTab === 'drawing-register' && <DrawingRegisterPage user={user} />`);
+    expect(appSource).toContain(`activeTab !== 'drawing-register'`);
+    expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'documents')");
+    expect(drawingRegisterSource).toContain("collection(documentRef, 'versions')");
+    expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'transmittals')");
+    expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'coordination_items')");
+    expect(drawingRegisterSource).toContain('External delivery, statutory approval, and legal sign-off remain human-confirmed');
+    expect(drawingRegisterSource).not.toContain('orderBy(');
   });
 
   it('routes contractor staff wages and plant to the production resource-control workspace', () => {

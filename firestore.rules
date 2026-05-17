@@ -872,6 +872,54 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /documents/{documentId} {
+        allow read: if canReadProject(projectId);
+        allow create: if canManageProject(projectId) &&
+          request.resource.data.id == documentId &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.status in ['draft', 'active', 'issued', 'superseded', 'withdrawn'] &&
+          request.resource.data.keys().hasOnly(['id', 'projectId', 'title', 'drawingNumber', 'documentType', 'discipline', 'status', 'currentVersionId', 'currentRevision', 'latestFileUrl', 'latestFileName', 'tags', 'createdBy', 'createdAt', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['id', 'projectId', 'title', 'documentType', 'status', 'currentVersionId', 'currentRevision', 'createdBy', 'createdAt', 'updatedAt']);
+        allow update: if canManageProject(projectId) &&
+          request.resource.data.id == resource.data.id &&
+          request.resource.data.projectId == resource.data.projectId &&
+          request.resource.data.createdBy == resource.data.createdBy &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'drawingNumber', 'documentType', 'discipline', 'status', 'currentVersionId', 'currentRevision', 'latestFileUrl', 'latestFileName', 'tags', 'updatedAt']);
+        allow delete: if false;
+
+        match /versions/{versionId} {
+          allow read: if canReadProject(projectId);
+          allow create: if canManageProject(projectId) &&
+            request.resource.data.id == versionId &&
+            request.resource.data.documentId == documentId &&
+            request.resource.data.projectId == projectId &&
+            request.resource.data.createdBy == request.auth.uid &&
+            request.resource.data.keys().hasOnly(['id', 'documentId', 'projectId', 'versionNumber', 'revision', 'fileUrl', 'fileName', 'checksum', 'notes', 'issueStatus', 'supersedesVersionId', 'createdBy', 'createdAt']) &&
+            request.resource.data.keys().hasAll(['id', 'documentId', 'projectId', 'versionNumber', 'revision', 'createdBy', 'createdAt']);
+          allow update, delete: if false;
+        }
+      }
+
+      match /transmittals/{transmittalId} {
+        allow read: if canReadProject(projectId);
+        allow create: if canManageProject(projectId) &&
+          request.resource.data.id == transmittalId &&
+          request.resource.data.projectId == projectId &&
+          request.resource.data.issuedBy == request.auth.uid &&
+          request.resource.data.status in ['draft', 'issued'] &&
+          request.resource.data.keys().hasOnly(['id', 'projectId', 'title', 'status', 'recipientIds', 'documentVersionIds', 'purpose', 'issuedBy', 'issuedAt', 'createdAt', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['id', 'projectId', 'title', 'status', 'recipientIds', 'documentVersionIds', 'issuedBy', 'issuedAt', 'createdAt', 'updatedAt']);
+        allow update: if canManageProject(projectId) &&
+          request.resource.data.id == resource.data.id &&
+          request.resource.data.projectId == resource.data.projectId &&
+          request.resource.data.issuedBy == resource.data.issuedBy &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'status', 'recipientIds', 'purpose', 'updatedAt']);
+        allow delete: if false;
+      }
+
       match /work_packages/{packageId} {
         allow read: if canReadProject(projectId) ||
           (isAuthenticated() && resource.data.assignedFreelancerId == request.auth.uid);

@@ -381,3 +381,27 @@ Deployment and broad validation for Construction OS admin routing pass:
 - Uploaded 74 production files to `https://test.architex.co.za/` by explicit FTPS.
 - Live verification passed for `https://test.architex.co.za/` with title `Architex | Built Environment OS` and zero bad resources.
 - Direct deployed chunk verification passed for `assets/ProjectWorkflowPage-KO6qIE6i.js`; it returned HTTP 200 and contained the Construction OS, admin role, and package-linked collection strings.
+
+## 2026-05-17 Drawing Register and transmittal control pass
+
+Scope followed from `backend.html`: implement a formal Drawing Register and Transmittal Generator surface for drawing numbers, revisions, issue status, superseded records, and recipient transmittal logs.
+
+Implemented:
+
+- Added a production `DrawingRegisterPage` routed from the canonical `drawing-register` dashboard option for clients, architects, BEPs, and admins.
+- The page reads live project records and nested `projects/{projectId}/documents`, `versions`, and `transmittals` subcollections. It does not use mock drawing data or local placeholders.
+- Design managers can create drawing/register records, add revisions, supersede older revisions, and issue transmittal records against selected live revisions.
+- Clients get a read-only register view with document status, latest revision, and transmittal history.
+- Issued transmittals also create a linked `coordination_items` record so the document-control action appears in the broader coordination workflow.
+- The UI explicitly states that external delivery, statutory approval, and legal sign-off remain human-confirmed. No email sending, municipal certification, payment action, or legal approval is automated.
+- Firestore rules were extended for project documents, document versions, and transmittals with role-gated reads/writes and immutable record protections.
+
+Validation completed for this pass so far:
+
+- `npm run lint`
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts --testTimeout 20000`
+- Result: 2 focused test files passed, 53 tests passed.
+
+Human review note:
+
+- This slice creates document-control metadata and transmittal logs only. The human still needs to confirm any real-world issue/delivery outside the platform.
