@@ -295,3 +295,19 @@ Validation completed for this pass:
 Human review note:
 
 - This is a live projection/helper only. A future provider integration can replace the directory projection with real supplier APIs, but this pass avoids fake catalogue data and avoids automated purchasing.
+
+Deployment and broad validation for freelancer review + procurement catalogue pass:
+
+- Focused validation for freelancer review/rules: `npm run lint` plus dashboard/rules static tests passed, 2 files / 52 tests.
+- Focused validation for procurement BoM/catalogue: `npm run lint` plus dashboard/rules/package-readiness tests passed, 3 files / 57 tests.
+- Full TypeScript including tests: `npm run lint:tests` passed.
+- Full unit regression: `npm test -- --testTimeout 20000` passed, 55 files / 429 tests.
+- Admin route Playwright isolation after a startup timing flake: `npx playwright test e2e/admin-review.spec.ts --project=chromium --reporter=line` passed, 3/3.
+- Full Chromium E2E rerun: `npx playwright test --project=chromium --reporter=line` passed, 22/22.
+- Production build: `npx vite build --base ./` passed, 3059 modules transformed.
+- Uploaded 74 production files to `https://test.architex.co.za/` by explicit FTPS.
+- Live verification: `https://test.architex.co.za/` loaded with title `Architex | Built Environment OS`, zero bad resources, and the new production bundle visible.
+- Firestore rules deployed through the Firebase Rules API:
+  - Ruleset: `projects/gen-lang-client-0880960511/rulesets/ea480d08-b4e8-4081-a71e-1337b2b36364`
+  - SHA256: `8901624179758a268a9f66722e84ae713b6d9ddebf0193c76ebb9a5f45a3fa73`
+  - Verification: deployed rules SHA matched local `firestore.rules`.
