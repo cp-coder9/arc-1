@@ -283,6 +283,11 @@ describe('canonical dashboard page registry', () => {
     expect(packageWorkspaceSource).toContain('<BidSubmission tenders={tendersAvailableForBid} contractorId={user.uid} contractorName={user.displayName || user.email} onSubmitted={setSelectedTenderId} />');
     expect(packageWorkspaceSource).toContain('Supplier quote path');
     expect(packageWorkspaceSource).toContain('Package claims, delivery and warranties');
+    expect(packageWorkspaceSource).toContain('Drawing-to-BoM Extractor');
+    expect(packageWorkspaceSource).toContain('Supplier API Catalogue');
+    expect(packageWorkspaceSource).toContain("query(collection(db, 'directoryProfiles'), where('role', '==', 'supplier')");
+    expect(packageWorkspaceSource).toContain("source: 'tender package scope item'");
+    expect(packageWorkspaceSource).toContain("source: 'linked drawing/specification document'");
     expect(packageWorkspaceSource).toContain('payment_claim');
     expect(packageWorkspaceSource).toContain('warranty');
     expect(packageWorkspaceSource).toContain('payment_claim_evidence');

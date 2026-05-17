@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, collectionGroup, limit, onSnapshot, query, where } from 'firebase/firestore';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Factory, FileText, Loader2, PackageCheck, Plus, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Factory, FileText, Loader2, PackageCheck, Plus, Search, ShoppingCart } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Bid, GanttTask, Project, RFI, SiteInspection, SiteLog, TenderPackage, UserProfile } from '@/types';
 import { assessContractorWorkflow } from '@/services/contractorWorkflowService';
@@ -20,6 +20,27 @@ interface PackageProcurementWorkspaceProps {
 
 type LoadState = 'loading' | 'ready' | 'error';
 type CommitmentType = ProcurementCommitment['type'];
+type SupplierProfile = {
+  uid: string;
+  displayName?: string;
+  email?: string;
+  professionalLabel?: string;
+  professionalLabels?: string[];
+  region?: string;
+  averageRating?: number;
+  totalReviews?: number;
+  cidbGrading?: string;
+  tradeLicense?: string;
+};
+
+type ExtractedBoMItem = {
+  id: string;
+  description: string;
+  source: string;
+  quantity?: number;
+  unitPrice?: number;
+  total?: number;
+};
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 const COMMITMENT_TYPES: CommitmentType[] = ['supplier_quote', 'purchase_order', 'delivery_note', 'subcontract_order', 'payment_claim'];
@@ -102,6 +123,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const [siteLogs, setSiteLogs] = useState<SiteLog[]>([]);
   const [inspections, setInspections] = useState<SiteInspection[]>([]);
   const [snags, setSnags] = useState<SnagItem[]>([]);
+  const [supplierProfiles, setSupplierProfiles] = useState<SupplierProfile[]>([]);
   const [selectedTenderId, setSelectedTenderId] = useState('');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftType, setDraftType] = useState<CommitmentType>('supplier_quote');
@@ -138,6 +160,10 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
     unsubs.push(onSnapshot(query(collectionGroup(db, 'bids'), where('contractorId', '==', user.uid)), (snapshot) => {
       setMyBids(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Bid)));
     }, (error) => console.warn('Package bid projection unavailable; continuing without bid context:', error)));
+
+    unsubs.push(onSnapshot(query(collection(db, 'directoryProfiles'), where('role', '==', 'supplier'), limit(50)), (snapshot) => {
+      setSupplierProfiles(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as SupplierProfile)));
+    }, (error) => console.warn('Supplier catalogue projection unavailable; continuing without supplier directory:', error)));
 
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [user]);
@@ -188,6 +214,41 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
       snags: snags.filter((item) => item.packageId === selectedTender.id),
     });
   }, [activeBid, commitments, evidence, inspections, rfis, selectedTender, siteLogs, snags, tasks]);
+  const extractedBoMItems = useMemo<ExtractedBoMItem[]>(() => {
+    if (!selectedTender) return [];
+    const bidItems = activeBid?.lineItems?.map((item, index) => ({
+      id: `bid-${index}`,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      total: item.total,
+      source: 'priced contractor bid line item',
+    })) ?? [];
+    const scopeItems = (selectedTender.scope ?? []).map((scope, index) => ({
+      id: `scope-${index}`,
+      description: scope,
+      quantity: 1,
+      source: 'tender package scope item',
+    }));
+    const drawingItems = (selectedTender.documents ?? [])
+      .filter((document) => /drawing|plan|dwg|detail|schedule|spec|boq|bom/i.test(document.name))
+      .map((document, index) => ({
+        id: `document-${index}`,
+        description: document.name,
+        source: 'linked drawing/specification document',
+      }));
+    return [...bidItems, ...scopeItems, ...drawingItems].slice(0, 12);
+  }, [activeBid?.lineItems, selectedTender]);
+  const supplierCatalogueMatches = useMemo(() => {
+    const packageText = `${selectedTender?.title ?? ''} ${selectedTender?.description ?? ''} ${(selectedTender?.scope ?? []).join(' ')} ${(selectedTender?.requiredCertifications ?? []).join(' ')}`.toLowerCase();
+    return supplierProfiles
+      .map((supplier) => {
+        const labels = [supplier.professionalLabel, ...(supplier.professionalLabels ?? []), supplier.cidbGrading, supplier.tradeLicense].filter(Boolean).join(' ');
+        const matchTerms = labels.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 3 && packageText.includes(term));
+        return { supplier, labels, matchTerms: Array.from(new Set(matchTerms)).slice(0, 4) };
+      })
+      .sort((a, b) => b.matchTerms.length - a.matchTerms.length || (b.supplier.averageRating ?? 0) - (a.supplier.averageRating ?? 0));
+  }, [selectedTender, supplierProfiles]);
 
   const stats = useMemo(() => ({
     packages: tenders.length,
@@ -304,6 +365,51 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
             <CardDescription>Suppliers record quotes, delivery notes, warranties, and payment claims as procurement records against the selected package. Contractor/subcontractor bid submission remains CIDB/NHBRC-verification gated.</CardDescription>
           </CardHeader>
         </Card>
+      )}
+
+      {mode === 'procurement' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-heading text-xl flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Drawing-to-BoM Extractor</CardTitle>
+              <CardDescription>Extracts a procurement-ready BoM view from the selected live package scope, linked drawings/specifications, and priced bid lines where available. It does not invent quantities or supplier pricing.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!selectedTender ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">Select a live package to derive a BoM from its scope and documents.</p> : extractedBoMItems.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No scope, bid line items, or drawing/specification document names are available for this package yet.</p> : extractedBoMItems.map((item) => (
+                <div key={item.id} className="rounded-xl border border-border bg-background/70 p-4 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{item.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Source: {item.source}{item.quantity ? ` · Qty ${item.quantity}` : ''}</p>
+                    </div>
+                    {item.total != null ? <Badge variant="secondary">{currency.format(item.total)}</Badge> : <Badge variant="outline">needs pricing</Badge>}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-heading text-xl flex items-center gap-2"><Search className="h-5 w-5 text-primary" /> Supplier API Catalogue</CardTitle>
+              <CardDescription>Live supplier directory projection for procurement matching. It surfaces registered supplier profiles and package-relevant keywords only; quote requests still use the review-gated procurement record form.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {supplierCatalogueMatches.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No supplier directory profiles are visible yet.</p> : supplierCatalogueMatches.slice(0, 8).map(({ supplier, labels, matchTerms }) => (
+                <div key={supplier.uid} className="rounded-xl border border-border bg-background/70 p-4 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{supplier.displayName || supplier.email || supplier.uid}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{labels || 'No supplier specialisation recorded'} · {supplier.region || 'No region'}</p>
+                    </div>
+                    <Badge variant={matchTerms.length ? 'default' : 'outline'}>{matchTerms.length ? `${matchTerms.length} match terms` : 'directory profile'}</Badge>
+                  </div>
+                  {matchTerms.length > 0 && <p className="mt-3 text-xs text-primary">Matched package terms: {matchTerms.join(', ')}</p>}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-6">

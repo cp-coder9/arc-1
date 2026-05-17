@@ -266,3 +266,32 @@ Validation completed for this pass so far:
 Human review note:
 
 - This slice intentionally stops at invoice readiness. Actual invoice creation, certification, escrow release, and payment remain separate human-confirmed flows.
+
+## 2026-05-17 procurement BoM and supplier catalogue pass
+
+Scope followed from `backend.html`: deepen the BoQ / BoM + supplier tools listed under contractor/package procurement while staying inside live data and human-review boundaries.
+
+Implemented:
+
+1. Drawing-to-BoM Extractor
+   - Added a first-class `Drawing-to-BoM Extractor` panel to `PackageProcurementWorkspace` for `procurement` mode.
+   - Derives a procurement-ready BoM view only from live selected-package inputs:
+     - contractor bid line items, when a bid exists for the current user;
+     - tender package `scope` entries;
+     - linked document names that look like drawings, details, schedules, specifications, BoQs, or BoMs.
+   - Items without real priced bid totals are explicitly labelled `needs pricing`; the UI does not fabricate quantities, rates, or supplier prices.
+
+2. Supplier API Catalogue projection
+   - Added a live `Supplier API Catalogue` panel backed by `directoryProfiles` where `role == supplier`.
+   - Ranks visible supplier profiles by real package keyword overlap and rating metadata where available.
+   - Keeps quote/order/payment actions in the review-gated procurement record form instead of creating automatic purchase orders.
+
+Validation completed for this pass:
+
+- `npm run lint`
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/firestore-rules.static.test.ts src/services/__tests__/packageReadinessService.test.ts --testTimeout 20000`
+- Result: 3 focused test files passed, 57 tests passed.
+
+Human review note:
+
+- This is a live projection/helper only. A future provider integration can replace the directory projection with real supplier APIs, but this pass avoids fake catalogue data and avoids automated purchasing.
