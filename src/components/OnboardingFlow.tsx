@@ -55,13 +55,6 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
         data-testid="role-select-client"
       />
       <RoleCard
-        icon={<Briefcase className="w-8 h-8" />}
-        title="Architect"
-        description="I am a SACAP registered architect looking for work"
-        onClick={() => handleRoleSelect('architect')}
-        data-testid="role-select-architect"
-      />
-      <RoleCard
         icon={<Sparkles className="w-8 h-8" />}
         title="Freelancer"
         description="I am a specialist or consultant (Engineer, etc.)"
@@ -71,7 +64,7 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
       <RoleCard
         icon={<Construction className="w-8 h-8" />}
         title="BEP / Design Team"
-        description="I am a built-environment professional or design-team lead"
+        description="Architects, engineers, consultants, and design-team leads"
         onClick={() => handleRoleSelect('bep')}
         data-testid="role-select-bep"
       />
@@ -192,14 +185,14 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
             className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm"
             required
           >
-            <option value="">Select your trade...</option>
-            <option value="Builder">General Builder</option>
-            <option value="Tiler">Professional Tiler</option>
-            <option value="Plumber">Plumber</option>
-            <option value="Electrician">Electrician</option>
-            <option value="Carpenter">Carpenter</option>
-            <option value="Painter">Painter</option>
+            <option value="">Select your profession...</option>
+            <option value="Architect">Architect / SACAP professional</option>
             <option value="Engineer">Civil/Structural Engineer</option>
+            <option value="Quantity Surveyor">Quantity Surveyor</option>
+            <option value="Project Manager">Project Manager</option>
+            <option value="Technologist">Architectural Technologist</option>
+            <option value="Interior Designer">Interior Designer</option>
+            <option value="Builder">General Builder</option>
           </select>
         </div>
         <div className="space-y-2">
@@ -213,6 +206,38 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
           />
         </div>
       </div>
+
+      {formData.professionalLabel === 'Architect' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <BadgeCheck size={14} /> SACAP Registration #
+            </label>
+            <Input
+              name="sacapNumber"
+              placeholder="ST123456"
+              className="h-10 rounded-lg bg-white"
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Briefcase size={14} /> Main specialization
+            </label>
+            <select
+              name="mainSpecialization"
+              onChange={handleInputChange}
+              className="w-full h-10 px-3 rounded-lg border border-border bg-white text-xs"
+            >
+              <option value="">Select specialization...</option>
+              <option value="Residential">Residential</option>
+              <option value="Urban Design">Urban Design</option>
+              <option value="Sustainable Design">Sustainable Design</option>
+              <option value="Heritage">Heritage</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {(formData.professionalLabel === 'Builder' || formData.professionalLabel === 'Engineer') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
@@ -455,7 +480,6 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
               >
                 {step === 1 && renderRoleSelection()}
                 {step === 2 && role === 'client' && renderClientOnboarding()}
-                {step === 2 && role === 'architect' && renderArchitectOnboarding()}
                 {step === 2 && role === 'bep' && renderBEPOnboarding()}
                 {step === 2 && role === 'contractor' && renderContractorOnboarding()}
                 {step === 2 && (role === 'subcontractor' || role === 'supplier') && renderPackageParticipantOnboarding()}

@@ -12,7 +12,7 @@ const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
 export function Logo({ 
   className = "flex items-center gap-2", 
-  iconClassName = "w-10 h-10 text-primary", 
+  iconClassName = "h-14 w-14 object-contain text-primary sm:h-16 sm:w-16", 
   showText = false,
   textClassName = "font-heading font-bold text-2xl lg:text-3xl tracking-tighter"
 }: LogoProps) {

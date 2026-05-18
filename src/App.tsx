@@ -597,7 +597,7 @@ export default function App() {
               <div className="relative grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
                 <div className="text-left">
                   <div className="mb-5 flex items-center gap-3">
-                    <Logo iconClassName="h-12 w-12 text-[#0f6b62] sm:h-14 sm:w-14" textClassName="hidden" />
+                    <Logo iconClassName="h-16 w-16 object-contain text-[#0f6b62] sm:h-20 sm:w-20" textClassName="hidden" />
                     <div>
                       <p className="font-heading text-2xl font-black tracking-[-0.055em]">Architex OS</p>
                       <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#F8FAFC]/45">Built Environment Access</p>
@@ -636,9 +636,8 @@ export default function App() {
                   >
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
                       <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
-                      <AuthRoleCard data-testid="role-select-architect" icon={<Briefcase className="w-8 h-8" />} title="Architect" description="I am a SACAP registered architect looking for work" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
                       <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
-                      <AuthRoleCard data-testid="role-select-bep" icon={<Construction className="w-8 h-8" />} title="BEP / Design Team" description="I am a built-environment professional or design-team lead" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                      <AuthRoleCard data-testid="role-select-bep" icon={<Briefcase className="w-8 h-8" />} title="BEP / Design Team" description="Architects, engineers, consultants, and design-team leads" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
                       <AuthRoleCard data-testid="role-select-contractor" icon={<Factory className="w-8 h-8" />} title="Contractor" description="I manage construction delivery, tendering, and site work" active={roleSelection === 'contractor'} onClick={() => setRoleSelection('contractor')} />
                       <AuthRoleCard data-testid="role-select-subcontractor" icon={<Hammer className="w-8 h-8" />} title="Subcontractor" description="I deliver a trade package, evidence, and close-out items" active={roleSelection === 'subcontractor'} onClick={() => setRoleSelection('subcontractor')} />
                       <AuthRoleCard data-testid="role-select-supplier" icon={<Factory className="w-8 h-8" />} title="Supplier" description="I supply materials, products, deliveries, or warranties" active={roleSelection === 'supplier'} onClick={() => setRoleSelection('supplier')} />
@@ -707,7 +706,7 @@ export default function App() {
         <div className="h-full flex flex-col gap-y-4 p-7 overflow-y-auto">
           <div className="flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
-              <Logo iconClassName="h-10 w-10 object-contain" textClassName="hidden" />
+              <Logo iconClassName="h-14 w-14 object-contain sm:h-16 sm:w-16" textClassName="hidden" />
               <div>
                 <p className="font-sans text-[1.35rem] font-black tracking-[-0.055em] text-primary">Architex OS</p>
                 <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
@@ -769,7 +768,7 @@ export default function App() {
                 onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }}
               />
             )}
-            {(user!.role === 'architect' || user!.primaryFirmId) && (
+            {(DESIGN_TEAM_ROLES.includes(user!.role) || user!.primaryFirmId) && (
               <NavItem
                 icon={<Building2 size={18} />}
                 label="Firm Workspace"
@@ -785,7 +784,7 @@ export default function App() {
                 onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
               />
             )}
-            {user!.role === 'architect' && (
+            {DESIGN_TEAM_ROLES.includes(user!.role) && (
               <NavItem
                 icon={<Search size={18} />}
                 label="Marketplace"
@@ -793,7 +792,7 @@ export default function App() {
                 onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
               />
             )}
-            {user!.role === 'architect' && (
+            {DESIGN_TEAM_ROLES.includes(user!.role) && (
               <NavItem
                 icon={<Send size={18} />}
                 label="My Applications"
@@ -801,7 +800,7 @@ export default function App() {
                 onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }}
               />
             )}
-            {user!.role === 'architect' && (
+            {DESIGN_TEAM_ROLES.includes(user!.role) && (
               <NavItem
                 icon={<Users size={18} />}
                 label="Team & Freelancers"
@@ -809,7 +808,7 @@ export default function App() {
                 onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
               />
             )}
-            {user!.role === 'architect' && (
+            {DESIGN_TEAM_ROLES.includes(user!.role) && (
               <NavItem
                 icon={<Users size={18} />}
                 label="Coordination"
@@ -817,7 +816,7 @@ export default function App() {
                 onClick={() => { setActiveTab('coordination'); setIsSidebarOpen(false); }}
               />
             )}
-            {(user!.role === 'client' || user!.role === 'architect') && (
+            {(user!.role === 'client' || DESIGN_TEAM_ROLES.includes(user!.role)) && (
               <NavItem
                 icon={<Calculator size={18} />}
                 label="Fee Estimator"
@@ -1429,7 +1428,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#04302c]/80 px-4 py-4 backdrop-blur-2xl sm:px-8 lg:px-16">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <button onClick={() => goToTab('home')} className="group flex items-center gap-3 text-left" aria-label="Architex home">
-            <Logo iconClassName="h-12 w-12 text-[#0f6b62]" textClassName="hidden" />
+            <Logo iconClassName="h-16 w-16 object-contain text-[#0f6b62] sm:h-[4.5rem] sm:w-[4.5rem]" textClassName="hidden" />
             <div>
               <p className="font-heading text-xl font-black tracking-[-0.04em] text-[#F8FAFC]">Architex</p>
               <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#F8FAFC]/45">built environment OS</p>
@@ -1527,7 +1526,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
 
       <footer className="relative z-10 border-t border-[#04302c]/10 bg-[#F8FAFC] px-4 py-10 text-[#04302c] sm:px-8 lg:px-16">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 text-center md:flex-row md:items-center md:justify-between md:text-left">
-          <Logo showText iconClassName="h-12 w-12 text-[#04302c]" textClassName="font-heading text-2xl font-black tracking-[-0.04em]" />
+          <Logo showText iconClassName="h-16 w-16 object-contain text-[#04302c] sm:h-[4.5rem] sm:w-[4.5rem]" textClassName="font-heading text-2xl font-black tracking-[-0.04em]" />
           <p className="text-sm font-medium text-[#04302c]/60">© 2026 Architex. Minimal interface, governed project intelligence.</p>
         </div>
       </footer>

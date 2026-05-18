@@ -24,7 +24,7 @@ async function forceClick(locator: import('@playwright/test').Locator) {
 }
 
 test.describe('Authentication', () => {
-  const publicRoles = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'];
+  const publicRoles = ['client', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'];
 
   test('should show landing page', async ({ page }) => {
     await gotoApp(page);
