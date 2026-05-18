@@ -1,73 +1,56 @@
 # Root landing deployment note
 
-Date: 2026-05-18 09:32 UTC
+Date: 2026-05-18 10:20 UTC
 
-Requested: use `arc-1/undercon` as the landing page when visitors go to `architex.co.za`.
+Requested: use `arc-1/undercon` as the public landing page when visitors go to `architex.co.za`, while leaving the production app on `test.architex.co.za` / `/architex.co.za/ai/` intact.
 
 ## What was deployed
 
 Prepared the static landing from `/mnt/e/arc-1/undercon/code.html` with production-safe adjustments:
 
-- Replaced external Architex image references with local `logo.png`.
+- Replaced the external Architex image reference with an embedded/local logo asset so the apex page does not depend on a third-party image URL.
 - Added SEO description metadata.
 - Updated title to `Architex | Built Environment OS Initializing`.
 - Made the hero heading responsive for mobile.
 - Updated footer copyright to 2026.
 - Changed footer links to the AI workspace and contact email.
 
-Uploaded files:
+## Hosting/root mapping resolution
 
-- `/home/archite4/public_html/index.html`
-- `/home/archite4/public_html/logo.png`
-- `/home/archite4/public_html/.htaccess`
-- `/home/archite4/public_html/architex.co.za/index.html`
-- `/home/archite4/public_html/architex.co.za/logo.png`
-- `/home/archite4/public_html/architex.co.za/.htaccess`
+cPanel confirmed the active domain roots are:
 
-The existing AI app under `/home/archite4/public_html/architex.co.za/ai/` was not modified.
+- `architex.co.za`: `/home/archite4/public_html`
+- `test.architex.co.za`: `/home/archite4/public_html/architex.co.za/ai`
+
+The earlier FTP upload was landing in a jailed/ambiguous FTP root and did not create a visible `index.html` in the real cPanel File Manager root. The vhost mapping was already correct, but the real `/home/archite4/public_html/index.html` was missing, which is why the apex domain returned the LiteSpeed 404.
+
+Resolution applied through authenticated cPanel File Manager API:
+
+- Wrote `/home/archite4/public_html/index.html` with the prepared under-construction landing.
+- Wrote `/home/archite4/public_html/.htaccess` with `DirectoryIndex index.html`, no directory listing, and no-cache/security headers.
+- Embedded the logo into `index.html` as a data URL to avoid binary upload and cache mismatch problems.
+- Left `/home/archite4/public_html/architex.co.za/ai/` untouched.
 
 ## Validation completed
 
-Local Playwright validation passed for desktop and mobile:
+Local Playwright validation passed for the prepared landing before upload:
 
-- Title: `Architex | Built Environment OS Initializing`
+- Title: `Architex | Built Environment OS Initializing`.
 - No missing local resources.
 - No horizontal overflow.
 - Required content present: `Protocol v0.8.8 Initializing`.
 
-Live verification:
+Live verification after cPanel File Manager deployment passed:
 
-- `https://architex.co.za/architex.co.za/ai/` still loads the existing Built Environment OS app.
-- `https://architex.co.za/architex.co.za/` is reachable and returns HTTP 200, but LiteSpeed is still serving a cached older `index.html` with:
-  - `cache-control: public, max-age=86400`
-  - `last-modified: Sun, 17 May 2026 13:52:18 GMT`
-  - `content-length: 21248`
-- FTP confirms the uploaded file at `/home/archite4/public_html/architex.co.za/index.html` is the new prepared file with title `Architex | Built Environment OS Initializing` and size 20705 bytes.
+- `https://architex.co.za/` returns HTTP 200 and serves the under-construction landing.
+- `https://www.architex.co.za/` returns HTTP 200 and serves the under-construction landing.
+- `https://architex.co.za/index.html` returns HTTP 200 and serves the under-construction landing.
+- Desktop viewport: no missing resources, no horizontal overflow, required boot-sequence content present.
+- Mobile viewport: no missing resources, no horizontal overflow, required boot-sequence content present.
+- `https://test.architex.co.za/` still returns HTTP 200 and serves the Built Environment OS app.
 
-## Blocker for exact apex domain
+## Current status
 
-`https://architex.co.za/` still returns a LiteSpeed 404 even after uploading `/home/archite4/public_html/index.html`.
+Resolved. No human cPanel/vhost action is currently required for the apex landing.
 
-This indicates the active vhost/document root for the apex domain `architex.co.za` is not currently mapped to the FTP-accessible `/home/archite4/public_html/` folder. FTP upload alone cannot correct this vhost mapping.
-
-Observed DNS/host resolution:
-
-- `architex.co.za`, `www.architex.co.za`, `test.architex.co.za`, and `ftp.architex.co.za` all resolve to `169.239.218.73`.
-- The web server maps `test.architex.co.za` and `https://architex.co.za/architex.co.za/ai/` to accessible content.
-- The apex `https://architex.co.za/` remains attached to a LiteSpeed default/missing vhost and returns 404.
-
-## Human action needed
-
-In cPanel or the hosting control panel, set the domain document root for `architex.co.za` and `www.architex.co.za` to one of the uploaded folders:
-
-Preferred:
-
-- `/home/archite4/public_html/architex.co.za`
-
-Alternative:
-
-- `/home/archite4/public_html`
-
-Then purge LiteSpeed/cache for `architex.co.za`, or wait for the current `max-age=86400` cache to expire for the older mapped page.
-
-After the vhost root is corrected, the uploaded under-construction landing should serve at `https://architex.co.za/`.
+Remaining separate operational note: the repository branch still has local commits and generated/reference files that are not pushed to a remote Git repository. The production web files are deployed independently through hosting upload/cPanel, not through Git push.
