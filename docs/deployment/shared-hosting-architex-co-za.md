@@ -60,7 +60,7 @@ If the plan only supports static files/PHP:
 1. Run `npm run build` locally.
 2. Upload `dist/` contents to `public_html/`.
 3. Configure SPA fallback to `index.html` in `.htaccess`.
-4. Keep API routes on Vercel/Firebase/Node hosting and configure the frontend API base URL accordingly. The current code uses relative `/api` routes, so static-only hosting without an API proxy will break authenticated server workflows.
+4. Keep API routes on the owned Node/API host and configure `VITE_API_BASE_URL` before building the frontend. For the current test/static domain, use `VITE_API_BASE_URL=https://api.architex.co.za` so authenticated server workflows call the JSON API host instead of the SPA fallback.
 
 Example `.htaccess` for SPA fallback:
 

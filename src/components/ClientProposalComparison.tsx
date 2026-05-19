@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { getIdToken } from 'firebase/auth';
@@ -79,7 +80,7 @@ export default function ClientProposalComparison({ user }: { user: UserProfile }
     setAcceptingId(application.id);
     try {
       const token = await getIdToken(firebaseUser);
-      const response = await fetch(`/api/jobs/${application.job.id}/applications/${application.id}/accept`, {
+      const response = await apiFetch(`/api/jobs/${application.job.id}/applications/${application.id}/accept`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });

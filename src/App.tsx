@@ -7,6 +7,7 @@ import React, { Suspense, lazy, useCallback, useState, useEffect } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
 import { trackUserActivity, type UserActivitySource } from './lib/userActivity';
+import { apiFetch } from './lib/apiClient';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -475,7 +476,7 @@ export default function App() {
     if (!token) return null;
 
     try {
-      const res = await fetch('/api/auth/check-admin', {
+      const res = await apiFetch('/api/auth/check-admin', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

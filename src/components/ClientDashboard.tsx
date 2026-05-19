@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, orderBy, deleteField } from 'firebase/firestore';
@@ -311,7 +312,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('You must be logged in to accept an application');
 
-      const response = await fetch(`/api/jobs/${job.id}/applications/${application.id}/accept`, {
+      const response = await apiFetch(`/api/jobs/${job.id}/applications/${application.id}/accept`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

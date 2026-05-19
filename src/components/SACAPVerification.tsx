@@ -3,6 +3,7 @@
  * For architect verification workflow
  */
 
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) return;
-      const res = await fetch('/api/verifications/me?subjectType=bep', {
+      const res = await apiFetch('/api/verifications/me?subjectType=bep', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load verification status');
@@ -85,7 +86,7 @@ export function SACAPVerification({ user }: SACAPVerificationProps) {
 
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('You must be signed in to submit verification');
-      const response = await fetch('/api/verifications/submit', {
+      const response = await apiFetch('/api/verifications/submit', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

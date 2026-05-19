@@ -9,6 +9,13 @@ const app = express();
 
 const BODY_LIMIT = '50mb';
 const API_NOT_FOUND_MESSAGE = 'API route not found';
+const ALLOWED_CORS_ORIGINS = [
+  "https://architex.co.za",
+  "https://www.architex.co.za",
+  "https://test.architex.co.za",
+  "https://architex-marketplace.vercel.app",
+  /\.vercel\.app$/,
+];
 
 // Vercel and local proxy adapters set X-Forwarded-* headers. Trusting the
 // first proxy prevents express-rate-limit from throwing before routes run.
@@ -18,6 +25,13 @@ app.use((_req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   next();
 });
+
+app.use(
+  cors({
+    origin: ALLOWED_CORS_ORIGINS,
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
@@ -154,17 +168,6 @@ app.post('/api/auth/check-admin', async (req, res) => {
     return res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) });
   }
 });
-
-app.use(
-  cors({
-    origin: [
-      "https://architex.co.za",
-      "https://architex-marketplace.vercel.app",
-      /\.vercel\.app$/,
-    ],
-    credentials: true,
-  })
-);
 
 // Mount the shared API router lazily so lightweight routes (for example
 // `/api/health`) still work even if downstream integrations fail at import time.

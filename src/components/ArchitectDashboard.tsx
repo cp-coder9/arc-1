@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, orderBy } from 'firebase/firestore';
@@ -781,7 +782,7 @@ function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('You must be logged in to apply');
 
-      const response = await fetch(`/api/jobs/${job.id}/applications`, {
+      const response = await apiFetch(`/api/jobs/${job.id}/applications`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, orderBy, getDoc, addDoc, updateDoc, getDocs } from 'firebase/firestore';
@@ -144,7 +145,7 @@ export default function FileManager({ user }: FileManagerProps) {
       if (!idToken) throw new Error("Not authenticated");
 
       // 2. Call secure server-side delete endpoint
-      const response = await fetch('/api/files/delete', {
+      const response = await apiFetch('/api/files/delete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../lib/apiClient';
 import { collection, doc, getDoc, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -140,7 +141,7 @@ export default function AdminAIReviewQueue() {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('Admin authentication token unavailable');
-      const response = await fetch(`/api/admin/ai-review/${selectedItem.id}/resolve`, {
+      const response = await apiFetch(`/api/admin/ai-review/${selectedItem.id}/resolve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

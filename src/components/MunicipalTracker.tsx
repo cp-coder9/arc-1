@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { MunicipalityType, CouncilSubmission, TrackingEvent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -81,7 +82,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const fetchHeatmap = async (muni: MunicipalityType) => {
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/municipal/heatmap/${muni}`, {
+      const res = await apiFetch(`/api/municipal/heatmap/${muni}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await readJsonOrNull(res);
@@ -95,7 +96,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
     setIsScraping(true);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/municipal/scrape', {
+      const res = await apiFetch('/api/municipal/scrape', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -126,7 +127,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
 
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/municipal/credentials', {
+      const res = await apiFetch('/api/municipal/credentials', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -176,7 +177,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
       });
 
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/municipal/ocr', {
+      const res = await apiFetch('/api/municipal/ocr', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -242,7 +243,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const submitCrowdsource = async (status: string, backlog: 'low' | 'medium' | 'high') => {
     try {
       const token = await auth.currentUser?.getIdToken();
-      await fetch('/api/municipal/crowdsource', {
+      await apiFetch('/api/municipal/crowdsource', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -3,6 +3,7 @@
  * Handles in-app, email (SendGrid), and push (FCM) notifications
  */
 
+import { apiFetch } from '../lib/apiClient';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 import {
@@ -263,7 +264,7 @@ class NotificationService {
       const user = auth.currentUser;
       if (!user) return;
       const idToken = await user.getIdToken();
-      await fetch('/api/notifications/token', {
+      await apiFetch('/api/notifications/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

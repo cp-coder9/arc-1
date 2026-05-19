@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { UserProfile, ArchitectProfile, JobCategory } from '../types';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -77,7 +78,7 @@ export default function ProfileEditor({ user, trigger, isAdminEditing = false }:
     setIsVerifying(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/architect/verify-sacap', {
+      const res = await apiFetch('/api/architect/verify-sacap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ const handleSave = async (e: React.FormEvent) => {
         try {
           // Call server-side API for SACAP verification
           const idToken = await auth.currentUser?.getIdToken();
-          const response = await fetch('/api/architect/verify-sacap', {
+          const response = await apiFetch('/api/architect/verify-sacap', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

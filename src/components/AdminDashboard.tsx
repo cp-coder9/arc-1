@@ -4,6 +4,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, Firm, UserVerification } from '../types';
+import { apiFetch } from '../lib/apiClient';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -265,7 +266,7 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
     setIsTesting(true);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/agent/test-settings', {
+      const res = await apiFetch('/api/agent/test-settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -879,7 +880,7 @@ export default function AdminDashboard({
         toast.error('A clear rejection reason is required');
         return;
       }
-      const response = await fetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/review`, {
+      const response = await apiFetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/review`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -905,7 +906,7 @@ export default function AdminDashboard({
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('Admin session expired');
-      const response = await fetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/recheck`, {
+      const response = await apiFetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/recheck`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
