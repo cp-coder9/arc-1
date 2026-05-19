@@ -82,12 +82,29 @@ const apiLimiter = rateLimit({
 const router = express.Router();
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const ORIGINLESS_FORM_WEBHOOK_PATHS = new Set(["/payment/notify"]);
+const BROWSER_FORM_CONTENT_TYPES = [
+  "application/x-www-form-urlencoded",
+  "multipart/form-data",
+  "text/plain",
+];
+
+function isBrowserFormSubmission(req: express.Request): boolean {
+  const contentType = req.get("content-type")?.toLowerCase() || "";
+  return BROWSER_FORM_CONTENT_TYPES.some((browserFormType) => contentType.startsWith(browserFormType));
+}
+
 
 function sameOriginGuard(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (SAFE_METHODS.has(req.method)) return next();
 
   const origin = req.get("origin");
-  if (!origin) return next();
+  if (!origin) {
+    if (isBrowserFormSubmission(req) && !ORIGINLESS_FORM_WEBHOOK_PATHS.has(req.path)) {
+      return res.status(403).json({ error: "Missing origin header on browser form request" });
+    }
+    return next();
+  }
 
   const host = req.get("x-forwarded-host") || req.get("host");
   const protocol = req.get("x-forwarded-proto") || req.protocol;

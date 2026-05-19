@@ -63,6 +63,10 @@ async function startServer() {
     }
   });
 
+  app.use("/api", (req, res) => {
+    res.status(404).json({ error: "API route not found", path: req.originalUrl });
+  });
+
   // --- Local Development Notification Worker ---
   // In Vercel, this is handled by api/notifications/worker.ts as a cron job.
   // We keep it here for real-time local testing.

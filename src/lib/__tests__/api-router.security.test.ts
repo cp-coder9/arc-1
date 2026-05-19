@@ -348,6 +348,35 @@ describe('api-router security and high-value integration routes', () => {
     }
   }, 20_000);
 
+  it('blocks originless browser form submissions except trusted webhooks', async () => {
+    vi.useRealTimers();
+    const app = await buildApp();
+
+    try {
+      const blocked = await request(app)
+        .post('/api/auth/check-admin')
+        .set('Host', 'architex.test')
+        .type('form')
+        .send({ role: 'admin' });
+
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.error).toContain('Missing origin');
+      expect(verifyIdToken).not.toHaveBeenCalled();
+
+      const webhook = await request(app)
+        .post('/api/payment/notify')
+        .set('Host', 'architex.test')
+        .type('form')
+        .send({});
+
+      expect(webhook.status).toBe(400);
+      expect(webhook.text).toContain('No payment ID provided');
+    } finally {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    }
+  }, 20_000);
+
   it('requires Firebase auth for protected API routes', async () => {
     const app = await buildApp();
 

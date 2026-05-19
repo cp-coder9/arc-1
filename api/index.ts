@@ -7,12 +7,20 @@ import firebaseAppletConfig from "../firebase-applet-config.json";
 
 const app = express();
 
+const BODY_LIMIT = '50mb';
+const API_NOT_FOUND_MESSAGE = 'API route not found';
+
 // Vercel and local proxy adapters set X-Forwarded-* headers. Trusting the
 // first proxy prevents express-rate-limit from throwing before routes run.
 app.set('trust proxy', 1);
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use((_req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
 function trimWrappingQuotes(value: string) {
   const trimmed = value.trim();
@@ -171,6 +179,10 @@ app.use('/api', async (req, res, next) => {
       details: error instanceof Error ? error.message : String(error),
     });
   }
+});
+
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: API_NOT_FOUND_MESSAGE, path: req.originalUrl });
 });
 
 export default app;

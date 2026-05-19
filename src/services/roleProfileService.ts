@@ -78,15 +78,34 @@ const CONTRACTOR_PROFILE_FIELDS = [
 ] as const;
 
 const PACKAGE_PARTICIPANT_PROFILE_FIELDS = [
-  'tradeCategories',
-  'productCategories',
   'packageTypes',
+] as const;
+
+const SUBCONTRACTOR_PROFILE_FIELDS = [
+  ...PACKAGE_PARTICIPANT_PROFILE_FIELDS,
+  'tradeCategories',
   'serviceAreas',
   'capacity',
   'insurance',
+  'healthSafetyFiles',
+  'assignedPackageScopes',
+  'shopDrawingCapabilities',
+  'sampleSubmissionCapabilities',
+  'rfiContactEmail',
+  'closeOutEvidenceTypes',
+] as const;
+
+const SUPPLIER_PROFILE_FIELDS = [
+  ...PACKAGE_PARTICIPANT_PROFILE_FIELDS,
+  'tradeCategories',
+  'productCategories',
   'deliveryRegions',
   'catalogueUrls',
+  'catalogueApiEndpoint',
+  'standardLeadTimeDays',
+  'deliveryNoteContact',
   'warrantySupport',
+  'warrantyTermsUrl',
   'productSupportContact',
 ] as const;
 
@@ -113,8 +132,8 @@ export const ROLE_FIELD_ALLOWLIST: Record<string, readonly string[]> = {
   architect: [...COMMON_PROFILE_FIELDS, ...PROFESSIONAL_PROFILE_FIELDS, 'sacapNumber', 'linkedIn', 'specializations'],
   contractor: [...COMMON_PROFILE_FIELDS, ...CONTRACTOR_PROFILE_FIELDS],
   freelancer: [...COMMON_PROFILE_FIELDS, ...FREELANCER_PROFILE_FIELDS],
-  subcontractor: [...COMMON_PROFILE_FIELDS, ...PACKAGE_PARTICIPANT_PROFILE_FIELDS],
-  supplier: [...COMMON_PROFILE_FIELDS, ...PACKAGE_PARTICIPANT_PROFILE_FIELDS],
+  subcontractor: [...COMMON_PROFILE_FIELDS, ...SUBCONTRACTOR_PROFILE_FIELDS],
+  supplier: [...COMMON_PROFILE_FIELDS, ...SUPPLIER_PROFILE_FIELDS],
   admin: [...COMMON_PROFILE_FIELDS, ...ADMIN_PROFILE_FIELDS],
 };
 
@@ -123,8 +142,8 @@ export const REQUIRED_ROLE_PROFILE_FIELDS: Record<string, readonly string[]> = {
   bep: ['displayName', 'disciplines', 'statutoryBody', 'registrationNumber', 'professionalIndemnity', 'practiceDetails', 'taxNumber', 'digitalSignatureStatus'],
   architect: ['displayName', 'disciplines', 'statutoryBody', 'registrationNumber', 'professionalIndemnity', 'practiceDetails', 'taxNumber', 'digitalSignatureStatus'],
   contractor: ['displayName', 'cidbNumber', 'nhbrcNumber', 'companyRegistrationNumber', 'healthSafetyFiles', 'bankingDetails'],
-  subcontractor: ['displayName', 'tradeCategories', 'packageTypes', 'bankingDetails', 'serviceAreas'],
-  supplier: ['displayName', 'productCategories', 'deliveryRegions', 'warrantySupport', 'bankingDetails'],
+  subcontractor: ['displayName', 'tradeCategories', 'packageTypes', 'bankingDetails', 'serviceAreas', 'assignedPackageScopes'],
+  supplier: ['displayName', 'productCategories', 'deliveryRegions', 'warrantySupport', 'bankingDetails', 'standardLeadTimeDays'],
   freelancer: ['displayName', 'skills', 'software', 'availability', 'payoutDetails'],
   admin: ['displayName', 'permissionLevel', 'department', 'twoFactorEnabled', 'auditIdentity'],
 };

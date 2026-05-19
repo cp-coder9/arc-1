@@ -92,6 +92,51 @@ describe('roleProfileService', () => {
     expect(supplier).not.toHaveProperty('trustScore');
   });
 
+
+  it('separates backend.html subcontractor execution fields from supplier product fulfilment fields', () => {
+    const subcontractor = sanitizeRoleProfileUpdate('subcontractor', {
+      assignedPackageScopes: ['Fire detection package'],
+      shopDrawingCapabilities: ['layout drawings', 'coordination markups'],
+      sampleSubmissionCapabilities: ['material boards'],
+      rfiContactEmail: 'rfi@subcontractor.example',
+      closeOutEvidenceTypes: ['commissioning certificate', 'as-built drawings'],
+      catalogueApiEndpoint: 'https://supplier.example/api/catalogue',
+      warrantyTermsUrl: 'https://supplier.example/warranty',
+      standardLeadTimeDays: 14,
+    });
+
+    expect(subcontractor).toMatchObject({
+      assignedPackageScopes: ['Fire detection package'],
+      shopDrawingCapabilities: ['layout drawings', 'coordination markups'],
+      sampleSubmissionCapabilities: ['material boards'],
+      rfiContactEmail: 'rfi@subcontractor.example',
+      closeOutEvidenceTypes: ['commissioning certificate', 'as-built drawings'],
+    });
+    expect(subcontractor).not.toHaveProperty('catalogueApiEndpoint');
+    expect(subcontractor).not.toHaveProperty('warrantyTermsUrl');
+    expect(subcontractor).not.toHaveProperty('standardLeadTimeDays');
+
+    const supplier = sanitizeRoleProfileUpdate('supplier', {
+      catalogueApiEndpoint: 'https://supplier.example/api/catalogue',
+      standardLeadTimeDays: 14,
+      deliveryNoteContact: 'dispatch@supplier.example',
+      warrantyTermsUrl: 'https://supplier.example/warranty',
+      assignedPackageScopes: ['Fire detection package'],
+      shopDrawingCapabilities: ['coordination markups'],
+      rfiContactEmail: 'rfi@subcontractor.example',
+    });
+
+    expect(supplier).toMatchObject({
+      catalogueApiEndpoint: 'https://supplier.example/api/catalogue',
+      standardLeadTimeDays: 14,
+      deliveryNoteContact: 'dispatch@supplier.example',
+      warrantyTermsUrl: 'https://supplier.example/warranty',
+    });
+    expect(supplier).not.toHaveProperty('assignedPackageScopes');
+    expect(supplier).not.toHaveProperty('shopDrawingCapabilities');
+    expect(supplier).not.toHaveProperty('rfiContactEmail');
+  });
+
   it('computes role-profile completion blockers for onboarding and command centre warnings', () => {
     const completion = getRoleProfileCompletion('bep', {
       displayName: 'BEP One',

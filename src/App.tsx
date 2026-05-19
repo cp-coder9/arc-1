@@ -548,6 +548,18 @@ export default function App() {
     }
   };
 
+  const completeEmailAuth = async (firebaseUser: FirebaseUser, successMessage: string) => {
+    await syncServerProfile(roleSelection, firebaseUser);
+    const profile = await ensureAdminAccess(firebaseUser) || await refetchServerProfile(firebaseUser);
+    if (isAdminRoute && !profile) return;
+    setUser(profile);
+    toast.success(successMessage);
+  };
+
+  const isFirebaseAuthCode = (error: unknown, code: string) => (
+    typeof error === 'object' && error !== null && 'code' in error && String((error as { code?: unknown }).code) === code
+  );
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoggingIn || profileLoading) return;
@@ -555,22 +567,25 @@ export default function App() {
     setProfileLoading(true);
 
     try {
-      let firebaseUser;
       if (authMode === 'email-signup') {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
-        firebaseUser = result.user;
-        if (displayName) await updateProfile(firebaseUser, { displayName });
-        await sendEmailVerification(firebaseUser);
-      } else {
-        const result = await signInWithEmailAndPassword(auth, email, password);
-        firebaseUser = result.user;
+        try {
+          const result = await createUserWithEmailAndPassword(auth, email, password);
+          const firebaseUser = result.user;
+          if (displayName) await updateProfile(firebaseUser, { displayName });
+          await sendEmailVerification(firebaseUser);
+          await completeEmailAuth(firebaseUser, "Account created. Verification email sent.");
+          return;
+        } catch (signupError) {
+          if (!isFirebaseAuthCode(signupError, 'auth/email-already-in-use')) throw signupError;
+
+          const result = await signInWithEmailAndPassword(auth, email, password);
+          await completeEmailAuth(result.user, "This email already has an account. Signed you in with the existing account.");
+          return;
+        }
       }
 
-      await syncServerProfile(roleSelection, firebaseUser);
-      const profile = await ensureAdminAccess(firebaseUser) || await refetchServerProfile(firebaseUser);
-      if (isAdminRoute && !profile) return;
-      setUser(profile);
-      toast.success(authMode === 'email-signup' ? "Account created. Verification email sent." : "Welcome back!");
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      await completeEmailAuth(result.user, "Welcome back!");
     } catch (error: any) {
       console.error("Auth error:", error);
       toast.error(getAuthErrorMessage(error));
