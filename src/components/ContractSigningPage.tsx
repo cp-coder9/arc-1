@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, query, where } from 'firebase/firestore';
-import { FileSignature, Landmark, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileSignature, Landmark, Loader2, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { EscrowV2, UserProfile } from '@/types';
 import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -71,6 +72,32 @@ function roleGuidance(user: UserProfile) {
   return 'Package-level contracts and orders are managed in Procurement and Package workspaces until a formal appointment contract is generated for your role.';
 }
 
+const SIGNING_REVIEW_STEPS = [
+  'Scope, assumptions, exclusions, and deliverables are checked against the accepted brief.',
+  'Professional registration, insurance, tax, banking, and digital signature readiness are confirmed.',
+  'Milestones, release conditions, platform fee, and escrow amount are reviewed by both sides.',
+  'Any change, acceptance, signature, payment initiation, or escrow release must happen through a separately authorized workflow.',
+];
+
+function contractReadiness(contract: AppointmentContract, escrow: EscrowV2 | null) {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+
+  if (!contract.scope?.length) blockers.push('Contract scope is not recorded.');
+  if (!contract.deliverables?.length) blockers.push('Deliverables are not recorded.');
+  if (!contract.milestones?.length) blockers.push('Milestones and release conditions are not recorded.');
+  if (!contract.verificationId) warnings.push('Verification reference is not linked to the contract.');
+  if (!contract.totalEscrowAmount || contract.totalEscrowAmount <= 0) warnings.push('Escrow total is not recorded on the contract.');
+  if (!escrow) warnings.push('No live escrow record is visible for this contract.');
+  if (escrow && escrow.status === 'pending') warnings.push('Escrow exists but is still pending funding.');
+
+  return {
+    blockers,
+    warnings,
+    readyForHumanReview: blockers.length === 0,
+  };
+}
+
 export default function ContractSigningPage({ user }: { user: UserProfile }) {
   const [state, setState] = useState<LoadState>('loading');
   const [contracts, setContracts] = useState<AppointmentContract[]>([]);
@@ -116,6 +143,7 @@ export default function ContractSigningPage({ user }: { user: UserProfile }) {
   }, [selectedContract?.projectId]);
 
   const milestones = selectedContract?.milestones ?? [];
+  const readiness = selectedContract ? contractReadiness(selectedContract, escrow) : null;
 
   return (
     <div className="space-y-6" data-testid="contract-signing-page">
@@ -168,6 +196,31 @@ export default function ContractSigningPage({ user }: { user: UserProfile }) {
           </Card>
 
           <div className="space-y-6">
+            {readiness && (
+              <Card className="rounded-2xl border-amber-200 bg-amber-50/80 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="font-heading text-xl flex items-center gap-2 text-amber-950"><AlertTriangle className="h-5 w-5" /> Human signing guard</CardTitle>
+                  <CardDescription className="text-amber-900">This panel prepares a review decision only. It never submits a signature, accepts a contract, initiates payment, or releases escrow.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-amber-950">
+                  <div className="grid gap-2">
+                    {SIGNING_REVIEW_STEPS.map((step) => <div key={step} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><span>{step}</span></div>)}
+                  </div>
+                  {(readiness.blockers.length > 0 || readiness.warnings.length > 0) && (
+                    <div className="rounded-xl border border-amber-300 bg-white/70 p-3">
+                      {readiness.blockers.length > 0 && <p className="font-bold">Blockers: {readiness.blockers.join(' ')}</p>}
+                      {readiness.warnings.length > 0 && <p className="mt-1 text-amber-900">Warnings: {readiness.warnings.join(' ')}</p>}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Request signature disabled</Button>
+                    <Button type="button" disabled className="rounded-xl bg-amber-900 text-white disabled:opacity-80">Accept / bind disabled</Button>
+                  </div>
+                  <p className="text-xs text-amber-900">Ready for human review: {readiness.readyForHumanReview ? 'yes, subject to external signature/payment controls' : 'no, resolve blockers first'}.</p>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
               <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" /> Financial readiness</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">

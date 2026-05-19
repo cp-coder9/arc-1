@@ -73,6 +73,13 @@ function allowedEvidenceTypesForRole(role: UserProfile['role']) {
   return ROLE_EVIDENCE_TYPES[role] ?? PACKAGE_EVIDENCE_TYPES.map((option) => option.value);
 }
 
+function sourceLabelForBoMItem(sourceType: string) {
+  if (sourceType === 'tender_scope') return 'tender package scope item';
+  if (sourceType === 'drawing_or_specification') return 'linked drawing/specification document';
+  if (sourceType === 'bid_line_item') return 'awarded bid line item';
+  return 'manual procurement item';
+}
+
 function tenderQueriesForUser(user: UserProfile) {
   const tenders = collection(db, 'tender_packages');
 
@@ -416,7 +423,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold">{item.description}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Source: {item.sourceType.replaceAll('_', ' ')} · {item.sourceReference}{item.quantity ? ` · Qty ${item.quantity}` : ''}{item.requiredBy ? ` · Required by ${item.requiredBy}` : ''}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Source: {sourceLabelForBoMItem(item.sourceType)} · {item.sourceReference}{item.quantity ? ` · Qty ${item.quantity}` : ''}{item.requiredBy ? ` · Required by ${item.requiredBy}` : ''}</p>
                     </div>
                     {item.total != null ? <Badge variant="secondary">{currency.format(item.total)}</Badge> : <Badge variant="outline">needs pricing</Badge>}
                   </div>

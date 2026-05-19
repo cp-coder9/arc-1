@@ -1,14 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { EscrowV2, LedgerEntry, Project, UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
+
+const PAYMENT_GUARD_STEPS = [
+  'Invoice, claim, contract, and milestone evidence must match before any payment is requested.',
+  'Client/BEP/contractor/admin approvals must be recorded outside this read-only dashboard before provider action.',
+  'PayFast/payment provider calls, escrow releases, refunds, and supplier orders remain disabled until explicit backend flags and human confirmations are active.',
+  'This dashboard can surface pending releases and ledger state, but it cannot create money movement by itself.',
+];
 
 function timestampMs(value: unknown): number {
   if (!value) return 0;
@@ -120,6 +128,10 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
     refunds: ledger.filter((entry) => entry.type === 'refund').reduce((sum, entry) => sum + entry.amount, 0),
   }), [ledger, escrows]);
 
+  const releaseRequestedMilestones = useMemo(() => escrows.flatMap((escrow) => (escrow.milestones || [])
+    .filter((milestone) => milestone.status === 'release_requested')
+    .map((milestone) => ({ escrow, milestone }))), [escrows]);
+
   const monthlyRevenue = useMemo(() => {
     const buckets = new Map<string, number>();
     ledger.filter((entry) => entry.type === 'platform_fee').forEach((entry) => {
@@ -146,6 +158,27 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
         <SummaryCard icon={<CreditCard />} label="Pending Releases" value={summary.pendingReleases.toString()} />
         <SummaryCard icon={<RotateCcw />} label="Refunds" value={currency.format(summary.refunds)} />
       </div>
+
+      <Card className="rounded-[2rem] border-amber-200 bg-amber-50/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold uppercase tracking-widest text-amber-950 flex items-center gap-2"><AlertTriangle size={16} /> Payment and escrow execution guard</CardTitle>
+          <CardDescription className="text-amber-900">Human-confirmed governance boundary for provider calls, invoice payments, milestone releases, refunds, and escrow actions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-amber-950">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {PAYMENT_GUARD_STEPS.map((step) => <div key={step} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><span>{step}</span></div>)}
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Initiate payment disabled</Button>
+            <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Release escrow disabled</Button>
+            <Button type="button" disabled className="rounded-xl bg-amber-900 text-white disabled:opacity-80">Provider submission disabled</Button>
+          </div>
+          <div className="rounded-2xl border border-amber-300 bg-white/70 p-4">
+            <p className="font-bold">Pending release requests visible: {releaseRequestedMilestones.length}</p>
+            <p className="mt-1 text-xs text-amber-900">Use this count to triage human review. No release instruction is generated from this browser view.</p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-[2rem] border-border bg-white shadow-sm">
         <CardHeader>

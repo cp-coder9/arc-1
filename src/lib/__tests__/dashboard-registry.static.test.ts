@@ -12,6 +12,7 @@ const designTeamMatrixSource = readFileSync(resolve(process.cwd(), 'src/componen
 const tasksApprovalsSource = readFileSync(resolve(process.cwd(), 'src/components/TasksApprovalsPage.tsx'), 'utf8');
 const projectMessengerSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectMessengerPage.tsx'), 'utf8');
 const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/components/ContractSigningPage.tsx'), 'utf8');
+const financialDashboardSource = readFileSync(resolve(process.cwd(), 'src/components/FinancialDashboard.tsx'), 'utf8');
 const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
 const projectToolboxSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectToolboxPage.tsx'), 'utf8');
@@ -188,9 +189,11 @@ describe('canonical dashboard page registry', () => {
       expect(source).not.toContain('Workflow unavailable');
       expect(source).not.toContain("orderBy('createdAt'");
       expect(source).not.toContain("where('status', 'in'");
-      expect(source).toContain("where('status', '==', 'open')");
       expect(source).toContain('sortByRecent');
     }
+
+    expect(workflowSource).toContain("where('status', '==', 'open')");
+    expect(commandCentreSource).toContain("where('status', '==', 'published')");
 
     expect(workflowSource).toContain('return null;');
     expect(commandCentreSource).toContain('return null;');
@@ -243,7 +246,16 @@ describe('canonical dashboard page registry', () => {
     expect(contractSigningSource).toContain("collection(db, 'appointment_contracts')");
     expect(contractSigningSource).toContain("doc(db, 'escrow'");
     expect(contractSigningSource).toContain('This page does not execute signatures or payments');
+    expect(contractSigningSource).toContain('Human signing guard');
+    expect(contractSigningSource).toContain('Request signature disabled');
+    expect(contractSigningSource).toContain('Accept / bind disabled');
     expect(contractSigningSource).not.toContain('addDoc(');
+
+    expect(financialDashboardSource).toContain('Payment and escrow execution guard');
+    expect(financialDashboardSource).toContain('Initiate payment disabled');
+    expect(financialDashboardSource).toContain('Release escrow disabled');
+    expect(financialDashboardSource).toContain('Provider submission disabled');
+    expect(financialDashboardSource).not.toContain('addDoc(');
 
     expect(disputeResolutionSource).toContain("collection(db, 'disputes')");
     expect(disputeResolutionSource).toContain('filedBy');
@@ -381,8 +393,8 @@ describe('canonical dashboard page registry', () => {
     expect(packageWorkspaceSource).toContain('Drawing-to-BoM Extractor');
     expect(packageWorkspaceSource).toContain('Supplier API Catalogue');
     expect(packageWorkspaceSource).toContain("query(collection(db, 'directoryProfiles'), where('role', '==', 'supplier')");
-    expect(packageWorkspaceSource).toContain("source: 'tender package scope item'");
-    expect(packageWorkspaceSource).toContain("source: 'linked drawing/specification document'");
+    expect(packageWorkspaceSource).toContain("source: 'package-procurement-workspace'");
+    expect(packageWorkspaceSource).toContain('roleEvidenceOptions');
     expect(packageWorkspaceSource).toContain('payment_claim');
     expect(packageWorkspaceSource).toContain('warranty');
     expect(packageWorkspaceSource).toContain('payment_claim_evidence');
