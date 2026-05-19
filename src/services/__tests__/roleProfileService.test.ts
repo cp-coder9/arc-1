@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDirectoryProfile, sanitizeRoleProfileUpdate } from '../roleProfileService';
+import { buildDirectoryProfile, getRoleProfileCompletion, sanitizeRoleProfileUpdate } from '../roleProfileService';
 
 describe('roleProfileService', () => {
   it('allows only role-specific fields and blocks privilege escalation', () => {
@@ -32,4 +32,78 @@ describe('roleProfileService', () => {
     });
     expect(directoryProfile).not.toHaveProperty('email');
   });
+
+  it('keeps backend.html role-specific payment, verification, and signing fields in the allowlist', () => {
+    const client = sanitizeRoleProfileUpdate('client', {
+      idNumber: '8001015009087',
+      companyRegistrationNumber: '2024/123456/07',
+      billingAddress: '1 Main Road',
+      digitalSignatureStatus: 'pending',
+      ownerAddress: 'Erf 10',
+      bankingDetails: { accountLast4: '1234' },
+      role: 'admin',
+    });
+    expect(client).toMatchObject({
+      idNumber: '8001015009087',
+      companyRegistrationNumber: '2024/123456/07',
+      billingAddress: '1 Main Road',
+      digitalSignatureStatus: 'pending',
+      ownerAddress: 'Erf 10',
+      bankingDetails: { accountLast4: '1234' },
+    });
+    expect(client).not.toHaveProperty('role');
+
+    const contractor = sanitizeRoleProfileUpdate('contractor', {
+      cidbNumber: 'CIDB-1',
+      nhbrcNumber: 'NHBRC-1',
+      healthSafetyFiles: ['h-and-s.pdf'],
+      bankingDetails: { accountLast4: '5678' },
+      plantCapacity: ['TLB'],
+      labourCapacity: 18,
+      verificationStatus: 'verified',
+    });
+    expect(contractor).toMatchObject({
+      cidbNumber: 'CIDB-1',
+      nhbrcNumber: 'NHBRC-1',
+      healthSafetyFiles: ['h-and-s.pdf'],
+      bankingDetails: { accountLast4: '5678' },
+      plantCapacity: ['TLB'],
+      labourCapacity: 18,
+    });
+    expect(contractor).not.toHaveProperty('verificationStatus');
+
+    const supplier = sanitizeRoleProfileUpdate('supplier', {
+      tradeCategories: ['windows'],
+      warrantySupport: true,
+      productSupportContact: 'support@example.com',
+      packageTypes: ['fenestration'],
+      deliveryRegions: ['Western Cape'],
+      bankingDetails: { accountLast4: '2468' },
+      trustScore: 100,
+    });
+    expect(supplier).toMatchObject({
+      tradeCategories: ['windows'],
+      warrantySupport: true,
+      productSupportContact: 'support@example.com',
+      packageTypes: ['fenestration'],
+      deliveryRegions: ['Western Cape'],
+      bankingDetails: { accountLast4: '2468' },
+    });
+    expect(supplier).not.toHaveProperty('trustScore');
+  });
+
+  it('computes role-profile completion blockers for onboarding and command centre warnings', () => {
+    const completion = getRoleProfileCompletion('bep', {
+      displayName: 'BEP One',
+      disciplines: ['architecture'],
+      statutoryBody: 'SACAP',
+      registrationNumber: 'PR-1',
+      digitalSignatureStatus: 'active',
+    });
+
+    expect(completion.isComplete).toBe(false);
+    expect(completion.missingFields).toEqual(expect.arrayContaining(['professionalIndemnity', 'practiceDetails', 'taxNumber']));
+    expect(completion.blockers).toContain('Profile incomplete: professionalIndemnity, practiceDetails, taxNumber');
+  });
+
 });

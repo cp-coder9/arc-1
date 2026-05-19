@@ -25,16 +25,108 @@ const COMMON_PROFILE_FIELDS = [
   'bio',
   'website',
   'avatarUrl',
+  'address',
+  'taxNumber',
+  'vatNumber',
+  'bankingDetails',
+  'bankVerificationStatus',
+  'digitalSignatureStatus',
+  'signatureProviderId',
 ] as const;
 
-const ROLE_FIELD_ALLOWLIST: Record<string, readonly string[]> = {
-  client: [...COMMON_PROFILE_FIELDS, 'projectTypes', 'budgetRange', 'preferredContactMethod'],
-  bep: [...COMMON_PROFILE_FIELDS, 'disciplines', 'registrationNumber', 'council', 'yearsExperience', 'portfolioUrls', 'services', 'professionalIndemnity'],
-  contractor: [...COMMON_PROFILE_FIELDS, 'tradeCategories', 'cidbGrade', 'serviceAreas', 'insurance', 'capacity'],
-  freelancer: [...COMMON_PROFILE_FIELDS, 'disciplines', 'skills', 'hourlyRate', 'portfolioUrls', 'availability'],
-  subcontractor: [...COMMON_PROFILE_FIELDS, 'tradeCategories', 'serviceAreas', 'capacity', 'insurance'],
-  supplier: [...COMMON_PROFILE_FIELDS, 'productCategories', 'serviceAreas', 'deliveryRegions', 'catalogueUrls'],
-  admin: COMMON_PROFILE_FIELDS,
+const CLIENT_PROFILE_FIELDS = [
+  'idNumber',
+  'companyRegistrationNumber',
+  'billingAddress',
+  'billingContactName',
+  'billingEmail',
+  'ownerName',
+  'ownerAddress',
+  'projectOwnerDetails',
+  'projectTypes',
+  'budgetRange',
+  'preferredContactMethod',
+] as const;
+
+const PROFESSIONAL_PROFILE_FIELDS = [
+  'disciplines',
+  'statutoryBody',
+  'registrationNumber',
+  'council',
+  'yearsExperience',
+  'portfolioUrls',
+  'services',
+  'professionalIndemnity',
+  'practiceDetails',
+  'practiceRegistrationNumber',
+  'piInsurancePolicyNumber',
+  'piInsuranceExpiryDate',
+] as const;
+
+const CONTRACTOR_PROFILE_FIELDS = [
+  'tradeCategories',
+  'cidbGrade',
+  'cidbNumber',
+  'nhbrcNumber',
+  'companyRegistrationNumber',
+  'healthSafetyFiles',
+  'serviceAreas',
+  'insurance',
+  'capacity',
+  'plantCapacity',
+  'labourCapacity',
+] as const;
+
+const PACKAGE_PARTICIPANT_PROFILE_FIELDS = [
+  'tradeCategories',
+  'productCategories',
+  'packageTypes',
+  'serviceAreas',
+  'capacity',
+  'insurance',
+  'deliveryRegions',
+  'catalogueUrls',
+  'warrantySupport',
+  'productSupportContact',
+] as const;
+
+const FREELANCER_PROFILE_FIELDS = [
+  'disciplines',
+  'skills',
+  'software',
+  'hourlyRate',
+  'portfolioUrls',
+  'availability',
+  'payoutDetails',
+] as const;
+
+const ADMIN_PROFILE_FIELDS = [
+  'permissionLevel',
+  'department',
+  'twoFactorEnabled',
+  'auditIdentity',
+] as const;
+
+export const ROLE_FIELD_ALLOWLIST: Record<string, readonly string[]> = {
+  client: [...COMMON_PROFILE_FIELDS, ...CLIENT_PROFILE_FIELDS],
+  bep: [...COMMON_PROFILE_FIELDS, ...PROFESSIONAL_PROFILE_FIELDS],
+  architect: [...COMMON_PROFILE_FIELDS, ...PROFESSIONAL_PROFILE_FIELDS, 'sacapNumber', 'linkedIn', 'specializations'],
+  contractor: [...COMMON_PROFILE_FIELDS, ...CONTRACTOR_PROFILE_FIELDS],
+  freelancer: [...COMMON_PROFILE_FIELDS, ...FREELANCER_PROFILE_FIELDS],
+  subcontractor: [...COMMON_PROFILE_FIELDS, ...PACKAGE_PARTICIPANT_PROFILE_FIELDS],
+  supplier: [...COMMON_PROFILE_FIELDS, ...PACKAGE_PARTICIPANT_PROFILE_FIELDS],
+  admin: [...COMMON_PROFILE_FIELDS, ...ADMIN_PROFILE_FIELDS],
+};
+
+export const REQUIRED_ROLE_PROFILE_FIELDS: Record<string, readonly string[]> = {
+  client: ['displayName', 'billingAddress', 'ownerAddress', 'digitalSignatureStatus'],
+  bep: ['displayName', 'disciplines', 'statutoryBody', 'registrationNumber', 'professionalIndemnity', 'practiceDetails', 'taxNumber', 'digitalSignatureStatus'],
+  architect: ['displayName', 'disciplines', 'statutoryBody', 'registrationNumber', 'professionalIndemnity', 'practiceDetails', 'taxNumber', 'digitalSignatureStatus'],
+  contractor: ['displayName', 'cidbNumber', 'nhbrcNumber', 'companyRegistrationNumber', 'healthSafetyFiles', 'bankingDetails'],
+  subcontractor: ['displayName', 'tradeCategories', 'packageTypes', 'bankingDetails', 'serviceAreas'],
+  supplier: ['displayName', 'productCategories', 'deliveryRegions', 'warrantySupport', 'bankingDetails'],
+  freelancer: ['displayName', 'skills', 'software', 'availability', 'payoutDetails'],
+  admin: ['displayName', 'permissionLevel', 'department', 'twoFactorEnabled', 'auditIdentity'],
 };
 
 const BLOCKED_PROFILE_FIELDS = new Set([
@@ -91,5 +183,50 @@ export function buildDirectoryProfile(user: DirectoryUserLike, roleProfile: Role
     verificationStatus,
     verificationCheckedAt: verification?.checkedAt || null,
     visibility: 'directory',
+  };
+}
+
+
+function hasProfileValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (value && typeof value === 'object') return Object.keys(value).length > 0;
+  return value !== null && value !== undefined;
+}
+
+export interface RoleProfileCompletion {
+  role: UserRole;
+  requiredFields: string[];
+  missingFields: string[];
+  completedFields: string[];
+  completionRatio: number;
+  isComplete: boolean;
+  blockers: string[];
+}
+
+export function getRoleProfileCompletion(role: UserRole | string | undefined, profile: RoleProfileInput): RoleProfileCompletion {
+  const normalizedRole = normalizeUserRole(role);
+  if (!normalizedRole) throw new Error('Unsupported role for profile completion');
+
+  const requiredFields = [...(REQUIRED_ROLE_PROFILE_FIELDS[normalizedRole] || [])];
+  const completedFields = requiredFields.filter((field) => hasProfileValue(profile?.[field]));
+  const missingFields = requiredFields.filter((field) => !hasProfileValue(profile?.[field]));
+  const completionRatio = requiredFields.length === 0 ? 1 : completedFields.length / requiredFields.length;
+  const blockers = missingFields.length > 0 ? [`Profile incomplete: ${missingFields.join(', ')}`] : [];
+
+  if (['client', 'bep', 'architect'].includes(normalizedRole) && profile?.digitalSignatureStatus !== 'active') {
+    blockers.push('Digital signature setup is not active');
+  }
+
+  return {
+    role: normalizedRole,
+    requiredFields,
+    missingFields,
+    completedFields,
+    completionRatio,
+    isComplete: missingFields.length === 0 && blockers.length === 0,
+    blockers,
   };
 }

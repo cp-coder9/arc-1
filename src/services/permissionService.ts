@@ -105,6 +105,25 @@ const PROJECT_ACCESS_PERMISSIONS: Record<ProjectAccessRole, PermissionAction[]> 
   admin: ROLE_PERMISSIONS.admin,
 };
 
+const PROJECT_ACCESS_ROLE_COMPATIBILITY: Record<ProjectAccessRole, NormalizedUserRole[]> = {
+  project_owner: ['client'],
+  lead_bep: ['bep'],
+  design_team_member: ['bep'],
+  contractor: ['contractor'],
+  subcontractor_package_assignee: ['subcontractor'],
+  supplier_package_assignee: ['supplier'],
+  freelancer_task_assignee: ['freelancer'],
+  admin: ['admin'],
+};
+
+export function isProjectAccessRoleCompatibleWithUserRole(
+  accessRole: ProjectAccessRole,
+  userRole?: UserRole | string,
+): boolean {
+  const normalizedRole = normalizeUserRole(userRole);
+  return Boolean(normalizedRole && PROJECT_ACCESS_ROLE_COMPATIBILITY[accessRole]?.includes(normalizedRole));
+}
+
 export function isCanonicalUserRole(role: unknown): role is UserRole {
   return typeof role === 'string' && (CANONICAL_USER_ROLES as readonly string[]).includes(role);
 }
@@ -137,7 +156,13 @@ export function getActiveProjectAccessRoles(user: AuthzUser, project?: ProjectAc
   if (project.leadBepId === user.uid || project.leadArchitectId === user.uid) roles.add('lead_bep');
 
   for (const membership of project.memberships || []) {
-    if (membership.userId === user.uid && membership.status === 'active') roles.add(membership.accessRole);
+    if (
+      membership.userId === user.uid &&
+      membership.status === 'active' &&
+      isProjectAccessRoleCompatibleWithUserRole(membership.accessRole, user.role)
+    ) {
+      roles.add(membership.accessRole);
+    }
   }
 
   return [...roles];

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileText, Landmark, ListChecks, Loader2, WalletCards } from 'lucide-react';
 import { db } from '../lib/firebase';
+import { getRoleProfileCompletion } from '../services/roleProfileService';
 import type { Job, Project, UserProfile } from '../types';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -80,7 +81,10 @@ function projectQueryForUser(user: UserProfile) {
   return null;
 }
 
-function resolveNextAction(user: UserProfile, activeJob?: CommandJob) {
+function resolveNextAction(user: UserProfile, activeJob: CommandJob | undefined, profileCompletion: ReturnType<typeof getRoleProfileCompletion>) {
+  if (!profileCompletion.isComplete) {
+    return { label: 'Complete profile readiness', target: 'profile', detail: `${profileCompletion.blockers[0] || 'Profile completion is required'} before routed approvals, payments, signatures, or project matching can proceed.` };
+  }
   if (!activeJob) {
     if (user.role === 'client') return { label: 'Create a guided project brief', target: 'client-intake', detail: 'Start with the client intake workflow so BEPs can price and scope real requirements.' };
     if (user.role === 'contractor') return { label: 'Review tender marketplace', target: 'packages', detail: 'No active delivery project is linked yet. Review available package/tender work.' };
@@ -147,7 +151,8 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   const joinedJobs = useMemo(() => jobs.map((job) => ({ ...job, project: projects.find((project) => project.jobId === job.id) })), [jobs, projects]);
   const activeJob = joinedJobs.find((job) => job.status === 'in-progress') ?? joinedJobs[0];
   const activeProject = activeJob?.project ?? projects[0];
-  const nextAction = resolveNextAction(user, activeJob);
+  const profileCompletion = useMemo(() => getRoleProfileCompletion(user.role, user as unknown as Record<string, unknown>), [user]);
+  const nextAction = resolveNextAction(user, activeJob, profileCompletion);
   const roleVisual = ROLE_COMMAND_VISUALS[user.role];
   const openApprovals = activeJob?.requirements?.filter(Boolean).length ?? 0;
   const atRisk = activeJob?.deadline && new Date(activeJob.deadline).getTime() < Date.now() && activeJob.status !== 'completed';
@@ -193,8 +198,9 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
         <MetricCard icon={<CheckCircle2 />} label="Open approvals / requirements" value={openApprovals} detail="Requirements and decision points visible from the active job." accent={roleVisual.accent} />
+        <MetricCard icon={<ShieldProfileIcon />} label="Profile readiness" value={`${Math.round(profileCompletion.completionRatio * 100)}%`} detail={profileCompletion.isComplete ? 'Role profile, payment, verification, and signature fields are complete.' : profileCompletion.blockers[0]} tone={profileCompletion.isComplete ? 'default' : 'danger'} target="profile" onNavigate={onNavigate} accent={roleVisual.accent} />
         <MetricCard icon={<AlertTriangle />} label="At risk / overdue" value={atRisk ? 1 : 0} detail={activeJob?.deadline ? `Deadline: ${activeJob.deadline}` : 'No deadline recorded.'} tone={atRisk ? 'danger' : 'default'} accent={roleVisual.accent} />
         <MetricCard icon={<FileText />} label="Documents" value="Files" detail="Open the file manager/toolbox for project documents and evidence." target="toolbox" onNavigate={onNavigate} accent={roleVisual.accent} />
         <MetricCard icon={<WalletCards />} label="Budget & payments" value={activeJob ? currency.format(activeJob.budget || 0) : 'No budget'} detail="Payments remain routed through invoice, escrow, and governance workflows." target="payments" onNavigate={onNavigate} accent={roleVisual.accent} />
@@ -240,6 +246,10 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
       </Card>
     </div>
   );
+}
+
+function ShieldProfileIcon() {
+  return <CheckCircle2 />;
 }
 
 function MetricCard({ icon, label, value, detail, tone = 'default', target, onNavigate, accent }: { icon: React.ReactNode; label: string; value: React.ReactNode; detail: string; tone?: 'default' | 'danger'; target?: string; onNavigate?: (pageId: string) => void; accent: string }) {

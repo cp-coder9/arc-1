@@ -970,7 +970,7 @@ export default function App() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
-              {activeTab === 'toolbox' && <ProjectToolboxPage user={user} />}
+              {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'freelancer-work' && <FreelancerDashboard user={user} />}
               {activeTab === 'freelancer-submissions' && <FreelancerSubmissionsPage user={user} />}
               {activeTab === 'resource-sharing' && <ResourceSharingPage user={user} />}

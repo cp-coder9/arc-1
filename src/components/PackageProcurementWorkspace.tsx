@@ -44,16 +44,42 @@ type ExtractedBoMItem = {
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 const COMMITMENT_TYPES: CommitmentType[] = ['supplier_quote', 'purchase_order', 'delivery_note', 'subcontract_order', 'payment_claim'];
+const ROLE_COMMITMENT_TYPES: Partial<Record<UserProfile['role'], CommitmentType[]>> = {
+  supplier: ['supplier_quote', 'delivery_note', 'payment_claim'],
+  subcontractor: ['subcontract_order', 'payment_claim'],
+};
+const ROLE_DEFAULT_COMMITMENT_TYPE: Partial<Record<UserProfile['role'], CommitmentType>> = {
+  supplier: 'supplier_quote',
+  subcontractor: 'subcontract_order',
+};
 const PACKAGE_EVIDENCE_TYPES: Array<{ value: DeliveryEvidenceType; label: string; requiredForCloseout?: boolean }> = [
   { value: 'delivery_note', label: 'Delivery note', requiredForCloseout: true },
+  { value: 'supplier_quote', label: 'Product data / lead times' },
   { value: 'shop_drawing', label: 'Shop drawing approval', requiredForCloseout: true },
   { value: 'sample_approval', label: 'Sample / material approval', requiredForCloseout: true },
+  { value: 'rfi', label: 'RFIs / site instructions' },
   { value: 'warranty', label: 'Warranty certificate', requiredForCloseout: true },
   { value: 'manual', label: 'Manual / O&M document', requiredForCloseout: true },
   { value: 'certificate', label: 'Compliance certificate', requiredForCloseout: true },
   { value: 'payment_claim_evidence', label: 'Payment claim evidence' },
   { value: 'closeout_document', label: 'Close-out document', requiredForCloseout: true },
 ];
+const ROLE_EVIDENCE_TYPES: Partial<Record<UserProfile['role'], DeliveryEvidenceType[]>> = {
+  supplier: ['delivery_note', 'supplier_quote', 'warranty', 'manual', 'certificate', 'payment_claim_evidence'],
+  subcontractor: ['shop_drawing', 'sample_approval', 'rfi', 'payment_claim_evidence', 'closeout_document'],
+};
+
+function allowedCommitmentTypesForRole(role: UserProfile['role']) {
+  return ROLE_COMMITMENT_TYPES[role] ?? COMMITMENT_TYPES;
+}
+
+function defaultCommitmentTypeForRole(role: UserProfile['role']) {
+  return ROLE_DEFAULT_COMMITMENT_TYPE[role] ?? allowedCommitmentTypesForRole(role)[0] ?? 'supplier_quote';
+}
+
+function allowedEvidenceTypesForRole(role: UserProfile['role']) {
+  return ROLE_EVIDENCE_TYPES[role] ?? PACKAGE_EVIDENCE_TYPES.map((option) => option.value);
+}
 
 function tenderQueriesForUser(user: UserProfile) {
   const tenders = collection(db, 'tender_packages');
@@ -136,6 +162,14 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const [evidenceReference, setEvidenceReference] = useState('');
   const [evidenceNote, setEvidenceNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const roleCommitmentTypes = useMemo(() => allowedCommitmentTypesForRole(user.role), [user.role]);
+  const roleEvidenceTypes = useMemo(() => allowedEvidenceTypesForRole(user.role), [user.role]);
+  const roleEvidenceOptions = useMemo(() => PACKAGE_EVIDENCE_TYPES.filter((option) => roleEvidenceTypes.includes(option.value)), [roleEvidenceTypes]);
+
+  useEffect(() => {
+    setDraftType(defaultCommitmentTypeForRole(user.role));
+    setEvidenceType(allowedEvidenceTypesForRole(user.role)[0] ?? 'delivery_note');
+  }, [user.role]);
 
   useEffect(() => {
     setState('loading');
@@ -198,8 +232,8 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedTender?.projectId) ?? projects[0], [projects, selectedTender]);
   const activeBid = useMemo(() => myBids.find((bid) => bid.tenderPackageId === selectedTender?.id || bid.tenderPackageId === selectedTenderId), [myBids, selectedTender?.id, selectedTenderId]);
   const tendersAvailableForBid = useMemo(() => tenders.filter((tender) => tender.status === 'published' && !myBids.some((bid) => bid.tenderPackageId === tender.id)), [myBids, tenders]);
-  const selectedCommitments = useMemo(() => selectedTender ? sortByRecent(commitments.filter((item) => item.packageId === selectedTender.id)) : [], [commitments, selectedTender]);
-  const selectedEvidence = useMemo(() => selectedTender ? sortByRecent(evidence.filter((item) => item.packageId === selectedTender.id)) : [], [evidence, selectedTender]);
+  const selectedCommitments = useMemo(() => selectedTender ? sortByRecent(commitments.filter((item) => item.packageId === selectedTender.id && roleCommitmentTypes.includes(item.type))) : [], [commitments, roleCommitmentTypes, selectedTender]);
+  const selectedEvidence = useMemo(() => selectedTender ? sortByRecent(evidence.filter((item) => item.packageId === selectedTender.id && roleEvidenceTypes.includes(item.type))) : [], [evidence, roleEvidenceTypes, selectedTender]);
   const selectedReadiness = useMemo(() => {
     if (!selectedTender) return null;
     return assessContractorWorkflow({
@@ -260,6 +294,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const submitCommitment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedTender || !draftTitle.trim()) return;
+    if (!roleCommitmentTypes.includes(draftType)) return;
     setSaving(true);
     try {
       const requiresApproval = draftType === 'purchase_order' || draftType === 'subcontract_order' || draftType === 'payment_claim';
@@ -292,6 +327,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   const submitPackageEvidence = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedTender || !evidenceTitle.trim()) return;
+    if (!roleEvidenceTypes.includes(evidenceType)) return;
     setSaving(true);
     try {
       const now = new Date().toISOString();
@@ -362,7 +398,16 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
         <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
           <CardHeader>
             <CardTitle className="font-heading text-xl">Supplier quote path</CardTitle>
-            <CardDescription>Suppliers record quotes, delivery notes, warranties, and payment claims as procurement records against the selected package. Contractor/subcontractor bid submission remains CIDB/NHBRC-verification gated.</CardDescription>
+            <CardDescription>Suppliers record the supplier quote path, supplier API catalogue matches, product data / lead times, delivery notes, warranties, and payment evidence against the selected package. Contractor/subcontractor bid submission remains CIDB/NHBRC-verification gated.</CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {user.role === 'subcontractor' && (
+        <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-sm">
+          <CardHeader>
+            <CardTitle className="font-heading text-xl">Assigned package scope</CardTitle>
+            <CardDescription>Subcontractors record assigned package scope, shop drawings/samples, RFIs / site instructions, subcontract orders, payment claims, and closeout evidence only.</CardDescription>
           </CardHeader>
         </Card>
       )}
@@ -537,10 +582,10 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
               </CardHeader>
               <CardContent>
                 <form onSubmit={submitCommitment} className="space-y-3">
-                  <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder="Quote, purchase order, delivery note, subcontract order, or payment claim title" required />
+                  <Input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} placeholder={user.role === 'supplier' ? 'Supplier quote, delivery note, or payment claim title' : user.role === 'subcontractor' ? 'Subcontract order or payment claim title' : 'Quote, purchase order, delivery note, subcontract order, or payment claim title'} required />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select value={draftType} onChange={(event) => setDraftType(event.target.value as CommitmentType)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-                      {COMMITMENT_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}
+                      {roleCommitmentTypes.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}
                     </select>
                     <Input type="number" min="0" value={draftAmount} onChange={(event) => setDraftAmount(event.target.value)} placeholder="Amount (ZAR, optional)" />
                   </div>
@@ -563,7 +608,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
                   <Input value={evidenceTitle} onChange={(event) => setEvidenceTitle(event.target.value)} placeholder="Evidence title" required />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select value={evidenceType} onChange={(event) => setEvidenceType(event.target.value as DeliveryEvidenceType)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-                      {PACKAGE_EVIDENCE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+                      {roleEvidenceOptions.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                     </select>
                     <Input type="date" value={evidenceDueDate} onChange={(event) => setEvidenceDueDate(event.target.value)} />
                   </div>

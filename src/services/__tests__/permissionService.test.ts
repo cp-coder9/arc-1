@@ -8,6 +8,7 @@ import {
   getActiveProjectAccessRoles,
   getRolePermissions,
   isCanonicalUserRole,
+  isProjectAccessRoleCompatibleWithUserRole,
   normalizeUserRole,
 } from '../permissionService';
 
@@ -76,6 +77,44 @@ describe('permissionService', () => {
     expect(canUserPerform({ uid: 'subcontractor-1', role: 'subcontractor' }, 'project:update', subcontractorProject)).toBe(false);
     expect(canUserPerform({ uid: 'subcontractor-1', role: 'subcontractor' }, 'municipal:view_insight', subcontractorProject)).toBe(false);
     expect(getActiveProjectAccessRoles({ uid: 'suspended-subcontractor', role: 'subcontractor' }, subcontractorProject)).toEqual([]);
+  });
+
+
+
+  it('rejects mismatched subcontractor and supplier package memberships', () => {
+    const packageProject = {
+      ...project,
+      memberships: [
+        { userId: 'supplier-correct', accessRole: 'supplier_package_assignee' as const, status: 'active' as const },
+        { userId: 'supplier-wrong', accessRole: 'subcontractor_package_assignee' as const, status: 'active' as const },
+        { userId: 'subcontractor-correct', accessRole: 'subcontractor_package_assignee' as const, status: 'active' as const },
+        { userId: 'subcontractor-wrong', accessRole: 'supplier_package_assignee' as const, status: 'active' as const },
+        { userId: 'supplier-suspended', accessRole: 'supplier_package_assignee' as const, status: 'suspended' as const },
+      ],
+    };
+
+    expect(isProjectAccessRoleCompatibleWithUserRole('supplier_package_assignee', 'supplier')).toBe(true);
+    expect(isProjectAccessRoleCompatibleWithUserRole('supplier_package_assignee', 'subcontractor')).toBe(false);
+    expect(isProjectAccessRoleCompatibleWithUserRole('subcontractor_package_assignee', 'subcontractor')).toBe(true);
+    expect(isProjectAccessRoleCompatibleWithUserRole('subcontractor_package_assignee', 'supplier')).toBe(false);
+
+    expect(getActiveProjectAccessRoles({ uid: 'supplier-correct', role: 'supplier' }, packageProject)).toEqual(['supplier_package_assignee']);
+    expect(canUserPerform({ uid: 'supplier-correct', role: 'supplier' }, 'project:read', packageProject)).toBe(true);
+    expect(canUserPerform({ uid: 'supplier-correct', role: 'supplier' }, 'payment:read', packageProject)).toBe(true);
+
+    expect(getActiveProjectAccessRoles({ uid: 'supplier-wrong', role: 'supplier' }, packageProject)).toEqual([]);
+    expect(canUserPerform({ uid: 'supplier-wrong', role: 'supplier' }, 'project:read', packageProject)).toBe(false);
+    expect(canUserPerform({ uid: 'supplier-wrong', role: 'supplier' }, 'payment:read', packageProject)).toBe(false);
+
+    expect(getActiveProjectAccessRoles({ uid: 'subcontractor-correct', role: 'subcontractor' }, packageProject)).toEqual(['subcontractor_package_assignee']);
+    expect(canUserPerform({ uid: 'subcontractor-correct', role: 'subcontractor' }, 'project:read', packageProject)).toBe(true);
+    expect(canUserPerform({ uid: 'subcontractor-correct', role: 'subcontractor' }, 'payment:read', packageProject)).toBe(true);
+
+    expect(getActiveProjectAccessRoles({ uid: 'subcontractor-wrong', role: 'subcontractor' }, packageProject)).toEqual([]);
+    expect(canUserPerform({ uid: 'subcontractor-wrong', role: 'subcontractor' }, 'project:read', packageProject)).toBe(false);
+    expect(canUserPerform({ uid: 'subcontractor-wrong', role: 'subcontractor' }, 'payment:read', packageProject)).toBe(false);
+
+    expect(getActiveProjectAccessRoles({ uid: 'supplier-suspended', role: 'supplier' }, packageProject)).toEqual([]);
   });
 
   it('allows admins to perform governed actions regardless of project membership', () => {

@@ -14,6 +14,7 @@ const projectMessengerSource = readFileSync(resolve(process.cwd(), 'src/componen
 const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/components/ContractSigningPage.tsx'), 'utf8');
 const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
+const projectToolboxSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectToolboxPage.tsx'), 'utf8');
 const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/components/PackageConstructionOpsPage.tsx'), 'utf8');
 const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/components/PackageCloseoutPage.tsx'), 'utf8');
 const ganttChartSource = readFileSync(resolve(process.cwd(), 'src/components/GanttChart.tsx'), 'utf8');
@@ -101,6 +102,51 @@ describe('canonical dashboard page registry', () => {
     expectPage('admin-console', 'Admin Console', ['admin']);
   });
 
+
+
+
+  it('keeps package procurement commitment and evidence options role-specific for suppliers and subcontractors', () => {
+    expect(packageWorkspaceSource).toContain('const ROLE_COMMITMENT_TYPES: Partial<Record<UserProfile[\'role\'], CommitmentType[]>>');
+    expect(packageWorkspaceSource).toContain("supplier: ['supplier_quote', 'delivery_note', 'payment_claim']");
+    expect(packageWorkspaceSource).toContain("subcontractor: ['subcontract_order', 'payment_claim']");
+    expect(packageWorkspaceSource).toContain('const ROLE_DEFAULT_COMMITMENT_TYPE: Partial<Record<UserProfile[\'role\'], CommitmentType>>');
+    expect(packageWorkspaceSource).toContain("supplier: 'supplier_quote'");
+    expect(packageWorkspaceSource).toContain("subcontractor: 'subcontract_order'");
+    expect(packageWorkspaceSource).toContain('const roleCommitmentTypes = useMemo(() => allowedCommitmentTypesForRole(user.role), [user.role]);');
+    expect(packageWorkspaceSource).toContain('setDraftType(defaultCommitmentTypeForRole(user.role));');
+    expect(packageWorkspaceSource).toContain('if (!roleCommitmentTypes.includes(draftType)) return;');
+    expect(packageWorkspaceSource).toContain("{roleCommitmentTypes.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}");
+
+    const globalOptionMatch = packageWorkspaceSource.match(/<select value=\{draftType\}[\s\S]*?<\/select>/);
+    expect(globalOptionMatch?.[0] ?? '').not.toContain('COMMITMENT_TYPES.map');
+  });
+
+  it('keeps package procurement evidence prompts aligned to supplier delivery and subcontractor package workflows', () => {
+    expect(packageWorkspaceSource).toContain('const ROLE_EVIDENCE_TYPES: Partial<Record<UserProfile[\'role\'], DeliveryEvidenceType[]>>');
+    expect(packageWorkspaceSource).toContain("supplier: ['delivery_note', 'supplier_quote', 'warranty', 'manual', 'certificate', 'payment_claim_evidence']");
+    expect(packageWorkspaceSource).toContain("subcontractor: ['shop_drawing', 'sample_approval', 'rfi', 'payment_claim_evidence', 'closeout_document']");
+    expect(packageWorkspaceSource).toContain('const roleEvidenceTypes = useMemo(() => allowedEvidenceTypesForRole(user.role), [user.role]);');
+    expect(packageWorkspaceSource).toContain('{roleEvidenceOptions.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}');
+    expect(packageWorkspaceSource).toContain('Product data / lead times');
+    expect(packageWorkspaceSource).toContain('Assigned package scope');
+    expect(packageWorkspaceSource).toContain('RFIs / site instructions');
+  });
+
+  it('implements backend.html role-specific toolbox content instead of one shared generic toolbox', () => {
+    expect(projectToolboxSource).toContain('const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig>');
+    expect(projectToolboxSource).toContain('Subcontractor Package Toolbox');
+    expect(projectToolboxSource).toContain('Supplier Delivery Toolbox');
+    expect(projectToolboxSource).toContain('Assigned Package Scope');
+    expect(projectToolboxSource).toContain('Shop Drawings & Samples');
+    expect(projectToolboxSource).toContain('Supplier API Catalogue');
+    expect(projectToolboxSource).toContain('Supplier Quote Path');
+    expect(projectToolboxSource).toContain('Delivery Notes & Warranties');
+    expect(projectToolboxSource).toContain('Payment Tracker');
+    expect(projectToolboxSource).toContain('Supplier access is delivery/procurement scoped');
+    expect(projectToolboxSource).toContain('Subcontractor access is package-scoped');
+    expect(appSource).toContain("activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />");
+  });
+
   it('keeps registry ids unique and every shell-backed page statically routable', () => {
     const pageIds = extractPageIds();
     expect(pageIds.length, 'Expected dashboard page ids to be statically discoverable').toBeGreaterThan(20);
@@ -126,6 +172,15 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />`);
     expect(appSource).not.toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />`);
+  });
+
+
+  it('links command centre next actions to role-profile completion blockers', () => {
+    expect(commandCentreSource).toContain("import { getRoleProfileCompletion }");
+    expect(commandCentreSource).toContain('const profileCompletion = useMemo(() => getRoleProfileCompletion(user.role, user as unknown as Record<string, unknown>), [user]);');
+    expect(commandCentreSource).toContain('!profileCompletion.isComplete');
+    expect(commandCentreSource).toContain("target: 'profile'");
+    expect(commandCentreSource).toContain('Profile readiness');
   });
 
   it('keeps shared workflow projections compatible with deployed Firestore rules and default indexes', () => {
@@ -386,7 +441,7 @@ describe('canonical dashboard page registry', () => {
   it('routes toolbox to the production project file toolbox', () => {
     expect(appSource).toContain("const ProjectToolboxPage = lazyWithChunkRetry(() => import('./components/ProjectToolboxPage'));"
     );
-    expect(appSource).toContain(`activeTab === 'toolbox' && <ProjectToolboxPage user={user} />`);
+    expect(appSource).toContain(`activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />`);
     expect(appSource).toContain(`activeTab !== 'toolbox'`);
   });
 

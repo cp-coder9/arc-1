@@ -523,3 +523,45 @@ Commit: `e2844c17 Add Construction OS inspection scheduling`
   - Verification: deployed rules SHA matched local `firestore.rules`.
 
 Human review note: this tool schedules and records inspection intent only. It does not issue completion certificates, final approvals, payment release instructions, or statutory compliance sign-off without human review.
+
+## 2026-05-19 role-specific toolbox and package-control pass
+
+Scope followed from `backend.html`: continue creating production role tools without changing destructive workflow semantics, focusing on role-specific project toolboxes and supplier/subcontractor package boundaries.
+
+Implemented:
+
+1. Role-specific Project Toolbox
+   - Replaced the generic toolbox shell with per-role tool cards for client, BEP/design team, contractor, subcontractor, supplier, freelancer, and admin users.
+   - Each toolbox card routes to existing production dashboard workflows through `onNavigate`, rather than opening placeholder pages.
+   - Preserved legacy `architect` compatibility as a BEP/design-team subtype while the login role remains merged under BEP / Design Team.
+   - Kept `FileManager` available beneath the role tools for existing project document access.
+
+2. Supplier and subcontractor package controls
+   - Supplier package workspace now limits commitment types to supplier quote, delivery note, and payment claim.
+   - Supplier evidence now focuses on delivery notes, product data / lead times, warranties, manuals, certificates, and payment-claim support.
+   - Subcontractor package workspace now limits commitment types to subcontract order and payment claim.
+   - Subcontractor evidence now focuses on shop drawings, samples, RFIs / site instructions, payment-claim support, and close-out documents.
+   - Browser-side form submission now rejects disallowed role-specific commitment/evidence types before writing.
+
+3. Profile readiness and project membership guardrails
+   - Expanded role profile allowlists and completion blockers for payment, verification, and signature readiness fields.
+   - Added a Command Centre profile-readiness metric and next-action blocker before routed approvals, payments, signatures, or matching.
+   - Added `isProjectAccessRoleCompatibleWithUserRole` to prevent package/project access roles being treated as interchangeable.
+   - Supplier users no longer satisfy subcontractor package membership, and subcontractor users no longer satisfy supplier package membership.
+   - Existing architect-to-BEP normalization remains intact for legacy professional records.
+
+Validation completed for this pass:
+
+- `npm run lint`: passed.
+- `npx vitest run src/services/__tests__/roleProfileService.test.ts src/services/__tests__/permissionService.test.ts src/lib/__tests__/dashboard-registry.static.test.ts --testTimeout 20000`: 3 files passed, 60 tests passed.
+- Local Chromium browser smoke against the Vite sidebar harness:
+  - Supplier, subcontractor, BEP, and client Project Toolbox pages rendered without console/page errors.
+  - Supplier procurement commitment dropdown contained only `supplier_quote`, `delivery_note`, and `payment_claim`.
+  - Subcontractor procurement commitment dropdown contained only `subcontract_order` and `payment_claim`.
+- Production build: `VITE_PUBLIC_BASE=./ npm run build` passed, 3062 modules transformed.
+- Uploaded 75 staged files to `https://test.architex.co.za/` via explicit FTPS.
+- Live browser verification passed: title `Architex | Built Environment OS`, zero bad resources, and no horizontal overflow.
+
+Operational note:
+
+- Chrome DevTools MCP endpoint timed out during this pass, so the browser validation was completed with the same Chromium/Playwright harness used for the project's E2E coverage. The MCP endpoint should be repaired separately before relying on it for future manual-browser checks.
