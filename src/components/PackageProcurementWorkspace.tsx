@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, ClipboardCheck, Factory, FileText, Loader2
 import { db } from '@/lib/firebase';
 import type { Bid, GanttTask, Project, RFI, SiteInspection, SiteLog, TenderPackage, UserProfile } from '@/types';
 import { assessContractorWorkflow } from '@/services/contractorWorkflowService';
+import { buildMaterialSchedule, draftPurchaseOrderForHumanApproval, extractBoQBoMItems, matchSupplierCatalogue } from '@/services/procurementWorkflowService';
 import type { DeliveryEvidenceItem, DeliveryEvidenceType, ProcurementCommitment, SnagItem } from '@/services/packageReadinessService';
 import TenderWizard from './TenderWizard';
 import BidSubmission from './BidSubmission';
@@ -31,15 +32,6 @@ type SupplierProfile = {
   totalReviews?: number;
   cidbGrading?: string;
   tradeLicense?: string;
-};
-
-type ExtractedBoMItem = {
-  id: string;
-  description: string;
-  source: string;
-  quantity?: number;
-  unitPrice?: number;
-  total?: number;
 };
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
@@ -248,40 +240,20 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
       snags: snags.filter((item) => item.packageId === selectedTender.id),
     });
   }, [activeBid, commitments, evidence, inspections, rfis, selectedTender, siteLogs, snags, tasks]);
-  const extractedBoMItems = useMemo<ExtractedBoMItem[]>(() => {
+  const extractedBoMItems = useMemo(() => {
     if (!selectedTender) return [];
-    const bidItems = activeBid?.lineItems?.map((item, index) => ({
-      id: `bid-${index}`,
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      total: item.total,
-      source: 'priced contractor bid line item',
-    })) ?? [];
-    const scopeItems = (selectedTender.scope ?? []).map((scope, index) => ({
-      id: `scope-${index}`,
-      description: scope,
-      quantity: 1,
-      source: 'tender package scope item',
-    }));
-    const drawingItems = (selectedTender.documents ?? [])
-      .filter((document) => /drawing|plan|dwg|detail|schedule|spec|boq|bom/i.test(document.name))
-      .map((document, index) => ({
-        id: `document-${index}`,
-        description: document.name,
-        source: 'linked drawing/specification document',
-      }));
-    return [...bidItems, ...scopeItems, ...drawingItems].slice(0, 12);
-  }, [activeBid?.lineItems, selectedTender]);
+    return buildMaterialSchedule(extractBoQBoMItems({
+      tender: selectedTender,
+      awardedBid: activeBid,
+      programmeTasks: tasks.filter((task: any) => task.packageId === selectedTender.id || task.projectId === selectedTender.projectId),
+    })).slice(0, 12);
+  }, [activeBid, selectedTender, tasks]);
   const supplierCatalogueMatches = useMemo(() => {
-    const packageText = `${selectedTender?.title ?? ''} ${selectedTender?.description ?? ''} ${(selectedTender?.scope ?? []).join(' ')} ${(selectedTender?.requiredCertifications ?? []).join(' ')}`.toLowerCase();
-    return supplierProfiles
-      .map((supplier) => {
-        const labels = [supplier.professionalLabel, ...(supplier.professionalLabels ?? []), supplier.cidbGrading, supplier.tradeLicense].filter(Boolean).join(' ');
-        const matchTerms = labels.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 3 && packageText.includes(term));
-        return { supplier, labels, matchTerms: Array.from(new Set(matchTerms)).slice(0, 4) };
-      })
-      .sort((a, b) => b.matchTerms.length - a.matchTerms.length || (b.supplier.averageRating ?? 0) - (a.supplier.averageRating ?? 0));
+    const packageText = `${selectedTender?.title ?? ''} ${selectedTender?.description ?? ''} ${(selectedTender?.scope ?? []).join(' ')} ${(selectedTender?.requiredCertifications ?? []).join(' ')}`;
+    return matchSupplierCatalogue(packageText, supplierProfiles).map((match) => ({
+      ...match,
+      matchTerms: match.matchTerms.slice(0, 4),
+    }));
   }, [selectedTender, supplierProfiles]);
 
   const stats = useMemo(() => ({
@@ -299,21 +271,40 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
     try {
       const requiresApproval = draftType === 'purchase_order' || draftType === 'subcontract_order' || draftType === 'payment_claim';
       const now = new Date().toISOString();
+      const amount = draftAmount ? Number(draftAmount) : undefined;
+      const note = draftNote.trim() || undefined;
+      const baseRecord = draftType === 'purchase_order'
+        ? draftPurchaseOrderForHumanApproval({
+          packageId: selectedTender.id,
+          projectId: selectedTender.projectId,
+          jobId: selectedTender.jobId,
+          title: draftTitle,
+          amount,
+          dueDate: draftDueDate || undefined,
+          requestedBy: user,
+          sourceItems: extractedBoMItems,
+          note,
+          createdAt: now,
+        })
+        : {
+          packageId: selectedTender.id,
+          projectId: selectedTender.projectId,
+          jobId: selectedTender.jobId,
+          type: draftType,
+          title: draftTitle.trim(),
+          status: requiresApproval ? 'pending_approval' : 'draft',
+          amount,
+          dueDate: draftDueDate || undefined,
+          note,
+          requestedBy: user.uid,
+          requestedByRole: user.role,
+          humanReviewRequired: requiresApproval,
+          createdAt: now,
+          updatedAt: now,
+        };
       await addDoc(collection(db, 'package_procurement_commitments'), {
-        packageId: selectedTender.id,
-        projectId: selectedTender.projectId,
-        jobId: selectedTender.jobId,
-        type: draftType,
-        title: draftTitle.trim(),
-        status: requiresApproval ? 'pending_approval' : 'draft',
-        amount: draftAmount ? Number(draftAmount) : undefined,
-        dueDate: draftDueDate || undefined,
-        note: draftNote.trim() || undefined,
-        requestedBy: user.uid,
-        requestedByRole: user.role,
-        humanReviewRequired: requiresApproval,
-        createdAt: now,
-        updatedAt: now,
+        ...baseRecord,
+        requestedByName: user.displayName || user.email,
       });
       setDraftTitle('');
       setDraftAmount('');
@@ -425,7 +416,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold">{item.description}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Source: {item.source}{item.quantity ? ` · Qty ${item.quantity}` : ''}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Source: {item.sourceType.replaceAll('_', ' ')} · {item.sourceReference}{item.quantity ? ` · Qty ${item.quantity}` : ''}{item.requiredBy ? ` · Required by ${item.requiredBy}` : ''}</p>
                     </div>
                     {item.total != null ? <Badge variant="secondary">{currency.format(item.total)}</Badge> : <Badge variant="outline">needs pricing</Badge>}
                   </div>
@@ -511,6 +502,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
                     </div>
                     <Badge variant={statusTone(item.status)}>{item.status.replaceAll('_', ' ')}</Badge>
                   </div>
+                  {item.type === 'purchase_order' && <p className="mt-3 text-xs font-semibold text-primary">Purchase order assistant output is pending human approval; it cannot be issued until an authorised approval is recorded.</p>}
                   {item.type === 'payment_claim' && <p className="mt-3 text-xs font-semibold text-primary">Payment application is review-gated. No invoice, escrow release, or payment is executed by this record.</p>}
                 </div>
               ))}

@@ -1,0 +1,200 @@
+import type { Bid, GanttTask, TenderPackage, UserProfile } from '../types';
+
+export type BoQBoMSourceType = 'bid_line_item' | 'tender_scope' | 'drawing_or_specification' | 'manual';
+export type PurchaseOrderValidationStatus = 'blocked' | 'ready_for_issue';
+
+export interface BoQBoMItem {
+  id: string;
+  description: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  total?: number;
+  tradePackageId?: string;
+  costCode?: string;
+  requiredBy?: string;
+  sourceType: BoQBoMSourceType;
+  sourceReference: string;
+  confidence: number;
+  humanReviewRequired: boolean;
+}
+
+export interface SupplierCatalogueProfile {
+  uid: string;
+  displayName?: string;
+  email?: string;
+  professionalLabel?: string;
+  professionalLabels?: string[];
+  region?: string;
+  averageRating?: number;
+  totalReviews?: number;
+  cidbGrading?: string;
+  tradeLicense?: string;
+  catalogueKeywords?: string[];
+  availabilityNotes?: string;
+  leadTimeDays?: number;
+}
+
+export interface SupplierCatalogueMatch {
+  supplier: SupplierCatalogueProfile;
+  labels: string;
+  matchTerms: string[];
+  leadTimeDays?: number;
+  score: number;
+}
+
+export interface PurchaseOrderDraftInput {
+  packageId: string;
+  projectId?: string;
+  jobId?: string;
+  title: string;
+  amount?: number;
+  dueDate?: string;
+  requestedBy: Pick<UserProfile, 'uid' | 'role' | 'displayName' | 'email'>;
+  supplierId?: string;
+  sourceItems?: BoQBoMItem[];
+  note?: string;
+  createdAt?: string;
+}
+
+export interface PurchaseOrderDraft {
+  packageId: string;
+  projectId?: string;
+  jobId?: string;
+  type: 'purchase_order';
+  title: string;
+  status: 'pending_approval';
+  amount?: number;
+  dueDate?: string;
+  requestedBy: string;
+  requestedByRole: UserProfile['role'];
+  requestedByName: string;
+  supplierId?: string;
+  sourceItemIds: string[];
+  humanReviewRequired: true;
+  aiMayIssue: false;
+  governanceNote: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrderIssueCandidate {
+  type: 'purchase_order';
+  status: string;
+  title: string;
+  humanApprovedBy?: string;
+  humanApprovedAt?: string;
+}
+
+export function extractBoQBoMItems(input: { tender: TenderPackage; awardedBid?: Bid; programmeTasks?: GanttTask[] }): BoQBoMItem[] {
+  const { tender, awardedBid, programmeTasks = [] } = input;
+  const taskDates = programmeTasks
+    .filter((task: GanttTask & { packageId?: string }) => task.packageId === tender.id || task.projectId === tender.projectId)
+    .map((task) => task.startDate || task.baselineStartDate || task.endDate)
+    .filter(Boolean)
+    .sort();
+  const requiredBy = taskDates[0];
+
+  const bidItems: BoQBoMItem[] = (awardedBid?.lineItems ?? []).map((item, index) => ({
+    id: `bid-${awardedBid?.id ?? tender.id}-${index}`,
+    description: item.description,
+    quantity: item.quantity,
+    unit: 'item',
+    unitPrice: item.unitPrice,
+    total: item.total,
+    tradePackageId: tender.id,
+    requiredBy,
+    sourceType: 'bid_line_item',
+    sourceReference: `Bid ${awardedBid?.id ?? 'draft'} line ${index + 1}`,
+    confidence: 0.9,
+    humanReviewRequired: true,
+  }));
+
+  const scopeItems: BoQBoMItem[] = (tender.scope ?? []).map((scope, index) => ({
+    id: `scope-${tender.id}-${index}`,
+    description: scope,
+    quantity: 1,
+    unit: 'allowance',
+    tradePackageId: tender.id,
+    requiredBy,
+    sourceType: 'tender_scope',
+    sourceReference: `Tender scope item ${index + 1}`,
+    confidence: 0.7,
+    humanReviewRequired: true,
+  }));
+
+  const documentItems: BoQBoMItem[] = (tender.documents ?? [])
+    .filter((document) => /drawing|plan|dwg|detail|schedule|spec|boq|bom|material/i.test(document.name))
+    .map((document, index) => ({
+      id: `document-${tender.id}-${index}`,
+      description: document.name,
+      tradePackageId: tender.id,
+      requiredBy,
+      sourceType: 'drawing_or_specification',
+      sourceReference: document.url || document.name,
+      confidence: /boq|bom|schedule|spec/i.test(document.name) ? 0.65 : 0.45,
+      humanReviewRequired: true,
+    }));
+
+  return [...bidItems, ...scopeItems, ...documentItems].slice(0, 50);
+}
+
+export function matchSupplierCatalogue(packageText: string, suppliers: SupplierCatalogueProfile[]): SupplierCatalogueMatch[] {
+  const searchablePackageText = packageText.toLowerCase();
+  return suppliers
+    .map((supplier) => {
+      const labels = [supplier.professionalLabel, ...(supplier.professionalLabels ?? []), supplier.cidbGrading, supplier.tradeLicense, ...(supplier.catalogueKeywords ?? [])]
+        .filter(Boolean)
+        .join(' ');
+      const matchTerms = labels.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 3 && searchablePackageText.includes(term));
+      const uniqueTerms = Array.from(new Set(matchTerms)).slice(0, 8);
+      const ratingBoost = Math.min((supplier.averageRating ?? 0) / 5, 1);
+      const leadTimeBoost = supplier.leadTimeDays ? Math.max(0, 1 - supplier.leadTimeDays / 90) : 0;
+      return {
+        supplier,
+        labels,
+        matchTerms: uniqueTerms,
+        leadTimeDays: supplier.leadTimeDays,
+        score: uniqueTerms.length * 10 + ratingBoost * 2 + leadTimeBoost,
+      };
+    })
+    .sort((a, b) => b.score - a.score || (b.supplier.averageRating ?? 0) - (a.supplier.averageRating ?? 0));
+}
+
+export function draftPurchaseOrderForHumanApproval(input: PurchaseOrderDraftInput): PurchaseOrderDraft {
+  const now = input.createdAt ?? new Date().toISOString();
+  return {
+    packageId: input.packageId,
+    projectId: input.projectId,
+    jobId: input.jobId,
+    type: 'purchase_order',
+    title: input.title.trim(),
+    status: 'pending_approval',
+    amount: input.amount,
+    dueDate: input.dueDate,
+    requestedBy: input.requestedBy.uid,
+    requestedByRole: input.requestedBy.role,
+    requestedByName: input.requestedBy.displayName || input.requestedBy.email,
+    supplierId: input.supplierId,
+    sourceItemIds: (input.sourceItems ?? []).map((item) => item.id),
+    humanReviewRequired: true,
+    aiMayIssue: false,
+    governanceNote: 'Purchase orders may be drafted from BoQ/BoM and supplier catalogue data, but cannot be issued or treated as approved until a recorded human approval exists.',
+    note: input.note,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function validatePurchaseOrderIssue(candidate: PurchaseOrderIssueCandidate): { status: PurchaseOrderValidationStatus; reasons: string[] } {
+  const reasons: string[] = [];
+  if (candidate.type !== 'purchase_order') reasons.push('Only purchase order records can be issued through this guard.');
+  if (!candidate.humanApprovedBy || !candidate.humanApprovedAt) reasons.push(`${candidate.title} requires recorded human approval before issue.`);
+  if (!['approved', 'issued'].includes(candidate.status)) reasons.push(`${candidate.title} is ${candidate.status}; it must be human-approved before issue.`);
+  return { status: reasons.length === 0 ? 'ready_for_issue' : 'blocked', reasons };
+}
+
+export function buildMaterialSchedule(items: BoQBoMItem[]): BoQBoMItem[] {
+  return [...items].sort((a, b) => String(a.requiredBy ?? '9999-12-31').localeCompare(String(b.requiredBy ?? '9999-12-31')) || a.description.localeCompare(b.description));
+}
