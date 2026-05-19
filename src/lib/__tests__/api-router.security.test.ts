@@ -329,18 +329,24 @@ describe('api-router security and high-value integration routes', () => {
   });
 
   it('blocks cross-origin state-changing requests before route handlers run', async () => {
+    vi.useRealTimers();
     const app = await buildApp();
 
-    const response = await request(app)
-      .post('/api/auth/check-admin')
-      .set('Origin', 'https://evil.example')
-      .set('Host', 'architex.test')
-      .send({ role: 'admin' });
+    try {
+      const response = await request(app)
+        .post('/api/auth/check-admin')
+        .set('Origin', 'https://evil.example')
+        .set('Host', 'architex.test')
+        .send({ role: 'admin' });
 
-    expect(response.status).toBe(403);
-    expect(response.body.error).toContain('Cross-origin');
-    expect(verifyIdToken).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('Cross-origin');
+      expect(verifyIdToken).not.toHaveBeenCalled();
+    } finally {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    }
+  }, 20_000);
 
   it('requires Firebase auth for protected API routes', async () => {
     const app = await buildApp();
