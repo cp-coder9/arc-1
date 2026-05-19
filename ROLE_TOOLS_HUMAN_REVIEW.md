@@ -589,3 +589,21 @@ Validation completed:
 - Local Chromium browser smoke against the Vite sidebar harness verified the Profile Editor for client, BEP, contractor, supplier, subcontractor, freelancer, and admin roles with no console/page errors and expected role-specific fields visible.
 
 Human review note: the profile panel records readiness metadata only. It does not verify statutory registrations, activate digital signatures, approve banking, or release payments without the existing human/admin/provider workflows.
+
+## 2026-05-19 Contract and payment execution guard pass
+
+Scope:
+- Added a `Human signing guard` to `ContractSigningPage` so contract scope, deliverables, milestones, verification, and escrow readiness are shown as review-only decision support.
+- Added disabled signature/acceptance controls with explicit copy that no signature, contract acceptance, payment initiation, or escrow release happens from the browser view.
+- Added a `Payment and escrow execution guard` to `FinancialDashboard` so provider calls, invoice payments, milestone releases, refunds, supplier orders, and escrow actions remain human-confirmed and backend-gated.
+- Added disabled payment/provider controls and pending release visibility without adding money-movement writes.
+- Tightened static regression coverage for these safety boundaries and updated stale registry invariants for package procurement/command-centre live queries.
+
+Validation:
+- `npm run lint` passed.
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts src/lib/__tests__/sensitiveWorkflowGuards.test.ts --testTimeout 20000` passed: 2 files, 51 tests.
+- Local Playwright smoke against the sidebar harness passed for client `Payments & Governance` and `Contracts & Signing` routes; verified the payment/escrow guard text and disabled controls rendered with no blocking console/page errors.
+- Chrome DevTools MCP was attempted against the same local harness, but the MCP request timed out; deterministic Playwright verification was used for the required browser smoke.
+
+Human review note:
+- The new controls intentionally remain disabled until explicit backend execution workflows and human confirmations are implemented. This preserves the platform boundary that dashboards can prepare evidence and review state, but cannot bind contracts or move money automatically.
