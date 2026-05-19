@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+const onboardingSource = readFileSync(resolve(process.cwd(), 'src/components/OnboardingFlow.tsx'), 'utf8');
 const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8');
 const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
 const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
@@ -103,9 +104,17 @@ describe('canonical dashboard page registry', () => {
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
     expectPage('admin-console', 'Admin Console', ['admin']);
   });
+  it('exposes every non-admin onboarding role explicitly, including architect, subcontractor, and supplier', () => {
+    for (const role of ['client', 'freelancer', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier']) {
+      expect(appSource).toContain(`data-testid="role-select-${role}"`);
+      expect(onboardingSource).toContain(`data-testid="role-select-${role}"`);
+    }
 
-
-
+    expect(onboardingSource).toContain("role === 'architect' && renderArchitectOnboarding()");
+    expect(onboardingSource).toContain("role === 'subcontractor' || role === 'supplier'");
+    expect(appSource).toContain('SACAP architect profile with legacy marketplace compatibility');
+    expect(appSource).toContain('Authorized Architex administrators only');
+  });
 
 
   it('pins the full role navigation matrix for every canonical role and page', () => {

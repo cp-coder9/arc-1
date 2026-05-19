@@ -752,10 +752,11 @@ export default function App() {
                     transition={{ duration: 0.3 }}
                     className="space-y-4 sm:space-y-6"
                   >
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-7">
                       <AuthRoleCard data-testid="role-select-client" icon={<Users className="w-8 h-8" />} title="Client" description="I want to hire professionals for my building project" active={roleSelection === 'client'} onClick={() => setRoleSelection('client')} />
                       <AuthRoleCard data-testid="role-select-freelancer" icon={<Sparkles className="w-8 h-8" />} title="Freelancer" description="I am a specialist or consultant (Engineer, etc.)" active={roleSelection === 'freelancer'} onClick={() => setRoleSelection('freelancer')} />
-                      <AuthRoleCard data-testid="role-select-bep" icon={<Briefcase className="w-8 h-8" />} title="BEP / Design Team" description="Architects, engineers, consultants, and design-team leads" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                      <AuthRoleCard data-testid="role-select-bep" icon={<Briefcase className="w-8 h-8" />} title="BEP / Design Team" description="Engineers, QSs, technologists, and design-team leads" active={roleSelection === 'bep'} onClick={() => setRoleSelection('bep')} />
+                      <AuthRoleCard data-testid="role-select-architect" icon={<Building2 className="w-8 h-8" />} title="Architect" description="SACAP architect profile with legacy marketplace compatibility" active={roleSelection === 'architect'} onClick={() => setRoleSelection('architect')} />
                       <AuthRoleCard data-testid="role-select-contractor" icon={<Factory className="w-8 h-8" />} title="Contractor" description="I manage construction delivery, tendering, and site work" active={roleSelection === 'contractor'} onClick={() => setRoleSelection('contractor')} />
                       <AuthRoleCard data-testid="role-select-subcontractor" icon={<Hammer className="w-8 h-8" />} title="Subcontractor" description="I deliver a trade package, evidence, and close-out items" active={roleSelection === 'subcontractor'} onClick={() => setRoleSelection('subcontractor')} />
                       <AuthRoleCard data-testid="role-select-supplier" icon={<Factory className="w-8 h-8" />} title="Supplier" description="I supply materials, products, deliveries, or warranties" active={roleSelection === 'supplier'} onClick={() => setRoleSelection('supplier')} />
