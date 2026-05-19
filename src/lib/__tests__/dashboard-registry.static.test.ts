@@ -22,6 +22,7 @@ const ganttChartSource = readFileSync(resolve(process.cwd(), 'src/components/Gan
 const aiCoPilotSource = readFileSync(resolve(process.cwd(), 'src/components/AICoPilotPage.tsx'), 'utf8');
 const adminAIReviewQueueSource = readFileSync(resolve(process.cwd(), 'src/components/AdminAIReviewQueue.tsx'), 'utf8');
 const adminDashboardSource = readFileSync(resolve(process.cwd(), 'src/components/AdminDashboard.tsx'), 'utf8');
+const adminGovernanceConsoleSource = readFileSync(resolve(process.cwd(), 'src/components/AdminGovernanceConsolePage.tsx'), 'utf8');
 const bidSubmissionSource = readFileSync(resolve(process.cwd(), 'src/components/BidSubmission.tsx'), 'utf8');
 const bepFreelancerJobsSource = readFileSync(resolve(process.cwd(), 'src/components/BEPFreelancerJobsPage.tsx'), 'utf8');
 const freelancerSubmissionsSource = readFileSync(resolve(process.cwd(), 'src/components/FreelancerSubmissionsPage.tsx'), 'utf8');
@@ -415,16 +416,19 @@ describe('canonical dashboard page registry', () => {
     expect(drawingChecklistServiceSource).not.toContain('orderBy(');
   });
 
-  it('routes admin console to the production admin governance dashboard', () => {
-    expect(appSource).toContain(`activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />`);
+  it('routes admin console to a whole-system governance console with backend.html datasets', () => {
+    expect(appSource).toContain(`activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'admin-console'`);
-    expect(adminDashboardSource).toContain('AdminGovernanceToolsPanel');
-    expect(adminDashboardSource).toContain('Audit Trail Viewer');
-    expect(adminDashboardSource).toContain('Tool Set Management');
-    expect(adminDashboardSource).toContain('Payment Rate Settings');
-    expect(adminDashboardSource).toContain('AI Notification Feed');
-    expect(adminDashboardSource).toContain("activeTab === 'governance-tools' ? 'governance-tools'");
-    expect(adminDashboardSource).toContain('data-testid="admin-governance-tools-panel"');
+    expect(adminGovernanceConsoleSource).toContain('data-testid="admin-governance-console"');
+    expect(adminGovernanceConsoleSource).toContain('Whole-system governance console');
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'projects'");
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'disputes'");
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'escrow'");
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'payments'");
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'messages'");
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'ai_review_queue'");
+    expect(adminGovernanceConsoleSource).toContain("collectionName: 'system_logs'");
+    expect(adminGovernanceConsoleSource).toContain('observational by default');
   });
 
   it('routes freelancer submissions to the production submissions workflow', () => {

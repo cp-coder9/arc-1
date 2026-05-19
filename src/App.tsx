@@ -143,6 +143,7 @@ const BEPFreelancerJobsPage = lazyWithChunkRetry(() => import('./components/BEPF
 const SANSComplianceFormsPage = lazyWithChunkRetry(() => import('./components/SANSComplianceFormsPage'));
 const CPDAssessmentPage = lazyWithChunkRetry(() => import('./components/CPDAssessmentPage'));
 const DrawingRegisterPage = lazyWithChunkRetry(() => import('./components/DrawingRegisterPage'));
+const AdminGovernanceConsolePage = lazyWithChunkRetry(() => import('./components/AdminGovernanceConsolePage'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -968,7 +969,7 @@ export default function App() {
               {activeTab === 'tasks' && <TasksApprovalsPage user={user} />}
               {activeTab === 'resource-centre' && <ResourceCentre user={user} />}
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
-              {activeTab === 'admin-console' && <AdminDashboard user={user} activeTab="overview" onTabChange={setActiveTab} />}
+              {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'freelancer-work' && <FreelancerDashboard user={user} />}
