@@ -572,6 +572,13 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`activeTab !== 'directory-search'`);
   });
 
+  it('routes the canonical profile page to the production profile workspace', () => {
+    expect(appSource).toContain("const ProfileEditor = lazyWithChunkRetry(() => import('./components/ProfileEditor'));");
+    expect(appSource).toContain(`activeTab === 'profile' && <ProfileWorkspacePage user={user} />`);
+    expect(appSource).toContain('data-testid="profile-workspace-page"');
+    expect(appSource).toContain('<ProfileEditor user={user} />');
+  });
+
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
     expect(appSource).toContain('Unsafe payment, escrow, signature, provider, and approval decisions');
     expect(appSource).toContain('human confirmation before anything is submitted');

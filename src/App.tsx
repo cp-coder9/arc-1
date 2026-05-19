@@ -117,6 +117,7 @@ const BEPDashboard = lazyWithChunkRetry(() => import('./components/BEPDashboard'
 const ContractorDashboard = lazyWithChunkRetry(() => import('./components/ContractorDashboard'));
 const FirmDashboard = lazyWithChunkRetry(() => import('./components/FirmDashboard'));
 const UserSettings = lazyWithChunkRetry(() => import('./components/UserSettings'));
+const ProfileEditor = lazyWithChunkRetry(() => import('./components/ProfileEditor'));
 const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceManagement'));
 const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
 const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
@@ -232,7 +233,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const REAL_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-register', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge', 'toolbox', 'freelancer-submissions', 'resource-sharing', 'freelancer-work', 'ai', 'contractor-staff', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'sans-forms', 'cpd-assessment']);
+const REAL_WORKFLOW_PAGE_IDS = new Set(['profile', 'journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-register', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge', 'toolbox', 'freelancer-submissions', 'resource-sharing', 'freelancer-work', 'ai', 'contractor-staff', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'sans-forms', 'cpd-assessment']);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -1080,7 +1081,8 @@ export default function App() {
             <Suspense fallback={<DashboardFallback />}>
               {activeTab === 'invoices' && <InvoiceManagement user={user} />}
               {activeTab === 'files' && <FileManager user={user} />}
-              {(activeTab === 'profile-settings' || activeTab === 'profile') && <UserSettings user={user} />}
+              {activeTab === 'profile-settings' && <UserSettings user={user} />}
+              {activeTab === 'profile' && <ProfileWorkspacePage user={user} />}
               {activeTab === 'firm' && <FirmDashboard user={user} />}
               {activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />}
               {activeTab === 'client-intake' && <GuidedBriefWizard user={user} />}
@@ -1177,6 +1179,54 @@ function RoleLegacyFallbackPage({ activeTab, user, onNavigate }: { activeTab: st
           <Button variant="outline" className="rounded-xl justify-start gap-2" onClick={() => onNavigate('files')}><Files className="h-4 w-4" /> Project files</Button>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+
+function ProfileWorkspacePage({ user }: { user: UserProfile }) {
+  const roleVisual = roleVisualFor(user.role);
+  const roleLabel = user.role === 'bep' || user.role === 'architect' ? 'design team' : user.role;
+  const profileSignals = [
+    { label: 'Identity and account', detail: 'Email, password reset, notification preferences, and digital-signature status remain managed in account settings.' },
+    { label: 'Matching profile', detail: 'Display name, bio, expertise, SACAP data, and portfolio media are edited through the production profile editor.' },
+    { label: 'Governed reuse', detail: 'Profile data feeds directory search, proposals, contracts, invoices, procurement records, and verification workflows without role escalation.' },
+  ];
+
+  return (
+    <div className="space-y-6" data-testid="profile-workspace-page">
+      <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow overflow-hidden" style={{ borderTop: `5px solid ${roleVisual.accent}` }}>
+        <CardHeader className="bg-[#f4faff]/80 border-b border-border/70">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <Badge variant="secondary" className="w-fit rounded-full beos-label-caps">Core workflow</Badge>
+              <div>
+                <CardTitle className="font-sans text-3xl font-black tracking-[-0.045em] flex items-center gap-3">
+                  <span className="rounded-[0.95rem] bg-white text-primary p-3 shadow-[0_10px_24px_rgba(20,71,63,0.08)]"><UserCircle size={22} /></span>
+                  Profile Editor
+                </CardTitle>
+                <CardDescription className="mt-3 max-w-3xl text-base leading-relaxed">
+                  A dedicated production profile workspace for {roleLabel} users, aligning backend.html role workflows with the real UserSettings and ProfileEditor components.
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge className="capitalize shrink-0 rounded-full border-0 text-white" style={{ backgroundColor: roleVisual.accent }}>{roleLabel}</Badge>
+              <ProfileEditor user={user} />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {profileSignals.map((signal) => (
+            <div key={signal.label} className="rounded-[1.25rem] border border-border bg-background/70 p-5">
+              <p className="font-sans text-sm font-black uppercase tracking-[0.16em] text-primary">{signal.label}</p>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{signal.detail}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <UserSettings user={user} />
     </div>
   );
 }
