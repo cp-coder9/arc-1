@@ -3,7 +3,7 @@ import { collection, limit, onSnapshot, query, where } from 'firebase/firestore'
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileText, Landmark, ListChecks, Loader2, WalletCards } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { getRoleProfileCompletion } from '../services/roleProfileService';
-import type { Job, Project, TenderPackage, UserProfile } from '../types';
+import type { DelegatedTask, Job, Project, TenderPackage, UserProfile } from '../types';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -15,6 +15,7 @@ type ProjectCommandCentreProps = {
 
 type CommandJob = Job & { project?: Project };
 type CommandPackage = TenderPackage & { source?: 'marketplace' | 'awarded' | 'admin' };
+type CommandDelegatedTask = DelegatedTask & { source?: 'delegated' };
 
 type LoadState = 'loading' | 'ready';
 
@@ -81,6 +82,11 @@ function tenderQueriesForUser(user: UserProfile) {
   return [];
 }
 
+function delegatedTaskQueryForUser(user: UserProfile) {
+  if (user.role !== 'freelancer') return null;
+  return query(collection(db, 'delegatedTasks'), where('assigneeId', '==', user.uid), limit(25));
+}
+
 function projectQueryForUser(user: UserProfile) {
   const projects = collection(db, 'projects');
 
@@ -99,11 +105,15 @@ function projectQueryForUser(user: UserProfile) {
   return null;
 }
 
-function resolveNextAction(user: UserProfile, activeJob: CommandJob | undefined, profileCompletion: ReturnType<typeof getRoleProfileCompletion>, activePackage?: CommandPackage) {
+function resolveNextAction(user: UserProfile, activeJob: CommandJob | undefined, profileCompletion: ReturnType<typeof getRoleProfileCompletion>, activePackage?: CommandPackage, activeTask?: CommandDelegatedTask) {
   if (!profileCompletion.isComplete) {
     return { label: 'Complete profile readiness', target: 'profile', detail: `${profileCompletion.blockers[0] || 'Profile completion is required'} before routed approvals, payments, signatures, or project matching can proceed.` };
   }
   if (!activeJob) {
+    if (activeTask && user.role === 'freelancer') {
+      const statusDetail = activeTask.submissionStatus && activeTask.submissionStatus !== 'not_submitted' ? ' Submission status is ' + activeTask.submissionStatus.replaceAll('_', ' ') + '.' : '';
+      return { label: activeTask.status === 'completed' ? 'Track approval and invoice readiness' : 'Submit assigned freelancer work', target: 'freelancer-work', detail: (activeTask.notes || activeTask.assigneeRole || 'Your delegated task') + ' is due ' + (activeTask.deadline || 'without a recorded deadline') + '.' + statusDetail + ' Use the freelancer workspace for governed submissions, feedback, and payment readiness.' };
+    }
     if (activePackage && (user.role === 'contractor' || user.role === 'subcontractor')) {
       return { label: activePackage.source === 'awarded' ? 'Update package delivery evidence' : 'Review available package scope', target: 'packages', detail: `${activePackage.title} is visible in your package workspace. Use packages to manage tenders, RFIs, evidence, claims, and close-out readiness.` };
     }
@@ -132,8 +142,12 @@ function resolveNextAction(user: UserProfile, activeJob: CommandJob | undefined,
   return { label: 'Review project records', target: 'journey', detail: 'Open the project journey for stage history, documents, payments, and audit trail.' };
 }
 
-function buildAiSummary(user: UserProfile, activeJob?: CommandJob, project?: Project, activePackage?: CommandPackage) {
+function buildAiSummary(user: UserProfile, activeJob?: CommandJob, project?: Project, activePackage?: CommandPackage, activeTask?: CommandDelegatedTask) {
   if (!activeJob) {
+    if (activeTask) {
+      const payment = activeTask.paymentStatus ? ' Payment readiness is ' + activeTask.paymentStatus.replaceAll('_', ' ') + '.' : '';
+      return 'Your delegated task for job ' + activeTask.jobId + ' is ' + activeTask.status + ', due ' + (activeTask.deadline || 'without a recorded deadline') + ', with submission status ' + (activeTask.submissionStatus || 'not_submitted').replaceAll('_', ' ') + '.' + payment + ' Continue in the freelancer workspace so submissions, reviews, and invoice readiness remain human-reviewed and auditable.';
+    }
     if (activePackage) {
       const budget = typeof activePackage.estimatedBudget === 'number' ? ` with an estimated budget of ${currency.format(activePackage.estimatedBudget)}` : '';
       const source = activePackage.source === 'awarded' ? 'awarded package' : activePackage.source === 'marketplace' ? 'published package opportunity' : 'package record';
@@ -152,6 +166,7 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   const [jobs, setJobs] = useState<CommandJob[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [packages, setPackages] = useState<CommandPackage[]>([]);
+  const [delegatedTasks, setDelegatedTasks] = useState<CommandDelegatedTask[]>([]);
 
   useEffect(() => {
     setState('loading');
@@ -163,6 +178,16 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
       console.warn('Command centre job projection unavailable; continuing without job context:', error);
       setJobs([]);
       setState('ready');
+    }) : null;
+
+    const delegatedTaskQuery = delegatedTaskQueryForUser(user);
+    const unsubscribeDelegatedTasks = delegatedTaskQuery ? onSnapshot(delegatedTaskQuery, (snapshot) => {
+      setDelegatedTasks(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data(), source: "delegated" } as CommandDelegatedTask))));
+      setState("ready");
+    }, (error) => {
+      console.warn("Command centre delegated task projection unavailable; continuing without freelancer task context:", error);
+      setDelegatedTasks([]);
+      setState("ready");
     }) : null;
 
     const projectQuery = projectQueryForUser(user);
@@ -188,11 +213,12 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
       setState('ready');
     }));
 
-    if (!jobQuery && packageQueries.length === 0) setState('ready');
+    if (!jobQuery && packageQueries.length === 0 && !delegatedTaskQuery) setState('ready');
 
     return () => {
       unsubscribeJobs?.();
       unsubscribeProjects?.();
+      unsubscribeDelegatedTasks?.();
       unsubscribePackages.forEach((unsubscribe) => unsubscribe());
     };
   }, [user]);
@@ -200,11 +226,12 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   const joinedJobs = useMemo(() => jobs.map((job) => ({ ...job, project: projects.find((project) => project.jobId === job.id) })), [jobs, projects]);
   const activeJob = joinedJobs.find((job) => job.status === 'in-progress') ?? joinedJobs[0];
   const activePackage = packages.find((pkg) => pkg.source === 'awarded' || pkg.status === 'awarded') ?? packages[0];
+  const activeTask = delegatedTasks.find((task) => task.status === 'in-progress') ?? delegatedTasks.find((task) => task.status === 'pending') ?? delegatedTasks[0];
   const activeProject = activeJob?.project ?? projects[0];
   const profileCompletion = useMemo(() => getRoleProfileCompletion(user.role, user as unknown as Record<string, unknown>), [user]);
-  const nextAction = resolveNextAction(user, activeJob, profileCompletion, activePackage);
+  const nextAction = resolveNextAction(user, activeJob, profileCompletion, activePackage, activeTask);
   const roleVisual = ROLE_COMMAND_VISUALS[user.role];
-  const openApprovals = activeJob?.requirements?.filter(Boolean).length ?? (activePackage ? activePackage.scope?.length ?? 0 : 0);
+  const openApprovals = activeJob?.requirements?.filter(Boolean).length ?? (activeTask ? Number(activeTask.submissionStatus !== 'approved') : activePackage ? activePackage.scope?.length ?? 0 : 0);
   const atRisk = activeJob?.deadline && new Date(activeJob.deadline).getTime() < Date.now() && activeJob.status !== 'completed';
 
   return (
@@ -219,13 +246,13 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
                 <Badge className="rounded-full border-0 text-white" style={{ backgroundColor: roleVisual.accent }}>{roleVisual.viewLabel}</Badge>
               </div>
               <CardDescription className="mt-3 max-w-3xl text-base leading-relaxed">
-                {activeJob || activePackage ? roleVisual.description : `${roleVisual.description} No visible live project or package record is selected yet.`} It never performs approval, payment, signature, or submission actions without the dedicated human-confirmed workflow.
+                {activeJob || activePackage || activeTask ? roleVisual.description : `${roleVisual.description} No visible live project or package record is selected yet.`} It never performs approval, payment, signature, or submission actions without the dedicated human-confirmed workflow.
               </CardDescription>
             </div>
             <div className="rounded-[1.1rem] border border-border bg-white/80 p-3 min-w-[180px]">
               <p className="beos-label-caps text-muted-foreground">Live projection</p>
-              <p className="mt-2 text-2xl font-black tracking-[-0.055em]" style={{ color: roleVisual.accent }}>{joinedJobs.length + packages.length}</p>
-              <p className="text-xs text-muted-foreground">visible job/package records</p>
+              <p className="mt-2 text-2xl font-black tracking-[-0.055em]" style={{ color: roleVisual.accent }}>{joinedJobs.length + packages.length + delegatedTasks.length}</p>
+              <p className="text-xs text-muted-foreground">visible job/package/task records</p>
             </div>
           </div>
         </CardHeader>
@@ -242,7 +269,7 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
           </div>
           <div className="rounded-[1.25rem] border border-border bg-background/70 p-5 space-y-2">
             <h3 className="beos-label-caps text-muted-foreground">Current Stage</h3>
-            <p className="beos-metric capitalize">{activeProject?.currentStage?.replaceAll('-', ' ') ?? activeJob?.status ?? activePackage?.status ?? 'Not started'}</p>
+            <p className="beos-metric capitalize">{activeProject?.currentStage?.replaceAll('-', ' ') ?? activeJob?.status ?? activePackage?.status ?? activeTask?.status ?? 'Not started'}</p>
             <p className="text-xs text-muted-foreground">From project lifecycle or job status records.</p>
           </div>
         </CardContent>
@@ -262,15 +289,15 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
             <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">AI Summary</CardTitle>
             <CardDescription>Generated deterministically from live project/job fields. Human review required.</CardDescription>
           </CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{buildAiSummary(user, activeJob, activeProject, activePackage)}</p></CardContent>
+          <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{buildAiSummary(user, activeJob, activeProject, activePackage, activeTask)}</p></CardContent>
         </Card>
         <Card className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
           <CardHeader>
             <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">Key Dates</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> Deadline: {activeJob?.deadline ?? activePackage?.deadline ?? 'Not recorded'}</div>
-            <div className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Created: {activeJob?.createdAt ?? activePackage?.createdAt ?? activeProject?.createdAt ?? 'Not recorded'}</div>
+            <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> Deadline: {activeJob?.deadline ?? activePackage?.deadline ?? activeTask?.deadline ?? 'Not recorded'}</div>
+            <div className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Created: {activeJob?.createdAt ?? activePackage?.createdAt ?? activeTask?.createdAt ?? activeProject?.createdAt ?? 'Not recorded'}</div>
           </CardContent>
         </Card>
       </div>
@@ -280,13 +307,13 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">Recent Activity</CardTitle>
-              <CardDescription>Latest live jobs and package records visible to this role. No mock activity is generated.</CardDescription>
+              <CardDescription>Latest live jobs, package records, and delegated tasks visible to this role. No mock activity is generated.</CardDescription>
             </div>
             <Badge variant="outline" className="w-fit rounded-full">live data</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {joinedJobs.length === 0 && packages.length === 0 ? <p className="text-sm text-muted-foreground">No live job, project, or package records are currently visible for this role.</p> : (
+          {joinedJobs.length === 0 && packages.length === 0 && delegatedTasks.length === 0 ? <p className="text-sm text-muted-foreground">No live job, project, package, or delegated task records are currently visible for this role.</p> : (
             <>
               {joinedJobs.slice(0, 5).map((job) => (
                 <div key={`job-${job.id}`} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -298,6 +325,12 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
                 <div key={`package-${pkg.id}`} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                   <div><p className="font-semibold">{pkg.title}</p><p className="text-xs text-muted-foreground">Package · {pkg.createdAt} · {pkg.source === 'awarded' ? 'awarded to you' : 'visible opportunity'}</p></div>
                   <Badge variant={pkg.status === 'awarded' ? 'default' : 'secondary'} className="rounded-full">{pkg.status}</Badge>
+                </div>
+              ))}
+              {joinedJobs.length + packages.length < 5 && delegatedTasks.slice(0, 5 - joinedJobs.length - packages.length).map((task) => (
+                <div key={"task-" + task.id} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div><p className="font-semibold">{task.assigneeRole || "Delegated task"}</p><p className="text-xs text-muted-foreground">Freelancer task · {task.createdAt} · due {task.deadline || "not recorded"}</p></div>
+                  <Badge variant={task.status === "completed" ? "default" : "secondary"} className="rounded-full">{task.submissionStatus?.replaceAll("_", " ") ?? task.status}</Badge>
                 </div>
               ))}
             </>
