@@ -19,7 +19,7 @@ import {
   browserLocalPersistence,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { UserProfile, UserRole, KnowledgeCitation } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './components/ui/card';
@@ -407,25 +407,68 @@ export default function App() {
     return () => unsubscribe();
   }, [isAdminRoute]);
 
+  const readJsonResponse = async (res: Response) => {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const preview = (await res.text()).slice(0, 120).replace(/\s+/g, ' ');
+      throw new Error(`Expected JSON from auth API, received ${contentType || 'unknown content type'} (${res.status}). ${preview}`);
+    }
+    return res.json();
+  };
+
+  const createClientProfileFallback = async (selectedRole: UserRole | null, firebaseUser: FirebaseUser) => {
+    const userRef = doc(db, 'users', firebaseUser.uid);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) return { existing: true, role: (userDoc.data() as UserProfile).role };
+
+    const fallbackRole: UserRole = selectedRole && selectedRole !== 'admin' ? selectedRole : 'client';
+    if (isAdminRoute || selectedRole === 'admin') {
+      throw new Error('Admin profile sync requires the secured API route. Please use the admin deployment with API support.');
+    }
+
+    const now = new Date().toISOString();
+    const fallbackProfile: UserProfile = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || '',
+      displayName: displayName || firebaseUser.displayName || 'Architex User',
+      role: fallbackRole,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(userRef, fallbackProfile);
+    console.warn('Auth API unavailable; created minimal client-side profile fallback for static hosting.');
+    return { role: fallbackRole, created: true, fallback: true };
+  };
+
   const syncServerProfile = async (selectedRole: UserRole | null, firebaseUser: FirebaseUser = auth.currentUser!) => {
     const token = await firebaseUser?.getIdToken();
     if (!token) return null;
 
-    const res = await fetch('/api/auth/check-admin', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ role: selectedRole || 'client', displayName, profileData: formData }),
-    });
+    try {
+      const res = await fetch('/api/auth/check-admin', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ role: selectedRole || 'client', displayName, profileData: formData }),
+      });
 
-    if (!res.ok) {
-      const details = await res.json().catch(() => null);
-      throw new Error(details?.details || details?.error || 'Failed to sync Firebase profile');
+      if (!res.ok) {
+        const details = await readJsonResponse(res).catch(() => null);
+        throw new Error(details?.details || details?.error || 'Failed to sync Firebase profile');
+      }
+
+      return readJsonResponse(res);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('Expected JSON from auth API') || message.includes('Failed to fetch') || message.includes('NetworkError')) {
+        return createClientProfileFallback(selectedRole, firebaseUser);
+      }
+      throw error;
     }
-
-    return res.json();
   };
 
   const ensureAdminAccess = async (firebaseUser: any) => {
