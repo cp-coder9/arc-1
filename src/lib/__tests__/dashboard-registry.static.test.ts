@@ -193,6 +193,16 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain('data-testid={`nav-page-${page.id}`}');
   });
 
+  it('keeps role-aware dashboard keyboard shortcuts discoverable and input-safe', () => {
+    expect(appSource).toContain('function isEditableShortcutTarget');
+    expect(appSource).toContain('handleDashboardShortcut');
+    expect(appSource).toContain('event.altKey');
+    expect(appSource).toContain('visiblePages[numericShortcut - 1]?.id');
+    expect(appSource).toContain('data-testid="dashboard-keyboard-shortcuts"');
+    expect(appSource).toContain('Alt+1–9 opens your first visible pages');
+    expect(appSource).toContain('setIsSidebarOpen(false);');
+  });
+
   it('routes the shared command page to the real project command centre projection', () => {
     expect(appSource).toContain("const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));"
     );

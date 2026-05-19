@@ -113,7 +113,7 @@ All previously critical items have been completed:
 
 ### UX Improvements
 
-- [ ] Add keyboard navigation shortcuts
+- [x] Add keyboard navigation shortcuts
 - [x] Add tour/onboarding for new users
 - [x] Add dark mode toggle
 - [x] Improve mobile sidebar/dashboard responsiveness

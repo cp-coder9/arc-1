@@ -312,6 +312,11 @@ function pageLabelFor(activeTab: string) {
   return pageById(activeTab)?.label ?? activeTab.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
+
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
   const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.endsWith('/admin');
@@ -565,6 +570,37 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!user) return;
+
+    const handleDashboardShortcut = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.repeat) return;
+      if (isEditableShortcutTarget(event.target)) return;
+
+      const visiblePages = pagesForRole(user.role);
+      const numericShortcut = Number(event.key);
+      const numericTarget = Number.isInteger(numericShortcut) && numericShortcut >= 1 && numericShortcut <= 9
+        ? visiblePages[numericShortcut - 1]?.id
+        : undefined;
+      const quickTargetByKey: Record<string, string | undefined> = {
+        k: "command",
+        a: pageById("ai")?.roles.includes(user.role) ? "ai" : undefined,
+        p: pageById("profile")?.roles.includes(user.role) ? "profile" : undefined,
+        f: "files",
+        i: ["bep", "architect", "contractor", "freelancer", "admin"].includes(user.role) ? "invoicing" : undefined,
+      };
+      const targetPage = numericTarget ?? quickTargetByKey[event.key.toLowerCase()];
+
+      if (!targetPage) return;
+      event.preventDefault();
+      setActiveTab(targetPage);
+      setIsSidebarOpen(false);
+    };
+
+    window.addEventListener("keydown", handleDashboardShortcut);
+    return () => window.removeEventListener("keydown", handleDashboardShortcut);
+  }, [user]);
+
   if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -742,6 +778,7 @@ export default function App() {
   const currentPageLabel = pageLabelFor(activeTab);
   const currentSectionLabel = currentPage ? dashboardSectionLabel(currentPage.group) : 'Workspace';
   const roleVisual = roleVisualFor(user.role);
+  const visibleShortcutPages = pagesForRole(user.role).slice(0, 9);
 
   return (
     <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
@@ -947,6 +984,14 @@ export default function App() {
               />
             </div>
           </nav>
+
+            <div className="mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground" data-testid="dashboard-keyboard-shortcuts">
+              <p className="font-bold text-foreground">Keyboard shortcuts</p>
+              <p className="mt-1">Alt+1–9 opens your first visible pages. Alt+K Command, Alt+A AI, Alt+P Profile, Alt+F Files, Alt+I Invoicing.</p>
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Visible page shortcut map">
+                {visibleShortcutPages.slice(0, 5).map((page, index) => <Badge key={page.id} variant="outline" className="rounded-full bg-background/70">Alt+{index + 1}: {page.label}</Badge>)}
+              </div>
+            </div>
 
           <div className="pt-5 mt-auto border-t border-border/70 shrink-0">
             <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold" onClick={handleLogout}>
