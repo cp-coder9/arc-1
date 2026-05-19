@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useCallback, useState, useEffect } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
+import { trackUserActivity, type UserActivitySource } from './lib/userActivity';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -330,6 +331,21 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('command');
 
+  const navigateDashboard = useCallback((targetPage: string, source: UserActivitySource = 'component') => {
+    setActiveTab(targetPage);
+    setIsSidebarOpen(false);
+    if (user) {
+      trackUserActivity({
+        action: 'navigate',
+        role: user.role,
+        feature: targetPage,
+        source,
+        target: targetPage,
+        label: pageLabelFor(targetPage),
+      });
+    }
+  }, [user]);
+
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>('selection');
   const [email, setEmail] = useState('');
@@ -380,6 +396,14 @@ export default function App() {
     void trackEvent('dashboard_tab_view', {
       tab: activeTab,
       role: user.role,
+    });
+    trackUserActivity({
+      action: 'feature_view',
+      role: user.role,
+      feature: activeTab,
+      source: 'dashboard_tab',
+      target: activeTab,
+      label: pageLabelFor(activeTab),
     });
   }, [activeTab, user]);
 
@@ -593,13 +617,12 @@ export default function App() {
 
       if (!targetPage) return;
       event.preventDefault();
-      setActiveTab(targetPage);
-      setIsSidebarOpen(false);
+      navigateDashboard(targetPage, 'keyboard_shortcut');
     };
 
     window.addEventListener("keydown", handleDashboardShortcut);
     return () => window.removeEventListener("keydown", handleDashboardShortcut);
-  }, [user]);
+  }, [navigateDashboard, user]);
 
   if (loading || profileLoading) {
     return (
@@ -815,7 +838,7 @@ export default function App() {
               icon={<LayoutDashboard size={18} />}
               label="Command Centre"
               active={activeTab === 'command'}
-              onClick={() => { setActiveTab('command'); setIsSidebarOpen(false); }}
+              onClick={() => navigateDashboard('command', 'sidebar')}
               data-testid="nav-page-command"
             />
             {Object.entries(
@@ -835,7 +858,7 @@ export default function App() {
                     icon={page.icon}
                     label={page.label}
                     active={activeTab === page.id}
-                    onClick={() => { setActiveTab(page.id); setIsSidebarOpen(false); }}
+                    onClick={() => navigateDashboard(page.id, 'sidebar')}
                     data-testid={`nav-page-${page.id}`}
                   />
                 ))}
@@ -846,7 +869,7 @@ export default function App() {
                 icon={<Plus size={18} />}
                 label="Post a Job (legacy)"
                 active={activeTab === 'post-job'}
-                onClick={() => { setActiveTab('post-job'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('post-job', 'sidebar')}
               />
             )}
             {(DESIGN_TEAM_ROLES.includes(user!.role) || user!.primaryFirmId) && (
@@ -854,7 +877,7 @@ export default function App() {
                 icon={<Building2 size={18} />}
                 label="Firm Workspace"
                 active={activeTab === 'firm'}
-                onClick={() => { setActiveTab('firm'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('firm', 'sidebar')}
               />
             )}
             {user!.role === 'contractor' && (
@@ -862,7 +885,7 @@ export default function App() {
                 icon={<Search size={18} />}
                 label="Tender Marketplace"
                 active={activeTab === 'marketplace'}
-                onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('marketplace', 'sidebar')}
               />
             )}
             {DESIGN_TEAM_ROLES.includes(user!.role) && (
@@ -870,7 +893,7 @@ export default function App() {
                 icon={<Search size={18} />}
                 label="Marketplace"
                 active={activeTab === 'marketplace'}
-                onClick={() => { setActiveTab('marketplace'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('marketplace', 'sidebar')}
               />
             )}
             {DESIGN_TEAM_ROLES.includes(user!.role) && (
@@ -878,7 +901,7 @@ export default function App() {
                 icon={<Send size={18} />}
                 label="My Applications"
                 active={activeTab === 'applications'}
-                onClick={() => { setActiveTab('applications'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('applications', 'sidebar')}
               />
             )}
             {DESIGN_TEAM_ROLES.includes(user!.role) && (
@@ -886,7 +909,7 @@ export default function App() {
                 icon={<Users size={18} />}
                 label="Team & Freelancers"
                 active={activeTab === 'team'}
-                onClick={() => { setActiveTab('team'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('team', 'sidebar')}
               />
             )}
             {DESIGN_TEAM_ROLES.includes(user!.role) && (
@@ -894,7 +917,7 @@ export default function App() {
                 icon={<Users size={18} />}
                 label="Coordination"
                 active={activeTab === 'coordination'}
-                onClick={() => { setActiveTab('coordination'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('coordination', 'sidebar')}
               />
             )}
             {(user!.role === 'client' || DESIGN_TEAM_ROLES.includes(user!.role)) && (
@@ -902,14 +925,14 @@ export default function App() {
                 icon={<Calculator size={18} />}
                 label="Fee Estimator"
                 active={activeTab === 'fees'}
-                onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('fees', 'sidebar')}
               />
             )}
             <NavItem
               icon={<FileText size={18} />}
               label="Active Projects"
               active={activeTab === 'projects'}
-              onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }}
+              onClick={() => navigateDashboard('projects', 'sidebar')}
             />
             {user!.role === 'admin' && (
               <>
@@ -917,43 +940,43 @@ export default function App() {
                   icon={<ShieldCheck size={18} />}
                   label="Compliance Hub"
                   active={activeTab === 'compliance'}
-                  onClick={() => { setActiveTab('compliance'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('compliance', 'sidebar')}
                 />
                 <NavItem
                   icon={<Users size={18} />}
                   label="User Management"
                   active={activeTab === 'users'}
-                  onClick={() => { setActiveTab('users'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('users', 'sidebar')}
                 />
                 <NavItem
                   icon={<Settings2 size={18} />}
                   label="LLM Settings"
                   active={activeTab === 'settings'}
-                  onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('settings', 'sidebar')}
                 />
                 <NavItem
                   icon={<Sparkles size={18} />}
                   label="Knowledge Base"
                   active={activeTab === 'knowledge'}
-                  onClick={() => { setActiveTab('knowledge'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('knowledge', 'sidebar')}
                 />
                 <NavItem
                   icon={<Calculator size={18} />}
                   label="Fees"
                   active={activeTab === 'fees'}
-                  onClick={() => { setActiveTab('fees'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('fees', 'sidebar')}
                 />
                 <NavItem
                   icon={<Landmark size={18} />}
                   label="Financial"
                   active={activeTab === 'financial'}
-                  onClick={() => { setActiveTab('financial'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('financial', 'sidebar')}
                 />
                 <NavItem
                   icon={<Building2 size={18} />}
                   label="Firms"
                   active={activeTab === 'firms'}
-                  onClick={() => { setActiveTab('firms'); setIsSidebarOpen(false); }}
+                  onClick={() => navigateDashboard('firms', 'sidebar')}
                 />
               </>
             )}
@@ -961,26 +984,26 @@ export default function App() {
               icon={<History size={18} />}
               label="Audit Logs"
               active={activeTab === 'audit'}
-              onClick={() => { setActiveTab('audit'); setIsSidebarOpen(false); }}
+              onClick={() => navigateDashboard('audit', 'sidebar')}
             />
             <div className="pt-4 mt-4 border-t border-border/70">
               <NavItem
                 icon={<CreditCard size={18} />}
                 label="Invoices"
                 active={activeTab === 'invoices'}
-                onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('invoices', 'sidebar')}
               />
               <NavItem
                 icon={<HardDrive size={18} />}
                 label="Files"
                 active={activeTab === 'files'}
-                onClick={() => { setActiveTab('files'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('files', 'sidebar')}
               />
               <NavItem
                 icon={<UserCircle size={18} />}
                 label="My Settings"
                 active={activeTab === 'profile-settings'}
-                onClick={() => { setActiveTab('profile-settings'); setIsSidebarOpen(false); }}
+                onClick={() => navigateDashboard('profile-settings', 'sidebar')}
               />
             </div>
           </nav>
@@ -1020,7 +1043,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {activeTab !== 'ai' && pageById('ai')?.roles.includes(user.role) && (
-              <Button variant="outline" size="sm" className="hidden rounded-full border-[#7046a8]/25 bg-[#7046a8]/10 font-black text-[#7046a8] hover:bg-[#7046a8] hover:text-white sm:inline-flex" onClick={() => setActiveTab('ai')}>
+              <Button variant="outline" size="sm" className="hidden rounded-full border-[#7046a8]/25 bg-[#7046a8]/10 font-black text-[#7046a8] hover:bg-[#7046a8] hover:text-white sm:inline-flex" onClick={() => navigateDashboard('ai', 'header_cta')}>
                 <Bot className="mr-2 h-4 w-4" /> Ask AI
               </Button>
             )}
@@ -1072,13 +1095,13 @@ export default function App() {
               {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && activeTab !== 'technical-brief' && activeTab !== 'directory-search' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
-                  {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
-                  {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
-                  {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={setActiveTab} />}
+                  {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
+                  {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
+                  {user.role === 'admin' && <AdminDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
-                  {(user.role === 'subcontractor' || user.role === 'supplier') && <RoleLegacyFallbackPage activeTab={activeTab} user={user} onNavigate={setActiveTab} />}
+                  {(user.role === 'subcontractor' || user.role === 'supplier') && <RoleLegacyFallbackPage activeTab={activeTab} user={user} onNavigate={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                 </>
               )}
             </Suspense>
