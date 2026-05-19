@@ -109,3 +109,5 @@ Hosting target: shared hosting with MySQL
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.
+
+- Uploaded media optimization pass: introduced a reusable `OptimizedImage` wrapper with default lazy loading, async decoding, responsive `sizes`, fetch-priority handling, no-referrer policy, and safe error marking; applied it to architect portfolio galleries, profile-editor portfolio thumbnails, File Manager image cards, and site-log photo thumbnails. Marked the portfolio/uploaded-media image optimization backlog item complete. Targeted validation passed: `npm run lint -- --pretty false` and `npx vitest run src/components/ui/optimized-image.test.tsx src/components/__tests__/FileManager.quickscan.test.tsx` (5 tests).

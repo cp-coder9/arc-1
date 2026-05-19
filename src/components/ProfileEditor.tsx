@@ -11,6 +11,7 @@ import { User, Settings, Save, Loader2, Plus, Trash2, Image as ImageIcon, Shield
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { uploadAndTrackFile } from '../lib/uploadService';
+import { OptimizedImage } from './ui/optimized-image';
 
 interface ProfileEditorProps {
   user: UserProfile;
@@ -418,7 +419,7 @@ const handleSave = async (e: React.FormEvent) => {
                       {portfolioImages.map((img, idx) => (
                         <div key={idx} className="bg-secondary/20 p-4 rounded-2xl border border-border flex gap-4">
                           <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-border">
-                            <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
+                            <OptimizedImage src={img.url} alt={img.title} className="w-full h-full object-cover" sizes="96px" />
                           </div>
                           <div className="flex-1 space-y-2">
                             <Input

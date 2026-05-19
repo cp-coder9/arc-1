@@ -107,7 +107,7 @@ All previously critical items have been completed:
 
 - [x] Implement route/component code splitting for dashboard bundles
 - [x] Lazy-load heavy dashboard, file, invoice, settings, and onboarding components
-- [ ] Add image optimization for portfolio and uploaded media
+- [x] Add image optimization for portfolio and uploaded media
 - [ ] Implement virtual scrolling for very large lists
 - [x] Add offline persistence for Firestore
 

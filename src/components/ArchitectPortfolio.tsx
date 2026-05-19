@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, Award, Briefcase, Calendar, Link as LinkIcon, MapPin, ShieldCheck, ShieldX } from 'lucide-react';
 import { ArchitectProfile, Review, UserProfile } from '@/types';
 import { safeFormat } from '@/lib/utils';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 
 interface ArchitectPortfolioProps {
   architectId: string;
@@ -208,10 +209,11 @@ export function ArchitectPortfolio({ architectId }: ArchitectPortfolioProps) {
               {profile.portfolioImages.map((image, index) => (
                 <Card key={index} className="overflow-hidden group cursor-pointer">
                   <div className="aspect-video relative">
-                    <img
+                    <OptimizedImage
                       src={image.url}
                       alt={image.title}
                       className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
                   </div>
                   <CardContent className="p-4">

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { createSiteLog, subscribeToSiteLogs } from '@/services/constructionService';
 import { uploadAndTrackFile } from '@/lib/uploadService';
 import { paginateItems, safeFormat, totalPages } from '@/lib/utils';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 
 const PAGE_SIZE = 5;
 
@@ -144,7 +145,7 @@ export default function SiteLogManager({ projectId, jobId, currentUserId, compac
             </div>
             {log.photos.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {log.photos.map((photo) => <a key={photo.url} href={photo.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-border"><img src={photo.url} alt={photo.caption} className="h-20 w-full object-cover" /></a>)}
+                {log.photos.map((photo) => <a key={photo.url} href={photo.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-border"><OptimizedImage src={photo.url} alt={photo.caption} className="h-20 w-full object-cover" sizes="(max-width: 768px) 50vw, 25vw" /></a>)}
               </div>
             )}
           </div>

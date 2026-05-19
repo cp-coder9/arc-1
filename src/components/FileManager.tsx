@@ -28,6 +28,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { safeFormat, cn } from '@/lib/utils';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 
 interface FileManagerProps {
   user: UserProfile;
@@ -428,11 +429,11 @@ export default function FileManager({ user }: FileManagerProps) {
           <Card key={file.id} className="group overflow-hidden rounded-[1.5rem] border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white">
             <div className="aspect-video bg-secondary/30 flex items-center justify-center relative group-hover:bg-secondary/10 transition-colors">
               {displayFileType(file).startsWith('image/') ? (
-                <img 
-                  src={file.url} 
+                <OptimizedImage
+                  src={file.url}
                   alt={displayFileName(file)}
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                  referrerPolicy="no-referrer"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 />
               ) : (
                 <div className="p-6 bg-white rounded-2xl shadow-sm border border-border">
