@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { auth, db } from '../lib/firebase';
 import { updateProfile, updateEmail, EmailAuthProvider, reauthenticateWithCredential, sendPasswordResetEmail, sendEmailVerification, reload } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -10,9 +10,104 @@ import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { User, Mail, Shield, AlertCircle, Loader2, Save, Key, UserCircle, Bell } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
+import { getRoleProfileCompletion, sanitizeRoleProfileUpdate } from '../services/roleProfileService';
 
 interface UserSettingsProps {
   user: UserProfile;
+}
+
+type RoleProfileField = {
+  key: string;
+  label: string;
+  helper: string;
+  kind?: 'text' | 'textarea' | 'array' | 'boolean' | 'object';
+};
+
+const ROLE_PROFILE_FIELDS: Record<UserProfile['role'], RoleProfileField[]> = {
+  client: [
+    { key: 'billingAddress', label: 'Billing address', helper: 'Used for invoices, payment gateway checks, and escrow notices.' },
+    { key: 'ownerAddress', label: 'Project owner address', helper: 'Required for appointments, statutory records, and ownership checks.' },
+    { key: 'idNumber', label: 'ID / registration number', helper: 'Client or company identity reference for governed workflows.' },
+    { key: 'digitalSignatureStatus', label: 'Digital signature status', helper: 'Use active, pending, or not_started.' },
+  ],
+  bep: [
+    { key: 'disciplines', label: 'Professional disciplines', helper: 'Comma-separated disciplines, e.g. architecture, structural, fire.', kind: 'array' },
+    { key: 'statutoryBody', label: 'Statutory body', helper: 'SACAP, ECSA, SACPCMP, SAIAT, or other registration body.' },
+    { key: 'registrationNumber', label: 'Registration number', helper: 'Professional registration reference used for proposal and signing readiness.' },
+    { key: 'professionalIndemnity', label: 'Professional indemnity', helper: 'Policy summary or insurer reference.', kind: 'object' },
+    { key: 'practiceDetails', label: 'Practice details', helper: 'Practice/entity details for appointments and invoices.', kind: 'object' },
+    { key: 'taxNumber', label: 'Tax number', helper: 'Used for invoice readiness.' },
+    { key: 'digitalSignatureStatus', label: 'Digital signature status', helper: 'Use active, pending, or not_started.' },
+  ],
+  architect: [
+    { key: 'disciplines', label: 'Professional disciplines', helper: 'Comma-separated disciplines. Architects are treated as BEP/design-team professionals.', kind: 'array' },
+    { key: 'statutoryBody', label: 'Statutory body', helper: 'Usually SACAP for architects.' },
+    { key: 'registrationNumber', label: 'Registration number', helper: 'Professional registration reference used for proposal and signing readiness.' },
+    { key: 'professionalIndemnity', label: 'Professional indemnity', helper: 'Policy summary or insurer reference.', kind: 'object' },
+    { key: 'practiceDetails', label: 'Practice details', helper: 'Practice/entity details for appointments and invoices.', kind: 'object' },
+    { key: 'taxNumber', label: 'Tax number', helper: 'Used for invoice readiness.' },
+    { key: 'digitalSignatureStatus', label: 'Digital signature status', helper: 'Use active, pending, or not_started.' },
+  ],
+  contractor: [
+    { key: 'cidbNumber', label: 'CIDB number', helper: 'Contractor tender/package eligibility reference.' },
+    { key: 'nhbrcNumber', label: 'NHBRC number', helper: 'Required where residential building compliance applies.' },
+    { key: 'companyRegistrationNumber', label: 'Company registration number', helper: 'Company identity for contracts and payments.' },
+    { key: 'healthSafetyFiles', label: 'Health & safety file references', helper: 'Comma-separated references or uploaded document names.', kind: 'array' },
+    { key: 'plantCapacity', label: 'Plant capacity', helper: 'Comma-separated plant/resource capability.', kind: 'array' },
+    { key: 'labourCapacity', label: 'Labour capacity', helper: 'Number or summary of available labour.' },
+    { key: 'bankingDetails', label: 'Banking readiness note', helper: 'Banking reference for payment-governance readiness.', kind: 'object' },
+  ],
+  subcontractor: [
+    { key: 'tradeCategories', label: 'Trade categories', helper: 'Comma-separated package trades.', kind: 'array' },
+    { key: 'packageTypes', label: 'Package types', helper: 'Comma-separated package types you can execute.', kind: 'array' },
+    { key: 'serviceAreas', label: 'Service areas', helper: 'Comma-separated regions or municipalities.', kind: 'array' },
+    { key: 'insurance', label: 'Insurance readiness', helper: 'Insurance policy or cover note.', kind: 'object' },
+    { key: 'bankingDetails', label: 'Banking readiness note', helper: 'Banking reference for payment-claim readiness.', kind: 'object' },
+  ],
+  supplier: [
+    { key: 'productCategories', label: 'Product categories', helper: 'Comma-separated supplier product categories.', kind: 'array' },
+    { key: 'deliveryRegions', label: 'Delivery regions', helper: 'Comma-separated delivery regions or municipalities.', kind: 'array' },
+    { key: 'catalogueUrls', label: 'Catalogue URLs', helper: 'Comma-separated catalogue or API/product links.', kind: 'array' },
+    { key: 'warrantySupport', label: 'Warranty support available', helper: 'Confirm whether warranty support is available.', kind: 'boolean' },
+    { key: 'productSupportContact', label: 'Product support contact', helper: 'Email/phone for technical or warranty support.' },
+    { key: 'bankingDetails', label: 'Banking readiness note', helper: 'Banking reference for payment-claim readiness.', kind: 'object' },
+  ],
+  freelancer: [
+    { key: 'skills', label: 'Skills', helper: 'Comma-separated skills offered to BEP teams.', kind: 'array' },
+    { key: 'software', label: 'Software', helper: 'Comma-separated software/tool capability.', kind: 'array' },
+    { key: 'availability', label: 'Availability', helper: 'Availability window or workload note.' },
+    { key: 'portfolioUrls', label: 'Portfolio URLs', helper: 'Comma-separated portfolio or sample links.', kind: 'array' },
+    { key: 'payoutDetails', label: 'Payout readiness note', helper: 'Payout reference for invoice readiness.', kind: 'object' },
+  ],
+  admin: [
+    { key: 'permissionLevel', label: 'Permission level', helper: 'Governance permission level for audit visibility.' },
+    { key: 'department', label: 'Department', helper: 'Admin/governance department or function.' },
+    { key: 'twoFactorEnabled', label: '2FA enabled', helper: 'Confirm whether 2FA is enabled.', kind: 'boolean' },
+    { key: 'auditIdentity', label: 'Audit identity', helper: 'Audit identity or staff reference.', kind: 'object' },
+  ],
+};
+
+const ARRAY_FIELDS = new Set(['disciplines', 'healthSafetyFiles', 'plantCapacity', 'tradeCategories', 'packageTypes', 'serviceAreas', 'productCategories', 'deliveryRegions', 'catalogueUrls', 'skills', 'software', 'portfolioUrls']);
+const OBJECT_FIELDS = new Set(['professionalIndemnity', 'practiceDetails', 'bankingDetails', 'insurance', 'payoutDetails', 'auditIdentity']);
+
+function valueToInput(value: unknown) {
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (typeof record.note === 'string') return record.note;
+    return JSON.stringify(value);
+  }
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+}
+
+function normalizeRoleProfileValue(field: RoleProfileField, raw: string | boolean) {
+  if (field.kind === 'boolean') return Boolean(raw);
+  if (typeof raw !== 'string') return raw;
+  const trimmed = raw.trim();
+  if (field.kind === 'array' || ARRAY_FIELDS.has(field.key)) return trimmed ? trimmed.split(',').map((item) => item.trim()).filter(Boolean) : [];
+  if (field.kind === 'object' || OBJECT_FIELDS.has(field.key)) return trimmed ? { note: trimmed } : {};
+  return trimmed;
 }
 
 export default function UserSettings({ user }: UserSettingsProps) {
@@ -29,6 +124,13 @@ export default function UserSettings({ user }: UserSettingsProps) {
     email: user.notificationPreferences?.email ?? true,
     push: user.notificationPreferences?.push ?? true,
   });
+  const roleFields = ROLE_PROFILE_FIELDS[user.role] ?? [];
+  const [roleProfileDraft, setRoleProfileDraft] = useState<Record<string, string | boolean>>(() => {
+    const initial: Record<string, string | boolean> = {};
+    for (const field of roleFields) initial[field.key] = field.kind === 'boolean' ? Boolean((user as unknown as Record<string, unknown>)[field.key]) : valueToInput((user as unknown as Record<string, unknown>)[field.key]);
+    return initial;
+  });
+  const profileCompletion = useMemo(() => getRoleProfileCompletion(user.role, user as unknown as Record<string, unknown>), [user]);
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -42,9 +144,15 @@ export default function UserSettings({ user }: UserSettingsProps) {
       }
 
       // Update Firestore
+      const roleProfilePayload = roleFields.reduce<Record<string, unknown>>((payload, field) => {
+        payload[field.key] = normalizeRoleProfileValue(field, roleProfileDraft[field.key]);
+        return payload;
+      }, {});
+      const sanitizedRoleProfile = sanitizeRoleProfileUpdate(user.role, roleProfilePayload);
       await updateDoc(doc(db, 'users', user.uid), {
         displayName,
         bio,
+        ...sanitizedRoleProfile,
         updatedAt: new Date().toISOString()
       });
 
@@ -138,7 +246,7 @@ export default function UserSettings({ user }: UserSettingsProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12">
+    <div className="max-w-5xl mx-auto space-y-8">
       <div className="bg-white p-10 rounded-[2.5rem] border border-border">
         <div className="flex items-center gap-6 mb-8">
           <div className="w-20 h-20 rounded-3xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-3xl shadow-xl shadow-primary/20">
@@ -175,6 +283,59 @@ export default function UserSettings({ user }: UserSettingsProps) {
                   className="min-h-[150px] rounded-2xl bg-secondary/30 border-none p-6 focus:ring-2 focus:ring-primary/50 text-base"
                   placeholder="Tell clients or architects about yourself..."
                 />
+              </div>
+
+              <div className="rounded-[1.5rem] border border-primary/15 bg-primary/5 p-5 space-y-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-xl font-heading font-bold flex items-center gap-2"><Shield className="h-5 w-5 text-primary" /> Role readiness profile</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">These fields feed matching, verification, contracts, invoices, payment governance, and signature readiness. They do not approve payments or sign documents automatically.</p>
+                  </div>
+                  <div className="rounded-full bg-white px-4 py-2 text-sm font-black text-primary border border-primary/15">
+                    {Math.round(profileCompletion.completionRatio * 100)}% ready
+                  </div>
+                </div>
+                {profileCompletion.blockers.length > 0 && (
+                  <div className="rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p className="font-bold flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Readiness blockers</p>
+                    <ul className="mt-2 list-disc pl-5 space-y-1">
+                      {profileCompletion.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                    </ul>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {roleFields.map((field) => (
+                    <div key={field.key} className={field.kind === 'textarea' || field.kind === 'object' ? 'sm:col-span-2 space-y-2' : 'space-y-2'}>
+                      <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">{field.label}</label>
+                      {field.kind === 'boolean' ? (
+                        <label className="flex h-14 items-center gap-3 rounded-2xl bg-white/80 border border-primary/10 px-5 text-sm font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(roleProfileDraft[field.key])}
+                            onChange={(event) => setRoleProfileDraft((current) => ({ ...current, [field.key]: event.target.checked }))}
+                            className="h-4 w-4 accent-primary"
+                          />
+                          Available / enabled
+                        </label>
+                      ) : field.kind === 'textarea' || field.kind === 'object' ? (
+                        <Textarea
+                          value={String(roleProfileDraft[field.key] ?? '')}
+                          onChange={(event) => setRoleProfileDraft((current) => ({ ...current, [field.key]: event.target.value }))}
+                          className="min-h-24 rounded-2xl bg-white/80 border-primary/10 p-4 focus:ring-2 focus:ring-primary/50"
+                          placeholder={field.helper}
+                        />
+                      ) : (
+                        <Input
+                          value={String(roleProfileDraft[field.key] ?? '')}
+                          onChange={(event) => setRoleProfileDraft((current) => ({ ...current, [field.key]: event.target.value }))}
+                          className="h-14 rounded-2xl bg-white/80 border-primary/10 px-5 focus:ring-2 focus:ring-primary/50"
+                          placeholder={field.helper}
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground leading-relaxed">{field.helper}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <Button 

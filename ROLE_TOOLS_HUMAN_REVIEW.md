@@ -565,3 +565,27 @@ Validation completed for this pass:
 Operational note:
 
 - Chrome DevTools MCP endpoint timed out during this pass, so the browser validation was completed with the same Chromium/Playwright harness used for the project's E2E coverage. The MCP endpoint should be repaired separately before relying on it for future manual-browser checks.
+
+## 2026-05-19 role-profile readiness editor pass
+
+Scope followed from `backend.html`: expose role-specific profile, verification, payment-readiness, digital-signature, and matching fields in the real account/profile surface instead of leaving them as backend-only allowlist fields.
+
+Implemented:
+
+- Added a `Role readiness profile` panel to `UserSettings` for every login role.
+- Client fields now include billing address, project owner address, identity/registration reference, and digital signature status.
+- BEP/design-team fields now include disciplines, statutory body, registration number, professional indemnity, practice details, tax number, and digital signature status.
+- Contractor fields now include CIDB, NHBRC, company registration, health and safety references, plant/labour capacity, and banking readiness.
+- Subcontractor/supplier fields now include trade/product categories, package/delivery regions, warranty/product support, insurance, and banking readiness.
+- Freelancer fields now include skills, software, availability, portfolio links, and payout readiness.
+- Admin fields now include permission level, department, 2FA state, and audit identity.
+- Profile saves continue through `sanitizeRoleProfileUpdate`, so privilege fields such as role, verification status, trust score, and admin claims remain blocked.
+- The panel displays the same role-completion blockers used by the Command Centre profile readiness metric.
+
+Validation completed:
+
+- `npm run lint`: passed.
+- `npx vitest run src/services/__tests__/roleProfileService.test.ts src/lib/__tests__/dashboard-registry.static.test.ts --testTimeout 20000`: 2 files passed, 49 tests passed.
+- Local Chromium browser smoke against the Vite sidebar harness verified the Profile Editor for client, BEP, contractor, supplier, subcontractor, freelancer, and admin roles with no console/page errors and expected role-specific fields visible.
+
+Human review note: the profile panel records readiness metadata only. It does not verify statutory registrations, activate digital signatures, approve banking, or release payments without the existing human/admin/provider workflows.
