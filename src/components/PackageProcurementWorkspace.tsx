@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, collectionGroup, limit, onSnapshot, query, where } from 'firebase/firestore';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Factory, FileText, Loader2, PackageCheck, Plus, Search, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, ClipboardCheck, Factory, FileText, Loader2, MessageSquarePlus, PackageCheck, Plus, Search, ShoppingCart } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Bid, GanttTask, Project, RFI, SiteInspection, SiteLog, TenderPackage, UserProfile } from '@/types';
 import { assessContractorWorkflow } from '@/services/contractorWorkflowService';
@@ -270,6 +270,42 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
     awarded: tenders.filter((tender) => tender.status === 'awarded').length,
   }), [commitments, tenders]);
 
+  const packageParticipantDashboard = useMemo(() => {
+    if (!selectedTender || !['subcontractor', 'supplier'].includes(user.role)) return null;
+
+    const selectedTasks = tasks.filter((task: any) => task.packageId === selectedTender.id || task.projectId === selectedTender.projectId);
+    const selectedRfis = rfis.filter((rfi: any) => rfi.packageId === selectedTender.id || rfi.projectId === selectedTender.projectId);
+    const selectedSnags = snags.filter((snag) => snag.packageId === selectedTender.id);
+    const openCommitments = selectedCommitments.filter((item) => !['approved', 'issued', 'delivered', 'cancelled'].includes(item.status));
+    const requiredEvidenceOutstanding = selectedEvidence.filter((item) => item.requiredForCloseout && !['approved', 'closed'].includes(item.status));
+    const openRfis = selectedRfis.filter((rfi) => !['closed', 'resolved', 'answered'].includes(String((rfi as any).status)));
+    const openSnags = selectedSnags.filter((snag) => !['closed', 'rejected'].includes(snag.status));
+    const upcomingTasks = sortByRecent(selectedTasks.filter((task) => task.status !== 'completed')).slice(0, 3);
+
+    let nextAction = user.role === 'supplier'
+      ? 'Upload delivery note, product data, warranty, or payment evidence for the selected package.'
+      : 'Upload shop drawing, sample approval, RFI evidence, claim evidence, or close-out document for the selected package.';
+
+    if (openCommitments.length > 0) {
+      nextAction = `Follow up ${openCommitments[0].title} (${openCommitments[0].status.replace(/_/g, ' ')}).`;
+    } else if (requiredEvidenceOutstanding.length > 0) {
+      nextAction = `Close out required evidence: ${requiredEvidenceOutstanding[0].title}.`;
+    } else if (openRfis.length > 0) {
+      nextAction = `Resolve open RFI: ${openRfis[0].subject || 'package query'}.`;
+    } else if (openSnags.length > 0) {
+      nextAction = `Clear snag item: ${openSnags[0].title}.`;
+    }
+
+    return {
+      nextAction,
+      openCommitments,
+      requiredEvidenceOutstanding,
+      openRfis,
+      openSnags,
+      upcomingTasks,
+    };
+  }, [rfis, selectedCommitments, selectedEvidence, selectedTender, snags, tasks, user.role]);
+
   const submitCommitment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedTender || !draftTitle.trim()) return;
@@ -383,6 +419,45 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
           <MetricCard icon={<CheckCircle2 />} label="Awarded" value={stats.awarded} />
         </CardContent>
       </Card>
+
+      {packageParticipantDashboard && selectedTender && (
+        <Card className="rounded-2xl border-orange-200 bg-orange-50/70 shadow-sm" data-testid="package-participant-dashboard">
+          <CardHeader>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <Badge variant="secondary" className="uppercase tracking-widest">{user.role === 'supplier' ? 'Supplier package dashboard' : 'Subcontractor package dashboard'}</Badge>
+                <CardTitle className="font-heading text-2xl mt-3">{selectedTender.title}</CardTitle>
+                <CardDescription className="mt-2 max-w-3xl text-base">
+                  Dedicated package-only view for assigned scope, shop drawings/samples, orders, deliveries, claims, RFIs, snags, warranties, and close-out evidence. It never grants broader project mutation rights.
+                </CardDescription>
+              </div>
+              <Badge className="capitalize w-fit">package-limited</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border border-orange-200 bg-background/80 p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Next package action</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{packageParticipantDashboard.nextAction}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <MetricCard icon={<FileText />} label="Open commitments" value={packageParticipantDashboard.openCommitments.length} danger={packageParticipantDashboard.openCommitments.length > 0} />
+              <MetricCard icon={<Camera />} label="Evidence due" value={packageParticipantDashboard.requiredEvidenceOutstanding.length} danger={packageParticipantDashboard.requiredEvidenceOutstanding.length > 0} />
+              <MetricCard icon={<MessageSquarePlus />} label="Open RFIs" value={packageParticipantDashboard.openRfis.length} danger={packageParticipantDashboard.openRfis.length > 0} />
+              <MetricCard icon={<AlertTriangle />} label="Open snags" value={packageParticipantDashboard.openSnags.length} danger={packageParticipantDashboard.openSnags.length > 0} />
+            </div>
+            {packageParticipantDashboard.upcomingTasks.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {packageParticipantDashboard.upcomingTasks.map((task) => (
+                  <div key={task.id} className="rounded-xl border border-border bg-background/80 p-3 text-sm">
+                    <p className="font-semibold">{task.title || task.phase || 'Programme task'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{task.startDate || 'No start'} → {task.endDate || 'No due date'} · {task.status}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {canCreateTender(user) && selectedProject && (
         <TenderWizard projectId={selectedProject.id} jobId={selectedProject.jobId} createdBy={user.uid} onCreated={setSelectedTenderId} />
@@ -624,9 +699,9 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
   );
 }
 
-function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+function MetricCard({ icon, label, value, danger = false }: { icon: React.ReactNode; label: string; value: React.ReactNode; danger?: boolean }) {
   return (
-    <div className="rounded-2xl border border-border bg-background/70 p-4">
+    <div className={`rounded-2xl border bg-background/70 p-4 ${danger ? 'border-destructive/40' : 'border-border'}`}>
       <div className="flex items-center gap-2 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}<p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p></div>
       <p className="mt-3 font-heading text-3xl font-black">{value}</p>
     </div>
