@@ -104,15 +104,18 @@ describe('canonical dashboard page registry', () => {
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
     expectPage('admin-console', 'Admin Console', ['admin']);
   });
-  it('exposes every non-admin onboarding role explicitly, including architect, subcontractor, and supplier', () => {
-    for (const role of ['client', 'freelancer', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier']) {
+  it('keeps non-admin login options explicit while architects enter through BEP / Design Team', () => {
+    for (const role of ['client', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier']) {
       expect(appSource).toContain(`data-testid="role-select-${role}"`);
       expect(onboardingSource).toContain(`data-testid="role-select-${role}"`);
     }
 
-    expect(onboardingSource).toContain("role === 'architect' && renderArchitectOnboarding()");
+    expect(appSource).not.toContain('data-testid="role-select-architect"');
+    expect(onboardingSource).not.toContain('data-testid="role-select-architect"');
+    expect(onboardingSource).not.toContain("role === 'architect' && renderArchitectOnboarding()");
+    expect(appSource).toContain('Architects, engineers, QSs, technologists, and design-team leads');
+    expect(onboardingSource).toContain('Architects, engineers, QSs, technologists, and design-team leads');
     expect(onboardingSource).toContain("role === 'subcontractor' || role === 'supplier'");
-    expect(appSource).toContain('SACAP architect profile with legacy marketplace compatibility');
     expect(appSource).toContain('Authorized Architex administrators only');
   });
 

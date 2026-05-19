@@ -29,15 +29,16 @@ test.describe('Onboarding Flow', () => {
     await expect(page.getByPlaceholder('John Doe')).toBeVisible();
   });
 
-  test('should guide architect to account creation after onboarding', async ({ page }) => {
+  test('should guide BEP architect profile to account creation after onboarding', async ({ page }) => {
     await gotoApp(page);
 
     await clickLandingAction(page, 'Get Started');
     await expect(page.getByText('Join Architex')).toBeVisible();
 
-    await forceClick(page.getByTestId('role-select-architect'));
+    await forceClick(page.getByTestId('role-select-bep'));
+    await page.locator('select[name="professionalLabel"]').selectOption('Architect');
+    await page.locator('input[name="region"]').fill('Gauteng');
     await page.getByPlaceholder('ST123456').fill('ST123456');
-    await page.locator('input[name="experienceYears"]').fill('7');
     await page.locator('select[name="mainSpecialization"]').selectOption('Residential');
     await page.getByRole('button', { name: 'Finish Setup' }).click();
 

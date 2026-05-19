@@ -64,16 +64,9 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
       <RoleCard
         icon={<Construction className="w-8 h-8" />}
         title="BEP / Design Team"
-        description="Engineers, QSs, technologists, and design-team leads"
+        description="Architects, engineers, QSs, technologists, and design-team leads"
         onClick={() => handleRoleSelect('bep')}
         data-testid="role-select-bep"
-      />
-      <RoleCard
-        icon={<Building2 className="w-8 h-8" />}
-        title="Architect"
-        description="SACAP architect profile with marketplace compatibility"
-        onClick={() => handleRoleSelect('architect')}
-        data-testid="role-select-architect"
       />
       <RoleCard
         icon={<Factory className="w-8 h-8" />}
@@ -487,7 +480,6 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
               >
                 {step === 1 && renderRoleSelection()}
                 {step === 2 && role === 'client' && renderClientOnboarding()}
-                {step === 2 && role === 'architect' && renderArchitectOnboarding()}
                 {step === 2 && role === 'bep' && renderBEPOnboarding()}
                 {step === 2 && role === 'contractor' && renderContractorOnboarding()}
                 {step === 2 && (role === 'subcontractor' || role === 'supplier') && renderPackageParticipantOnboarding()}
