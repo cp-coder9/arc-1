@@ -103,6 +103,9 @@ Hosting target: shared hosting with MySQL
 - Broader browser OS validation: `PLAYWRIGHT_HTML_OPEN=never npx playwright test --project=chromium --reporter=line` completed successfully with 18/18 Chromium e2e tests passing.
 - Final unit regression after browser OS sweep: `npm test` completed successfully with 53 test files and 413/413 tests passing. Expected stderr/stdout appears from negative-path service tests only.
 
+
+- Role navigation matrix coverage: added a static registry invariant that pins all 38 canonical dashboard pages for all 8 canonical roles, closing the backend.html testing backlog item for role/page navigation coverage and guarding against accidental role exposure or removal. Validation passed: `npm run lint -- --pretty false`, `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts`, `npm run build`, and direct `npx vitest run src/lib/__tests__/api-router.security.test.ts`. Full `npm test` reached the known suite-level `api-router.security` cross-origin timeout once, while the direct file rerun passed 62/62.
+
 ## Blockers / items requiring owner input later
 - Shared-hosting control panel, MySQL credentials, domain DNS/FTP/cPanel access are not present in this workspace. I will prepare deploy artifacts and instructions, but cannot upload without credentials.
 - CPD statutory certificate issuance/sync still requires real professional-body provider credentials and configuration. The browser UI now records attempts with certificate review pending, but does not auto-issue or auto-sync certificates.

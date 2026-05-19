@@ -107,6 +107,30 @@ describe('canonical dashboard page registry', () => {
 
 
 
+
+  it('pins the full role navigation matrix for every canonical role and page', () => {
+    const sharedPageIds = ['command', 'profile', 'toolbox', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai'];
+    const expectedPagesByRole: Record<string, string[]> = {
+      client: [...sharedPageIds, 'client-intake', 'client-proposals', 'directory-search', 'municipal-tracker', 'client-progress', 'drawing-register'],
+      bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment'],
+      architect: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment'],
+      contractor: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'snagging', 'construction', 'contractor-staff', 'procurement', 'packages', 'knowledge'],
+      subcontractor: [...sharedPageIds, 'snagging', 'procurement', 'packages', 'knowledge'],
+      supplier: [...sharedPageIds, 'snagging', 'procurement', 'packages', 'knowledge'],
+      freelancer: [...sharedPageIds, 'invoicing', 'design', 'drawing-checker', 'freelancer-work', 'freelancer-submissions', 'knowledge', 'resource-sharing', 'resource-centre'],
+      admin: [...sharedPageIds, 'invoicing', 'design', 'drawing-register', 'sans-forms', 'technical-brief', 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'admin-console'],
+    };
+
+    const allPageIds = extractPageIds();
+    expect(allPageIds).toHaveLength(38);
+
+    for (const role of canonicalRoles) {
+      const actualPagesForRole = allPageIds.filter((pageId) => entryIncludesRole(findPageEntry(pageId), role));
+      expect(actualPagesForRole, `Unexpected dashboard navigation matrix for ${role}`).toHaveLength(expectedPagesByRole[role].length);
+      expect(actualPagesForRole, `Unexpected dashboard navigation matrix for ${role}`).toEqual(expect.arrayContaining(expectedPagesByRole[role]));
+    }
+  });
+
   it('keeps package procurement commitment and evidence options role-specific for suppliers and subcontractors', () => {
     expect(packageWorkspaceSource).toContain('const ROLE_COMMITMENT_TYPES: Partial<Record<UserProfile[\'role\'], CommitmentType[]>>');
     expect(packageWorkspaceSource).toContain("supplier: ['supplier_quote', 'delivery_note', 'payment_claim']");
