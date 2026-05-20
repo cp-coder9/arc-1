@@ -213,3 +213,212 @@ function combineGateStatuses(statuses: ReleaseGateStatus[]): ReleaseGateStatus {
   if (statuses.includes('warn')) return 'warn';
   return 'pass';
 }
+
+export interface Phase6SecurityRuleMatrixEntry {
+  collection: string;
+  owner: 'user' | 'firm' | 'admin' | 'server' | 'project' | 'mixed';
+  allowCases: string[];
+  denyCases: string[];
+  requiredAudit: boolean;
+}
+
+export interface Phase6EnvironmentRequirement {
+  key: string;
+  exposure: 'server-only' | 'browser-exposed';
+  requiredFor: string;
+}
+
+export interface Phase6ReleaseGateDefinition {
+  id: string;
+  label: string;
+  required: boolean;
+  noGoIfMissing: boolean;
+}
+
+export interface Phase6DryRunMigrationPlanInput {
+  version: string;
+  requestedBy: string;
+  targetCollections: string[];
+  estimatedWrites: number;
+}
+
+export interface Phase6RollbackPlan {
+  releaseCommitSha: string;
+  requiredArtifacts: string[];
+  steps: string[];
+}
+
+export interface Phase6DryRunMigrationPlan {
+  version: string;
+  requestedBy: string;
+  mode: 'dry-run';
+  targetCollections: string[];
+  estimatedWrites: number;
+  idempotencyKey: string;
+  steps: string[];
+  rollback: Phase6RollbackPlan;
+}
+
+export interface Phase6GateResultInput {
+  gateId: string;
+  status: 'pass' | 'warn' | 'fail' | 'blocked';
+  evidence: string;
+}
+
+export interface Phase6GateEvaluation {
+  canRelease: boolean;
+  blockers: string[];
+  warnings: string[];
+  passedGateIds: string[];
+}
+
+export interface ClassifiedEnvironmentVariables {
+  serverOnly: { present: string[]; missing: string[] };
+  browserExposed: { present: string[]; missing: string[] };
+  leakWarnings: string[];
+}
+
+export interface Phase6ReleaseReadinessReportInput {
+  generatedAt: string;
+  generatedBy: string;
+  gateResults: Phase6GateResultInput[];
+  environment: Record<string, string | undefined>;
+}
+
+export interface Phase6ReleaseReadinessReport extends Phase6GateEvaluation {
+  generatedAt: string;
+  generatedBy: string;
+  securityMatrixCount: number;
+  requiredEnvironmentCount: number;
+  environment: ClassifiedEnvironmentVariables;
+  noGoConditions: string[];
+  rollbackPlan: Phase6RollbackPlan;
+}
+
+export const PHASE6_SECURITY_RULE_MATRIX: readonly Phase6SecurityRuleMatrixEntry[] = Object.freeze([
+  { collection: 'users', owner: 'user', allowCases: ['owner_reads_profile', 'server_updates_identity_fields', 'admin_reads_for_support'], denyCases: ['user_self_sets_admin', 'user_self_sets_subscription_status'], requiredAudit: true },
+  { collection: 'firms', owner: 'firm', allowCases: ['firm_owner_updates_profile', 'admin_reads_firm', 'server_applies_verified_billing'], denyCases: ['member_self_escalates_role', 'non_member_reads_private_firm'], requiredAudit: true },
+  { collection: 'firmInvites', owner: 'firm', allowCases: ['firm_admin_creates_invite', 'invitee_accepts_valid_invite'], denyCases: ['expired_invite_acceptance', 'non_admin_creates_invite'], requiredAudit: true },
+  { collection: 'cpdCourses', owner: 'admin', allowCases: ['published_course_public_read', 'admin_writes_course'], denyCases: ['professional_publishes_course', 'anonymous_writes_course'], requiredAudit: true },
+  { collection: 'cpdRecords', owner: 'server', allowCases: ['server_awards_passed_attempt_points', 'admin_revokes_with_reason'], denyCases: ['professional_self_awards_points', 'client_edits_certificate_url'], requiredAudit: true },
+  { collection: 'subscriptions', owner: 'server', allowCases: ['server_webhook_updates_status', 'admin_reads_subscription'], denyCases: ['browser_user_direct_write', 'firm_member_changes_billing_owner'], requiredAudit: true },
+  { collection: 'credits', owner: 'server', allowCases: ['server_spends_credit_with_idempotency', 'server_credits_verified_purchase'], denyCases: ['browser_user_direct_write', 'negative_credit_balance'], requiredAudit: true },
+  { collection: 'ledger', owner: 'server', allowCases: ['server_append_with_idempotency', 'admin_reads_financial_audit'], denyCases: ['browser_user_direct_write', 'update_existing_ledger_entry'], requiredAudit: true },
+  { collection: 'escrow', owner: 'server', allowCases: ['server_records_verified_provider_event', 'admin_places_dispute_hold_with_reason'], denyCases: ['browser_user_direct_write', 'release_without_required_human_approval'], requiredAudit: true },
+  { collection: 'materialOrders', owner: 'project', allowCases: ['contractor_drafts_order', 'authorized_approver_confirms_order'], denyCases: ['ai_auto_places_order', 'supplier_edits_client_approval'], requiredAudit: true },
+  { collection: 'supplierQuotes', owner: 'project', allowCases: ['supplier_submits_invited_quote', 'project_member_reads_quote'], denyCases: ['uninvited_supplier_reads_quote', 'ai_awards_quote_without_human'], requiredAudit: true },
+  { collection: 'aiActionLogs', owner: 'server', allowCases: ['server_appends_ai_output', 'admin_reviews_ai_queue'], denyCases: ['delete_ai_decision_log', 'ai_approves_legal_financial_statutory_action'], requiredAudit: true },
+  { collection: 'auditLogs', owner: 'server', allowCases: ['server_append_audit_event', 'admin_reads_with_reason'], denyCases: ['update_existing_audit_event', 'browser_user_direct_write'], requiredAudit: true },
+]);
+
+export const PHASE6_ENVIRONMENT_REQUIREMENTS: readonly Phase6EnvironmentRequirement[] = Object.freeze([
+  { key: 'PAYFAST_MERCHANT_ID', exposure: 'server-only', requiredFor: 'payment checkout and webhook reconciliation' },
+  { key: 'PAYFAST_MERCHANT_KEY', exposure: 'server-only', requiredFor: 'payment checkout signing' },
+  { key: 'BLOB_READ_WRITE_TOKEN', exposure: 'server-only', requiredFor: 'certificate and invoice artifact storage' },
+  { key: 'FIREBASE_SERVICE_ACCOUNT_JSON', exposure: 'server-only', requiredFor: 'server-owned rules, migrations, and webhooks' },
+  { key: 'SUPPLIER_API_KEY', exposure: 'server-only', requiredFor: 'supplier adapter activation when provider terms exist' },
+  { key: 'LLM_PROVIDER_API_KEY', exposure: 'server-only', requiredFor: 'AI review queues and governed summaries' },
+  { key: 'VITE_FIREBASE_API_KEY', exposure: 'browser-exposed', requiredFor: 'Firebase browser client initialization' },
+]);
+
+export const PHASE6_RELEASE_GATES: readonly Phase6ReleaseGateDefinition[] = Object.freeze([
+  { id: 'security-rules', label: 'Firestore rules allow and deny matrix passed', required: true, noGoIfMissing: true },
+  { id: 'payment-webhooks', label: 'PayFast subscription, activation, refund, and duplicate ITN tests passed', required: true, noGoIfMissing: true },
+  { id: 'dry-run-migrations', label: 'Migration dry-run produced an idempotent report and rollback artifacts', required: true, noGoIfMissing: true },
+  { id: 'unit-integration-tests', label: 'Unit and integration suites passed', required: true, noGoIfMissing: true },
+  { id: 'e2e-role-flows', label: 'Client, BEP, contractor, firm, supplier, freelancer, admin role flows passed', required: true, noGoIfMissing: true },
+  { id: 'environment-readiness', label: 'Server-only and browser-exposed env vars classified', required: true, noGoIfMissing: true },
+  { id: 'rollback-plan', label: 'Rollback procedure and artifacts verified', required: true, noGoIfMissing: true },
+]);
+
+export function buildPhase6RollbackPlan(releaseCommitSha: string): Readonly<Phase6RollbackPlan> {
+  const sha = releaseCommitSha.trim();
+  if (!sha) throw new Error('Release commit SHA is required');
+  return Object.freeze({
+    releaseCommitSha: sha,
+    requiredArtifacts: ['pre_migration_export', 'mutation_report', 'release_commit_sha', 'previous_deploy_bundle'],
+    steps: [
+      'pause_deployments_and_background_jobs',
+      'restore_previous_static_and_api_bundle',
+      'restore_previous_firestore_rules',
+      'run_migration_rollback_from_export_if_mutations_were_applied',
+      'run_smoke_tests_and_payment_webhook_health_checks',
+      'resume_jobs_only_after_owner_approval',
+    ],
+  });
+}
+
+export function buildPhase6DryRunMigrationPlan(input: Phase6DryRunMigrationPlanInput): Readonly<Phase6DryRunMigrationPlan> {
+  const version = input.version.trim();
+  const requestedBy = input.requestedBy.trim();
+  if (!version) throw new Error('Migration version is required');
+  if (!requestedBy) throw new Error('Migration requester is required');
+  if (input.targetCollections.length === 0) throw new Error('At least one target collection is required');
+  if (!Number.isInteger(input.estimatedWrites) || input.estimatedWrites < 0) throw new Error('Estimated writes must be a non-negative integer');
+  const targetCollections = input.targetCollections.map((collection) => collection.trim()).filter(Boolean);
+  if (targetCollections.length !== input.targetCollections.length) throw new Error('Target collection names are required');
+  return Object.freeze({
+    version,
+    requestedBy,
+    mode: 'dry-run',
+    targetCollections: Object.freeze([...targetCollections]) as unknown as string[],
+    estimatedWrites: input.estimatedWrites,
+    idempotencyKey: `phase6:${version}:${targetCollections.join(',')}`,
+    steps: Object.freeze(['snapshot_current_counts', 'validate_source_documents', 'compute_backfill_mutations_without_writing', 'write_migration_report']) as unknown as string[],
+    rollback: buildPhase6RollbackPlan('pending-release-commit'),
+  });
+}
+
+export function classifyEnvironmentVariables(env: Record<string, string | undefined>): Readonly<ClassifiedEnvironmentVariables> {
+  const requiredServerOnly = PHASE6_ENVIRONMENT_REQUIREMENTS.filter((entry) => entry.exposure === 'server-only').map((entry) => entry.key);
+  const requiredBrowser = PHASE6_ENVIRONMENT_REQUIREMENTS.filter((entry) => entry.exposure === 'browser-exposed').map((entry) => entry.key);
+  const present = (key: string) => Boolean(env[key]?.trim());
+  const serverOnlyPresent = requiredServerOnly.filter(present);
+  const browserPresent = requiredBrowser.filter(present);
+  const secretNameFragments = ['PAYFAST', 'SUPPLIER', 'BLOB', 'SERVICE_ACCOUNT', 'LLM_PROVIDER', 'API_KEY', 'MERCHANT_KEY'];
+  const allowedBrowserKeys = new Set(requiredBrowser);
+  const leakWarnings = Object.keys(env)
+    .filter((key) => key.startsWith('VITE_') && !allowedBrowserKeys.has(key) && secretNameFragments.some((fragment) => key.includes(fragment)))
+    .map((key) => `${key} appears to expose a server-only secret to the browser bundle`);
+  return Object.freeze({
+    serverOnly: Object.freeze({ present: Object.freeze(serverOnlyPresent) as unknown as string[], missing: Object.freeze(requiredServerOnly.filter((key) => !present(key))) as unknown as string[] }),
+    browserExposed: Object.freeze({ present: Object.freeze(browserPresent) as unknown as string[], missing: Object.freeze(requiredBrowser.filter((key) => !present(key))) as unknown as string[] }),
+    leakWarnings: Object.freeze(leakWarnings) as unknown as string[],
+  });
+}
+
+export function evaluatePhase6GateResults(results: Phase6GateResultInput[]): Readonly<Phase6GateEvaluation> {
+  const blockers = results
+    .filter((result) => result.status === 'fail' || result.status === 'blocked')
+    .map((result) => `${result.gateId}: ${result.evidence}`);
+  const warnings = results.filter((result) => result.status === 'warn').map((result) => `${result.gateId}: ${result.evidence}`);
+  const passedGateIds = results.filter((result) => result.status === 'pass').map((result) => result.gateId);
+  return Object.freeze({
+    canRelease: blockers.length === 0,
+    blockers: Object.freeze(blockers) as unknown as string[],
+    warnings: Object.freeze(warnings) as unknown as string[],
+    passedGateIds: Object.freeze(passedGateIds) as unknown as string[],
+  });
+}
+
+export function buildPhase6ReleaseReadinessReport(input: Phase6ReleaseReadinessReportInput): Readonly<Phase6ReleaseReadinessReport> {
+  const generatedBy = input.generatedBy.trim();
+  if (!generatedBy) throw new Error('Report generator is required');
+  const gateEvaluation = evaluatePhase6GateResults(input.gateResults);
+  const environment = classifyEnvironmentVariables(input.environment);
+  const leakBlockers = environment.leakWarnings.map((warning) => `environment-readiness: ${warning}`);
+  const missingEnvBlockers = [...environment.serverOnly.missing, ...environment.browserExposed.missing].map((key) => `environment-readiness: missing ${key}`);
+  const blockers = [...gateEvaluation.blockers, ...leakBlockers, ...missingEnvBlockers];
+  return Object.freeze({
+    ...gateEvaluation,
+    canRelease: blockers.length === 0,
+    blockers: Object.freeze(blockers) as unknown as string[],
+    generatedAt: input.generatedAt,
+    generatedBy,
+    securityMatrixCount: PHASE6_SECURITY_RULE_MATRIX.length,
+    requiredEnvironmentCount: PHASE6_ENVIRONMENT_REQUIREMENTS.length,
+    environment,
+    noGoConditions: Object.freeze(['Any failed or blocked required release gate', ...PHASE6_NO_GO_CONDITIONS]) as unknown as string[],
+    rollbackPlan: buildPhase6RollbackPlan('pending-release-commit'),
+  });
+}

@@ -194,3 +194,10 @@ Owner instruction: finish the Architex PRD overnight and keep JCode/agents on go
 - Extended governanceService focused coverage for queue aggregation, redaction defaults, closed-item exclusion, and non-sensitive unredacted summaries.
 - Validation: npx vitest run src/services/__tests__/governanceService.test.ts - 7 tests passed; npm run lint -- --pretty false - passed.
 - Blockers: no external credentials required for this local governance slice; no push/deploy performed.
+
+## 2026-05-21T01:15:00+02:00 Hermes oversight run
+- Observed JCode coordinator/server processes active, with no active repo edits/tests in progress; branch phase-2-verification-workflows was clean before this slice and ahead of origin.
+- Implemented smallest PRD-safe payment/statutory provider readiness slice: provider-neutral PayFast/payment readiness projection covering server-only credentials, prohibited public env exposure, webhook reconciliation, server-owned ledger/dispute holds, VAT/tax audit controls, and human escrow release gate.
+- Added focused coverage for ready PayFast configuration, blocked public credential exposure, missing webhook route/event mapping, and blocked money-movement/statutory controls.
+- Validation: npx vitest run src/services/__tests__/paymentProviderReadinessService.test.ts - 4 tests passed; npm run lint -- --pretty false - passed.
+- Blockers surfaced by abstraction: real PayFast go-live must remain blocked until credentials are server-only, ITN/webhook reconciliation exists, and finance/statutory controls are verified; no push/deploy performed.
