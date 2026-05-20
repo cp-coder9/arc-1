@@ -30,6 +30,47 @@ export interface SensitiveWorkflowGuardResult {
   submitsToProvider: false;
 }
 
+export interface SensitiveWorkflowPreflightInput {
+  workflow: SensitiveWorkflowKey | SensitiveWorkflowFlag;
+  actorId: string;
+  targetType: string;
+  targetId: string;
+  action: string;
+  humanConfirmationId?: string;
+  idempotencyKey?: string;
+  provider?: string;
+  env?: SensitiveWorkflowEnv;
+}
+
+export interface SensitiveWorkflowAuditEvent {
+  category: 'sensitive_workflow';
+  action: string;
+  actorId: string;
+  target: {
+    type: string;
+    id: string;
+  };
+  provider?: string;
+  humanConfirmationId?: string;
+  idempotencyKey?: string;
+  guard: SensitiveWorkflowGuardResult;
+  createdAt: string;
+}
+
+export interface SensitiveWorkflowPreflightResult {
+  guard: SensitiveWorkflowGuardResult;
+  canSubmitToProvider: boolean;
+  auditEvent: SensitiveWorkflowAuditEvent;
+  missingHumanConfirmation: boolean;
+  missingIdempotencyKey: boolean;
+  safeResponse: SensitiveWorkflowGuardResult & {
+    canSubmitToProvider: false;
+    humanConfirmationId?: string;
+    idempotencyKey?: string;
+    auditAction: string;
+  };
+}
+
 function isEnabled(value: string | undefined) {
   return value === 'true';
 }
@@ -75,6 +116,67 @@ export function assertSensitiveWorkflowEnabled(
   if (!result.allowed) {
     const error = new Error(result.reason);
     Object.assign(error, { status: 403, sensitiveWorkflowGuard: result });
+    throw error;
+  }
+  return result;
+}
+
+export function buildSensitiveWorkflowAuditEvent(
+  input: Omit<SensitiveWorkflowPreflightInput, 'workflow' | 'env'>,
+  guard: SensitiveWorkflowGuardResult,
+  createdAt = new Date().toISOString()
+): SensitiveWorkflowAuditEvent {
+  return {
+    category: 'sensitive_workflow',
+    action: input.action,
+    actorId: input.actorId,
+    target: {
+      type: input.targetType,
+      id: input.targetId,
+    },
+    provider: input.provider,
+    humanConfirmationId: input.humanConfirmationId,
+    idempotencyKey: input.idempotencyKey,
+    guard,
+    createdAt,
+  };
+}
+
+export function preflightSensitiveWorkflow(input: SensitiveWorkflowPreflightInput): SensitiveWorkflowPreflightResult {
+  const guard = requireSensitiveWorkflowEnabled(input.workflow, input.env ?? process.env);
+  const missingHumanConfirmation = !input.humanConfirmationId;
+  const missingIdempotencyKey = !input.idempotencyKey;
+  const canSubmitToProvider = guard.allowed && !missingHumanConfirmation && !missingIdempotencyKey;
+  const reasonParts = [guard.reason, missingHumanConfirmation ? 'humanConfirmationId is required' : undefined, missingIdempotencyKey ? 'idempotencyKey is required' : undefined].filter(Boolean);
+  const effectiveGuard: SensitiveWorkflowGuardResult = canSubmitToProvider ? guard : {
+    ...guard,
+    allowed: false,
+    requiresHumanConfirmation: true,
+    reason: reasonParts.join('; ') || 'Sensitive workflow preflight failed',
+  };
+  const auditEvent = buildSensitiveWorkflowAuditEvent(input, effectiveGuard);
+
+  return {
+    guard: effectiveGuard,
+    canSubmitToProvider,
+    auditEvent,
+    missingHumanConfirmation,
+    missingIdempotencyKey,
+    safeResponse: {
+      ...effectiveGuard,
+      canSubmitToProvider: false,
+      humanConfirmationId: input.humanConfirmationId,
+      idempotencyKey: input.idempotencyKey,
+      auditAction: input.action,
+    },
+  };
+}
+
+export function assertSensitiveWorkflowPreflight(input: SensitiveWorkflowPreflightInput) {
+  const result = preflightSensitiveWorkflow(input);
+  if (!result.canSubmitToProvider) {
+    const error = new Error(result.guard.reason);
+    Object.assign(error, { status: 403, sensitiveWorkflowGuard: result.guard, sensitiveWorkflowPreflight: result });
     throw error;
   }
   return result;

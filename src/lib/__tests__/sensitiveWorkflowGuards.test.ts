@@ -5,6 +5,8 @@ import {
   EXTERNAL_ACTIONS_DRY_RUN_FLAG,
   SENSITIVE_WORKFLOW_FLAGS,
   assertSensitiveWorkflowEnabled,
+  assertSensitiveWorkflowPreflight,
+  preflightSensitiveWorkflow,
   requireSensitiveWorkflowEnabled,
   resolveSensitiveWorkflowFlag,
   type SensitiveWorkflowEnv,
@@ -99,5 +101,78 @@ describe('sensitive workflow guards', () => {
         },
       });
     }
+  });
+
+  it('requires human confirmation and idempotency keys before any provider submission preflight can pass', () => {
+    const result = preflightSensitiveWorkflow({
+      workflow: 'livePayments',
+      actorId: 'client-1',
+      targetType: 'invoice',
+      targetId: 'invoice-1',
+      action: 'payment.checkout.create',
+      provider: 'payfast',
+      env: env({
+        [SENSITIVE_WORKFLOW_FLAGS.livePayments]: 'true',
+        [EXTERNAL_ACTIONS_DRY_RUN_FLAG]: 'false',
+      }),
+    });
+
+    expect(result.canSubmitToProvider).toBe(false);
+    expect(result.missingHumanConfirmation).toBe(true);
+    expect(result.missingIdempotencyKey).toBe(true);
+    expect(result.safeResponse).toMatchObject({
+      canSubmitToProvider: false,
+      externalActionQueued: false,
+      createsPayment: false,
+      createsContract: false,
+      createsSignature: false,
+      submitsToProvider: false,
+      auditAction: 'payment.checkout.create',
+    });
+    expect(result.guard.reason).toContain('humanConfirmationId is required');
+    expect(result.guard.reason).toContain('idempotencyKey is required');
+  });
+
+  it('creates an audit-ready preflight event only when flag, dry-run, human confirmation, and idempotency gates pass', () => {
+    const result = preflightSensitiveWorkflow({
+      workflow: 'eSignatureSubmission',
+      actorId: 'bep-1',
+      targetType: 'appointment_contract',
+      targetId: 'contract-1',
+      action: 'signature.provider.submit',
+      provider: 'signing-provider',
+      humanConfirmationId: 'confirm-1',
+      idempotencyKey: 'idem-1',
+      env: env({
+        [SENSITIVE_WORKFLOW_FLAGS.eSignatureSubmission]: 'true',
+        [EXTERNAL_ACTIONS_DRY_RUN_FLAG]: 'false',
+      }),
+    });
+
+    expect(result.canSubmitToProvider).toBe(true);
+    expect(result.guard.allowed).toBe(true);
+    expect(result.auditEvent).toMatchObject({
+      category: 'sensitive_workflow',
+      action: 'signature.provider.submit',
+      actorId: 'bep-1',
+      target: { type: 'appointment_contract', id: 'contract-1' },
+      provider: 'signing-provider',
+      humanConfirmationId: 'confirm-1',
+      idempotencyKey: 'idem-1',
+    });
+  });
+
+  it('throws a 403-style preflight error when the provider submission gates fail', () => {
+    expect(() => assertSensitiveWorkflowPreflight({
+      workflow: 'escrowReleases',
+      actorId: 'client-1',
+      targetType: 'escrow_milestone',
+      targetId: 'milestone-1',
+      action: 'escrow.release.submit',
+      env: env({
+        [SENSITIVE_WORKFLOW_FLAGS.escrowReleases]: 'true',
+        [EXTERNAL_ACTIONS_DRY_RUN_FLAG]: 'false',
+      }),
+    })).toThrowError(/humanConfirmationId is required/);
   });
 });

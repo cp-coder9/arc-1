@@ -63,6 +63,16 @@ function requireExternalActionEnabled(flagName: string) {
 }
 ```
 
+Before any provider request is submitted, the route should also run a preflight that proves:
+
+- the workflow feature flag is enabled;
+- global dry-run is explicitly disabled;
+- an accountable `humanConfirmationId` exists;
+- an `idempotencyKey` exists for safe retries;
+- the route can record an audit event with actor, target, provider, guard result, confirmation, and idempotency metadata.
+
+The shared helper is `preflightSensitiveWorkflow()` in `src/lib/sensitiveWorkflowGuards.ts`. It returns `canSubmitToProvider: false` and a safe response payload unless all of those gates pass. Browser-facing workflows should show the safe response instead of attempting live payments, escrow releases, e-signatures, municipal submissions, provider verifications, supplier orders, resource provisioning, or transactional email.
+
 Recommended response shape while disabled:
 
 ```json
