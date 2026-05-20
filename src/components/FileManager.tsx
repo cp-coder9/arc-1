@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { safeFormat, cn } from '@/lib/utils';
 import { OptimizedImage } from '@/components/ui/optimized-image';
+import { getSelectedProfessionalId } from '@/lib/professionalRoleCompatibility';
 
 interface FileManagerProps {
   user: UserProfile;
@@ -193,12 +194,13 @@ export default function FileManager({ user }: FileManagerProps) {
 
       const job = { id: jobSnap.id, ...jobSnap.data() } as Job;
 
-      // Security guard: only the assigned architect (or job owner if no architect assigned) may run a quick scan
-      if (job.selectedArchitectId && job.selectedArchitectId !== user.uid) {
-        throw new Error('Only the assigned architect for this job can run a quick scan.');
+      // Security guard: only the assigned design professional (or job owner if no professional is assigned) may run a quick scan
+      const selectedProfessionalId = getSelectedProfessionalId(job);
+      if (selectedProfessionalId && selectedProfessionalId !== user.uid) {
+        throw new Error('Only the assigned BEP / design professional for this job can run a quick scan.');
       }
 
-      const architectId = job.selectedArchitectId || user.uid;
+      const architectId = selectedProfessionalId || user.uid;
 
       submissionRef = await addDoc(collection(db, `jobs/${file.jobId}/submissions`), {
         jobId: file.jobId,

@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { getSelectedProfessionalId, isSelectedProfessional } from '@/lib/professionalRoleCompatibility';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -43,14 +44,14 @@ function disputeQueriesForUser(user: UserProfile) {
 
 function counterpartyForJob(user: UserProfile, job?: Job) {
   if (!job) return '';
-  if (job.clientId === user.uid) return job.selectedArchitectId || '';
-  if (job.selectedArchitectId === user.uid) return job.clientId || '';
+  if (job.clientId === user.uid) return getSelectedProfessionalId(job);
+  if (isSelectedProfessional(job, user.uid)) return job.clientId || '';
   return '';
 }
 
 function canFileDispute(user: UserProfile, job?: Job) {
   if (!job) return false;
-  return job.clientId === user.uid || job.selectedArchitectId === user.uid;
+  return job.clientId === user.uid || isSelectedProfessional(job, user.uid);
 }
 
 function statusVariant(status?: string) {

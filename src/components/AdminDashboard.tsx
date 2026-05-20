@@ -41,6 +41,7 @@ import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import AdvanceStageButton from './AdvanceStageButton';
 import FinancialDashboard from './FinancialDashboard';
+import { getSelectedProfessionalId } from '../lib/professionalRoleCompatibility';
 
 const PROVIDER_CONFIGS = {
   gemini: {
@@ -1436,7 +1437,8 @@ export default function AdminDashboard({
         <DialogContent className="max-w-[95vw] w-[1100px] max-h-[90vh] overflow-y-auto rounded-[2rem] p-0">
           {selectedJob && (() => {
             const client = allUsers.find(u => u.uid === selectedJob.clientId);
-            const architect = selectedJob.selectedArchitectId ? allUsers.find(u => u.uid === selectedJob.selectedArchitectId) : null;
+            const selectedProfessionalId = getSelectedProfessionalId(selectedJob);
+            const architect = selectedProfessionalId ? allUsers.find(u => u.uid === selectedProfessionalId) : null;
             const jobSubmissions = submissions.filter(submission => submission.jobId === selectedJob.id);
             const jobDisputes = disputes.filter(dispute => dispute.jobId === selectedJob.id);
 
@@ -1488,7 +1490,7 @@ export default function AdminDashboard({
                     <DetailPanel title="Stakeholders">
                       <StakeholderBlock label="Client" user={client} fallbackId={selectedJob.clientId} />
                       <div className="mt-4 pt-4 border-t border-border">
-                        <StakeholderBlock label="Selected Architect" user={architect} fallbackId={selectedJob.selectedArchitectId} empty="No architect selected yet" />
+                        <StakeholderBlock label="Selected BEP / Design Professional" user={architect} fallbackId={selectedProfessionalId} empty="No design professional selected yet" />
                       </div>
                     </DetailPanel>
 

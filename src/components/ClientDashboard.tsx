@@ -1,4 +1,5 @@
 import { apiFetch } from '../lib/apiClient';
+import { getSelectedProfessionalId } from '../lib/professionalRoleCompatibility';
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, orderBy, deleteField } from 'firebase/firestore';
@@ -228,16 +229,19 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const [editJob, setEditJob] = useState<Partial<Job>>(job);
   const [disputeReason, setDisputeReason] = useState('');
   const [requestedResolution, setRequestedResolution] = useState('');
+  const selectedProfessionalId = getSelectedProfessionalId(job);
 
   useEffect(() => {
-    if (job.selectedArchitectId) {
+    if (selectedProfessionalId) {
       const fetchArchitect = async () => {
-        const archDoc = await getDoc(doc(db, 'users', job.selectedArchitectId!));
+        const archDoc = await getDoc(doc(db, 'users', selectedProfessionalId));
         if (archDoc.exists()) setArchitect({ uid: archDoc.id, ...archDoc.data() } as UserProfile);
       };
       fetchArchitect();
+    } else {
+      setArchitect(null);
     }
-  }, [job.selectedArchitectId]);
+  }, [selectedProfessionalId]);
 
   useEffect(() => {
     const q = query(collection(db, `jobs/${job.id}/applications`), where('status', '==', 'pending'));
@@ -295,6 +299,8 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const handleUnassignArchitect = async () => {
     try {
       await updateDoc(doc(db, 'jobs', job.id), {
+        selectedProfessionalId: deleteField(),
+        selectedBepId: deleteField(),
         selectedArchitectId: deleteField(),
         status: 'open',
         updatedAt: new Date().toISOString(),
@@ -339,7 +345,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
       await addDoc(collection(db, 'disputes'), {
         jobId: job.id,
         filedBy: user.uid,
-        filedAgainst: job.selectedArchitectId || '',
+        filedAgainst: selectedProfessionalId,
         reason: disputeReason,
         requestedResolution,
         status: 'open',
