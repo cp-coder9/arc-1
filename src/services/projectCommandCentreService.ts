@@ -1,5 +1,6 @@
 import {
   PROJECT_STAGE_LABELS,
+  PROJECT_STAGE_ORDER,
   type DelegatedTask,
   type Job,
   type Project,
@@ -7,6 +8,7 @@ import {
   type TenderPackage,
   type UserRole,
 } from '../types';
+import { getMissingStageGateRequirements } from './projectLifecycleService';
 
 export type CanonicalProjectStage = Exclude<ProjectStage, 'scoping'>;
 
@@ -370,6 +372,28 @@ function fallbackAction(input: ProjectCommandCentreInput, stage: CanonicalProjec
   };
 }
 
+function nextCanonicalStage(stage: CanonicalProjectStage): CanonicalProjectStage | null {
+  const currentIndex = PROJECT_STAGE_ORDER.indexOf(stage);
+  const nextStage = currentIndex >= 0 ? PROJECT_STAGE_ORDER[currentIndex + 1] : undefined;
+  return nextStage && nextStage !== 'scoping' ? nextStage : null;
+}
+
+function stageGateAction(input: ProjectCommandCentreInput, stage: CanonicalProjectStage): ActionSeed | null {
+  const nextStage = nextCanonicalStage(stage);
+  if (!input.activeProject || !nextStage || !('stageGateEvidence' in input.activeProject)) return null;
+
+  const missingRequirements = getMissingStageGateRequirements(nextStage, input.activeProject.stageGateEvidence || {});
+  if (missingRequirements.length === 0) return null;
+
+  const firstRequirement = missingRequirements[0];
+  return {
+    label: `Clear ${firstRequirement.label.toLowerCase()} gate`,
+    target: 'tasks',
+    detail: `Before the project can advance to ${PROJECT_STAGE_LABELS[nextStage]}, ${firstRequirement.reason} Missing gate evidence: ${missingRequirements.map(requirement => requirement.label).join(', ')}.`,
+    priority: 'high',
+  };
+}
+
 function buildAiSummary(input: ProjectCommandCentreInput, stage: CanonicalProjectStage, action: ProjectNextBestAction): string {
   const { activeRole, activeJob, activePackage, activeTask } = input;
   const subject = activeJob?.title || activePackage?.title || activeTask?.assigneeRole || 'No active project record';
@@ -388,6 +412,8 @@ export function getProjectCommandCentreGuidance(input: ProjectCommandCentreInput
   const activeStage = canonicalStage(input);
   const profileCompletion = input.profileCompletion;
 
+  const gatedAction = stageGateAction(input, activeStage);
+
   const actionSeed = profileCompletion && !profileCompletion.isComplete
     ? {
         label: 'Complete profile readiness',
@@ -395,6 +421,8 @@ export function getProjectCommandCentreGuidance(input: ProjectCommandCentreInput
         detail: `${profileCompletion.blockers[0] || 'Profile completion is required'} before routed approvals, payments, signatures, project matching, or submissions can proceed.`,
         priority: 'high' as const,
       }
+    : gatedAction
+      ? gatedAction
     : fallbackAction(input, activeStage);
 
   const nextAction = withHumanConfirmation(actionSeed);

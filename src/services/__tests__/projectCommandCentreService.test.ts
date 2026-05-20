@@ -192,6 +192,41 @@ describe('projectCommandCentreService', () => {
     expectHumanConfirmed(guidance.nextAction);
   });
 
+  it('prioritises missing PRD stage-gate evidence when project uses gate evidence model', () => {
+    const guidance = getProjectCommandCentreGuidance({
+      activeRole: 'client',
+      activeProject: {
+        ...baseProject('intake'),
+        stageGateEvidence: { clientBriefCompleted: true },
+      },
+      activeJob: baseJob,
+      profileCompletion: { isComplete: true, completionRatio: 1, missingFields: [], blockers: [] },
+    });
+
+    expect(guidance.nextAction).toMatchObject({
+      label: 'Clear technical brief approved gate',
+      target: 'tasks',
+      priority: 'high',
+    });
+    expect(guidance.nextAction.detail).toContain('Before the project can advance to Team Appointment');
+    expect(guidance.nextAction.detail).toContain('Technical brief approved');
+    expectHumanConfirmed(guidance.nextAction);
+  });
+
+  it('falls back to normal role guidance once next-stage PRD gates are clear', () => {
+    const guidance = getProjectCommandCentreGuidance({
+      activeRole: 'client',
+      activeProject: {
+        ...baseProject('intake'),
+        stageGateEvidence: { clientBriefCompleted: true, technicalBriefApproved: true },
+      },
+      activeJob: baseJob,
+      profileCompletion: { isComplete: true, completionRatio: 1, missingFields: [], blockers: [] },
+    });
+
+    expect(guidance.nextAction).toMatchObject({ label: 'Complete the guided project brief', target: 'client-intake' });
+  });
+
   it('is deterministic for the same input and does not mutate source records', () => {
     const input = {
       activeRole: 'contractor' as UserRole,
