@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Firm, FirmMember, FirmInvite, Project, UserProfile } from '@/types';
-import { subscribeToFirm, subscribeToFirmInvites, subscribeToFirmMembers, subscribeToFirmProjects } from '@/services/firmService';
+import { Firm, FirmMember, FirmInvite, FirmRole, Project, UserProfile } from '@/types';
+import { inviteFirmMember, subscribeToFirm, subscribeToFirmInvites, subscribeToFirmMembers, subscribeToFirmProjects } from '@/services/firmService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { Building2, FolderKanban, Mail, ShieldCheck, UserPlus, Users } from 'lucide-react';
+
+const INVITABLE_FIRM_ROLES: FirmRole[] = ['admin', 'coordinator', 'staff', 'billing_viewer'];
 
 export default function FirmDashboard({ user }: { user: UserProfile }) {
   const [firm, setFirm] = useState<Firm | null>(null);
@@ -12,8 +16,27 @@ export default function FirmDashboard({ user }: { user: UserProfile }) {
   const [invites, setInvites] = useState<FirmInvite[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<FirmRole>('staff');
+  const [inviting, setInviting] = useState(false);
   const firmId = user.primaryFirmId;
   const canManageFirm = user.firmRole === 'owner' || user.firmRole === 'admin';
+
+  const handleInviteMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!firmId || !canManageFirm) return;
+    setInviting(true);
+    try {
+      await inviteFirmMember({ firmId, email: inviteEmail, role: inviteRole, invitedBy: user.uid });
+      setInviteEmail('');
+      setInviteRole('staff');
+      toast.success('Firm invite created');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create firm invite');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   useEffect(() => {
     if (!firmId) {
@@ -80,7 +103,7 @@ export default function FirmDashboard({ user }: { user: UserProfile }) {
             </Badge>
           </div>
         </div>
-        <Button className="rounded-full h-12 px-6 font-bold" disabled={!canManageFirm} title={canManageFirm ? 'Invitation flow is not connected yet' : 'Only firm owners and admins can invite members'}>
+        <Button className="rounded-full h-12 px-6 font-bold" disabled={!canManageFirm} title={canManageFirm ? 'Use the invite panel to add verified firm members' : 'Only firm owners and admins can invite members'}>
           <UserPlus className="mr-2 h-4 w-4" /> Invite member
         </Button>
       </div>
@@ -95,7 +118,7 @@ export default function FirmDashboard({ user }: { user: UserProfile }) {
         <Card className="border-border shadow-sm bg-card rounded-[2.5rem] overflow-hidden">
           <CardHeader className="p-8 border-b border-border bg-primary/5">
             <CardTitle className="font-heading text-2xl flex items-center gap-2"><Users className="text-primary" /> Members</CardTitle>
-            <CardDescription>Phase 1 shell for verified active firm memberships.</CardDescription>
+            <CardDescription>Verified active firm memberships and role-scoped access.</CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-4">
             {loading && <p className="text-muted-foreground italic">Loading firm workspace...</p>}
@@ -126,6 +149,15 @@ export default function FirmDashboard({ user }: { user: UserProfile }) {
               <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><Mail size={16} /> Pending Invites</CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-3">
+              {canManageFirm && (
+                <form onSubmit={handleInviteMember} className="rounded-2xl border border-border bg-white p-4 space-y-3">
+                  <Input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="team.member@example.com" required disabled={inviting} />
+                  <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as FirmRole)} disabled={inviting} className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                    {INVITABLE_FIRM_ROLES.map((role) => <option key={role} value={role}>{role.replace('_', ' ')}</option>)}
+                  </select>
+                  <Button type="submit" size="sm" className="w-full rounded-full" disabled={inviting}>{inviting ? 'Creating invite...' : 'Create invite'}</Button>
+                </form>
+              )}
               {loading && <p className="text-xs text-muted-foreground italic py-6 text-center">Loading invitations...</p>}
               {!loading && invites.map((invite) => (
                 <div key={invite.id} className="rounded-2xl border border-border p-4 bg-white">
