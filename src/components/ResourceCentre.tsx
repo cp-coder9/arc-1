@@ -30,6 +30,7 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
   const [discipline, setDiscipline] = useState('');
   const [title, setTitle] = useState('');
   const [municipality, setMunicipality] = useState('');
+  const [checklistDiscipline, setChecklistDiscipline] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
     try {
       await addDoc(collection(db, 'resource_checklists'), {
         title: title.trim(),
-        discipline: discipline || undefined,
+        discipline: checklistDiscipline.trim() || undefined,
         municipality: municipality.trim() || undefined,
         status: 'open',
         requiredForSubmission: true,
@@ -76,6 +77,7 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
       });
       setTitle('');
       setMunicipality('');
+      setChecklistDiscipline('');
     } finally {
       setSaving(false);
     }
@@ -125,7 +127,7 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border-border bg-card/90 shadow-sm"><CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Add checklist item</CardTitle><CardDescription>Persist a municipal/submission checklist item for team readiness tracking.</CardDescription></CardHeader><CardContent><form onSubmit={createChecklist} className="space-y-3"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Checklist item / template needed" required /><Input value={municipality} onChange={(e) => setMunicipality(e.target.value)} placeholder="Municipality or portal, optional" /><Textarea value={discipline} onChange={(e) => setDiscipline(e.target.value)} placeholder="Discipline key, optional" /><Button type="submit" disabled={saving || !title.trim()} className="w-full rounded-xl gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Save checklist</Button></form></CardContent></Card>
+          <Card className="rounded-2xl border-border bg-card/90 shadow-sm"><CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Add checklist item</CardTitle><CardDescription>Persist a municipal/submission checklist item for team readiness tracking.</CardDescription></CardHeader><CardContent><form onSubmit={createChecklist} className="space-y-3"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Checklist item / template needed" required /><Input value={municipality} onChange={(e) => setMunicipality(e.target.value)} placeholder="Municipality or portal, optional" /><Textarea value={checklistDiscipline} onChange={(e) => setChecklistDiscipline(e.target.value)} placeholder="Discipline key, optional" /><Button type="submit" disabled={saving || !title.trim()} className="w-full rounded-xl gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Save checklist</Button></form></CardContent></Card>
           <Card className="rounded-2xl border-border bg-card/90 shadow-sm"><CardHeader><CardTitle className="font-heading text-xl">Checklist tracker</CardTitle><CardDescription>Persisted records, not static examples.</CardDescription></CardHeader><CardContent className="space-y-3">{checklists.length === 0 ? <p className="text-sm text-muted-foreground">No checklist records yet.</p> : checklists.slice(0, 12).map((item) => <div key={item.id} className="rounded-xl border border-border p-3 text-sm"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{item.discipline || 'Any discipline'} · {item.municipality || 'No municipality'}</p></div><select value={item.status} onChange={(e) => markChecklist(item, e.target.value as ChecklistItem['status'])} className="h-8 rounded-xl border border-input bg-background px-2 text-xs"><option value="open">Open</option><option value="in_progress">In progress</option><option value="complete">Complete</option></select></div></div>)}</CardContent></Card>
         </div>
       </div>

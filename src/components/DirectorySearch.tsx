@@ -21,6 +21,7 @@ type DirectoryProfile = {
 };
 
 const targetRoles = ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer'];
+const DIRECTORY_RESULT_WINDOW = 36;
 
 function timestampMs(value: unknown): number {
   if (!value) return 0;
@@ -41,6 +42,7 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
   const [term, setTerm] = useState('');
   const [region, setRegion] = useState('');
   const [inviting, setInviting] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(DIRECTORY_RESULT_WINDOW);
 
   useEffect(() => {
     const constraints = role === 'all'
@@ -59,6 +61,13 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
     const haystack = [profile.displayName, profile.role, profile.discipline, profile.region, profile.verificationStatus].join(' ').toLowerCase();
     return (!term || haystack.includes(term.toLowerCase())) && (!region || (profile.region || '').toLowerCase().includes(region.toLowerCase()));
   }), [profiles, region, term]);
+
+  useEffect(() => {
+    setVisibleCount(DIRECTORY_RESULT_WINDOW);
+  }, [region, role, term]);
+
+  const visibleProfiles = useMemo(() => filteredProfiles.slice(0, visibleCount), [filteredProfiles, visibleCount]);
+  const hiddenResultCount = Math.max(filteredProfiles.length - visibleProfiles.length, 0);
 
   const invite = async (profile: DirectoryProfile) => {
     setInviting(profile.uid);
@@ -102,8 +111,13 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
         </CardContent>
       </Card>
 
+      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <p>{filteredProfiles.length} visible profile{filteredProfiles.length === 1 ? '' : 's'} match the current filters.</p>
+        {hiddenResultCount > 0 && <p>Showing {visibleProfiles.length}; load more to keep large directories responsive.</p>}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {filteredProfiles.map((profile) => (
+        {visibleProfiles.map((profile) => (
           <Card key={profile.uid} className="rounded-2xl border-border bg-card/90">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
@@ -121,6 +135,14 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
           </Card>
         ))}
       </div>
+
+      {hiddenResultCount > 0 && (
+        <div className="flex justify-center">
+          <Button variant="outline" className="rounded-xl" onClick={() => setVisibleCount((current) => current + DIRECTORY_RESULT_WINDOW)}>
+            Load {Math.min(DIRECTORY_RESULT_WINDOW, hiddenResultCount)} more profiles
+          </Button>
+        </div>
+      )}
 
       {filteredProfiles.length === 0 && <Card className="rounded-2xl"><CardContent className="p-10 text-center text-sm text-muted-foreground">No visible directory profiles match the current filters.</CardContent></Card>}
     </div>
