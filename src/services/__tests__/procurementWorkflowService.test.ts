@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Bid, GanttTask, TenderPackage, UserProfile } from '../../types';
 import {
+  buildRFQShortlist,
   buildMaterialSchedule,
   draftPurchaseOrderForHumanApproval,
+  evaluateSupplierPrequalification,
   extractBoQBoMItems,
   matchSupplierCatalogue,
   validatePurchaseOrderIssue,
@@ -113,5 +115,77 @@ describe('procurementWorkflowService', () => {
     const early = { ...late, id: 'early', requiredBy: '2026-06-01', description: 'Z item' };
 
     expect(buildMaterialSchedule([late, early]).map((item) => item.id)).toEqual(['early', 'late']);
+  });
+
+  it('prequalifies suppliers only when required statutory and commercial documents are verified', () => {
+    const result = evaluateSupplierPrequalification({
+      supplier: { uid: 'supplier-1', displayName: 'Electrical Supplier', averageRating: 4.8 },
+      requiredDocumentTypes: ['tax_clearance', 'bbbee_certificate', 'cidb_registration'],
+      documents: [
+        { type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31', verifiedBy: 'admin-1', verifiedAt: '2026-05-01T00:00:00.000Z' },
+        { type: 'bbbee_certificate', status: 'verified', expiresAt: '2027-01-31', verifiedBy: 'admin-1', verifiedAt: '2026-05-01T00:00:00.000Z' },
+        { type: 'cidb_registration', status: 'verified', verifiedBy: 'admin-1', verifiedAt: '2026-05-01T00:00:00.000Z' },
+      ],
+      minimumRating: 4,
+      asOf: '2026-05-20T00:00:00.000Z',
+    });
+
+    expect(result).toMatchObject({
+      supplierId: 'supplier-1',
+      status: 'prequalified',
+      blockers: [],
+      warnings: [],
+      humanReviewRequired: false,
+      aiMayAward: false,
+    });
+    expect(result.verifiedDocumentTypes).toEqual(['tax_clearance', 'bbbee_certificate', 'cidb_registration']);
+    expect(result.governanceNote).toMatch(/require recorded human approval/i);
+  });
+
+  it('blocks supplier prequalification when required documents are missing, expired or rejected', () => {
+    const result = evaluateSupplierPrequalification({
+      supplier: { uid: 'supplier-2', displayName: 'Materials Supplier', averageRating: 3.2 },
+      requiredDocumentTypes: ['tax_clearance', 'bbbee_certificate', 'insurance'],
+      documents: [
+        { type: 'tax_clearance', status: 'verified', expiresAt: '2026-01-01' },
+        { type: 'bbbee_certificate', status: 'rejected' },
+      ],
+      minimumRating: 4,
+      asOf: '2026-05-20T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      expect.stringContaining('tax_clearance has expired'),
+      expect.stringContaining('bbbee_certificate is rejected'),
+      expect.stringContaining('insurance is required'),
+    ]));
+    expect(result.warnings).toContain('Materials Supplier is below the preferred supplier rating threshold.');
+    expect(result.humanReviewRequired).toBe(true);
+  });
+
+  it('builds advisory RFQ shortlists ranked by prequalification status before catalogue score', () => {
+    const shortlist = buildRFQShortlist({
+      packageText: `${tender.title} ${tender.description} ${tender.scope.join(' ')}`,
+      suppliers: [
+        { uid: 'blocked-high-score', displayName: 'Electrical Boards Express', catalogueKeywords: ['electrical', 'boards', 'conduit'], averageRating: 5, leadTimeDays: 2 },
+        { uid: 'prequalified', displayName: 'Compliant Electrical Supply', catalogueKeywords: ['electrical', 'conduit'], averageRating: 4.2, leadTimeDays: 14 },
+      ],
+      supplierDocuments: {
+        prequalified: [
+          { type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31' },
+          { type: 'bbbee_certificate', status: 'verified', expiresAt: '2026-12-31' },
+        ],
+        'blocked-high-score': [
+          { type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31' },
+        ],
+      },
+      asOf: '2026-05-20T00:00:00.000Z',
+      limit: 2,
+    });
+
+    expect(shortlist.map((entry) => entry.supplier.uid)).toEqual(['prequalified', 'blocked-high-score']);
+    expect(shortlist[0]).toMatchObject({ rank: 1, prequalification: { status: 'prequalified', aiMayAward: false } });
+    expect(shortlist[1].prequalification.status).toBe('blocked');
   });
 });

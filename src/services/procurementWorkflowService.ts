@@ -2,6 +2,7 @@ import type { Bid, GanttTask, TenderPackage, UserProfile } from '../types';
 
 export type BoQBoMSourceType = 'bid_line_item' | 'tender_scope' | 'drawing_or_specification' | 'manual';
 export type PurchaseOrderValidationStatus = 'blocked' | 'ready_for_issue';
+export type SupplierPrequalificationStatus = 'blocked' | 'review_required' | 'prequalified';
 
 export interface BoQBoMItem {
   id: string;
@@ -41,6 +42,39 @@ export interface SupplierCatalogueMatch {
   matchTerms: string[];
   leadTimeDays?: number;
   score: number;
+}
+
+export interface SupplierPrequalificationDocument {
+  type: 'bbbee_certificate' | 'tax_clearance' | 'cidb_registration' | 'trade_license' | 'insurance' | 'bank_confirmation';
+  status: 'missing' | 'submitted' | 'verified' | 'expired' | 'rejected';
+  expiresAt?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
+export interface SupplierPrequalificationInput {
+  supplier: SupplierCatalogueProfile;
+  requiredDocumentTypes?: SupplierPrequalificationDocument['type'][];
+  documents?: SupplierPrequalificationDocument[];
+  minimumRating?: number;
+  asOf?: string;
+}
+
+export interface SupplierPrequalificationResult {
+  supplierId: string;
+  status: SupplierPrequalificationStatus;
+  blockers: string[];
+  warnings: string[];
+  missingDocumentTypes: SupplierPrequalificationDocument['type'][];
+  verifiedDocumentTypes: SupplierPrequalificationDocument['type'][];
+  humanReviewRequired: boolean;
+  aiMayAward: false;
+  governanceNote: string;
+}
+
+export interface RFQShortlistEntry extends SupplierCatalogueMatch {
+  prequalification: SupplierPrequalificationResult;
+  rank: number;
 }
 
 export interface PurchaseOrderDraftInput {
@@ -160,6 +194,84 @@ export function matchSupplierCatalogue(packageText: string, suppliers: SupplierC
       };
     })
     .sort((a, b) => b.score - a.score || (b.supplier.averageRating ?? 0) - (a.supplier.averageRating ?? 0));
+}
+
+export function evaluateSupplierPrequalification(input: SupplierPrequalificationInput): SupplierPrequalificationResult {
+  const asOf = Date.parse(input.asOf ?? new Date().toISOString());
+  if (Number.isNaN(asOf)) throw new Error('asOf must be a valid ISO date string.');
+
+  const requiredDocumentTypes = input.requiredDocumentTypes ?? ['tax_clearance', 'bbbee_certificate'];
+  const documents = input.documents ?? [];
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const verifiedDocumentTypes: SupplierPrequalificationDocument['type'][] = [];
+
+  requiredDocumentTypes.forEach((type) => {
+    const document = documents.find((candidate) => candidate.type === type);
+    if (!document || document.status === 'missing') {
+      blockers.push(`${type} is required for supplier prequalification.`);
+      return;
+    }
+    if (document.status === 'verified') {
+      if (document.expiresAt && Date.parse(document.expiresAt) < asOf) {
+        blockers.push(`${type} has expired and must be re-verified.`);
+      } else {
+        verifiedDocumentTypes.push(type);
+      }
+      return;
+    }
+    if (document.status === 'expired' || document.status === 'rejected') {
+      blockers.push(`${type} is ${document.status} and must be resolved before award.`);
+    } else {
+      warnings.push(`${type} is submitted but not yet verified by a human reviewer.`);
+    }
+  });
+
+  const minimumRating = input.minimumRating ?? 0;
+  if ((input.supplier.averageRating ?? 0) < minimumRating) {
+    warnings.push(`${input.supplier.displayName ?? input.supplier.uid} is below the preferred supplier rating threshold.`);
+  }
+
+  const status: SupplierPrequalificationStatus = blockers.length > 0 ? 'blocked' : warnings.length > 0 ? 'review_required' : 'prequalified';
+  return {
+    supplierId: input.supplier.uid,
+    status,
+    blockers,
+    warnings,
+    missingDocumentTypes: requiredDocumentTypes.filter((type) => !verifiedDocumentTypes.includes(type)),
+    verifiedDocumentTypes,
+    humanReviewRequired: status !== 'prequalified',
+    aiMayAward: false,
+    governanceNote: 'Supplier prequalification and RFQ shortlisting are advisory workflow outputs only; awards, purchase orders, and payment effects require recorded human approval.',
+  };
+}
+
+export function buildRFQShortlist(input: {
+  packageText: string;
+  suppliers: SupplierCatalogueProfile[];
+  supplierDocuments?: Record<string, SupplierPrequalificationDocument[]>;
+  requiredDocumentTypes?: SupplierPrequalificationDocument['type'][];
+  minimumRating?: number;
+  limit?: number;
+  asOf?: string;
+}): RFQShortlistEntry[] {
+  return matchSupplierCatalogue(input.packageText, input.suppliers)
+    .map((match) => ({
+      ...match,
+      prequalification: evaluateSupplierPrequalification({
+        supplier: match.supplier,
+        documents: input.supplierDocuments?.[match.supplier.uid] ?? [],
+        requiredDocumentTypes: input.requiredDocumentTypes,
+        minimumRating: input.minimumRating,
+        asOf: input.asOf,
+      }),
+    }))
+    .sort((a, b) => {
+      const statusRank: Record<SupplierPrequalificationStatus, number> = { prequalified: 0, review_required: 1, blocked: 2 };
+      return statusRank[a.prequalification.status] - statusRank[b.prequalification.status] || b.score - a.score;
+    })
+    .slice(0, input.limit ?? 5)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
 export function draftPurchaseOrderForHumanApproval(input: PurchaseOrderDraftInput): PurchaseOrderDraft {
