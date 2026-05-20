@@ -607,3 +607,23 @@ Validation:
 
 Human review note:
 - The new controls intentionally remain disabled until explicit backend execution workflows and human confirmations are implemented. This preserves the platform boundary that dashboards can prepare evidence and review state, but cannot bind contracts or move money automatically.
+
+## 2026-05-19 package delivery Construction OS registry pass
+
+Scope followed from `backend.html`: subcontractor and supplier users need package-scoped construction operations access, not only procurement and close-out surfaces.
+
+Implemented:
+
+- Exposed the existing `construction` canonical dashboard page to `subcontractor` and `supplier` roles in `src/App.tsx`.
+- This does not add new unsafe semantics: `ProjectWorkflowPage` was already routing `contractor`, `subcontractor`, `supplier`, and `admin` users to `PackageConstructionOpsPage`, which is package-linked and keeps site instructions/inspections human-reviewed.
+- Updated dashboard registry static tests so the role navigation matrix now pins `construction` for subcontractor and supplier users.
+
+Validation:
+
+- `npm run lint`: passed.
+- `npx vitest run src/lib/__tests__/dashboard-registry.static.test.ts`: initial default forks run timed out starting a worker before loading tests; retry with `--pool=threads --maxWorkers=1` passed, 49 tests.
+
+Remaining follow-up:
+
+- Continue replacing any residual shell-style surfaces only where a production service/rules path exists.
+- Keep long-term `architect`/`bep` taxonomy reconciliation as a product decision; this pass preserved compatibility.

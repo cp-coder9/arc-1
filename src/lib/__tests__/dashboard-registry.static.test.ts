@@ -99,6 +99,7 @@ describe('canonical dashboard page registry', () => {
     expectPage('bep-team', 'Design Team Matrix', ['bep', 'architect']);
     expectPage('invoicing', 'Invoicing', ['bep', 'architect', 'contractor', 'freelancer', 'admin']);
     expectPage('snagging', 'Snagging / Close-Out', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
+    expectPage('construction', 'Construction OS', ['contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('packages', 'Subcontractor Packages', ['contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('freelancer-work', 'Assigned Work', ['freelancer']);
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
@@ -127,8 +128,8 @@ describe('canonical dashboard page registry', () => {
       bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment'],
       architect: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment'],
       contractor: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'snagging', 'construction', 'contractor-staff', 'procurement', 'packages', 'knowledge'],
-      subcontractor: [...sharedPageIds, 'snagging', 'procurement', 'packages', 'knowledge'],
-      supplier: [...sharedPageIds, 'snagging', 'procurement', 'packages', 'knowledge'],
+      subcontractor: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge'],
+      supplier: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge'],
       freelancer: [...sharedPageIds, 'invoicing', 'design', 'drawing-checker', 'freelancer-work', 'freelancer-submissions', 'knowledge', 'resource-sharing', 'resource-centre'],
       admin: [...sharedPageIds, 'invoicing', 'design', 'drawing-register', 'sans-forms', 'technical-brief', 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'admin-console'],
     };
@@ -311,7 +312,7 @@ describe('canonical dashboard page registry', () => {
     expect(disputeResolutionSource).not.toContain('orderBy(');
   });
 
-  it('backs package construction OS with package-linked live operations for contractor-side and admin roles', () => {
+  it('backs package construction OS with package-linked live operations for contractor, package delivery, and admin roles', () => {
     expect(workflowSource).toContain("import PackageConstructionOpsPage from './PackageConstructionOpsPage';");
     expect(workflowSource).toContain("pageId === 'construction' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)");
     expect(workflowSource).toContain('return <PackageConstructionOpsPage user={user} />;');
