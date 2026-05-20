@@ -3,6 +3,7 @@ import { collection, doc, limit, onSnapshot, query, where } from 'firebase/fires
 import { AlertTriangle, CheckCircle2, FileSignature, Landmark, Loader2, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { EscrowV2, UserProfile } from '@/types';
+import { evaluateContractSignatureReadiness, type ContractSignatureRecord } from '@/services/contractSigningService';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -27,6 +28,8 @@ type AppointmentContract = {
   assumptions?: string[];
   milestones?: Array<{ id: string; name: string; percentage: number; amount: number; releaseConditions?: string[]; status?: string }>;
   downstreamFeeds?: string[];
+  signatureRequestId?: string;
+  signatures?: Partial<Record<'client' | 'professional', ContractSignatureRecord>>;
   verificationId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -79,25 +82,6 @@ const SIGNING_REVIEW_STEPS = [
   'Any change, acceptance, signature, payment initiation, or escrow release must happen through a separately authorized workflow.',
 ];
 
-function contractReadiness(contract: AppointmentContract, escrow: EscrowV2 | null) {
-  const blockers: string[] = [];
-  const warnings: string[] = [];
-
-  if (!contract.scope?.length) blockers.push('Contract scope is not recorded.');
-  if (!contract.deliverables?.length) blockers.push('Deliverables are not recorded.');
-  if (!contract.milestones?.length) blockers.push('Milestones and release conditions are not recorded.');
-  if (!contract.verificationId) warnings.push('Verification reference is not linked to the contract.');
-  if (!contract.totalEscrowAmount || contract.totalEscrowAmount <= 0) warnings.push('Escrow total is not recorded on the contract.');
-  if (!escrow) warnings.push('No live escrow record is visible for this contract.');
-  if (escrow && escrow.status === 'pending') warnings.push('Escrow exists but is still pending funding.');
-
-  return {
-    blockers,
-    warnings,
-    readyForHumanReview: blockers.length === 0,
-  };
-}
-
 export default function ContractSigningPage({ user }: { user: UserProfile }) {
   const [state, setState] = useState<LoadState>('loading');
   const [contracts, setContracts] = useState<AppointmentContract[]>([]);
@@ -143,7 +127,7 @@ export default function ContractSigningPage({ user }: { user: UserProfile }) {
   }, [selectedContract?.projectId]);
 
   const milestones = selectedContract?.milestones ?? [];
-  const readiness = selectedContract ? contractReadiness(selectedContract, escrow) : null;
+  const readiness = selectedContract ? evaluateContractSignatureReadiness(selectedContract, escrow) : null;
 
   return (
     <div className="space-y-6" data-testid="contract-signing-page">
@@ -216,7 +200,7 @@ export default function ContractSigningPage({ user }: { user: UserProfile }) {
                     <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Request signature disabled</Button>
                     <Button type="button" disabled className="rounded-xl bg-amber-900 text-white disabled:opacity-80">Accept / bind disabled</Button>
                   </div>
-                  <p className="text-xs text-amber-900">Ready for human review: {readiness.readyForHumanReview ? 'yes, subject to external signature/payment controls' : 'no, resolve blockers first'}.</p>
+                  <p className="text-xs text-amber-900">Ready for human review: {readiness.readyForHumanReview ? 'yes, subject to external signature/payment controls' : 'no, resolve blockers first'}. Missing signatures: {readiness.missingSignatures.length ? readiness.missingSignatures.join(', ') : 'none'}.</p>
                 </CardContent>
               </Card>
             )}
