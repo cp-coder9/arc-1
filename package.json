@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "NODE_ENV=production tsx server.ts",
-    "start:api:host": "NODE_ENV=production DISABLE_NOTIFICATION_WORKER=true tsx server.ts",
+    "start:api:host": "NODE_ENV=production DISABLE_NOTIFICATION_WORKER=true tsx api-server.ts",
     "build": "vite build",
     "vercel-build": "vite build",
     "preview": "vite preview",
