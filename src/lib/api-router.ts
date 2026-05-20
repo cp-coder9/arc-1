@@ -1848,6 +1848,13 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
       clientId: brief.clientId,
       leadArchitectId: bepId,
       currentStage: 'appointment',
+      stageGateEvidence: {
+        clientBriefCompleted: true,
+        technicalBriefApproved: true,
+        verifiedProfessionalAppointed: true,
+        appointmentAgreementSigned: false,
+        escrowPlanInitialized: true,
+      },
       stageHistory: [{ stage: 'appointment', enteredAt: now, actorId: authContext.uid, note: 'BEP appointed from finalized technical brief' }],
       teamMembers: [
         { userId: brief.clientId, role: 'client', joinedAt: now, status: 'active' },
