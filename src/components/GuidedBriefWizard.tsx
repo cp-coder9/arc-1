@@ -31,6 +31,7 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
     municipalArea: '',
     requirements: '',
     publishOpportunity: true,
+    aiAdvisoryAcknowledged: false,
   });
 
   const requirements = useMemo(() => form.requirements.split('\n').map((item) => item.trim()).filter(Boolean), [form.requirements]);
@@ -41,6 +42,10 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
   const createBrief = async () => {
     if (user.role !== 'client') {
       toast.error('Only clients can create guided briefs.');
+      return;
+    }
+    if (!form.aiAdvisoryAcknowledged) {
+      toast.error('Please acknowledge that AI diagnostic guidance is advisory and requires BEP review.');
       return;
     }
 
@@ -65,6 +70,7 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
           erfNumber: form.erfNumber,
           propertyAddress: form.propertyAddress,
           municipalArea: form.municipalArea,
+          aiAdvisoryAcknowledged: form.aiAdvisoryAcknowledged,
         },
       });
 
@@ -138,6 +144,10 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
         <CardContent className="p-6 space-y-6">
           <div className="flex flex-wrap gap-2">{[1, 2, 3, 4].map((index) => <Badge key={index} variant={step === index ? 'default' : 'outline'}>Step {index}</Badge>)}</div>
 
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="note" aria-label="AI advisory notice">
+            <strong>AI diagnostic guidance is advisory.</strong> It can help explain likely routes, risks, and professional inputs, but it does not appoint a professional, certify compliance, approve municipal submissions, create a contract, or replace BEP review.
+          </div>
+
           {step === 1 && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Project title"><Input value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="e.g. New family home in Pretoria" /></Field>
             <Field label="Category"><select className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.category} onChange={(event) => update('category', event.target.value)}>{categories.map((category) => <option key={category}>{category}</option>)}</select></Field>
@@ -164,14 +174,15 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
             </label>
             <div className="space-y-2">{selectedFiles.map((file) => <div key={`${file.name}-${file.size}`} className="rounded-xl border border-border p-3 text-sm">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</div>)}</div>
             <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={form.publishOpportunity} onChange={(event) => update('publishOpportunity', event.target.checked)} /> Publish as opportunity after saving</label>
+            <label className="flex items-start gap-3 text-sm rounded-xl border border-border p-3 bg-background"><input className="mt-1" type="checkbox" checked={form.aiAdvisoryAcknowledged} onChange={(event) => update('aiAdvisoryAcknowledged', event.target.checked)} /> <span>I understand the AI diagnostic summary is advisory only and must be reviewed by an appointed BEP before appointment, compliance submission, construction, payment, or legal use.</span></label>
           </div>}
 
-          {step === 4 && <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6"><h3 className="font-heading text-xl font-bold">Brief workflow completed</h3><p className="text-sm text-muted-foreground mt-2">The brief, attachments, advisory interpretation, and optional marketplace opportunity were persisted to Firestore.</p></div>}
+          {step === 4 && <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6"><h3 className="font-heading text-xl font-bold">Brief workflow completed</h3><p className="text-sm text-muted-foreground mt-2">The brief, attachments, advisory interpretation, acknowledgement, and optional marketplace opportunity were persisted to Firestore.</p></div>}
 
           <div className="flex justify-between gap-3 pt-4 border-t border-border">
             <Button variant="outline" disabled={step === 1 || saving} onClick={() => setStep((current) => Math.max(1, current - 1))}>Back</Button>
             {step < 3 && <Button onClick={() => setStep((current) => current + 1)}>Continue</Button>}
-            {step === 3 && <Button disabled={saving} onClick={createBrief}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save brief'}</Button>}
+            {step === 3 && <Button disabled={saving || !form.aiAdvisoryAcknowledged} onClick={createBrief}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save brief'}</Button>}
           </div>
         </CardContent>
       </Card>
