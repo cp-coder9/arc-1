@@ -12,6 +12,7 @@ const bepMarketplaceSource = readFileSync(resolve(process.cwd(), 'src/components
 const designTeamMatrixSource = readFileSync(resolve(process.cwd(), 'src/components/DesignTeamMatrixPage.tsx'), 'utf8');
 const tasksApprovalsSource = readFileSync(resolve(process.cwd(), 'src/components/TasksApprovalsPage.tsx'), 'utf8');
 const projectMessengerSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectMessengerPage.tsx'), 'utf8');
+const messagingServiceSource = readFileSync(resolve(process.cwd(), 'src/services/messagingService.ts'), 'utf8');
 const contractSigningSource = readFileSync(resolve(process.cwd(), 'src/components/ContractSigningPage.tsx'), 'utf8');
 const financialDashboardSource = readFileSync(resolve(process.cwd(), 'src/components/FinancialDashboard.tsx'), 'utf8');
 const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
@@ -105,6 +106,17 @@ describe('canonical dashboard page registry', () => {
     expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
     expectPage('admin-console', 'Admin Console', ['admin']);
   });
+  it('maps direct login and admin login routes to the correct auth entry state', () => {
+    expect(appSource).toContain("isAdminAuthRoute(window.location.pathname)");
+    expect(appSource).toContain("isPublicLoginRoute(window.location.pathname)");
+    expect(appSource).toContain("isPublicSignupRoute(window.location.pathname)");
+    expect(appSource).toContain("isAdminRoute || isLoginRoute || isSignupRoute");
+    expect(appSource).toContain("isSignupRoute ? 'email-signup'");
+    expect(appSource).toContain("/admin/login");
+    expect(appSource).toContain("/login");
+    expect(appSource).toContain("/signup");
+  });
+
   it('keeps non-admin login options explicit while architects enter through BEP / Design Team', () => {
     for (const role of ['client', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier']) {
       expect(appSource).toContain(`data-testid="role-select-${role}"`);
@@ -293,7 +305,8 @@ describe('canonical dashboard page registry', () => {
   it('backs shared messenger, contract, and dispute tools with live Firestore records only', () => {
     expect(projectMessengerSource).toContain("collection(db, 'messages')");
     expect(projectMessengerSource).toContain('where(\'jobId\'');
-    expect(projectMessengerSource).toContain('addDoc(collection(db, \'messages\')');
+    expect(projectMessengerSource).toContain('messagingService.sendMessage');
+    expect(messagingServiceSource).toContain('addDoc(collection(db, \'messages\')');
     expect(projectMessengerSource).not.toContain('orderBy(');
 
     expect(contractSigningSource).toContain("collection(db, 'appointment_contracts')");

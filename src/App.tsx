@@ -350,14 +350,36 @@ function isEditableShortcutTarget(target: EventTarget | null) {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
+function normalizeAuthPath(pathname: string) {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  return normalized.toLowerCase();
+}
+
+function isAdminAuthRoute(pathname: string) {
+  const path = normalizeAuthPath(pathname);
+  return path === '/admin' || path.endsWith('/admin') || path === '/admin/login' || path.endsWith('/admin/login');
+}
+
+function isPublicLoginRoute(pathname: string) {
+  const path = normalizeAuthPath(pathname);
+  return path === '/login' || path.endsWith('/login');
+}
+
+function isPublicSignupRoute(pathname: string) {
+  const path = normalizeAuthPath(pathname);
+  return path === '/signup' || path.endsWith('/signup') || path === '/register' || path.endsWith('/register');
+}
+
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
-  const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.endsWith('/admin');
+  const isAdminRoute = isAdminAuthRoute(window.location.pathname);
+  const isLoginRoute = isPublicLoginRoute(window.location.pathname) && !isAdminRoute;
+  const isSignupRoute = isPublicSignupRoute(window.location.pathname);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [roleSelection, setRoleSelection] = useState<UserRole | null>(isAdminRoute ? 'admin' : null);
-  const [showLogin, setShowLogin] = useState(isAdminRoute);
+  const [showLogin, setShowLogin] = useState(isAdminRoute || isLoginRoute || isSignupRoute);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -379,7 +401,7 @@ export default function App() {
   }, [user]);
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>('selection');
+  const [authMode, setAuthMode] = useState<'selection' | 'email-login' | 'email-signup'>(isSignupRoute ? 'email-signup' : 'selection');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -397,8 +419,15 @@ export default function App() {
       setRoleSelection('admin');
       setShowLogin(true);
       setShowOnboarding(false);
+      return;
     }
-  }, [isAdminRoute]);
+
+    if (isLoginRoute || isSignupRoute) {
+      setShowLogin(true);
+      setShowOnboarding(false);
+      if (isSignupRoute) setAuthMode('email-signup');
+    }
+  }, [isAdminRoute, isLoginRoute, isSignupRoute]);
 
   const getAuthErrorMessage = (error: unknown) => {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code) : '';
