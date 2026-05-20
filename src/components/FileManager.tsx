@@ -107,8 +107,12 @@ export default function FileManager({ user }: FileManagerProps) {
       const jobIds = new Set<string>();
       const jobQueries = user.role === 'client'
         ? [query(collection(db, 'jobs'), where('clientId', '==', user.uid))]
-        : user.role === 'architect'
-          ? [query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid))]
+        : (user.role === 'architect' || user.role === 'bep')
+          ? [
+              query(collection(db, 'jobs'), where('selectedProfessionalId', '==', user.uid)),
+              query(collection(db, 'jobs'), where('selectedBepId', '==', user.uid)),
+              query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid)),
+            ]
           : [];
 
       for (const jobQuery of jobQueries) {
