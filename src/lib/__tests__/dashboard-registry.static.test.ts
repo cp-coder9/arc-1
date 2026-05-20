@@ -19,6 +19,7 @@ const financialDashboardSource = readFileSync(resolve(process.cwd(), 'src/compon
 const disputeResolutionSource = readFileSync(resolve(process.cwd(), 'src/components/DisputeResolutionPage.tsx'), 'utf8');
 const packageWorkspaceSource = readFileSync(resolve(process.cwd(), 'src/components/PackageProcurementWorkspace.tsx'), 'utf8');
 const projectToolboxSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectToolboxPage.tsx'), 'utf8');
+const externalApiMockSource = readFileSync(resolve(process.cwd(), 'src/data/mockExternalApiIntegrations.ts'), 'utf8');
 const packageConstructionSource = readFileSync(resolve(process.cwd(), 'src/components/PackageConstructionOpsPage.tsx'), 'utf8');
 const packageCloseoutSource = readFileSync(resolve(process.cwd(), 'src/components/PackageCloseoutPage.tsx'), 'utf8');
 const ganttChartSource = readFileSync(resolve(process.cwd(), 'src/components/GanttChart.tsx'), 'utf8');
@@ -186,6 +187,8 @@ describe('canonical dashboard page registry', () => {
 
   it('implements backend.html role-specific toolbox content instead of one shared generic toolbox', () => {
     expect(projectToolboxSource).toContain('const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig>');
+    expect(projectToolboxSource).toContain('toolGroups: ToolboxGroup[]');
+    expect(projectToolboxSource).toContain('config.toolGroups.map((group)');
     expect(projectToolboxSource).toContain('Subcontractor Package Toolbox');
     expect(projectToolboxSource).toContain('Supplier Delivery Toolbox');
     expect(projectToolboxSource).toContain('Assigned Package Scope');
@@ -196,7 +199,19 @@ describe('canonical dashboard page registry', () => {
     expect(projectToolboxSource).toContain('Payment Tracker');
     expect(projectToolboxSource).toContain('Supplier access is delivery/procurement scoped');
     expect(projectToolboxSource).toContain('Subcontractor access is package-scoped');
+    expect(projectToolboxSource).toContain('data-testid={`toolbox-group-${user.role}-${group.id}`}');
     expect(appSource).toContain("activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />");
+  });
+
+  it('keeps external API integrations backed by deterministic local mock fixtures until credentials are live', () => {
+    expect(externalApiMockSource).toContain('export const MOCK_EXTERNAL_API_INTEGRATIONS');
+    for (const integration of ['payfast-sandbox', 'cpd-statutory-sync', 'supplier-catalogue', 'municipal-portal']) {
+      expect(externalApiMockSource).toContain(`id: '${integration}'`);
+    }
+    expect(externalApiMockSource).toContain("mode: 'local_mock'");
+    expect(externalApiMockSource).toContain('No live payment, statutory, municipal, or supplier-provider action is performed by this fixture.');
+    expect(projectToolboxSource).toContain("import { MOCK_EXTERNAL_API_INTEGRATIONS, MOCK_EXTERNAL_API_NOTICE } from '@/data/mockExternalApiIntegrations';");
+    expect(projectToolboxSource).toContain('External API mock fixtures');
   });
 
   it('keeps registry ids unique and every shell-backed page statically routable', () => {

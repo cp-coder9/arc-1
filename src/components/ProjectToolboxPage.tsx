@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Files, ShieldCheck } from 'lucide-react';
+import { MOCK_EXTERNAL_API_INTEGRATIONS, MOCK_EXTERNAL_API_NOTICE } from '@/data/mockExternalApiIntegrations';
 import type { UserProfile, UserRole } from '@/types';
 import FileManager from './FileManager';
 import { Badge } from './ui/badge';
@@ -12,11 +13,18 @@ type ToolboxAction = {
   pageId: string;
 };
 
+type ToolboxGroup = {
+  id: string;
+  label: string;
+  description: string;
+  tools: ToolboxAction[];
+};
+
 type RoleToolboxConfig = {
   title: string;
   subtitle: string;
   scope: string;
-  tools: ToolboxAction[];
+  toolGroups: ToolboxGroup[];
 };
 
 const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
@@ -24,88 +32,120 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Client Project Toolbox',
     subtitle: 'Brief, approval, payment, progress, and handover tools for the project owner.',
     scope: 'Client-facing decisions only. Professional sign-off, statutory submissions, and payment releases stay human-confirmed.',
-    tools: [
-      { label: 'Guided Brief Wizard', description: 'Create or refine the client brief and project requirements.', pageId: 'client-intake' },
-      { label: 'BEP Proposals', description: 'Compare professional proposals before appointment.', pageId: 'client-proposals' },
-      { label: 'Client Approval Centre', description: 'Review drawings, decisions, payment gates, and progress evidence.', pageId: 'tasks' },
-      { label: 'Progress Reports', description: 'View project status, claims, risks, and next actions.', pageId: 'client-progress' },
+    toolGroups: [
+      { id: 'brief-appointment', label: 'Brief and appointment', description: 'Tools for turning the client need into an appointment-ready project record.', tools: [
+        { label: 'Guided Brief Wizard', description: 'Create or refine the client brief and project requirements.', pageId: 'client-intake' },
+        { label: 'BEP Proposals', description: 'Compare professional proposals before appointment.', pageId: 'client-proposals' },
+      ] },
+      { id: 'approval-progress', label: 'Approvals and progress', description: 'Tools for controlled decisions, visible progress, and payment-governance evidence.', tools: [
+        { label: 'Client Approval Centre', description: 'Review drawings, decisions, payment gates, and progress evidence.', pageId: 'tasks' },
+        { label: 'Progress Reports', description: 'View project status, claims, risks, and next actions.', pageId: 'client-progress' },
+      ] },
     ],
   },
   bep: {
     title: 'BEP / Professional Toolbox',
     subtitle: 'Technical brief, design coordination, compliance, municipal, freelancer, and delivery tools.',
     scope: 'BEP tools prepare and coordinate professional work; statutory sign-off remains explicit and auditable.',
-    tools: [
-      { label: 'Technical Brief Editor', description: 'Convert the client brief into professional scope and deliverables.', pageId: 'technical-brief' },
-      { label: 'Design & Compliance', description: 'Coordinate SANS, design reviews, and professional compliance checks.', pageId: 'design' },
-      { label: 'Drawing Register', description: 'Track drawing issues, revisions, and coordination status.', pageId: 'drawing-register' },
-      { label: 'Freelancer Jobs', description: 'Build and monitor outsourced professional work packages.', pageId: 'bep-freelancers' },
+    toolGroups: [
+      { id: 'brief-compliance', label: 'Technical brief and compliance', description: 'Professional scope, SANS checks, compliance evidence, and design-governance tools.', tools: [
+        { label: 'Technical Brief Editor', description: 'Convert the client brief into professional scope and deliverables.', pageId: 'technical-brief' },
+        { label: 'Design & Compliance', description: 'Coordinate SANS, design reviews, and professional compliance checks.', pageId: 'design' },
+      ] },
+      { id: 'document-delivery', label: 'Drawing delivery and resourcing', description: 'Document-control and outsourced package tools for design-team delivery.', tools: [
+        { label: 'Drawing Register', description: 'Track drawing issues, revisions, and coordination status.', pageId: 'drawing-register' },
+        { label: 'Freelancer Jobs', description: 'Build and monitor outsourced professional work packages.', pageId: 'bep-freelancers' },
+      ] },
     ],
   },
   architect: {
     title: 'Architect / Design-Team Toolbox',
     subtitle: 'Architectural delivery tools aligned to the BEP professional workflow.',
     scope: 'Architect is treated as a BEP subtype for authorization while keeping familiar role labels in the UI.',
-    tools: [
-      { label: 'Technical Brief Editor', description: 'Refine architectural scope, assumptions, and exclusions.', pageId: 'technical-brief' },
-      { label: 'AI Drawing Checker', description: 'Run drawing review support before human professional sign-off.', pageId: 'drawing-checker' },
-      { label: 'SANS / Compliance Forms', description: 'Prepare compliance forms and checklist evidence.', pageId: 'sans-forms' },
-      { label: 'Remote Desktop / Resources', description: 'Access resource-sharing and delivery support tools.', pageId: 'resource-sharing' },
+    toolGroups: [
+      { id: 'architectural-compliance', label: 'Architectural compliance', description: 'Scope, drawing review, and statutory-form preparation for architect-led delivery.', tools: [
+        { label: 'Technical Brief Editor', description: 'Refine architectural scope, assumptions, and exclusions.', pageId: 'technical-brief' },
+        { label: 'AI Drawing Checker', description: 'Run drawing review support before human professional sign-off.', pageId: 'drawing-checker' },
+        { label: 'SANS / Compliance Forms', description: 'Prepare compliance forms and checklist evidence.', pageId: 'sans-forms' },
+      ] },
+      { id: 'delivery-resources', label: 'Delivery resources', description: 'Resource access for drawing production and coordinated design support.', tools: [
+        { label: 'Remote Desktop / Resources', description: 'Access resource-sharing and delivery support tools.', pageId: 'resource-sharing' },
+      ] },
     ],
   },
   contractor: {
     title: 'Main Contractor Toolbox',
     subtitle: 'Tender, procurement, programme, staff, claims, site instruction, and package controls.',
     scope: 'Contractor tools manage the whole construction delivery layer but do not bypass client/admin approvals.',
-    tools: [
-      { label: 'BoQ / BoM Procurement', description: 'Create procurement lists, compare quotes, and manage supplier commitments.', pageId: 'procurement' },
-      { label: 'Subcontractor Packages', description: 'Create and monitor subcontractor/supplier package scopes.', pageId: 'packages' },
-      { label: 'Staff, Wages & Plant', description: 'Track labour, plant, and resource allocation.', pageId: 'contractor-staff' },
-      { label: 'Programme / Gantt', description: 'Manage baseline, look-ahead, and recovery programme layers.', pageId: 'programme' },
+    toolGroups: [
+      { id: 'commercial-procurement', label: 'Commercial and procurement', description: 'Procurement, package scopes, supplier commitments, and governed commercial evidence.', tools: [
+        { label: 'BoQ / BoM Procurement', description: 'Create procurement lists, compare quotes, and manage supplier commitments.', pageId: 'procurement' },
+        { label: 'Subcontractor Packages', description: 'Create and monitor subcontractor/supplier package scopes.', pageId: 'packages' },
+      ] },
+      { id: 'site-delivery', label: 'Site delivery controls', description: 'Labour, plant, programme, and recovery controls for main-contractor delivery.', tools: [
+        { label: 'Staff, Wages & Plant', description: 'Track labour, plant, and resource allocation.', pageId: 'contractor-staff' },
+        { label: 'Programme / Gantt', description: 'Manage baseline, look-ahead, and recovery programme layers.', pageId: 'programme' },
+      ] },
     ],
   },
   subcontractor: {
     title: 'Subcontractor Package Toolbox',
     subtitle: 'Assigned package scope, RFIs, shop drawings, samples, claims, snags, and close-out evidence.',
     scope: 'Subcontractor access is package-scoped. It cannot control whole-project procurement, supplier catalogues, or client approvals.',
-    tools: [
-      { label: 'Assigned Package Scope', description: 'Review subcontract order scope, deliverables, and readiness gates.', pageId: 'packages' },
-      { label: 'Shop Drawings & Samples', description: 'Submit package drawings, samples, product data, and coordination evidence.', pageId: 'procurement' },
-      { label: 'RFIs / Site Instructions', description: 'Raise package RFIs and respond to issued site instructions.', pageId: 'construction' },
-      { label: 'Payment Claims & Close-Out Evidence', description: 'Prepare payment claim evidence, snags, warranties, and completion records.', pageId: 'snagging' },
+    toolGroups: [
+      { id: 'package-scope', label: 'Package scope and submissions', description: 'Subcontract-order scope, shop drawings, samples, and package coordination tools.', tools: [
+        { label: 'Assigned Package Scope', description: 'Review subcontract order scope, deliverables, and readiness gates.', pageId: 'packages' },
+        { label: 'Shop Drawings & Samples', description: 'Submit package drawings, samples, product data, and coordination evidence.', pageId: 'procurement' },
+      ] },
+      { id: 'site-claims-closeout', label: 'RFIs, claims, and close-out', description: 'Execution communications, payment-claim evidence, snagging, and close-out records.', tools: [
+        { label: 'RFIs / Site Instructions', description: 'Raise package RFIs and respond to issued site instructions.', pageId: 'construction' },
+        { label: 'Payment Claims & Close-Out Evidence', description: 'Prepare payment claim evidence, snags, warranties, and completion records.', pageId: 'snagging' },
+      ] },
     ],
   },
   supplier: {
     title: 'Supplier Delivery Toolbox',
     subtitle: 'Supplier quote path, catalogue, product data, lead times, delivery notes, warranties, and payment evidence.',
     scope: 'Supplier access is delivery/procurement scoped. It is separate from subcontractor execution tools and cannot issue subcontract orders.',
-    tools: [
-      { label: 'Supplier API Catalogue', description: 'Maintain catalogue, alternatives, availability, prices, and lead times.', pageId: 'procurement' },
-      { label: 'Supplier Quote Path', description: 'Submit quotations, purchase-order responses, and delivery commitments.', pageId: 'packages' },
-      { label: 'Delivery Notes & Warranties', description: 'Upload delivery notes, manuals, warranty certificates, and product evidence.', pageId: 'snagging' },
-      { label: 'Payment Tracker', description: 'Track supplier payment claim evidence and governed payment status.', pageId: 'payments' },
+    toolGroups: [
+      { id: 'catalogue-quotes', label: 'Catalogue and quotes', description: 'Supplier catalogue, alternatives, lead times, quotation, and purchase-order response tools.', tools: [
+        { label: 'Supplier API Catalogue', description: 'Maintain catalogue, alternatives, availability, prices, and lead times.', pageId: 'procurement' },
+        { label: 'Supplier Quote Path', description: 'Submit quotations, purchase-order responses, and delivery commitments.', pageId: 'packages' },
+      ] },
+      { id: 'delivery-payment', label: 'Delivery and payment evidence', description: 'Delivery notes, warranty evidence, product documents, and supplier payment status.', tools: [
+        { label: 'Delivery Notes & Warranties', description: 'Upload delivery notes, manuals, warranty certificates, and product evidence.', pageId: 'snagging' },
+        { label: 'Payment Tracker', description: 'Track supplier payment claim evidence and governed payment status.', pageId: 'payments' },
+      ] },
     ],
   },
   freelancer: {
     title: 'Freelancer Work Toolbox',
     subtitle: 'Assigned tasks, submissions, feedback, drawing checks, resources, and invoice preparation.',
     scope: 'Freelancer tools are task-scoped and do not grant project-owner, contractor, or statutory authority.',
-    tools: [
-      { label: 'Assigned Work', description: 'View assigned work packages, brief files, and deliverable requirements.', pageId: 'freelancer-work' },
-      { label: 'Submissions & Feedback', description: 'Submit work, receive feedback, and track review status.', pageId: 'freelancer-submissions' },
-      { label: 'AI Drawing Checker', description: 'Check drawing deliverables before BEP review.', pageId: 'drawing-checker' },
-      { label: 'Resource Centre', description: 'Use checklists, templates, and remote resource support.', pageId: 'resource-centre' },
+    toolGroups: [
+      { id: 'assigned-deliverables', label: 'Assigned deliverables', description: 'Task-scoped work, submissions, revision cycles, and feedback records.', tools: [
+        { label: 'Assigned Work', description: 'View assigned work packages, brief files, and deliverable requirements.', pageId: 'freelancer-work' },
+        { label: 'Submissions & Feedback', description: 'Submit work, receive feedback, and track review status.', pageId: 'freelancer-submissions' },
+      ] },
+      { id: 'quality-resources', label: 'Quality and resources', description: 'Drawing checks, checklist access, templates, and remote resource support.', tools: [
+        { label: 'AI Drawing Checker', description: 'Check drawing deliverables before BEP review.', pageId: 'drawing-checker' },
+        { label: 'Resource Centre', description: 'Use checklists, templates, and remote resource support.', pageId: 'resource-centre' },
+      ] },
     ],
   },
   admin: {
     title: 'Admin Governance Toolbox',
     subtitle: 'Whole-system governance, audits, role tools, AI review, payment settings, disputes, and platform configuration.',
     scope: 'Admin tools govern the platform but still require auditable reasons for overrides and sensitive decisions.',
-    tools: [
-      { label: 'Admin Console', description: 'Review users, projects, verification, disputes, tools, rates, and governance queues.', pageId: 'admin-console' },
-      { label: 'AI Review Queue', description: 'Review AI-generated outputs before release or downstream action.', pageId: 'ai' },
-      { label: 'Audit Trail Viewer', description: 'Inspect governed workflow records and sensitive action history.', pageId: 'disputes' },
-      { label: 'Payment Rate Settings', description: 'Review payment rails, fee settings, claims, and escrow governance.', pageId: 'payments' },
+    toolGroups: [
+      { id: 'platform-governance', label: 'Platform governance', description: 'System-wide user, project, verification, dispute, and governance-queue oversight.', tools: [
+        { label: 'Admin Console', description: 'Review users, projects, verification, disputes, tools, rates, and governance queues.', pageId: 'admin-console' },
+        { label: 'Audit Trail Viewer', description: 'Inspect governed workflow records and sensitive action history.', pageId: 'disputes' },
+      ] },
+      { id: 'ai-payment-controls', label: 'AI and payment controls', description: 'Review queues and financial settings that remain explicitly human-governed.', tools: [
+        { label: 'AI Review Queue', description: 'Review AI-generated outputs before release or downstream action.', pageId: 'ai' },
+        { label: 'Payment Rate Settings', description: 'Review payment rails, fee settings, claims, and escrow governance.', pageId: 'payments' },
+      ] },
     ],
   },
 };
@@ -129,20 +169,54 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" data-testid={`toolbox-actions-${user.role}`}>
-            {config.tools.map((tool) => (
-              <div key={tool.label} className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm">
-                <h3 className="font-bold text-foreground">{tool.label}</h3>
-                <p className="mt-2 text-sm text-muted-foreground min-h-[3.5rem]">{tool.description}</p>
-                <Button type="button" variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => onNavigate?.(tool.pageId)}>
-                  Open workflow <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
+          <div className="space-y-5" data-testid={`toolbox-actions-${user.role}`}>
+            {config.toolGroups.map((group) => (
+              <section key={group.id} className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm" data-testid={`toolbox-group-${user.role}-${group.id}`}>
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="font-heading text-lg font-black tracking-[-0.03em] text-foreground">{group.label}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{group.description}</p>
+                  </div>
+                  <Badge variant="outline" className="w-fit rounded-full">{group.tools.length} tools</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {group.tools.map((tool) => (
+                    <div key={tool.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                      <h4 className="font-bold text-foreground">{tool.label}</h4>
+                      <p className="mt-2 text-sm text-muted-foreground min-h-[3.5rem]">{tool.description}</p>
+                      <Button type="button" variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => onNavigate?.(tool.pageId)}>
+                        Open workflow <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <p>Unsafe approvals, signatures, payment releases, and statutory submissions are not performed from the toolbox. This page provides traceable files and evidence for the dedicated human-confirmed workflows.</p>
+          </div>
+          <div className="rounded-2xl border border-dashed border-primary/30 bg-background/80 p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-heading text-lg font-black tracking-[-0.03em]">External API mock fixtures</h3>
+                <p className="text-sm text-muted-foreground">{MOCK_EXTERNAL_API_NOTICE}</p>
+              </div>
+              <Badge variant="secondary" className="w-fit rounded-full">local mocks</Badge>
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              {MOCK_EXTERNAL_API_INTEGRATIONS.map((integration) => (
+                <div key={integration.id} className="rounded-xl border border-border bg-card p-3 text-sm">
+                  <p className="font-bold text-foreground">{integration.label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{integration.endpointLabel}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="outline" className="rounded-full">{integration.mode}</Badge>
+                    <Badge variant="secondary" className="rounded-full">{integration.status.replaceAll('_', ' ')}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

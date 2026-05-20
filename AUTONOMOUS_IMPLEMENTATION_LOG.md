@@ -201,3 +201,21 @@ Owner instruction: finish the Architex PRD overnight and keep JCode/agents on go
 - Added focused coverage for ready PayFast configuration, blocked public credential exposure, missing webhook route/event mapping, and blocked money-movement/statutory controls.
 - Validation: npx vitest run src/services/__tests__/paymentProviderReadinessService.test.ts - 4 tests passed; npm run lint -- --pretty false - passed.
 - Blockers surfaced by abstraction: real PayFast go-live must remain blocked until credentials are server-only, ITN/webhook reconciliation exists, and finance/statutory controls are verified; no push/deploy performed.
+
+
+## 2026-05-21 01:37 SAST — Hermes oversight role-flow readiness slice
+- Live state: JCode service was running only ambient sleep after completing the prior verification turn; no npm/vitest/tsc implementation process was active, so Hermes took the next small provider-neutral PRD slice.
+- Added `src/services/backendRoleFlowReadinessService.ts` to project backend.html role-flow coverage per canonical role, with explicit page/capability evidence, provider gates, and human-governance preservation rather than fake integrations.
+- Added `src/services/__tests__/backendRoleFlowReadinessService.test.ts` covering all roles, client-ready evidence, BEP/statutory gating, supplier package blocking, and admin human-governed readiness.
+- Validation: `npm test -- src/services/__tests__/backendRoleFlowReadinessService.test.ts`; `npm run lint -- --pretty false`.
+
+- Commit deferred: concurrent/unowned change detected in `src/lib/__tests__/dashboard-registry.static.test.ts`; left all changes local and unpushed to avoid racing JCode.
+
+
+## 2026-05-21 01:42 SAST — Hermes role toolbox grouping and local integration mocks
+- JCode check: `.jcode ... serve` was still running, but no active npm/vitest/tsc implementation process was progressing beyond the prior backend role-flow slice, so Hermes continued the requested tool work directly.
+- Added grouped tool sections inside `ProjectToolboxPage` so each user role has its own toolbox and the role-specific tools are grouped within that role context.
+- Added `src/data/mockExternalApiIntegrations.ts` with deterministic local mock fixtures for PayFast sandbox status, CPD statutory sync, supplier catalogue/lead-time feed, and municipal portal status.
+- The mock fixture is explicitly local-only and does not perform live payment, statutory, municipal, supplier-order, escrow, or submission actions.
+- Validation: `npm run test -- src/services/__tests__/backendRoleFlowReadinessService.test.ts src/lib/__tests__/dashboard-registry.static.test.ts`; `npm run lint -- --pretty false`.
+- No push/deploy performed.
