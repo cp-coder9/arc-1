@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, onSnapshot, orderBy, query, type DocumentData, type Query, where } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
 import { AlertTriangle, CheckCircle2, CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { EscrowV2, Job, LedgerEntry, Project, UserProfile } from '@/types';
@@ -67,10 +67,10 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
     const ledgerMap = new Map<string, LedgerEntry>();
 
     if (!user || user.role === 'admin') {
-      unsubs.push(onSnapshot(query(collection(db, 'ledger'), orderBy('createdAt', 'desc'), limit(500)), (snapshot) => {
+      unsubs.push(onSnapshot(query(collection(db, 'ledger'), limit(500)), (snapshot) => {
         setLedger(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as LedgerEntry)));
       }, (error) => { console.warn('Admin ledger projection unavailable:', error); setLedger([]); }));
-      unsubs.push(onSnapshot(query(collection(db, 'escrow'), orderBy('updatedAt', 'desc'), limit(200)), (snapshot) => {
+      unsubs.push(onSnapshot(query(collection(db, 'escrow'), limit(200)), (snapshot) => {
         setEscrows(snapshot.docs.map((docSnap) => ({ jobId: docSnap.id, ...docSnap.data() } as EscrowV2)));
       }, (error) => { console.warn('Admin escrow projection unavailable:', error); setEscrows([]); }));
       unsubs.push(onSnapshot(query(collection(db, 'projects'), limit(200)), (snapshot) => {
