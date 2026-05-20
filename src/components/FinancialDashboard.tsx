@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, type DocumentData, type Query, where } from 'firebase/firestore';
 import { AlertTriangle, CheckCircle2, CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { EscrowV2, LedgerEntry, Project, UserProfile } from '@/types';
+import { EscrowV2, Job, LedgerEntry, Project, UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
@@ -31,18 +32,26 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function projectQueryForFinancialUser(user: UserProfile) {
+function projectQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
   const projects = collection(db, 'projects');
-  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), limit(100));
-  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), limit(100));
-  return null;
+  if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(100))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(projects, where('leadProfessionalId', '==', user.uid), limit(100)),
+    query(projects, where('leadBepId', '==', user.uid), limit(100)),
+    query(projects, where('leadArchitectId', '==', user.uid), limit(100)),
+  ];
+  return [];
 }
 
-function jobQueryForFinancialUser(user: UserProfile) {
+function jobQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(100));
-  if (user.role === 'architect' || user.role === 'bep') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(100));
-  return null;
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(100))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(100)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(100)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(100)),
+  ];
+  return [];
 }
 
 export default function FinancialDashboard({ user }: { user?: UserProfile }) {
@@ -78,19 +87,19 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
     unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payerId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payer ledger projection unavailable:', error)));
     unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payeeId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payee ledger projection unavailable:', error)));
 
-    const projectQuery = projectQueryForFinancialUser(user);
-    if (projectQuery) {
-      unsubs.push(onSnapshot(projectQuery, (snapshot) => {
-        setProjects(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project))));
+    const projectQueries = projectQueriesForFinancialUser(user);
+    if (projectQueries.length > 0) {
+      unsubs.push(subscribeToMergedQuerySnapshots<Project>(projectQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project), (items) => {
+        setProjects(sortByRecent(items));
       }, (error) => { console.warn('Financial project projection unavailable:', error); setProjects([]); }));
     } else {
       setProjects([]);
     }
 
-    const jobQuery = jobQueryForFinancialUser(user);
-    if (jobQuery) {
-      unsubs.push(onSnapshot(jobQuery, (snapshot) => {
-        setVisibleJobIds(snapshot.docs.map((docSnap) => docSnap.id));
+    const jobQueries = jobQueriesForFinancialUser(user);
+    if (jobQueries.length > 0) {
+      unsubs.push(subscribeToMergedQuerySnapshots<Job>(jobQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+        setVisibleJobIds(items.map((job) => job.id));
       }, (error) => { console.warn('Financial job projection unavailable:', error); setVisibleJobIds([]); }));
     } else {
       setVisibleJobIds([]);
