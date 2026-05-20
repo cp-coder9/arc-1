@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
 import { Loader2, MessageCircle, Send, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, Message, UserProfile } from '@/types';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
+import { messagingService } from '@/services/messagingService';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -113,16 +114,14 @@ export default function ProjectMessengerPage({ user }: { user: UserProfile }) {
     if (!selectedJob || !scope.canSend || !draft.trim()) return;
     setSending(true);
     try {
-      await addDoc(collection(db, 'messages'), {
+      await messagingService.sendMessage({
         jobId: selectedJob.id,
         senderId: user.uid,
         senderRole: user.role,
         content: draft.trim(),
-        isRead: false,
-        createdAt: new Date().toISOString(),
       });
       setDraft('');
-      toast.success('Message sent to the governed project thread');
+      toast.success('Message sanitized and sent to the governed project thread');
     } catch (error) {
       console.warn('Project message send failed:', error);
       toast.error('Message could not be sent. Check project membership and permissions.');
