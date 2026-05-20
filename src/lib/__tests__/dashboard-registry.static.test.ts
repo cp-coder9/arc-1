@@ -386,6 +386,10 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`{ id: 'drawing-register', label: 'Drawing Register'`);
     expect(appSource).toContain(`activeTab === 'drawing-register' && <DrawingRegisterPage user={user} />`);
     expect(appSource).toContain(`activeTab !== 'drawing-register'`);
+    expect(drawingRegisterSource).toContain("where('leadProfessionalId', '==', user.uid)");
+    expect(drawingRegisterSource).toContain("where('leadBepId', '==', user.uid)");
+    expect(drawingRegisterSource).toContain("where('leadArchitectId', '==', user.uid)");
+    expect(drawingRegisterSource).toContain('mergeProjectSnapshots');
     expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'documents')");
     expect(drawingRegisterSource).toContain("collection(documentRef, 'versions')");
     expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'transmittals')");
