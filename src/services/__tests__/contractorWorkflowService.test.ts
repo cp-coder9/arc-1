@@ -203,4 +203,81 @@ describe('contractorWorkflowService', () => {
       '1 open RFI should be answered before closeout.',
     ]));
   });
+
+  it('projects delivery readiness from site logs, RFIs, inspections, programme evidence, actions, and audit metadata', () => {
+    const result = assessContractorWorkflow({
+      ...baseInput,
+      programmeTasks: [
+        {
+          ...completedTask,
+          id: 'task-critical',
+          title: 'Critical commissioning',
+          startDate: '2026-07-27',
+          endDate: '2026-07-29',
+          forecastEndDate: '2026-08-02',
+          status: 'delayed',
+          progress: 60,
+          isCritical: true,
+          humanApprovalRequired: true,
+          baselineChangeStatus: 'pending_review',
+        },
+      ],
+      siteLogs: [{ ...siteLog, date: '2026-07-27', issues: ['Awaiting DB clarification'] }],
+      rfis: [
+        { ...closedRfi, id: 'rfi-open', status: 'open', priority: 'urgent', dueDate: '2026-07-28' },
+        { ...closedRfi, id: 'rfi-responded', status: 'responded', priority: 'medium', dueDate: '2026-07-30' },
+      ],
+      inspections: [{ ...passedInspection, overallResult: 'conditional', date: '2026-07-30' }],
+      evidence: approvedEvidence.filter((item) => item.type !== 'closeout_document'),
+      asOf: '2026-07-31T00:00:00.000Z',
+    });
+
+    expect(result.deliveryReadinessProjection).toEqual(expect.objectContaining({
+      packageId: tender.id,
+      projectId: tender.projectId,
+      projectedStatus: 'blocked',
+    }));
+    expect(result.deliveryReadinessProjection.siteLogCoverage).toEqual({
+      expectedWorkingDays: 3,
+      loggedDays: 1,
+      missingDays: ['2026-07-28', '2026-07-29'],
+      coveragePercent: 33,
+      issueCount: 1,
+    });
+    expect(result.deliveryReadinessProjection.rfiSummary).toEqual({
+      open: 1,
+      overdue: 1,
+      respondedAwaitingClosure: 1,
+      urgentOpen: 1,
+    });
+    expect(result.deliveryReadinessProjection.inspectionSummary).toEqual({
+      passed: 0,
+      conditional: 1,
+      failed: 0,
+      latestInspectionDate: '2026-07-30',
+    });
+    expect(result.deliveryReadinessProjection.programmeEvidence).toEqual(expect.objectContaining({
+      completedTasks: 0,
+      incompleteTasks: 1,
+      delayedCriticalTasks: 1,
+      unapprovedBaselineChanges: 1,
+      approvedEvidenceCount: 2,
+      missingEvidence: ['closeout_document'],
+    }));
+    expect(result.deliveryReadinessProjection.roleNextActions).toEqual(expect.arrayContaining([
+      { owner: 'contractor', priority: 'high', action: 'Backfill 2 missing site log days.' },
+      { owner: 'bep', priority: 'high', action: 'Respond to 1 overdue RFI.', dueDate: '2026-07-28' },
+      { owner: 'contractor', priority: 'medium', action: 'Close 1 responded RFI after confirming the instruction is buildable.' },
+      { owner: 'contractor', priority: 'high', action: 'Upload rectification evidence for failed or conditional inspections.' },
+      { owner: 'contractor', priority: 'high', action: 'Submit recovery plan for 1 delayed critical programme task.' },
+      { owner: 'client', priority: 'medium', action: 'Review 1 programme baseline change requiring human approval.' },
+      { owner: 'contractor', priority: 'high', action: 'Upload approved evidence: closeout_document.' },
+    ]));
+    expect(result.deliveryReadinessProjection.audit).toEqual({
+      generatedAt: '2026-07-31T00:00:00.000Z',
+      asOf: '2026-07-31T00:00:00.000Z',
+      sources: ['programme_tasks', 'site_logs', 'rfis', 'inspections', 'delivery_evidence'],
+      counts: { programmeTasks: 1, siteLogs: 1, rfis: 2, inspections: 1, evidenceItems: 2 },
+    });
+  });
 });
