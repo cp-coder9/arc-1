@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getProjectCommandCentreGuidance } from '../projectCommandCentreService';
+import { buildProjectCommandCentreProjection, getProjectCommandCentreGuidance } from '../projectCommandCentreService';
 import type { DelegatedTask, Job, Project, TenderPackage, UserRole } from '../../types';
 
 const baseProject = (currentStage: Project['currentStage']): Project => ({
@@ -225,6 +225,44 @@ describe('projectCommandCentreService', () => {
     });
 
     expect(guidance.nextAction).toMatchObject({ label: 'Complete the guided project brief', target: 'client-intake' });
+  });
+
+  it('builds command-centre milestones, readiness, timeline, and cost summaries', () => {
+    const projection = buildProjectCommandCentreProjection({
+      activeRole: 'bep',
+      activeProject: {
+        ...baseProject('coordination'),
+        stageHistory: [
+          { stage: 'intake', enteredAt: '2026-05-01T00:00:00.000Z', exitedAt: '2026-05-02T00:00:00.000Z', actorId: 'client-1' },
+          { stage: 'appointment', enteredAt: '2026-05-02T00:00:00.000Z', exitedAt: '2026-05-03T00:00:00.000Z', actorId: 'client-1' },
+          { stage: 'coordination', enteredAt: '2026-05-03T00:00:00.000Z', actorId: 'bep-1' },
+        ],
+        stageGateEvidence: { clientBriefCompleted: true, technicalBriefApproved: true, verifiedProfessionalAppointed: true, appointmentAgreementSigned: true, escrowPlanInitialized: true },
+      },
+      activeJob: baseJob,
+      activePackage: baseTender,
+      profileCompletion: { isComplete: true, completionRatio: 1, missingFields: [], blockers: [] },
+    });
+
+    expect(projection.milestones.find(milestone => milestone.stage === 'intake')).toMatchObject({ status: 'completed', enteredAt: '2026-05-01T00:00:00.000Z' });
+    expect(projection.milestones.find(milestone => milestone.stage === 'coordination')).toMatchObject({ status: 'active', label: 'Design & Coordination' });
+    expect(projection.readiness.status).toBe('attention_required');
+    expect(projection.readiness.warnings.some(warning => warning.startsWith('High priority action:'))).toBe(true);
+    expect(projection.timeline).toMatchObject({ currentStageStartedAt: '2026-05-03T00:00:00.000Z', nextDeadline: baseTender.deadline });
+    expect(projection.cost).toMatchObject({ budget: baseJob.budget, packageBudget: baseTender.estimatedBudget, estimatedExposure: baseJob.budget + (baseTender.estimatedBudget || 0), currency: 'ZAR' });
+  });
+
+  it('surfaces active stage-gate blockers in readiness summaries', () => {
+    const projection = buildProjectCommandCentreProjection({
+      activeRole: 'client',
+      activeProject: { ...baseProject('coordination'), stageGateEvidence: { clientBriefCompleted: true, technicalBriefApproved: true, verifiedProfessionalAppointed: false } },
+      activeJob: baseJob,
+      profileCompletion: { isComplete: true, completionRatio: 1, missingFields: [], blockers: [] },
+    });
+
+    expect(projection.milestones.find(milestone => milestone.stage === 'coordination')).toMatchObject({ status: 'blocked' });
+    expect(projection.readiness.status).toBe('blocked');
+    expect(projection.readiness.blockers).toContain('Stage gate missing: Verified professional appointed');
   });
 
   it('is deterministic for the same input and does not mutate source records', () => {

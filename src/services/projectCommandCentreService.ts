@@ -54,6 +54,45 @@ export interface ProjectCommandCentreGuidance {
   aiSummary: string;
 }
 
+export interface CommandCentreMilestone {
+  stage: CanonicalProjectStage;
+  label: string;
+  status: 'completed' | 'active' | 'blocked' | 'upcoming';
+  enteredAt?: string;
+  exitedAt?: string;
+  blockers: string[];
+}
+
+export interface CommandCentreReadinessSummary {
+  score: number;
+  status: 'ready' | 'attention_required' | 'blocked';
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface CommandCentreTimelineSummary {
+  currentStageStartedAt?: string;
+  nextDeadline?: string;
+  overdue: boolean;
+  dueInDays?: number;
+  label: string;
+}
+
+export interface CommandCentreCostSummary {
+  budget?: number;
+  packageBudget?: number;
+  estimatedExposure: number;
+  currency: 'ZAR';
+  label: string;
+}
+
+export interface ProjectCommandCentreProjection extends ProjectCommandCentreGuidance {
+  milestones: CommandCentreMilestone[];
+  readiness: CommandCentreReadinessSummary;
+  timeline: CommandCentreTimelineSummary;
+  cost: CommandCentreCostSummary;
+}
+
 type ActionSeed = {
   label: string;
   target: string;
@@ -394,6 +433,80 @@ function stageGateAction(input: ProjectCommandCentreInput, stage: CanonicalProje
   };
 }
 
+function stageGateBlockersForStage(input: ProjectCommandCentreInput, stage: CanonicalProjectStage): string[] {
+  if (!input.activeProject || !('stageGateEvidence' in input.activeProject)) return [];
+  return getMissingStageGateRequirements(stage, input.activeProject.stageGateEvidence || {}).map(requirement => requirement.label);
+}
+
+function buildMilestones(input: ProjectCommandCentreInput, activeStage: CanonicalProjectStage): CommandCentreMilestone[] {
+  const activeIndex = PROJECT_STAGE_ORDER.indexOf(activeStage);
+  return PROJECT_STAGE_ORDER.filter((stage): stage is CanonicalProjectStage => stage !== 'scoping').map((stage) => {
+    const stageIndex = PROJECT_STAGE_ORDER.indexOf(stage);
+    const history = input.activeProject?.stageHistory?.find(entry => (entry.stage === 'scoping' ? 'intake' : entry.stage) === stage);
+    const blockers = stageIndex >= activeIndex ? stageGateBlockersForStage(input, stage) : [];
+    return {
+      stage,
+      label: PROJECT_STAGE_LABELS[stage],
+      status: stage === activeStage ? (blockers.length ? 'blocked' : 'active') : stageIndex < activeIndex ? 'completed' : 'upcoming',
+      enteredAt: history?.enteredAt,
+      exitedAt: history?.exitedAt,
+      blockers,
+    };
+  });
+}
+
+function daysUntil(date?: string): number | undefined {
+  if (!date) return undefined;
+  const timestamp = Date.parse(date);
+  if (!Number.isFinite(timestamp)) return undefined;
+  return Math.ceil((timestamp - Date.now()) / 86_400_000);
+}
+
+function buildTimelineSummary(input: ProjectCommandCentreInput, activeStage: CanonicalProjectStage): CommandCentreTimelineSummary {
+  const currentHistory = input.activeProject?.stageHistory?.find(entry => (entry.stage === 'scoping' ? 'intake' : entry.stage) === activeStage);
+  const nextDeadline = input.activeTask?.deadline || input.activePackage?.deadline || input.activeJob?.deadline;
+  const dueInDays = daysUntil(nextDeadline);
+  const overdue = typeof dueInDays === 'number' ? dueInDays < 0 : false;
+  return {
+    currentStageStartedAt: currentHistory?.enteredAt,
+    nextDeadline,
+    overdue,
+    dueInDays,
+    label: nextDeadline ? `${overdue ? 'Overdue' : 'Next deadline'}: ${nextDeadline}` : 'No deadline recorded',
+  };
+}
+
+function buildCostSummary(input: ProjectCommandCentreInput): CommandCentreCostSummary {
+  const budget = typeof input.activeJob?.budget === 'number' ? input.activeJob.budget : undefined;
+  const packageBudget = typeof input.activePackage?.estimatedBudget === 'number' ? input.activePackage.estimatedBudget : undefined;
+  const estimatedExposure = [budget, packageBudget].filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).reduce((sum, value) => sum + value, 0);
+  return {
+    budget,
+    packageBudget,
+    estimatedExposure,
+    currency: 'ZAR',
+    label: estimatedExposure > 0 ? `Visible exposure ZAR ${estimatedExposure.toLocaleString('en-ZA')}` : 'No visible cost records',
+  };
+}
+
+function buildReadinessSummary(input: ProjectCommandCentreInput, milestones: CommandCentreMilestone[], nextAction: ProjectNextBestAction): CommandCentreReadinessSummary {
+  const blockers = [
+    ...(input.profileCompletion?.blockers || []),
+    ...milestones.find(milestone => milestone.status === 'blocked')?.blockers.map(blocker => `Stage gate missing: ${blocker}`) || [],
+  ];
+  const warnings = [
+    ...(!input.activeProject ? ['No active project record is selected.'] : []),
+    ...(nextAction.priority === 'high' ? [`High priority action: ${nextAction.label}`] : []),
+  ];
+  const score = Math.max(0, Math.round(100 - blockers.length * 25 - warnings.length * 10));
+  return {
+    score,
+    status: blockers.length ? 'blocked' : warnings.length ? 'attention_required' : 'ready',
+    blockers,
+    warnings,
+  };
+}
+
 function buildAiSummary(input: ProjectCommandCentreInput, stage: CanonicalProjectStage, action: ProjectNextBestAction): string {
   const { activeRole, activeJob, activePackage, activeTask } = input;
   const subject = activeJob?.title || activePackage?.title || activeTask?.assigneeRole || 'No active project record';
@@ -432,5 +545,17 @@ export function getProjectCommandCentreGuidance(input: ProjectCommandCentreInput
     stageLabel: PROJECT_STAGE_LABELS[activeStage],
     nextAction,
     aiSummary: buildAiSummary(input, activeStage, nextAction),
+  };
+}
+
+export function buildProjectCommandCentreProjection(input: ProjectCommandCentreInput): ProjectCommandCentreProjection {
+  const guidance = getProjectCommandCentreGuidance(input);
+  const milestones = buildMilestones(input, guidance.activeStage);
+  return {
+    ...guidance,
+    milestones,
+    readiness: buildReadinessSummary(input, milestones, guidance.nextAction),
+    timeline: buildTimelineSummary(input, guidance.activeStage),
+    cost: buildCostSummary(input),
   };
 }
