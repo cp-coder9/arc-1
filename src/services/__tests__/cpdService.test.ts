@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import {
+  buildCPDStatutorySyncPayload,
   createCPDCertificateVerificationFields,
   hashCPDCertificate,
   planCPDStatutorySync,
   scoreCPDAttempt,
   verifyCPDCertificateHash,
+  verifyCPDCertificateRecord,
   type CPDAssessment,
 } from '../cpdService';
 
@@ -145,19 +147,108 @@ describe('cpdService', () => {
     });
   });
 
-  test('marks statutory CPD sync ready only with complete provider config', () => {
-    const plan = planCPDStatutorySync({
+  test('verifies certificate records before statutory sync governance decisions', () => {
+    const baseCertificate = {
+      userId: 'bep-1',
+      courseId: 'course-sans-10400',
+      attemptId: 'attempt-1',
+      issuedAt: '2026-05-15T10:05:00.000Z',
+      expiresAt: '2027-05-15T10:05:00.000Z',
+      issuerKey: 'test-secret',
+    };
+    const fields = createCPDCertificateVerificationFields(baseCertificate);
+    const certificate = {
+      ...baseCertificate,
+      ...fields,
+      status: 'issued' as const,
+    };
+
+    expect(verifyCPDCertificateRecord(certificate, 'test-secret', '2026-06-01T00:00:00.000Z')).toEqual({
+      valid: true,
+      status: 'valid',
+      warnings: [],
+    });
+    expect(verifyCPDCertificateRecord({ ...certificate, userId: 'attacker' }, 'test-secret')).toEqual({
+      valid: false,
+      status: 'hash_mismatch',
+      warnings: ['Certificate hash does not match the supplied certificate fields.'],
+    });
+    expect(verifyCPDCertificateRecord({ ...certificate, status: 'revoked', revokedReason: 'Manual audit reversal.' }, 'test-secret')).toEqual({
+      valid: false,
+      status: 'revoked',
+      warnings: ['Manual audit reversal.'],
+    });
+    expect(verifyCPDCertificateRecord({ ...certificate, status: 'expired' }, 'test-secret')).toEqual({
+      valid: false,
+      status: 'expired',
+      warnings: ['Certificate has expired.'],
+    });
+    expect(verifyCPDCertificateRecord(certificate, 'test-secret', '2027-05-15T10:05:00.000Z')).toEqual({
+      valid: false,
+      status: 'expired',
+      warnings: ['Certificate has expired.'],
+    });
+  });
+
+  test('builds statutory CPD sync payload only with consent, provider config, and valid certificate', () => {
+    const baseCertificate = {
+      userId: 'bep-1',
+      courseId: 'course-sans-10400',
+      attemptId: 'attempt-1',
+      issuedAt: '2026-05-15T10:05:00.000Z',
+      expiresAt: '2027-05-15T10:05:00.000Z',
+      issuerKey: 'test-secret',
+    };
+    const certificate = {
+      ...baseCertificate,
+      ...createCPDCertificateVerificationFields(baseCertificate),
+      status: 'issued' as const,
+    };
+    const config = {
       enabled: true,
       providerName: 'Professional Body API',
       endpointUrl: 'https://cpd.example.test/sync',
       apiKey: 'real-secret-ref',
-    });
+    };
 
-    expect(plan).toEqual({
-      status: 'ready',
-      canSync: true,
+    expect(
+      buildCPDStatutorySyncPayload({
+        config,
+        certificate,
+        issuerKey: 'test-secret',
+        humanConsentRecorded: true,
+      })
+    ).toEqual({
       providerName: 'Professional Body API',
       endpointUrl: 'https://cpd.example.test/sync',
+      userId: 'bep-1',
+      courseId: 'course-sans-10400',
+      attemptId: 'attempt-1',
+      verificationCode: certificate.verificationCode,
+      verificationHash: certificate.verificationHash,
+      humanConsentRecorded: true,
+      autoSyncProhibited: true,
     });
+
+    expect(() => buildCPDStatutorySyncPayload({ config, certificate, issuerKey: 'test-secret' })).toThrow(
+      'Human consent is required before statutory CPD sync.'
+    );
+    expect(() =>
+      buildCPDStatutorySyncPayload({
+        config: { ...config, apiKey: undefined },
+        certificate,
+        issuerKey: 'test-secret',
+        humanConsentRecorded: true,
+      })
+    ).toThrow('No statutory CPD provider sync will be attempted');
+    expect(() =>
+      buildCPDStatutorySyncPayload({
+        config,
+        certificate: { ...certificate, status: 'revoked' },
+        issuerKey: 'test-secret',
+        humanConsentRecorded: true,
+      })
+    ).toThrow('Cannot sync invalid CPD certificate: revoked.');
   });
+
 });

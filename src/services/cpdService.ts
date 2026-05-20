@@ -23,6 +23,29 @@ export interface CPDSyncProviderConfig {
   enabled?: boolean;
 }
 
+export interface CPDCertificateRecord extends CPDCertificateInput, CPDCertificateVerificationFields {
+  status: 'issued' | 'expired' | 'revoked';
+  revokedReason?: string;
+}
+
+export interface CPDCertificateVerificationResult {
+  valid: boolean;
+  status: 'valid' | 'expired' | 'revoked' | 'hash_mismatch';
+  warnings: string[];
+}
+
+export interface CPDStatutorySyncPayload {
+  providerName: string;
+  endpointUrl: string;
+  userId: string;
+  courseId: string;
+  attemptId: string;
+  verificationCode: string;
+  verificationHash: string;
+  humanConsentRecorded: true;
+  autoSyncProhibited: true;
+}
+
 export type CPDSyncPlan =
   | {
       status: 'blocked_provider_not_configured';
@@ -100,6 +123,14 @@ export const verifyCPDCertificateHash = (input: {
   return expectedHash === input.verificationHash;
 };
 
+export const verifyCPDCertificateRecord = (certificate: CPDCertificateRecord, issuerKey: string, asOf = new Date().toISOString()): CPDCertificateVerificationResult => {
+  const hashValid = verifyCPDCertificateHash({ ...certificate, issuerKey });
+  if (!hashValid) return { valid: false, status: 'hash_mismatch', warnings: ['Certificate hash does not match the supplied certificate fields.'] };
+  if (certificate.status === 'revoked') return { valid: false, status: 'revoked', warnings: [certificate.revokedReason || 'Certificate has been revoked.'] };
+  if (certificate.status === 'expired' || (certificate.expiresAt && Date.parse(certificate.expiresAt) <= Date.parse(asOf))) return { valid: false, status: 'expired', warnings: ['Certificate has expired.'] };
+  return { valid: true, status: 'valid', warnings: [] };
+};
+
 export const planCPDStatutorySync = (config: CPDSyncProviderConfig | undefined): CPDSyncPlan => {
   const requiredFields: Array<keyof CPDSyncProviderConfig> = [];
 
@@ -122,5 +153,24 @@ export const planCPDStatutorySync = (config: CPDSyncProviderConfig | undefined):
     canSync: true,
     providerName: config.providerName,
     endpointUrl: config.endpointUrl,
+  };
+};
+
+export const buildCPDStatutorySyncPayload = (input: { config: CPDSyncProviderConfig; certificate: CPDCertificateRecord; issuerKey: string; humanConsentRecorded?: boolean }): CPDStatutorySyncPayload => {
+  const plan = planCPDStatutorySync(input.config);
+  if (plan.canSync === false) throw new Error(plan.reason);
+  if (!input.humanConsentRecorded) throw new Error('Human consent is required before statutory CPD sync.');
+  const verification = verifyCPDCertificateRecord(input.certificate, input.issuerKey);
+  if (!verification.valid) throw new Error(`Cannot sync invalid CPD certificate: ${verification.status}.`);
+  return {
+    providerName: plan.providerName,
+    endpointUrl: plan.endpointUrl,
+    userId: input.certificate.userId,
+    courseId: input.certificate.courseId,
+    attemptId: input.certificate.attemptId,
+    verificationCode: input.certificate.verificationCode,
+    verificationHash: input.certificate.verificationHash,
+    humanConsentRecorded: true,
+    autoSyncProhibited: true,
   };
 };
