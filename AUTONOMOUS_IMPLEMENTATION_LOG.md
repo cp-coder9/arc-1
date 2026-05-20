@@ -219,3 +219,12 @@ Owner instruction: finish the Architex PRD overnight and keep JCode/agents on go
 - The mock fixture is explicitly local-only and does not perform live payment, statutory, municipal, supplier-order, escrow, or submission actions.
 - Validation: `npm run test -- src/services/__tests__/backendRoleFlowReadinessService.test.ts src/lib/__tests__/dashboard-registry.static.test.ts`; `npm run lint -- --pretty false`.
 - No push/deploy performed.
+
+
+## 2026-05-21 01:51 SAST — Hermes provider integration readiness gate
+- Live state: JCode desktop/serve processes were present, but no active npm/vitest/tsc implementation process was running; Hermes continued the next small provider-neutral PRD readiness slice.
+- Added `src/services/providerIntegrationReadinessService.ts` to project PayFast, CPD/statutory, supplier catalogue, and municipal mock fixtures into explicit production-readiness gates.
+- The projection keeps all local mock integrations blocked from production until server-side credentials, human governance approvals, production adapter contracts, and payment reconciliation evidence are present as applicable.
+- Added `src/services/__tests__/providerIntegrationReadinessService.test.ts` covering mock-only status, PayFast reconciliation blocking, supplier adapter approval blocking, and statutory/municipal credential blocking.
+- Validation: `npm test -- src/services/__tests__/providerIntegrationReadinessService.test.ts`; `npm run lint -- --pretty false`.
+- No push/deploy performed.
