@@ -1,7 +1,7 @@
 # P0 Foundation Audit and Stage-Gate Kickoff
 
-Date: 2026-05-20  
-Source PRD: `prdnew.md`  
+Date: 2026-05-20
+Source PRD: `prdnew.md`
 Scope: first P0 pass for auth/RBAC/profile/organisation/stage/audit foundation.
 
 ## Current foundation inventory
