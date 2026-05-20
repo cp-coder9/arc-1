@@ -479,9 +479,19 @@ export type NotificationType =
   | 'invoice_sent'
   | 'invoice_paid'
   | 'firm_invite'
+  | 'firm_invite_accepted'
   | 'firm_role_changed'
   | 'firm_member_removed'
-  | 'directory_invitation';
+  | 'firm_subscription_updated'
+  | 'directory_invitation'
+  | 'material_request_created'
+  | 'material_quote_received'
+  | 'procurement_order_updated'
+  | 'cpd_course_published'
+  | 'cpd_certificate_issued'
+  | 'subscription_status_changed'
+  | 'refund_processed'
+  | 'contractor_delivery_update';
 
 export interface Notification {
   id: string;
@@ -500,6 +510,14 @@ export interface Notification {
     invitationId?: string;
     workPackageId?: string;
     discipline?: string;
+    materialRequestId?: string;
+    quoteId?: string;
+    procurementOrderId?: string;
+    courseId?: string;
+    certificateId?: string;
+    subscriptionId?: string;
+    refundId?: string;
+    deliveryId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];

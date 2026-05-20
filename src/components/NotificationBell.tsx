@@ -31,9 +31,19 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   invoice_sent: '📄',
   invoice_paid: '💰',
   firm_invite: '🏢',
+  firm_invite_accepted: '✅',
   firm_role_changed: '🪪',
   firm_member_removed: '🚪',
+  firm_subscription_updated: '💳',
   directory_invitation: '📨',
+  material_request_created: '📦',
+  material_quote_received: '🧾',
+  procurement_order_updated: '🛒',
+  cpd_course_published: '🎓',
+  cpd_certificate_issued: '🏅',
+  subscription_status_changed: '💳',
+  refund_processed: '↩️',
+  contractor_delivery_update: '🏗️',
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {
