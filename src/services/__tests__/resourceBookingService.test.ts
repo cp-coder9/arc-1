@@ -6,6 +6,8 @@ import {
   buildResourceUsageLedgerEntry,
   calculateResourceUsageBilling,
   canConfirmResourceBooking,
+  evaluateResourceBookingGovernance,
+  evaluateResourcePayoutReadiness,
   findResourceBookingConflicts,
   resourceBookingWindowsOverlap,
   type ResourceBookingWindow,
@@ -108,6 +110,93 @@ describe('resourceBookingService', () => {
       reason: 'active_booking_overlap',
     });
     expect(audit.conflicts.map((conflict) => conflict.bookingId)).toEqual(['booking-1']);
+  });
+
+  test('evaluates booking governance with human approval gates and conflict blockers', () => {
+    const blocked = evaluateResourceBookingGovernance({
+      request: {
+        resourceId: 'resource-1',
+        startsAt: '2026-05-15T11:30:00.000Z',
+        endsAt: '2026-05-15T12:30:00.000Z',
+      },
+      existingBookings,
+      requestedBy: 'freelancer-1',
+      ownerId: 'owner-1',
+      checkedAt: '2026-05-15T09:00:00.000Z',
+    });
+
+    expect(blocked).toMatchObject({
+      status: 'blocked_conflict',
+      blockers: ['Booking booking-1 overlaps this request.'],
+      humanApprovalRequired: true,
+      autoConfirmProhibited: true,
+      audit: {
+        canConfirm: false,
+        requestedBy: 'freelancer-1',
+        ownerId: 'owner-1',
+        reason: 'active_booking_overlap',
+      },
+    });
+
+    const ready = evaluateResourceBookingGovernance({
+      request: {
+        resourceId: 'resource-1',
+        startsAt: '2026-05-15T13:00:00.000Z',
+        endsAt: '2026-05-15T14:00:00.000Z',
+      },
+      existingBookings,
+      requestedBy: 'freelancer-1',
+      ownerId: 'owner-1',
+      checkedAt: '2026-05-15T09:05:00.000Z',
+    });
+
+    expect(ready.status).toBe('ready_for_owner_approval');
+    expect(ready.blockers).toEqual([]);
+    expect(ready.audit.canConfirm).toBe(true);
+
+    const approved = evaluateResourceBookingGovernance({
+      request: {
+        resourceId: 'resource-1',
+        startsAt: '2026-05-15T13:00:00.000Z',
+        endsAt: '2026-05-15T14:00:00.000Z',
+      },
+      existingBookings,
+      requestedBy: 'owner-1',
+      ownerId: 'owner-1',
+      approvedBy: 'owner-1',
+      checkedAt: '2026-05-15T09:10:00.000Z',
+    });
+
+    expect(approved.status).toBe('approved');
+    expect(approved.warnings).toEqual(['Owner-created bookings still require an auditable approval decision before confirmation.']);
+    expect(approved.audit.approvedBy).toBe('owner-1');
+  });
+
+  test('evaluates cancellation governance as auditable and non-auto-confirming', () => {
+    const cancelled = evaluateResourceBookingGovernance({
+      request: {
+        resourceId: 'resource-1',
+        startsAt: '2026-05-15T11:30:00.000Z',
+        endsAt: '2026-05-15T12:30:00.000Z',
+      },
+      existingBookings,
+      requestedBy: 'freelancer-1',
+      ownerId: 'owner-1',
+      cancellationReason: 'Client postponed site visit',
+      checkedAt: '2026-05-15T09:15:00.000Z',
+    });
+
+    expect(cancelled).toMatchObject({
+      status: 'cancelled',
+      blockers: [],
+      humanApprovalRequired: true,
+      autoConfirmProhibited: true,
+      audit: {
+        cancellationReason: 'Client postponed site visit',
+        canConfirm: false,
+        reason: 'active_booking_overlap',
+      },
+    });
   });
 
   test('calculates hourly usage billing with minimum minutes and owner payout', () => {
@@ -323,5 +412,63 @@ describe('resourceBookingService', () => {
         usageBillingResults: [{ bookingId: 'booking-1', resourceId: 'resource-2', userId: 'user-1', billableMinutes: 60, meteredUnits: 0, grossAmountCents: 100, platformFeeCents: 10, ownerPayoutCents: 90, currency: 'ZAR', formula: 'test' }],
       })
     ).toThrow('another resource');
+  });
+
+  test('evaluates payout readiness with manual approval and owner bank safeguards', () => {
+    const payout = buildResourcePayoutRecord({
+      resourceId: 'resource-1',
+      ownerId: 'owner-1',
+      payoutBatchId: 'batch-ready',
+      createdAt: '2026-05-16T00:00:00.000Z',
+      usageBillingResults: [
+        {
+          bookingId: 'booking-ready',
+          resourceId: 'resource-1',
+          userId: 'user-1',
+          billableMinutes: 60,
+          meteredUnits: 0,
+          grossAmountCents: 10_000,
+          platformFeeCents: 1_500,
+          ownerPayoutCents: 8_500,
+          currency: 'ZAR',
+          formula: 'test',
+        },
+      ],
+    });
+
+    expect(evaluateResourcePayoutReadiness(payout, { ownerBankVerified: true, minimumPayoutCents: 10_000 })).toEqual({
+      ready: true,
+      blockers: [],
+      warnings: ['Owner payout is below the preferred minimum of 10000 ZAR cents.'],
+      grossAmountCents: 10_000,
+      ownerPayoutCents: 8_500,
+      humanApprovalRequired: true,
+      autoPayoutProhibited: true,
+    });
+
+    expect(evaluateResourcePayoutReadiness(payout, { heldBookingIds: ['booking-ready'] })).toMatchObject({
+      ready: false,
+      blockers: [
+        'Owner bank details must be verified before payout.',
+        'Bookings on hold: booking-ready.',
+      ],
+      humanApprovalRequired: true,
+      autoPayoutProhibited: true,
+    });
+  });
+
+  test('blocks empty or non-positive payout readiness decisions', () => {
+    expect(
+      evaluateResourcePayoutReadiness(
+        { usageBookingIds: [], grossAmountCents: 0, platformFeeCents: 0, ownerPayoutCents: 0, currency: 'ZAR' },
+        { ownerBankVerified: true }
+      )
+    ).toMatchObject({
+      ready: false,
+      blockers: [
+        'No usage bookings are linked to this payout.',
+        'Payout amounts must be positive.',
+      ],
+    });
   });
 });

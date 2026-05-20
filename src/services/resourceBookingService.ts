@@ -90,6 +90,35 @@ export interface ResourcePayoutRecord {
   idempotencyKey: string;
 }
 
+export interface ResourceBookingGovernanceInput {
+  request: ResourceBookingRequest;
+  existingBookings: ResourceBookingWindow[];
+  requestedBy: string;
+  ownerId: string;
+  approvedBy?: string;
+  cancellationReason?: string;
+  checkedAt: string;
+}
+
+export interface ResourceBookingGovernanceDecision {
+  status: 'ready_for_owner_approval' | 'approved' | 'blocked_conflict' | 'cancelled';
+  blockers: string[];
+  warnings: string[];
+  humanApprovalRequired: true;
+  autoConfirmProhibited: true;
+  audit: ResourceBookingConflictAudit & { requestedBy: string; ownerId: string; approvedBy?: string; cancellationReason?: string };
+}
+
+export interface ResourcePayoutReadiness {
+  ready: boolean;
+  blockers: string[];
+  warnings: string[];
+  grossAmountCents: number;
+  ownerPayoutCents: number;
+  humanApprovalRequired: true;
+  autoPayoutProhibited: true;
+}
+
 const ACTIVE_BOOKING_STATUSES = new Set<ResourceBookingStatus>(['pending', 'confirmed']);
 
 const toMillis = (value: string, fieldName: string): number => {
@@ -165,6 +194,43 @@ export const buildResourceBookingConflictAudit = (
     canConfirm: conflicts.length === 0,
     checkedAt,
     reason: conflicts.length === 0 ? 'no_conflict' : 'active_booking_overlap',
+  };
+};
+
+export const evaluateResourceBookingGovernance = ({
+  request,
+  existingBookings,
+  requestedBy,
+  ownerId,
+  approvedBy,
+  cancellationReason,
+  checkedAt,
+}: ResourceBookingGovernanceInput): ResourceBookingGovernanceDecision => {
+  if (!requestedBy.trim()) throw new Error('requestedBy is required.');
+  if (!ownerId.trim()) throw new Error('ownerId is required.');
+  const audit = buildResourceBookingConflictAudit(request, existingBookings, checkedAt);
+  const blockers = audit.conflicts.map((conflict) => `Booking ${conflict.bookingId} overlaps this request.`);
+  const warnings: string[] = [];
+
+  if (requestedBy === ownerId) warnings.push('Owner-created bookings still require an auditable approval decision before confirmation.');
+  if (cancellationReason?.trim()) {
+    return {
+      status: 'cancelled',
+      blockers: [],
+      warnings,
+      humanApprovalRequired: true,
+      autoConfirmProhibited: true,
+      audit: { ...audit, requestedBy, ownerId, approvedBy, cancellationReason: cancellationReason.trim() },
+    };
+  }
+
+  return {
+    status: blockers.length > 0 ? 'blocked_conflict' : approvedBy?.trim() ? 'approved' : 'ready_for_owner_approval',
+    blockers,
+    warnings,
+    humanApprovalRequired: true,
+    autoConfirmProhibited: true,
+    audit: { ...audit, requestedBy, ownerId, approvedBy },
   };
 };
 
@@ -304,5 +370,29 @@ export const buildResourcePayoutRecord = ({
       payoutBatchId,
       usageBillingResults.map((result) => result.bookingId)
     ),
+  };
+};
+
+export const evaluateResourcePayoutReadiness = (
+  payout: Pick<ResourcePayoutRecord, 'usageBookingIds' | 'grossAmountCents' | 'ownerPayoutCents' | 'platformFeeCents' | 'currency'>,
+  options: { ownerBankVerified?: boolean; minimumPayoutCents?: number; heldBookingIds?: string[] } = {}
+): ResourcePayoutReadiness => {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  if (payout.usageBookingIds.length === 0) blockers.push('No usage bookings are linked to this payout.');
+  if (payout.grossAmountCents <= 0 || payout.ownerPayoutCents <= 0) blockers.push('Payout amounts must be positive.');
+  if (!options.ownerBankVerified) blockers.push('Owner bank details must be verified before payout.');
+  const heldBookingIds = options.heldBookingIds ?? [];
+  if (heldBookingIds.length > 0) blockers.push(`Bookings on hold: ${heldBookingIds.join(', ')}.`);
+  const minimum = options.minimumPayoutCents ?? 0;
+  if (minimum > 0 && payout.ownerPayoutCents < minimum) warnings.push(`Owner payout is below the preferred minimum of ${minimum} ${payout.currency} cents.`);
+  return {
+    ready: blockers.length === 0,
+    blockers,
+    warnings,
+    grossAmountCents: payout.grossAmountCents,
+    ownerPayoutCents: payout.ownerPayoutCents,
+    humanApprovalRequired: true,
+    autoPayoutProhibited: true,
   };
 };
