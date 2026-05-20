@@ -18,6 +18,73 @@ export interface ProjectSummary {
 }
 
 export const CLOSEOUT_ARTIFACTS_REQUIRED_ERROR = 'Cannot archive project: persisted completion certificate and final report artifacts are required.';
+export const CLOSEOUT_GATE_REQUIRED_ERROR = 'Cannot archive project: close-out gate has unresolved blockers.';
+
+export interface CloseoutGateAuditMetadata {
+  reviewedBy?: string;
+  reviewedAt?: string;
+  source?: string;
+}
+
+export interface CloseoutGateValidationInput {
+  snags?: Array<{ id?: string; title?: string; status?: string }>;
+  certificates?: Array<{ id?: string; title?: string; status?: string; url?: string }>;
+  warranties?: Array<{ id?: string; title?: string; status?: string; url?: string }>;
+  finalAccount?: { status?: string; approvedBy?: string; approvedAt?: string; amount?: number };
+  handoverPack?: { status?: string; url?: string; documentCount?: number; approvedBy?: string; approvedAt?: string };
+  unresolvedBlockers?: string[];
+  audit?: CloseoutGateAuditMetadata;
+}
+
+export interface CloseoutGateValidationResult {
+  ready: boolean;
+  blockers: string[];
+  audit: { reviewedBy?: string; reviewedAt?: string; source: string };
+}
+
+const CLOSED_SNAG_STATUSES = new Set(['closed', 'resolved', 'accepted']);
+const ACCEPTED_DOCUMENT_STATUSES = new Set(['approved', 'accepted', 'closed', 'issued']);
+const APPROVED_FINAL_ACCOUNT_STATUSES = new Set(['approved', 'accepted', 'settled', 'closed']);
+
+function hasUsableUrl(value?: string): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function evaluateCloseoutGate(input: CloseoutGateValidationInput = {}): CloseoutGateValidationResult {
+  const blockers: string[] = [];
+  const unresolvedSnags = (input.snags ?? []).filter((snag) => !CLOSED_SNAG_STATUSES.has(String(snag.status ?? '').toLowerCase()));
+  if (unresolvedSnags.length > 0) blockers.push(`${unresolvedSnags.length} snag${unresolvedSnags.length === 1 ? '' : 's'} unresolved.`);
+
+  const certificates = input.certificates ?? [];
+  if (certificates.length === 0) blockers.push('No close-out certificates recorded.');
+  const incompleteCertificates = certificates.filter((certificate) => !ACCEPTED_DOCUMENT_STATUSES.has(String(certificate.status ?? '').toLowerCase()) || !hasUsableUrl(certificate.url));
+  if (incompleteCertificates.length > 0) blockers.push(`${incompleteCertificates.length} certificate${incompleteCertificates.length === 1 ? '' : 's'} missing approval or file link.`);
+
+  const warranties = input.warranties ?? [];
+  if (warranties.length === 0) blockers.push('No warranties recorded.');
+  const incompleteWarranties = warranties.filter((warranty) => !ACCEPTED_DOCUMENT_STATUSES.has(String(warranty.status ?? '').toLowerCase()) || !hasUsableUrl(warranty.url));
+  if (incompleteWarranties.length > 0) blockers.push(`${incompleteWarranties.length} warranty record${incompleteWarranties.length === 1 ? '' : 's'} missing approval or file link.`);
+
+  if (!APPROVED_FINAL_ACCOUNT_STATUSES.has(String(input.finalAccount?.status ?? '').toLowerCase()) || !input.finalAccount?.approvedBy || !input.finalAccount?.approvedAt) {
+    blockers.push('Final account must be approved with approver and timestamp.');
+  }
+
+  if (!ACCEPTED_DOCUMENT_STATUSES.has(String(input.handoverPack?.status ?? '').toLowerCase()) || !hasUsableUrl(input.handoverPack?.url) || !input.handoverPack?.documentCount) {
+    blockers.push('Handover pack must be approved, linked, and contain documents.');
+  }
+
+  (input.unresolvedBlockers ?? []).filter((blocker) => blocker.trim().length > 0).forEach((blocker) => blockers.push(blocker));
+
+  if (!input.audit?.reviewedBy || !input.audit?.reviewedAt) {
+    blockers.push('Close-out audit metadata must include reviewer and reviewed timestamp.');
+  }
+
+  return {
+    ready: blockers.length === 0,
+    blockers,
+    audit: { reviewedBy: input.audit?.reviewedBy, reviewedAt: input.audit?.reviewedAt, source: input.audit?.source ?? 'closeout_gate' },
+  };
+}
 
 function hasPersistedCloseoutArtifacts(project: Project, certificateData?: Record<string, unknown>, reportData?: Record<string, unknown>): boolean {
   const artifacts = (project as any).closeoutArtifacts ?? {};
@@ -26,6 +93,13 @@ function hasPersistedCloseoutArtifacts(project: Project, certificateData?: Recor
   const certificateDoc = typeof certificateData?.url === 'string' && certificateData.url.trim().length > 0 && certificateData.type === 'completion_certificate';
   const reportDoc = typeof reportData?.report === 'string' && reportData.report.trim().length > 0 && reportData.type === 'final_report';
   return certificateUrl && report && certificateDoc && reportDoc;
+}
+
+function assertProjectCloseoutGate(project: Project): void {
+  const gate = evaluateCloseoutGate((project as any).closeoutGate ?? {});
+  if (!gate.ready) {
+    throw new Error(`${CLOSEOUT_GATE_REQUIRED_ERROR} ${gate.blockers.join(' ')}`);
+  }
 }
 
 export function summaryHasPersistedCloseoutArtifacts(summary: ProjectSummary | null): boolean {
@@ -111,6 +185,8 @@ export async function archiveProject(projectId: string): Promise<void> {
       throw new Error(CLOSEOUT_ARTIFACTS_REQUIRED_ERROR);
     }
 
+    assertProjectCloseoutGate(project);
+
     const now = new Date().toISOString();
     const actorId = project.leadArchitectId || project.clientId;
     const projectUpdate: Record<string, unknown> = { archived: true, archivedAt: now, updatedAt: now };
@@ -127,5 +203,5 @@ export async function archiveProject(projectId: string): Promise<void> {
   });
 }
 
-export const closeoutService = { getProjectSummary, generateCompletionCertificate, generateFinalReport, archiveProject, summaryHasPersistedCloseoutArtifacts };
+export const closeoutService = { getProjectSummary, generateCompletionCertificate, generateFinalReport, archiveProject, summaryHasPersistedCloseoutArtifacts, evaluateCloseoutGate };
 export default closeoutService;
