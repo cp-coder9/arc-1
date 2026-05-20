@@ -5,14 +5,17 @@ import { resolve } from 'node:path';
 const root = process.cwd();
 const requiredFiles = [
   'package.json',
+  'api-server.ts',
   'server.ts',
   'api/index.ts',
   'src/lib/api-router.ts',
   'docs/deployment/shared-hosting-architex-co-za.md',
+  'docs/deployment/api-architex-co-za-cpanel.md',
+  'scripts/cpanel-api-smoke.mjs',
   '.env.production.example',
 ];
 
-const requiredPackageScripts = ['build', 'start', 'lint', 'test'];
+const requiredPackageScripts = ['build', 'start', 'start:api:host', 'lint', 'test', 'smoke:api', 'deploy:api:bundle'];
 const requiredEnv = [
   'VITE_API_BASE_URL',
   'VITE_FIREBASE_API_KEY',

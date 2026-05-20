@@ -21,6 +21,8 @@ A shared-hosting plan can run this project only if it provides one of these:
 
 ## Node shared-hosting deployment path
 
+For the owned API subdomain, use the dedicated cPanel Node runbook: [`api-architex-co-za-cpanel.md`](./api-architex-co-za-cpanel.md). It defines the repeatable bundle command, cPanel Node settings, environment variables, DNS/SSL checklist, and JSON smoke checks.
+
 1. Upload repository files, or a release bundle containing:
    - `dist/` after `npm run build`
    - `server.ts`

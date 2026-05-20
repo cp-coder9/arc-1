@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "NODE_ENV=production tsx server.ts",
+    "start:api:host": "NODE_ENV=production DISABLE_NOTIFICATION_WORKER=true tsx api-server.ts",
     "build": "vite build",
     "vercel-build": "vite build",
     "preview": "vite preview",
@@ -23,6 +24,8 @@
     "test:e2e:ui": "playwright test --ui",
     "docs:api-contracts": "node scripts/validate-api-contracts.mjs",
     "predeploy:check": "node scripts/predeploy-check.mjs",
+    "smoke:api": "node scripts/cpanel-api-smoke.mjs",
+    "deploy:api:bundle": "npm run predeploy:check && node scripts/build-cpanel-api-bundle.mjs",
     "deploy:bundle": "npm run build && npm run predeploy:check && mkdir -p release && tar -czf release/architex-co-za-upload-bundle.tgz dist server.ts api src package.json package-lock.json firebase-applet-config.json docs/deployment .env.production.example",
     "install:deps": "npm install"
   },

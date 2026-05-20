@@ -63,3 +63,16 @@ The `Unexpected token '<'` error happens because frontend code calls an API path
 - Do not use `https://arc-1-orpin.vercel.app` as the working production target.
 - Do not deploy new frontend builds to Vercel for this task unless explicitly instructed.
 - Do not enable payment/signature/escrow execution until `api.architex.co.za` is live, secured, and verified.
+
+## 2026-05-20 API bundle progress
+
+Prepared and locally validated a cPanel Node API deployment path for `api.architex.co.za`:
+
+- Added `api-server.ts`, a dedicated API-only startup entrypoint that loads environment files before importing the Express API app.
+- Added `npm run start:api:host`, `npm run smoke:api`, and `npm run deploy:api:bundle`.
+- Added `scripts/build-cpanel-api-bundle.mjs` to create `release/api-architex-co-za/` and `release/api-architex-co-za-node.tgz` without secrets.
+- Added `scripts/cpanel-api-smoke.mjs` to assert `/api/health` and unauthenticated `/api/auth/check-admin` return JSON, not SPA HTML.
+- Added the cPanel runbook at `docs/deployment/api-architex-co-za-cpanel.md` and linked it from the shared-hosting deployment guide.
+- Validation run: `npm run lint && npm run deploy:api:bundle` passed locally.
+
+Remaining live blocker: external network access to the hosting endpoints has been intermittently timing out from the harness, so final upload/configuration and remote smoke checks must run as soon as `ftp.architex.co.za`, `cp73.domains.co.za:2083`, and `api.architex.co.za` are reachable.
