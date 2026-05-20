@@ -13,12 +13,13 @@ The user supplied two shared Google resources:
 1. Google AI Studio prompt share: `https://aistudio.google.com/app/prompts?...`
 2. Google Drive file share: `https://drive.google.com/file/d/1O_mtCO50XFZBults63TAKbwKk3i3ul1I/view?usp=sharing`
 
-Both resources required Google sign-in in this execution environment. The Drive direct download URL also returned a sign-in page. Because the content was not publicly readable here, this plan treats the links as **access-blocked external source material** and relies on repository-owned scope documents and implementation artifacts instead. If those links contain newer requirements, they should be re-shared as public/readable, exported to Markdown/PDF in the repo, or pasted into a follow-up task, then this plan should be reconciled.
+The original AI Studio prompt and the updated AI Studio prompt both required Google sign-in in this execution environment, so their prompt bodies remain inaccessible. The Drive file became downloadable via direct export and is titled `backend.html`. It matches the repository's local `backend.html` reference: **Architex Platform Template | Guided Built Environment OS**. This plan has therefore been reconciled against the accessible Drive/backend.html role-tool matrix while keeping AI Studio prompt content as an external access blocker.
 
 ### 1.2 Repository source material analysed
 
 Key accessible planning and implementation references:
 
+- `backend.html`: downloaded Drive reference titled **Architex Platform Template | Guided Built Environment OS**, defining the canonical role selector, sidebar groups, and role/tool page matrix.
 - `Full_scope.md`: full platform scope, role model, modules, workflows, AI governance, payment/escrow, command centre, monetisation, UX principles.
 - `FULL_SCOPE_PHASED_IMPLEMENTATION_PLAN.md`: backend-first production implementation plan.
 - `Phases/new-implementation-plan/*`: phase PRDs, task lists, and workflows.
@@ -64,6 +65,71 @@ Core surfaces:
 - Payment/escrow and finance centre
 - AI co-pilot and governed AI review queues
 - Admin governance console
+
+### 2.1 `backend.html` canonical role/tool matrix
+
+The Drive `backend.html` reference makes the implementation scope more concrete than a generic platform plan. The product must expose a role-filtered sidebar using these groups and tools:
+
+**Account**
+
+- Profile Editor
+
+**Project**
+
+- Command Centre
+- Project Toolbox
+- Project Journey
+- Tasks & Approvals
+- Project Messenger
+- Programme / Gantt
+- Dispute Resolution
+
+**Client Tools**
+
+- Guided Brief Wizard
+- BEP Proposals
+- Directory Search
+- Municipal Status
+- Progress Reports
+
+**BEP Tools**
+
+- Design & Compliance
+- AI Drawing Checker
+- Municipal Tracker
+- SANS / Compliance Forms
+- Client Marketplace
+- Design Team Matrix
+- Technical Brief Editor
+- Freelancer Jobs
+- Snagging / Close-Out
+
+**Contractor Tools**
+
+- Construction OS
+- Staff, Wages & Plant
+- BoQ / BoM Procurement
+- Subcontractor Packages
+
+**Freelancer Tools**
+
+- Assigned Work
+- Submissions & Feedback
+
+**System**
+
+- Payments & Governance
+- Invoicing
+- Contracts & Signing
+- Escrow Service
+- AI Co-Pilot
+- Knowledge / CPD
+- Remote Desktop / Resources
+- Resource Centre / Checklists
+- CPD Assessment
+- Admin Console
+
+Implementation implication: any existing placeholder `DashboardPageShell` for these pages must be replaced by a real data-backed workflow page, or explicitly feature-flagged with a documented production blocker.
 
 ## 3. Non-Negotiable Delivery Principles
 
@@ -756,7 +822,7 @@ npm run test:e2e
 
 ## 11. Human Decisions / External Blockers
 
-1. Make the two shared Google links accessible or provide exported content.
+1. Make the AI Studio prompt links accessible or provide exported prompt content. The Drive `backend.html` content is now accessible and has been reconciled into this plan.
 2. Confirm payment gateway and escrow/legal operating model.
 3. Confirm fee rates, subscription tiers, refunds, chargebacks, and settlement rules.
 4. Confirm verification providers for SACAP and other professional bodies.
