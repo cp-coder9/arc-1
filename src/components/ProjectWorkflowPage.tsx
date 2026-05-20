@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, limit, query, type DocumentData, type Query, where } from 'firebase/firestore';
 import { Briefcase, Loader2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import type { Job, Project, UserProfile } from '../types';
@@ -18,6 +18,7 @@ import ContractSigningPage from './ContractSigningPage';
 import DisputeResolutionPage from './DisputeResolutionPage';
 import PackageConstructionOpsPage from './PackageConstructionOpsPage';
 import PackageCloseoutPage from './PackageCloseoutPage';
+import { subscribeToMergedQuerySnapshots } from '../lib/firestoreQueryMerge';
 
 type Props = {
   pageId: string;
@@ -41,20 +42,33 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function projectQueryForUser(user: UserProfile) {
+function projectQueriesForUser(user: UserProfile): Query<DocumentData>[] {
   const projects = collection(db, 'projects');
-  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), limit(25));
-  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), limit(25));
-  if (user.role === 'admin') return query(projects, limit(25));
-  return null;
+  if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
+  if (user.role === 'architect' || user.role === 'bep') {
+    return [
+      query(projects, where('leadProfessionalId', '==', user.uid), limit(25)),
+      query(projects, where('leadBepId', '==', user.uid), limit(25)),
+      query(projects, where('leadArchitectId', '==', user.uid), limit(25)),
+    ];
+  }
+  if (user.role === 'admin') return [query(projects, limit(25))];
+  return [];
 }
 
-function jobQueryForUser(user: UserProfile) {
+function jobQueriesForUser(user: UserProfile): Query<DocumentData>[] {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
-  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
-  if (user.role === 'admin') return query(jobs, limit(25));
-  return query(jobs, where('status', '==', 'open'), limit(25));
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
+  if (user.role === 'architect' || user.role === 'bep') {
+    return [
+      query(jobs, where('selectedProfessionalId', '==', user.uid), limit(25)),
+      query(jobs, where('selectedBepId', '==', user.uid), limit(25)),
+      query(jobs, where('selectedArchitectId', '==', user.uid), limit(25)),
+    ];
+  }
+  if (user.role === 'freelancer') return [query(jobs, where('selectedArchitectId', '==', user.uid), limit(25))];
+  if (user.role === 'admin') return [query(jobs, limit(25))];
+  return [query(jobs, where('status', '==', 'open'), limit(25))];
 }
 
 export default function ProjectWorkflowPage({ pageId, user }: Props) {
@@ -64,24 +78,24 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
 
   useEffect(() => {
     setState('loading');
-    const projectQuery = projectQueryForUser(user);
-    const unsubProjects = projectQuery && canListProjectsByRole(user) ? onSnapshot(projectQuery, (snapshot) => {
-      setProjects(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project))));
+    const projectQueries = projectQueriesForUser(user);
+    const unsubProjects = projectQueries.length > 0 && canListProjectsByRole(user) ? subscribeToMergedQuerySnapshots<Project>(projectQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project), (items) => {
+      setProjects(sortByRecent(items));
       setState('ready');
     }, (error) => {
       console.warn('Workflow project projection unavailable; continuing without project context:', error);
       setProjects([]);
       setState('ready');
     }) : null;
-    const unsubJobs = onSnapshot(jobQueryForUser(user), (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job))));
-      if (!projectQuery) setState('ready');
+    const unsubJobs = subscribeToMergedQuerySnapshots<Job>(jobQueriesForUser(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+      setJobs(sortByRecent(items));
+      if (projectQueries.length === 0) setState('ready');
     }, (error) => {
       console.warn('Workflow job projection unavailable; continuing without job context:', error);
       setJobs([]);
       setState('ready');
     });
-    if (!projectQuery) setState('ready');
+    if (projectQueries.length === 0) setState('ready');
     return () => { unsubProjects?.(); unsubJobs(); };
   }, [user]);
 

@@ -247,7 +247,7 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("where('status', '==', 'open')");
     expect(commandCentreSource).toContain("where('status', '==', 'published')");
 
-    expect(workflowSource).toContain('return null;');
+    expect(workflowSource).toContain('return [];');
     expect(commandCentreSource).toContain('return null;');
   });
 
@@ -597,6 +597,18 @@ describe('canonical dashboard page registry', () => {
     expect(commandCentreSource).toContain("where('leadProfessionalId', '==', user.uid)");
     expect(commandCentreSource).toContain("where('leadBepId', '==', user.uid)");
     expect(commandCentreSource).toContain("where('leadArchitectId', '==', user.uid)");
+  });
+
+  it('keeps project workflow pages compatible with BEP professional aliases', () => {
+    expect(workflowSource).toContain('subscribeToMergedQuerySnapshots');
+    expect(workflowSource).toContain("function projectQueriesForUser(user: UserProfile)");
+    expect(workflowSource).toContain("function jobQueriesForUser(user: UserProfile)");
+    expect(workflowSource).toContain("where('selectedProfessionalId', '==', user.uid)");
+    expect(workflowSource).toContain("where('selectedBepId', '==', user.uid)");
+    expect(workflowSource).toContain("where('selectedArchitectId', '==', user.uid)");
+    expect(workflowSource).toContain("where('leadProfessionalId', '==', user.uid)");
+    expect(workflowSource).toContain("where('leadBepId', '==', user.uid)");
+    expect(workflowSource).toContain("where('leadArchitectId', '==', user.uid)");
   });
 
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {
