@@ -4,7 +4,7 @@ import { ClipboardCheck, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../lib/firebase';
 import type { UserProfile } from '../types';
-import { buildBriefInterpretation } from '../services/briefWorkflowService';
+import { buildTechnicalBriefInterpretation, buildTechnicalBriefRecord } from '../services/technicalBriefService';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -61,40 +61,26 @@ export default function TechnicalBriefEditor({ user }: { user: UserProfile }) {
     setSaving(true);
     try {
       const now = new Date().toISOString();
-      const technicalBrief = {
+      const technicalBriefInput = {
         opportunityId: selected.id,
         briefId: selected.briefId,
         clientId: selected.clientId,
         createdBy: user.uid,
         createdByRole: user.role,
-        professionalScope: splitLines(form.scope),
-        deliverables: splitLines(form.deliverables),
-        exclusions: splitLines(form.exclusions),
-        assumptions: splitLines(form.assumptions),
-        consultants: splitLines(form.consultants),
+        scope: form.scope,
+        deliverables: form.deliverables,
+        exclusions: form.exclusions,
+        assumptions: form.assumptions,
+        consultants: form.consultants,
         approvalRoute: form.approvalRoute.trim(),
         riskLevel: form.riskLevel,
-        missingInformation: splitLines(form.missingInformation),
-        status: 'ready_for_review',
-        humanReviewRequired: true,
+        missingInformation: form.missingInformation,
         createdAt: now,
-        updatedAt: now,
       };
+      const technicalBrief = buildTechnicalBriefRecord(technicalBriefInput);
       await addDoc(collection(db, 'technical_briefs'), technicalBrief);
 
-      const interpretation = buildBriefInterpretation({
-        briefId: selected.briefId,
-        clientId: selected.clientId,
-        createdBy: user.uid,
-        createdByRole: user.role,
-        summary: `Technical interpretation for ${selected.title}: ${form.scope || selected.description}`,
-        inferredProjectRoute: form.approvalRoute,
-        likelyRequiredProfessionals: splitLines(form.consultants),
-        risks: [form.riskLevel !== 'low' ? `Risk level marked ${form.riskLevel}` : '', ...splitLines(form.missingInformation).map((item) => `Missing information: ${item}`)].filter(Boolean),
-        assumptions: splitLines(form.assumptions),
-        confidence: 0.7,
-        model: 'human-authored-technical-brief',
-      });
+      const interpretation = buildTechnicalBriefInterpretation({ ...technicalBriefInput, title: selected.title, description: selected.description });
       await addDoc(collection(db, 'project_briefs', selected.briefId, 'interpretations'), interpretation);
       await updateDoc(doc(db, 'marketplace_opportunities', selected.id), { technicalBriefStatus: 'ready_for_review', updatedAt: now });
       toast.success('Technical brief saved for human review.');
@@ -139,10 +125,6 @@ export default function TechnicalBriefEditor({ user }: { user: UserProfile }) {
       </Card>
     </div>
   );
-}
-
-function splitLines(value: string) {
-  return value.split('\n').map((item) => item.trim()).filter(Boolean);
 }
 
 function Field({ label, children }: React.PropsWithChildren<{ label: string }>) {
