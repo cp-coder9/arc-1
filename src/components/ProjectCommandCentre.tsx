@@ -3,6 +3,7 @@ import { collection, limit, onSnapshot, query, where } from 'firebase/firestore'
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileText, Landmark, ListChecks, Loader2, WalletCards } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { subscribeToMergedQuerySnapshots } from '../lib/firestoreQueryMerge';
+import { getProjectCommandCentreGuidance } from '../services/projectCommandCentreService';
 import { getRoleProfileCompletion } from '../services/roleProfileService';
 import type { DelegatedTask, Job, Project, TenderPackage, UserProfile } from '../types';
 import { Badge } from './ui/badge';
@@ -114,62 +115,6 @@ function projectQueriesForUser(user: UserProfile) {
   return [];
 }
 
-function resolveNextAction(user: UserProfile, activeJob: CommandJob | undefined, profileCompletion: ReturnType<typeof getRoleProfileCompletion>, activePackage?: CommandPackage, activeTask?: CommandDelegatedTask) {
-  if (!profileCompletion.isComplete) {
-    return { label: 'Complete profile readiness', target: 'profile', detail: `${profileCompletion.blockers[0] || 'Profile completion is required'} before routed approvals, payments, signatures, or project matching can proceed.` };
-  }
-  if (!activeJob) {
-    if (activeTask && user.role === 'freelancer') {
-      const statusDetail = activeTask.submissionStatus && activeTask.submissionStatus !== 'not_submitted' ? ' Submission status is ' + activeTask.submissionStatus.replaceAll('_', ' ') + '.' : '';
-      return { label: activeTask.status === 'completed' ? 'Track approval and invoice readiness' : 'Submit assigned freelancer work', target: 'freelancer-work', detail: (activeTask.notes || activeTask.assigneeRole || 'Your delegated task') + ' is due ' + (activeTask.deadline || 'without a recorded deadline') + '.' + statusDetail + ' Use the freelancer workspace for governed submissions, feedback, and payment readiness.' };
-    }
-    if (activePackage && (user.role === 'contractor' || user.role === 'subcontractor')) {
-      return { label: activePackage.source === 'awarded' ? 'Update package delivery evidence' : 'Review available package scope', target: 'packages', detail: `${activePackage.title} is visible in your package workspace. Use packages to manage tenders, RFIs, evidence, claims, and close-out readiness.` };
-    }
-    if (activePackage && user.role === 'supplier') {
-      return { label: activePackage.source === 'awarded' ? 'Confirm delivery and warranty records' : 'Review procurement opportunity', target: 'procurement', detail: `${activePackage.title} is visible in your procurement workspace. Keep quotes, delivery notes, product data, and warranties traceable.` };
-    }
-    if (user.role === 'client') return { label: 'Create a guided project brief', target: 'client-intake', detail: 'Start with the client intake workflow so BEPs can price and scope real requirements.' };
-    if (user.role === 'contractor') return { label: 'Review tender marketplace', target: 'packages', detail: 'No active delivery project is linked yet. Review available package/tender work.' };
-    return { label: 'Complete profile and verification', target: 'profile', detail: 'Project routing depends on verified role, profile, billing, and signature readiness.' };
-  }
-
-  if (activeJob.status === 'open' && user.role === 'client') {
-    return { label: 'Compare BEP proposals', target: 'client-proposals', detail: 'Review fit, fee, exclusions, risk notes, and verification before appointment.' };
-  }
-
-  if (activeJob.status === 'open') {
-    return { label: 'Prepare proposal or scope response', target: 'technical-brief', detail: 'Use the technical brief and proposal workflow before appointment or package acceptance.' };
-  }
-
-  if (activeJob.status === 'in-progress') {
-    if (user.role === 'client') return { label: 'Review progress and approvals', target: 'client-progress', detail: 'Check plain-language progress, approvals, payments, and municipal status.' };
-    if (user.role === 'contractor' || user.role === 'subcontractor' || user.role === 'supplier') return { label: 'Resolve delivery tasks and packages', target: 'packages', detail: 'Prioritise package readiness, procurement commitments, RFIs, and close-out evidence.' };
-    return { label: 'Review tasks and compliance blockers', target: 'tasks', detail: 'Resolve open approvals, missing information, drawing checks, and design-team dependencies.' };
-  }
-
-  return { label: 'Review project records', target: 'journey', detail: 'Open the project journey for stage history, documents, payments, and audit trail.' };
-}
-
-function buildAiSummary(user: UserProfile, activeJob?: CommandJob, project?: Project, activePackage?: CommandPackage, activeTask?: CommandDelegatedTask) {
-  if (!activeJob) {
-    if (activeTask) {
-      const payment = activeTask.paymentStatus ? ' Payment readiness is ' + activeTask.paymentStatus.replaceAll('_', ' ') + '.' : '';
-      return 'Your delegated task for job ' + activeTask.jobId + ' is ' + activeTask.status + ', due ' + (activeTask.deadline || 'without a recorded deadline') + ', with submission status ' + (activeTask.submissionStatus || 'not_submitted').replaceAll('_', ' ') + '.' + payment + ' Continue in the freelancer workspace so submissions, reviews, and invoice readiness remain human-reviewed and auditable.';
-    }
-    if (activePackage) {
-      const budget = typeof activePackage.estimatedBudget === 'number' ? ` with an estimated budget of ${currency.format(activePackage.estimatedBudget)}` : '';
-      const source = activePackage.source === 'awarded' ? 'awarded package' : activePackage.source === 'marketplace' ? 'published package opportunity' : 'package record';
-      return `${activePackage.title} is a ${source}${budget}. Continue in the package/procurement workspace so commitments, evidence, RFIs, claims, warranties, and close-out records remain human-reviewed and auditable.`;
-    }
-    return 'No active project was found from live Firestore records for this role. The safest next step is to complete onboarding/profile readiness or create/invite work through the scoped workflow pages.';
-  }
-
-  const stage = project?.currentStage ? ` Current lifecycle stage is ${project.currentStage}.` : '';
-  const requirements = activeJob.requirements?.length ? ` Requirements tracked: ${activeJob.requirements.slice(0, 3).join(', ')}.` : '';
-  return `${activeJob.title} is ${activeJob.status} with a recorded budget of ${currency.format(activeJob.budget || 0)}.${stage}${requirements} AI guidance is advisory only and requires accountable human review before approvals, payments, submissions, or contract actions.`;
-}
-
 export default function ProjectCommandCentre({ user, onNavigate }: ProjectCommandCentreProps) {
   const [state, setState] = useState<LoadState>('loading');
   const [jobs, setJobs] = useState<CommandJob[]>([]);
@@ -236,9 +181,17 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
   const activeJob = joinedJobs.find((job) => job.status === 'in-progress') ?? joinedJobs[0];
   const activePackage = packages.find((pkg) => pkg.source === 'awarded' || pkg.status === 'awarded') ?? packages[0];
   const activeTask = delegatedTasks.find((task) => task.status === 'in-progress') ?? delegatedTasks.find((task) => task.status === 'pending') ?? delegatedTasks[0];
-  const activeProject = activeJob?.project ?? projects[0];
+  const activeProject = activeJob ? activeJob.project : projects[0];
   const profileCompletion = useMemo(() => getRoleProfileCompletion(user.role, user as unknown as Record<string, unknown>), [user]);
-  const nextAction = resolveNextAction(user, activeJob, profileCompletion, activePackage, activeTask);
+  const commandGuidance = getProjectCommandCentreGuidance({
+    activeRole: user.role,
+    activeProject,
+    activeJob,
+    activePackage,
+    activeTask,
+    profileCompletion,
+  });
+  const nextAction = commandGuidance.nextAction;
   const roleVisual = ROLE_COMMAND_VISUALS[user.role];
   const openApprovals = activeJob?.requirements?.filter(Boolean).length ?? (activeTask ? Number(activeTask.submissionStatus !== 'approved') : activePackage ? activePackage.scope?.length ?? 0 : 0);
   const atRisk = activeJob?.deadline && new Date(activeJob.deadline).getTime() < Date.now() && activeJob.status !== 'completed';
@@ -278,8 +231,8 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
           </div>
           <div className="rounded-[1.25rem] border border-border bg-background/70 p-5 space-y-2">
             <h3 className="beos-label-caps text-muted-foreground">Current Stage</h3>
-            <p className="beos-metric capitalize">{activeProject?.currentStage?.replaceAll('-', ' ') ?? activeJob?.status ?? activePackage?.status ?? activeTask?.status ?? 'Not started'}</p>
-            <p className="text-xs text-muted-foreground">From project lifecycle or job status records.</p>
+            <p className="beos-metric capitalize">{commandGuidance.stageLabel}</p>
+            <p className="text-xs text-muted-foreground">From canonical project lifecycle records, with legacy scoping mapped to intake.</p>
           </div>
         </CardContent>
       </Card>
@@ -298,7 +251,7 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
             <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">AI Summary</CardTitle>
             <CardDescription>Generated deterministically from live project/job fields. Human review required.</CardDescription>
           </CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{buildAiSummary(user, activeJob, activeProject, activePackage, activeTask)}</p></CardContent>
+          <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{commandGuidance.aiSummary}</p></CardContent>
         </Card>
         <Card className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
           <CardHeader>

@@ -7,6 +7,7 @@ const onboardingSource = readFileSync(resolve(process.cwd(), 'src/components/Onb
 const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8');
 const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
 const commandCentreSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectCommandCentre.tsx'), 'utf8');
+const commandCentreServiceSource = readFileSync(resolve(process.cwd(), 'src/services/projectCommandCentreService.ts'), 'utf8');
 const designComplianceSource = readFileSync(resolve(process.cwd(), 'src/components/DesignCompliancePage.tsx'), 'utf8');
 const bepMarketplaceSource = readFileSync(resolve(process.cwd(), 'src/components/BEPClientMarketplacePage.tsx'), 'utf8');
 const designTeamMatrixSource = readFileSync(resolve(process.cwd(), 'src/components/DesignTeamMatrixPage.tsx'), 'utf8');
@@ -243,8 +244,9 @@ describe('canonical dashboard page registry', () => {
   it('links command centre next actions to role-profile completion blockers', () => {
     expect(commandCentreSource).toContain("import { getRoleProfileCompletion }");
     expect(commandCentreSource).toContain('const profileCompletion = useMemo(() => getRoleProfileCompletion(user.role, user as unknown as Record<string, unknown>), [user]);');
-    expect(commandCentreSource).toContain('!profileCompletion.isComplete');
-    expect(commandCentreSource).toContain("target: 'profile'");
+    expect(commandCentreSource).toContain('getProjectCommandCentreGuidance');
+    expect(commandCentreServiceSource).toContain('profileCompletion && !profileCompletion.isComplete');
+    expect(commandCentreServiceSource).toContain("target: 'profile'");
     expect(commandCentreSource).toContain('Profile readiness');
   });
 
