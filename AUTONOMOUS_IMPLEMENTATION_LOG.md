@@ -172,3 +172,10 @@ Owner instruction: finish the Architex PRD overnight and keep JCode/agents on go
 - CPD statutory sync provider readiness, verification evidence, expiry/revocation handling.
 - Admin governance visibility for pending human approvals, disputes, payments, AI actions, statutory sync and audit queues.
 - API deployment package/readiness now that `api.architex.co.za` has isolated FTP access but Node hosting is blocked.
+
+## 2026-05-21T00:04:23+02:00 Hermes oversight run
+- Observed JCode coordinator processes active, but no active repo edits/tests in progress; branch phase-2-verification-workflows was clean and ahead of origin.
+- Implemented smallest PRD-safe marketplace analytics/readiness slice: provider-neutral marketplace analytics snapshot with category/location demand buckets, proposal/status counts, and explicit governance flags preventing AI auto-appointment and excluding personal data.
+- Extended marketplaceWorkflowService focused coverage for advisory analytics aggregation and no PII leakage.
+- Validation: npx vitest run src/services/__tests__/marketplaceWorkflowService.test.ts - 7 tests passed; npm run lint -- --pretty false - passed.
+- Blockers: none for this local slice; no push/deploy performed.

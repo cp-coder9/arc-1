@@ -46,6 +46,38 @@ export interface ProposalRecord extends ProposalInput {
   updatedAt: string;
 }
 
+
+export interface MarketplaceAnalyticsInput {
+  opportunities?: MarketplaceOpportunityRecord[];
+  proposals?: ProposalRecord[];
+  comparisons?: ProposalComparisonRecord[];
+  generatedAt?: string;
+}
+
+export interface MarketplaceAnalyticsBucket {
+  key: string;
+  opportunities: number;
+  proposals: number;
+  averageProposalFee?: number;
+}
+
+export interface MarketplaceAnalyticsSnapshot {
+  generatedAt: string;
+  opportunityCount: number;
+  proposalCount: number;
+  comparisonCount: number;
+  statusCounts: Record<OpportunityStatus, number>;
+  proposalStatusCounts: Record<ProposalStatus, number>;
+  categories: MarketplaceAnalyticsBucket[];
+  locations: MarketplaceAnalyticsBucket[];
+  governanceFlags: {
+    advisoryMatchingOnly: true;
+    humanAppointmentRequired: true;
+    excludesPersonalData: true;
+    aiMayAutoAppoint: false;
+  };
+}
+
 export interface ProposalComparisonInput {
   briefId: string;
   clientId: string;
@@ -131,5 +163,66 @@ export function buildProposalComparison(input: ProposalComparisonInput): Proposa
     limitations: ['Comparison is advisory only and does not automatically appoint a professional.', 'Client human confirmation is required before appointment.'],
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+function incrementRecord<T extends string>(record: Record<T, number>, key: T): void {
+  record[key] = (record[key] ?? 0) + 1;
+}
+
+function buildAnalyticsBuckets(
+  opportunities: MarketplaceOpportunityRecord[],
+  proposals: ProposalRecord[],
+  field: 'category' | 'location',
+): MarketplaceAnalyticsBucket[] {
+  const buckets = opportunities.reduce<Map<string, MarketplaceAnalyticsBucket & { totalFee: number; feeCount: number }>>((accumulator, opportunity) => {
+    const key = (opportunity[field]?.trim() || 'unspecified').toLowerCase();
+    const bucket = accumulator.get(key) ?? { key, opportunities: 0, proposals: 0, totalFee: 0, feeCount: 0 };
+    bucket.opportunities += 1;
+    const opportunityProposals = proposals.filter((proposal) => proposal.briefId === opportunity.briefId);
+    bucket.proposals += opportunityProposals.length;
+    opportunityProposals.forEach((proposal) => {
+      if (proposal.currency === 'ZAR' && Number.isFinite(proposal.feeAmount)) {
+        bucket.totalFee += proposal.feeAmount;
+        bucket.feeCount += 1;
+      }
+    });
+    accumulator.set(key, bucket);
+    return accumulator;
+  }, new Map());
+
+  return Array.from(buckets.values())
+    .map(({ totalFee, feeCount, ...bucket }) => ({
+      ...bucket,
+      averageProposalFee: feeCount > 0 ? Math.round((totalFee / feeCount) * 100) / 100 : undefined,
+    }))
+    .sort((a, b) => b.opportunities - a.opportunities || b.proposals - a.proposals || a.key.localeCompare(b.key));
+}
+
+export function buildMarketplaceAnalyticsSnapshot(input: MarketplaceAnalyticsInput): MarketplaceAnalyticsSnapshot {
+  const opportunities = input.opportunities ?? [];
+  const proposals = input.proposals ?? [];
+  const comparisons = input.comparisons ?? [];
+  const statusCounts: Record<OpportunityStatus, number> = { published: 0, paused: 0, closed: 0, appointed: 0 };
+  const proposalStatusCounts: Record<ProposalStatus, number> = { submitted: 0, shortlisted: 0, accepted: 0, rejected: 0, withdrawn: 0 };
+
+  opportunities.forEach((opportunity) => incrementRecord(statusCounts, opportunity.status));
+  proposals.forEach((proposal) => incrementRecord(proposalStatusCounts, proposal.status));
+
+  return {
+    generatedAt: input.generatedAt || new Date().toISOString(),
+    opportunityCount: opportunities.length,
+    proposalCount: proposals.length,
+    comparisonCount: comparisons.length,
+    statusCounts,
+    proposalStatusCounts,
+    categories: buildAnalyticsBuckets(opportunities, proposals, 'category'),
+    locations: buildAnalyticsBuckets(opportunities, proposals, 'location'),
+    governanceFlags: {
+      advisoryMatchingOnly: true,
+      humanAppointmentRequired: true,
+      excludesPersonalData: true,
+      aiMayAutoAppoint: false,
+    },
   };
 }
