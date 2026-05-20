@@ -64,12 +64,16 @@ If the plan only supports static files/PHP:
 3. Configure SPA fallback to `index.html` in `.htaccess`.
 4. Keep API routes on the owned Node/API host and configure `VITE_API_BASE_URL` before building the frontend. For the current test/static domain, use `VITE_API_BASE_URL=https://api.architex.co.za` so authenticated server workflows call the JSON API host instead of the SPA fallback.
 
-Example `.htaccess` for SPA fallback:
+Example `.htaccess` for SPA fallback. Keep the `/api` and `/health` guards before the frontend fallback so static preview domains return a real 404 for direct API probes instead of serving the React HTML shell. The committed `public/.htaccess` is copied into `dist/` by Vite builds:
 
 ```apache
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  RewriteRule ^api(?:/|$) - [R=404,L]
+  RewriteRule ^health$ - [R=404,L]
+
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

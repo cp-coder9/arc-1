@@ -11,6 +11,7 @@ const requiredFiles = [
   'src/lib/api-router.ts',
   'docs/deployment/shared-hosting-architex-co-za.md',
   'docs/deployment/api-architex-co-za-cpanel.md',
+  'public/.htaccess',
   'scripts/cpanel-api-smoke.mjs',
   '.env.production.example',
 ];
