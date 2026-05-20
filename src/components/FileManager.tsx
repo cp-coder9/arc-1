@@ -1,7 +1,7 @@
 import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, orderBy, getDoc, addDoc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, orderBy, getDoc, addDoc, updateDoc, getDocs, Query } from 'firebase/firestore';
 
 import { UserProfile, UploadedFile, Job, AIProgress } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -35,6 +35,9 @@ import { getSelectedProfessionalId } from '@/lib/professionalRoleCompatibility';
 interface FileManagerProps {
   user: UserProfile;
 }
+
+const DESIGN_PROFESSIONAL_ROLES = new Set(['architect', 'bep']);
+const DESIGN_PROFESSIONAL_JOB_FIELDS = ['selectedProfessionalId', 'selectedBepId', 'selectedArchitectId'] as const;
 
 export default function FileManager({ user }: FileManagerProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -79,7 +82,7 @@ export default function FileManager({ user }: FileManagerProps) {
       publish();
     };
 
-    const subscribeToFiles = (fileQuery: ReturnType<typeof query>) => {
+    const subscribeToFiles = (fileQuery: Query) => {
       const unsubscribe = onSnapshot(fileQuery, applySnapshot, (error) => {
         console.error("Error fetching files:", error);
         toast.error(
@@ -105,20 +108,25 @@ export default function FileManager({ user }: FileManagerProps) {
       // the File Manager hiding project files uploaded by a client, architect, or
       // admin when the current user did not personally upload the file.
       const jobIds = new Set<string>();
-      const jobQueries = user.role === 'client'
-        ? [query(collection(db, 'jobs'), where('clientId', '==', user.uid))]
-        : (user.role === 'architect' || user.role === 'bep')
-          ? [
-              query(collection(db, 'jobs'), where('selectedProfessionalId', '==', user.uid)),
-              query(collection(db, 'jobs'), where('selectedBepId', '==', user.uid)),
-              query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid)),
-            ]
+      const jobsCollection = collection(db, 'jobs');
+      const jobQueries: Query[] = user.role === 'client'
+        ? [query(jobsCollection, where('clientId', '==', user.uid))]
+        : DESIGN_PROFESSIONAL_ROLES.has(user.role)
+          ? DESIGN_PROFESSIONAL_JOB_FIELDS.map(field =>
+              query(jobsCollection, where(field, '==', user.uid))
+            )
           : [];
 
-      for (const jobQuery of jobQueries) {
-        const snapshot = await getDocs(jobQuery);
-        snapshot.docs.forEach(jobDoc => jobIds.add(jobDoc.id));
-      }
+      const jobResults = await Promise.allSettled(jobQueries.map(jobQuery => getDocs(jobQuery)));
+      jobResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          result.value.docs.forEach(jobDoc => jobIds.add(jobDoc.id));
+          return;
+        }
+
+        const field = user.role === 'client' ? 'clientId' : DESIGN_PROFESSIONAL_JOB_FIELDS[index];
+        console.warn('Unable to load project-file visibility query for jobs.' + field + ':', result.reason);
+      });
 
       const ids = Array.from(jobIds);
       for (let i = 0; i < ids.length; i += 10) {
