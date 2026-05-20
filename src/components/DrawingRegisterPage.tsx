@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, query, where, writeBatch, type Query } from 'firebase/firestore';
 import { AlertTriangle, FileArchive, FileClock, FileOutput, FileText, History, Loader2, Plus, RadioTower, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
@@ -81,12 +81,28 @@ function sortByRecent<T extends { updatedAt?: unknown; createdAt?: unknown; issu
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.issuedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.issuedAt ?? a.createdAt));
 }
 
-function projectQueryForUser(user: UserProfile) {
+function projectQueriesForUser(user: UserProfile): Query[] {
   const projects = collection(db, 'projects');
-  if (user.role === 'admin') return query(projects, limit(40));
-  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), limit(25));
-  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), limit(25));
-  return null;
+  if (user.role === 'admin') return [query(projects, limit(40))];
+  if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
+  if (user.role === 'architect' || user.role === 'bep') {
+    return [
+      query(projects, where('leadProfessionalId', '==', user.uid), limit(25)),
+      query(projects, where('leadBepId', '==', user.uid), limit(25)),
+      query(projects, where('leadArchitectId', '==', user.uid), limit(25)),
+    ];
+  }
+  return [];
+}
+
+function mergeProjectSnapshots(snapshotGroups: Project[][]) {
+  const byId = new Map<string, Project>();
+  for (const projects of snapshotGroups) {
+    for (const project of projects) {
+      byId.set(project.id, { ...byId.get(project.id), ...project });
+    }
+  }
+  return sortByRecent(Array.from(byId.values()));
 }
 
 function canManageDrawingRegister(user: UserProfile) {
@@ -135,23 +151,39 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const projectQuery = projectQueryForUser(user);
-    if (!projectQuery) {
+    const projectQueries = projectQueriesForUser(user);
+    if (projectQueries.length === 0) {
       setProjects([]);
       setState('ready');
       return undefined;
     }
-    setState('loading');
-    return onSnapshot(projectQuery, (snapshot) => {
-      const nextProjects = sortByRecent(snapshot.docs.map((projectDoc) => ({ id: projectDoc.id, ...projectDoc.data() } as Project)));
+
+    let cancelled = false;
+    const snapshotGroups = projectQueries.map(() => [] as Project[]);
+    const loadedGroups = new Set<number>();
+    const unsubscribers = projectQueries.map((projectQuery, index) => onSnapshot(projectQuery, (snapshot) => {
+      if (cancelled) return;
+      snapshotGroups[index] = snapshot.docs.map((projectDoc) => ({ id: projectDoc.id, ...projectDoc.data() } as Project));
+      loadedGroups.add(index);
+      const nextProjects = mergeProjectSnapshots(snapshotGroups);
       setProjects(nextProjects);
-      setSelectedProjectId((current) => current || nextProjects[0]?.id || '');
-      setState('ready');
+      setSelectedProjectId((current) => current && nextProjects.some((project) => project.id === current) ? current : nextProjects[0]?.id || '');
+      if (loadedGroups.size === projectQueries.length) setState('ready');
     }, (error) => {
       console.warn('Drawing register project projection unavailable:', error);
-      setProjects([]);
-      setState('error');
-    });
+      if (cancelled) return;
+      loadedGroups.add(index);
+      if (loadedGroups.size === projectQueries.length) {
+        setProjects(mergeProjectSnapshots(snapshotGroups));
+        setState('ready');
+      }
+    }));
+
+    setState('loading');
+    return () => {
+      cancelled = true;
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
   }, [user]);
 
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedProjectId), [projects, selectedProjectId]);
@@ -422,7 +454,7 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
         </CardContent>
       </Card>
 
-      {state === 'error' && <Notice title="Workflow unavailable" message="Firestore rules or indexes prevented loading the live drawing register projection for this role." />}
+      {state === 'error' && <Notice title="Drawing register needs attention" message="Project access could not be resolved for this role. Existing project data remains unchanged; check sign-in, role assignment, or Firestore access before recording revisions." />}
       {!selectedProject && state !== 'error' && <Notice title="No active project found" message="Create or appoint a project before issuing drawing register records or transmittals." />}
 
       {selectedProject && (
