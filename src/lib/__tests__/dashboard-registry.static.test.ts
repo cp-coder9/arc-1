@@ -370,7 +370,7 @@ describe('canonical dashboard page registry', () => {
 
   it('routes backend.html invoicing and package close-out/snags to live production tools', () => {
     expect(workflowSource).toContain("import PackageCloseoutPage from './PackageCloseoutPage';");
-    expect(workflowSource).toContain("pageId === 'snagging' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)");
+    expect(workflowSource).toContain("pageId === 'snagging' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)");
     expect(workflowSource).toContain('return <PackageCloseoutPage user={user} />;');
     expect(workflowSource).toContain("pageId === 'invoicing' && <InvoiceManagement user={user} />");
 

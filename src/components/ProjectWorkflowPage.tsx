@@ -130,7 +130,7 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
     return <PackageConstructionOpsPage user={user} />;
   }
 
-  if (pageId === 'snagging' && ['contractor', 'subcontractor', 'supplier'].includes(user.role)) {
+  if (pageId === 'snagging' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)) {
     return <PackageCloseoutPage user={user} />;
   }
 
