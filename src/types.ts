@@ -105,6 +105,9 @@ export interface Job {
   category: JobCategory;
   location?: string;
   status: 'open' | 'in-progress' | 'completed' | 'cancelled';
+  selectedProfessionalId?: string;
+  selectedBepId?: string;
+  /** @deprecated Use selectedProfessionalId/selectedBepId for new writes. */
   selectedArchitectId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -123,6 +126,9 @@ export interface JobStatusHistory {
 export interface Application {
   id: string;
   jobId: string;
+  professionalId?: string;
+  bepId?: string;
+  /** @deprecated Use professionalId/bepId for new writes. */
   architectId: string;
   architectName: string;
   proposal: string;
@@ -904,6 +910,9 @@ export interface Project {
   id: string;
   jobId: string;
   clientId: string;
+  leadProfessionalId?: string;
+  leadBepId?: string;
+  /** @deprecated Use leadProfessionalId/leadBepId for new writes. */
   leadArchitectId?: string;
   currentStage: ProjectStage;
   stageHistory: StageHistoryEntry[];

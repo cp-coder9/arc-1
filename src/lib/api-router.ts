@@ -46,6 +46,7 @@ import {
   buildProposalComparison,
 } from "../services/marketplaceWorkflowService";
 import { assertAppointmentPreconditions } from "../services/appointmentWorkflowService";
+import { getApplicationProfessionalId, withProfessionalJobAliases, withProfessionalProjectAliases } from "./professionalRoleCompatibility";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -3362,32 +3363,30 @@ router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) 
       ];
 
       tx.update(applicationRef, { status: 'accepted', updatedAt: now });
-      tx.update(jobRef, {
-        selectedArchitectId: applicationData.architectId,
+      const selectedProfessionalId = getApplicationProfessionalId(applicationData);
+      tx.update(jobRef, withProfessionalJobAliases({
         status: 'in-progress',
         updatedAt: now,
         statusHistory: [
           ...(jobData.statusHistory || []),
           { status: 'in-progress', timestamp: now, actorId: decoded.uid, note: `Accepted ${applicationData.architectName}` },
         ],
-      });
+      }, selectedProfessionalId) as any);
       if (!projectDoc.exists) {
-        tx.set(projectRef, {
+        tx.set(projectRef, withProfessionalProjectAliases({
           id: projectRef.id,
           jobId,
           clientId: jobData.clientId,
-          leadArchitectId: applicationData.architectId,
           currentStage: 'intake',
           stageHistory: initialStageHistory,
           teamMembers,
           createdAt: now,
-        });
+        }, selectedProfessionalId));
       } else {
-        tx.update(projectRef, {
-          leadArchitectId: applicationData.architectId,
+        tx.update(projectRef, withProfessionalProjectAliases({
           teamMembers,
           updatedAt: now,
-        });
+        }, selectedProfessionalId) as any);
       }
     });
 
@@ -3416,15 +3415,29 @@ router.post("/jobs/:jobId/applications/:applicationId/accept", async (req, res) 
       console.error('Failed to create acceptance notification:', notificationError);
     }
 
+    const acceptedProfessionalId = getApplicationProfessionalId(acceptedApplication);
     await recordAuditEvent(req, {
       category: 'approval',
       action: 'marketplace.application_accepted',
       actor: decodedAuditActor(decoded, 'client'),
       target: { type: 'job_application', id: applicationId, projectId: jobId },
-      metadata: { jobId, selectedBepId: acceptedApplication.architectId, projectCreatedOrUpdated: true },
+      metadata: {
+        jobId,
+        selectedProfessionalId: acceptedProfessionalId,
+        selectedBepId: acceptedProfessionalId,
+        selectedArchitectId: acceptedProfessionalId,
+        projectCreatedOrUpdated: true,
+      },
     });
 
-    res.json({ jobId, applicationId, selectedArchitectId: acceptedApplication.architectId, status: 'in-progress' });
+    res.json({
+      jobId,
+      applicationId,
+      selectedProfessionalId: acceptedProfessionalId,
+      selectedBepId: acceptedProfessionalId,
+      selectedArchitectId: acceptedProfessionalId,
+      status: 'in-progress',
+    });
   } catch (err: any) {
     console.error('Application accept error:', err);
     res.status(err.status || 500).json({ error: err.message || 'Failed to accept application' });

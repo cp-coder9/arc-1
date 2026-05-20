@@ -1,4 +1,5 @@
 import type { UserRole } from '@/types';
+import { getLeadProfessionalId } from '@/lib/professionalRoleCompatibility';
 
 export const CANONICAL_USER_ROLES = [
   'client',
@@ -63,6 +64,7 @@ export interface ProjectMembershipLike {
 export interface ProjectAccessContext {
   projectId: string;
   clientId?: string;
+  leadProfessionalId?: string;
   leadBepId?: string;
   leadArchitectId?: string;
   memberships?: ProjectMembershipLike[];
@@ -153,7 +155,7 @@ export function getActiveProjectAccessRoles(user: AuthzUser, project?: ProjectAc
 
   const roles = new Set<ProjectAccessRole>();
   if (project.clientId === user.uid) roles.add('project_owner');
-  if (project.leadBepId === user.uid || project.leadArchitectId === user.uid) roles.add('lead_bep');
+  if (getLeadProfessionalId(project) === user.uid) roles.add('lead_bep');
 
   for (const membership of project.memberships || []) {
     if (

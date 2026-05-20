@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
 
 const mode = process.env.NODE_ENV || 'production';
 dotenv.config({
@@ -6,19 +8,60 @@ dotenv.config({
 });
 
 const port = Number(process.env.PORT) || 3000;
+const BODY_LIMIT = '50mb';
+const ALLOWED_CORS_ORIGINS = [
+  'https://architex.co.za',
+  'https://www.architex.co.za',
+  'https://test.architex.co.za',
+  'https://architex-marketplace.vercel.app',
+  /\.vercel\.app$/,
+];
 
-try {
-  const { default: app } = await import('./api/index.ts');
-  const server = app.listen(port, '0.0.0.0', () => {
-    console.log('Architex API server running on http://localhost:' + port);
-    console.log('Environment: ' + (process.env.NODE_ENV || 'production'));
-  });
+const app = express();
+app.set('trust proxy', 1);
+app.use((_req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+app.use(cors({ origin: ALLOWED_CORS_ORIGINS, credentials: true }));
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
-  server.on('error', (error) => {
-    console.error('Architex API server failed to start:', error);
-    process.exitCode = 1;
-  });
-} catch (error) {
-  console.error('Architex API server failed to initialize:', error);
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/auth/check-admin', (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing authorization header' });
+  }
+  return next();
+});
+
+app.use('/api', async (req, res, next) => {
+  try {
+    const { default: apiRouter } = await import('./src/lib/api-router.ts');
+    return apiRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load API router:', error);
+    return res.status(500).json({
+      error: 'API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'API route not found', path: req.originalUrl });
+});
+
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log('Architex API server running on http://localhost:' + port);
+  console.log('Environment: ' + (process.env.NODE_ENV || 'production'));
+});
+
+server.on('error', (error) => {
+  console.error('Architex API server failed to start:', error);
   process.exitCode = 1;
-}
+});
