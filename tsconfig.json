@@ -32,6 +32,7 @@
   "exclude": [
     "node_modules",
     "dist",
+    "release",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/__tests__/**",
