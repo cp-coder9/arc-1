@@ -47,6 +47,14 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  app.post("/api/auth/check-admin", (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing authorization header" });
+    }
+    return next();
+  });
+
   // Mount the shared API router lazily. Firebase Admin / Firestore can add a
   // noticeable cold-start cost locally, so the server should become healthy
   // before those integrations are imported.
