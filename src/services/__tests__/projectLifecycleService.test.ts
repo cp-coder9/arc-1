@@ -4,7 +4,16 @@
  * Firestore operations are tested via integration tests.
  */
 
-import { canTransition, stageIndex, stageToJobStatus } from '../projectLifecycleService';
+import {
+  assertStageGateTransitionAllowed,
+  canTransition,
+  evaluateStageGateTransition,
+  getMissingStageGateRequirements,
+  getStageGateRequirements,
+  stageIndex,
+  stageToJobStatus,
+  STAGE_GATE_REQUIREMENTS,
+} from '../projectLifecycleService';
 import { ProjectStage, PROJECT_STAGE_ORDER } from '../../types';
 
 describe('projectLifecycleService', () => {
@@ -113,6 +122,89 @@ describe('projectLifecycleService', () => {
       ];
       expect(PROJECT_STAGE_ORDER).toEqual(expected);
       expect(PROJECT_STAGE_ORDER).not.toContain('scoping');
+    });
+  });
+
+  describe('PRD stage-gate requirements', () => {
+    it('defines governed requirements for every post-brief canonical stage', () => {
+      expect(Object.keys(STAGE_GATE_REQUIREMENTS)).toEqual([
+        'appointment',
+        'coordination',
+        'compliance',
+        'tender',
+        'delivery',
+        'payments',
+        'closeout',
+      ]);
+
+      expect(getStageGateRequirements('appointment').map(requirement => requirement.key)).toEqual([
+        'clientBriefCompleted',
+        'technicalBriefApproved',
+      ]);
+      expect(getStageGateRequirements('payments').map(requirement => requirement.key)).toEqual([
+        'constructionEvidenceSubmitted',
+        'paymentClaimCertified',
+        'escrowReleaseApproved',
+      ]);
+      expect(getStageGateRequirements('intake')).toEqual([]);
+      expect(getStageGateRequirements('scoping')).toEqual([]);
+    });
+
+    it('reports missing evidence for target stage progression', () => {
+      expect(getMissingStageGateRequirements('coordination', {
+        verifiedProfessionalAppointed: true,
+      }).map(requirement => requirement.key)).toEqual([
+        'appointmentAgreementSigned',
+        'escrowPlanInitialized',
+      ]);
+    });
+
+    it('blocks a valid stage transition when PRD gate evidence is missing', () => {
+      const evaluation = evaluateStageGateTransition('intake', 'appointment', {
+        clientBriefCompleted: true,
+      });
+
+      expect(evaluation.transitionRulePassed).toBe(true);
+      expect(evaluation.transitionAllowed).toBe(false);
+      expect(evaluation.missingRequirements.map(requirement => requirement.key)).toEqual(['technicalBriefApproved']);
+      expect(() => assertStageGateTransitionAllowed(evaluation)).toThrow(/Stage gate blocked/);
+    });
+
+    it('allows stage progression when transition rule and all PRD gates pass', () => {
+      const evaluation = evaluateStageGateTransition('intake', 'appointment', {
+        clientBriefCompleted: true,
+        technicalBriefApproved: true,
+      });
+
+      expect(evaluation.transitionAllowed).toBe(true);
+      expect(() => assertStageGateTransitionAllowed(evaluation)).not.toThrow();
+    });
+
+    it('keeps admin override bound by PRD evidence gates', () => {
+      const blocked = evaluateStageGateTransition('intake', 'compliance', {}, true);
+      expect(blocked.transitionRulePassed).toBe(true);
+      expect(blocked.transitionAllowed).toBe(false);
+      expect(blocked.missingRequirements.map(requirement => requirement.key)).toEqual([
+        'designPackageApproved',
+        'drawingRegisterReady',
+      ]);
+
+      const allowed = evaluateStageGateTransition('intake', 'compliance', {
+        designPackageApproved: true,
+        drawingRegisterReady: true,
+      }, true);
+      expect(allowed.transitionAllowed).toBe(true);
+    });
+
+    it('reports invalid transitions separately from missing gate evidence', () => {
+      const evaluation = evaluateStageGateTransition('coordination', 'appointment', {
+        clientBriefCompleted: true,
+        technicalBriefApproved: true,
+      });
+
+      expect(evaluation.transitionRulePassed).toBe(false);
+      expect(evaluation.transitionAllowed).toBe(false);
+      expect(() => assertStageGateTransitionAllowed(evaluation)).toThrow(/Invalid transition/);
     });
   });
 });

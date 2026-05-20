@@ -914,6 +914,8 @@ export interface Project {
   /** @deprecated Use leadProfessionalId/leadBepId for new writes. */
   leadArchitectId?: string;
   currentStage: ProjectStage;
+  /** PRD stage-gate evidence flags used to block premature legal, financial, or professional progression. */
+  stageGateEvidence?: Partial<Record<string, boolean>>;
   stageHistory: StageHistoryEntry[];
   teamMembers: ProjectTeamMember[];
   firmId?: string;
