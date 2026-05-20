@@ -77,6 +77,39 @@ export interface RFQShortlistEntry extends SupplierCatalogueMatch {
   rank: number;
 }
 
+
+export type RFQAwardReadinessStatus = 'blocked' | 'review_required' | 'ready_for_award_review';
+
+export interface SupplierQuoteResponse {
+  id: string;
+  supplierId: string;
+  status: 'draft' | 'submitted' | 'withdrawn' | 'expired' | 'accepted' | 'rejected';
+  amount?: number;
+  currency?: string;
+  leadTimeDays?: number;
+  validUntil?: string;
+  exclusions?: string[];
+  assumptions?: string[];
+  submittedAt?: string;
+}
+
+export interface RankedSupplierQuoteResponse extends SupplierQuoteResponse {
+  rank: number;
+  supplierName?: string;
+  prequalificationStatus?: SupplierPrequalificationStatus;
+  normalizedScore: number;
+}
+
+export interface RFQAwardReadinessResult {
+  status: RFQAwardReadinessStatus;
+  rankedResponses: RankedSupplierQuoteResponse[];
+  blockers: string[];
+  warnings: string[];
+  humanReviewRequired: true;
+  aiMayAward: false;
+  governanceNote: string;
+}
+
 export interface PurchaseOrderDraftInput {
   packageId: string;
   projectId?: string;
@@ -309,4 +342,63 @@ export function validatePurchaseOrderIssue(candidate: PurchaseOrderIssueCandidat
 
 export function buildMaterialSchedule(items: BoQBoMItem[]): BoQBoMItem[] {
   return [...items].sort((a, b) => String(a.requiredBy ?? '9999-12-31').localeCompare(String(b.requiredBy ?? '9999-12-31')) || a.description.localeCompare(b.description));
+}
+
+
+export function evaluateRFQAwardReadiness(input: {
+  responses: SupplierQuoteResponse[];
+  shortlist: RFQShortlistEntry[];
+  budget?: number;
+  asOf?: string;
+}): RFQAwardReadinessResult {
+  const asOf = Date.parse(input.asOf ?? new Date().toISOString());
+  if (Number.isNaN(asOf)) throw new Error('asOf must be a valid ISO date string.');
+
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const shortlistBySupplier = new Map(input.shortlist.map((entry) => [entry.supplier.uid, entry]));
+  const activeResponses = input.responses.filter((response) => response.status === 'submitted' || response.status === 'accepted');
+
+  if (activeResponses.length === 0) blockers.push('No submitted supplier quote responses are available for award review.');
+
+  const rankedResponses = activeResponses
+    .map((response) => {
+      const shortlistEntry = shortlistBySupplier.get(response.supplierId);
+      const supplierName = shortlistEntry?.supplier.displayName ?? response.supplierId;
+      if (!shortlistEntry) {
+        blockers.push(supplierName + ' is not on the governed RFQ shortlist.');
+      } else if (shortlistEntry.prequalification.status === 'blocked') {
+        blockers.push(supplierName + ' is blocked by supplier prequalification and cannot proceed to award review.');
+      } else if (shortlistEntry.prequalification.status === 'review_required') {
+        warnings.push(supplierName + ' requires human prequalification review before award.');
+      }
+
+      if (!response.amount || response.amount <= 0) blockers.push(supplierName + ' quote requires a positive amount before award review.');
+      if (response.validUntil && Date.parse(response.validUntil) < asOf) blockers.push(supplierName + ' quote expired on ' + response.validUntil + '.');
+      if (input.budget && response.amount && response.amount > input.budget) warnings.push(supplierName + ' quote exceeds the package budget.');
+      if ((response.exclusions ?? []).length > 0) warnings.push(supplierName + ' quote includes exclusions that require human commercial review.');
+
+      const amountScore = response.amount && response.amount > 0 ? 1 / response.amount : 0;
+      const leadTimeScore = response.leadTimeDays ? Math.max(0, 1 - response.leadTimeDays / 120) : 0;
+      const prequalificationScore = shortlistEntry?.prequalification.status === 'prequalified' ? 1 : shortlistEntry?.prequalification.status === 'review_required' ? 0.5 : 0;
+      return {
+        ...response,
+        supplierName,
+        prequalificationStatus: shortlistEntry?.prequalification.status,
+        normalizedScore: amountScore * 100000 + leadTimeScore * 10 + prequalificationScore * 25,
+      };
+    })
+    .sort((a, b) => b.normalizedScore - a.normalizedScore || (a.amount ?? Number.MAX_SAFE_INTEGER) - (b.amount ?? Number.MAX_SAFE_INTEGER))
+    .map((response, index) => ({ ...response, rank: index + 1 }));
+
+  const status: RFQAwardReadinessStatus = blockers.length > 0 ? 'blocked' : warnings.length > 0 ? 'review_required' : 'ready_for_award_review';
+  return {
+    status,
+    rankedResponses,
+    blockers: [...new Set(blockers)],
+    warnings: [...new Set(warnings)],
+    humanReviewRequired: true,
+    aiMayAward: false,
+    governanceNote: 'RFQ response ranking is advisory only; supplier awards, purchase orders, escrow movements, and payment effects require recorded human approval and audit evidence.',
+  };
 }

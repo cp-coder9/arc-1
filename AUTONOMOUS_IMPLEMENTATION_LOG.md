@@ -179,3 +179,10 @@ Owner instruction: finish the Architex PRD overnight and keep JCode/agents on go
 - Extended marketplaceWorkflowService focused coverage for advisory analytics aggregation and no PII leakage.
 - Validation: npx vitest run src/services/__tests__/marketplaceWorkflowService.test.ts - 7 tests passed; npm run lint -- --pretty false - passed.
 - Blockers: none for this local slice; no push/deploy performed.
+
+## 2026-05-21T00:34:35+02:00 Hermes oversight run
+- Observed JCode coordinator processes active, with clean tracked worktree before intervention and no repo edits/tests in progress; branch remained phase-2-verification-workflows ahead of origin.
+- Implemented smallest PRD-safe supplier/RFQ lifecycle slice: provider-neutral RFQ quote response award-readiness ranking with shortlist/prequalification checks, expiry/budget/exclusion warnings, explicit human award gate, and AI award prohibition.
+- Extended procurementWorkflowService focused coverage for ready award review and blocked/non-shortlisted/expired/prequalification-blocked responses.
+- Validation: npx vitest run src/services/__tests__/procurementWorkflowService.test.ts - 10 tests passed; npm run lint -- --pretty false - passed.
+- Blockers: no external credentials required for this local governance slice; no push/deploy performed.

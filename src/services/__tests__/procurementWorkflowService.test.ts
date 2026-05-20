@@ -4,6 +4,7 @@ import {
   buildRFQShortlist,
   buildMaterialSchedule,
   draftPurchaseOrderForHumanApproval,
+  evaluateRFQAwardReadiness,
   evaluateSupplierPrequalification,
   extractBoQBoMItems,
   matchSupplierCatalogue,
@@ -162,6 +163,87 @@ describe('procurementWorkflowService', () => {
     ]));
     expect(result.warnings).toContain('Materials Supplier is below the preferred supplier rating threshold.');
     expect(result.humanReviewRequired).toBe(true);
+  });
+
+
+  it('ranks submitted RFQ responses for human award review without allowing AI awards', () => {
+    const packageText = tender.title + ' ' + tender.description + ' ' + tender.scope.join(' ');
+    const shortlist = buildRFQShortlist({
+      packageText,
+      suppliers: [
+        { uid: 'supplier-fast', displayName: 'Fast Electrical Supply', catalogueKeywords: ['electrical', 'boards'], averageRating: 4.6, leadTimeDays: 5 },
+        { uid: 'supplier-value', displayName: 'Value Electrical Supply', catalogueKeywords: ['electrical', 'conduit'], averageRating: 4.4, leadTimeDays: 12 },
+      ],
+      supplierDocuments: {
+        'supplier-fast': [
+          { type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31' },
+          { type: 'bbbee_certificate', status: 'verified', expiresAt: '2026-12-31' },
+        ],
+        'supplier-value': [
+          { type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31' },
+          { type: 'bbbee_certificate', status: 'verified', expiresAt: '2026-12-31' },
+        ],
+      },
+      asOf: '2026-05-20T00:00:00.000Z',
+    });
+
+    const readiness = evaluateRFQAwardReadiness({
+      shortlist,
+      budget: 10000,
+      asOf: '2026-05-21T00:00:00.000Z',
+      responses: [
+        { id: 'quote-fast', supplierId: 'supplier-fast', status: 'submitted', amount: 9200, leadTimeDays: 5, validUntil: '2026-06-30' },
+        { id: 'quote-value', supplierId: 'supplier-value', status: 'submitted', amount: 8800, leadTimeDays: 12, validUntil: '2026-06-30' },
+      ],
+    });
+
+    expect(readiness.status).toBe('ready_for_award_review');
+    expect(readiness.rankedResponses.map((response) => response.supplierId)).toEqual(['supplier-fast', 'supplier-value']);
+    expect(readiness).toMatchObject({ humanReviewRequired: true, aiMayAward: false, blockers: [], warnings: [] });
+    expect(readiness.governanceNote).toMatch(/advisory only/i);
+  });
+
+  it('blocks RFQ award readiness for expired, non-shortlisted, or prequalification-blocked responses', () => {
+    const packageText = tender.title + ' ' + tender.description + ' ' + tender.scope.join(' ');
+    const shortlist = buildRFQShortlist({
+      packageText,
+      suppliers: [
+        { uid: 'blocked-supplier', displayName: 'Blocked Electrical Supply', catalogueKeywords: ['electrical', 'boards'], averageRating: 5 },
+        { uid: 'review-supplier', displayName: 'Review Electrical Supply', catalogueKeywords: ['electrical', 'conduit'], averageRating: 4.5 },
+      ],
+      supplierDocuments: {
+        'blocked-supplier': [{ type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31' }],
+        'review-supplier': [
+          { type: 'tax_clearance', status: 'verified', expiresAt: '2026-12-31' },
+          { type: 'bbbee_certificate', status: 'submitted' },
+        ],
+      },
+      asOf: '2026-05-20T00:00:00.000Z',
+    });
+
+    const readiness = evaluateRFQAwardReadiness({
+      shortlist,
+      budget: 10000,
+      asOf: '2026-05-21T00:00:00.000Z',
+      responses: [
+        { id: 'quote-blocked', supplierId: 'blocked-supplier', status: 'submitted', amount: 8500, validUntil: '2026-06-30' },
+        { id: 'quote-review', supplierId: 'review-supplier', status: 'submitted', amount: 12000, exclusions: ['Excludes delivery offloading'], validUntil: '2026-06-30' },
+        { id: 'quote-expired', supplierId: 'not-shortlisted', status: 'submitted', amount: 7000, validUntil: '2026-05-01' },
+      ],
+    });
+
+    expect(readiness.status).toBe('blocked');
+    expect(readiness.blockers).toEqual(expect.arrayContaining([
+      'Blocked Electrical Supply is blocked by supplier prequalification and cannot proceed to award review.',
+      'not-shortlisted is not on the governed RFQ shortlist.',
+      'not-shortlisted quote expired on 2026-05-01.',
+    ]));
+    expect(readiness.warnings).toEqual(expect.arrayContaining([
+      'Review Electrical Supply requires human prequalification review before award.',
+      'Review Electrical Supply quote exceeds the package budget.',
+      'Review Electrical Supply quote includes exclusions that require human commercial review.',
+    ]));
+    expect(readiness.aiMayAward).toBe(false);
   });
 
   it('builds advisory RFQ shortlists ranked by prequalification status before catalogue score', () => {
