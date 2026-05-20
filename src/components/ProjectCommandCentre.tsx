@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileText, Landmark, ListChecks, Loader2, WalletCards } from 'lucide-react';
 import { db } from '../lib/firebase';
+import { subscribeToMergedQuerySnapshots } from '../lib/firestoreQueryMerge';
 import { getRoleProfileCompletion } from '../services/roleProfileService';
 import type { DelegatedTask, Job, Project, TenderPackage, UserProfile } from '../types';
 import { Badge } from './ui/badge';
@@ -47,22 +48,26 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function jobQueryForUser(user: UserProfile) {
+function jobQueriesForUser(user: UserProfile) {
   const jobs = collection(db, 'jobs');
 
   if (user.role === 'client') {
-    return query(jobs, where('clientId', '==', user.uid), limit(25));
+    return [query(jobs, where('clientId', '==', user.uid), limit(25))];
   }
 
   if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') {
-    return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
+    return [
+      query(jobs, where('selectedProfessionalId', '==', user.uid), limit(25)),
+      query(jobs, where('selectedBepId', '==', user.uid), limit(25)),
+      query(jobs, where('selectedArchitectId', '==', user.uid), limit(25)),
+    ];
   }
 
   if (user.role === 'admin') {
-    return query(jobs, limit(25));
+    return [query(jobs, limit(25))];
   }
 
-  return null;
+  return [];
 }
 
 function tenderQueriesForUser(user: UserProfile) {
@@ -87,22 +92,26 @@ function delegatedTaskQueryForUser(user: UserProfile) {
   return query(collection(db, 'delegatedTasks'), where('assigneeId', '==', user.uid), limit(25));
 }
 
-function projectQueryForUser(user: UserProfile) {
+function projectQueriesForUser(user: UserProfile) {
   const projects = collection(db, 'projects');
 
   if (user.role === 'client') {
-    return query(projects, where('clientId', '==', user.uid), limit(25));
+    return [query(projects, where('clientId', '==', user.uid), limit(25))];
   }
 
   if (user.role === 'architect' || user.role === 'bep') {
-    return query(projects, where('leadArchitectId', '==', user.uid), limit(25));
+    return [
+      query(projects, where('leadProfessionalId', '==', user.uid), limit(25)),
+      query(projects, where('leadBepId', '==', user.uid), limit(25)),
+      query(projects, where('leadArchitectId', '==', user.uid), limit(25)),
+    ];
   }
 
   if (user.role === 'admin') {
-    return query(projects, limit(25));
+    return [query(projects, limit(25))];
   }
 
-  return null;
+  return [];
 }
 
 function resolveNextAction(user: UserProfile, activeJob: CommandJob | undefined, profileCompletion: ReturnType<typeof getRoleProfileCompletion>, activePackage?: CommandPackage, activeTask?: CommandDelegatedTask) {
@@ -170,9 +179,9 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
 
   useEffect(() => {
     setState('loading');
-    const jobQuery = jobQueryForUser(user);
-    const unsubscribeJobs = jobQuery ? onSnapshot(jobQuery, (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CommandJob))));
+    const jobQueries = jobQueriesForUser(user);
+    const unsubscribeJobs = jobQueries.length > 0 ? subscribeToMergedQuerySnapshots<CommandJob>(jobQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as CommandJob), (items) => {
+      setJobs(sortByRecent(items));
       setState('ready');
     }, (error) => {
       console.warn('Command centre job projection unavailable; continuing without job context:', error);
@@ -190,9 +199,9 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
       setState("ready");
     }) : null;
 
-    const projectQuery = projectQueryForUser(user);
-    const unsubscribeProjects = projectQuery && canListProjectsByRole(user) ? onSnapshot(projectQuery, (snapshot) => {
-      setProjects(sortByRecent(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project))));
+    const projectQueries = projectQueriesForUser(user);
+    const unsubscribeProjects = projectQueries.length > 0 && canListProjectsByRole(user) ? subscribeToMergedQuerySnapshots<Project>(projectQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project), (items) => {
+      setProjects(sortByRecent(items));
     }, (error) => {
       console.warn('Command centre project projection unavailable; continuing without project context:', error);
       setProjects([]);
@@ -213,7 +222,7 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
       setState('ready');
     }));
 
-    if (!jobQuery && packageQueries.length === 0 && !delegatedTaskQuery) setState('ready');
+    if (jobQueries.length === 0 && packageQueries.length === 0 && !delegatedTaskQuery) setState('ready');
 
     return () => {
       unsubscribeJobs?.();

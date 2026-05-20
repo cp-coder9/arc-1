@@ -192,9 +192,13 @@ describe('canonical dashboard page registry', () => {
     expect(new Set(pageIds).size, 'Dashboard page ids must be unique').toBe(pageIds.length);
 
     expect(appSource).toContain('const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));');
+    expect(appSource).toContain('const DIRECT_WORKFLOW_PAGE_IDS = new Set([');
+    expect(appSource).toContain('const PROJECT_WORKFLOW_PAGE_IDS = new Set([');
+    expect(appSource).toContain('const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);');
     expect(appSource).toContain('function pagesForRole(role: UserRole)');
     expect(appSource).toContain('function pageById(pageId: string)');
-    expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab)');
+    expect(appSource).toContain('PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
+    expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab)');
   });
 
   it('exposes backend role navigation sections and deterministic page test ids', () => {
@@ -260,7 +264,8 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("return <ProjectMessengerPage user={user} />;");
     expect(workflowSource).toContain("return <ContractSigningPage user={user} />;");
     expect(workflowSource).toContain("return <DisputeResolutionPage user={user} />;");
-    expect(appSource).toContain(`REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-register' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-marketplace' && activeTab !== 'bep-team' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />`);
+    expect(appSource).toContain('const PROJECT_WORKFLOW_PAGE_IDS = new Set([');
+    expect(appSource).toContain('PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
   });
 
   it('routes backend.html BEP marketplace and design team matrix to live production tools', () => {
@@ -268,8 +273,8 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const DesignTeamMatrixPage = lazyWithChunkRetry(() => import('./components/DesignTeamMatrixPage'));");
     expect(appSource).toContain(`activeTab === 'bep-marketplace' && <BEPClientMarketplacePage user={user} />`);
     expect(appSource).toContain(`activeTab === 'bep-team' && <DesignTeamMatrixPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'bep-marketplace'`);
-    expect(appSource).toContain(`activeTab !== 'bep-team'`);
+    expect(appSource).toContain(`'bep-marketplace'`);
+    expect(appSource).toContain(`'bep-team'`);
 
     expect(bepMarketplaceSource).toContain("collection(db, 'jobs')");
     expect(bepMarketplaceSource).toContain("where('status', '==', 'open')");
@@ -377,7 +382,7 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const AICoPilotPage = lazyWithChunkRetry(() => import('./components/AICoPilotPage'));"
     );
     expect(appSource).toContain(`activeTab === 'ai' && <AICoPilotPage user={user} onNavigate={setActiveTab} />`);
-    expect(appSource).toContain(`activeTab !== 'ai'`);
+    expect(appSource).toContain(`'ai'`);
   });
 
   it('routes drawing register and transmittals to live document-control records', () => {
@@ -385,7 +390,7 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`{ id: 'drawing-register', label: 'Drawing Register'`);
     expect(appSource).toContain(`activeTab === 'drawing-register' && <DrawingRegisterPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'drawing-register'`);
+    expect(appSource).toContain(`'drawing-register'`);
     expect(drawingRegisterSource).toContain("where('leadProfessionalId', '==', user.uid)");
     expect(drawingRegisterSource).toContain("where('leadBepId', '==', user.uid)");
     expect(drawingRegisterSource).toContain("where('leadArchitectId', '==', user.uid)");
@@ -402,14 +407,14 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const ContractorStaffPlantPage = lazyWithChunkRetry(() => import('./components/ContractorStaffPlantPage'));"
     );
     expect(appSource).toContain(`activeTab === 'contractor-staff' && <ContractorStaffPlantPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'contractor-staff'`);
+    expect(appSource).toContain(`'contractor-staff'`);
   });
 
   it('routes BEP freelancer work packages to the production delegation workspace', () => {
     expect(appSource).toContain("const BEPFreelancerJobsPage = lazyWithChunkRetry(() => import('./components/BEPFreelancerJobsPage'));"
     );
     expect(appSource).toContain(`activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'bep-freelancers'`);
+    expect(appSource).toContain(`'bep-freelancers'`);
     expect(bepFreelancerJobsSource).toContain("const delegatedTaskRef = doc(db, 'delegatedTasks', taskRef.id)");
     expect(bepFreelancerJobsSource).toContain('batch.set(delegatedTaskRef, taskData)');
     expect(bepFreelancerJobsSource).toContain('jobTaskId: taskRef.id');
@@ -422,14 +427,14 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const SANSComplianceFormsPage = lazyWithChunkRetry(() => import('./components/SANSComplianceFormsPage'));"
     );
     expect(appSource).toContain(`activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'sans-forms'`);
+    expect(appSource).toContain(`'sans-forms'`);
   });
 
   it('routes CPD assessment to the production browser-safe CPD workflow', () => {
     expect(appSource).toContain("const CPDAssessmentPage = lazyWithChunkRetry(() => import('./components/CPDAssessmentPage'));"
     );
     expect(appSource).toContain(`activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'cpd-assessment'`);
+    expect(appSource).toContain(`'cpd-assessment'`);
   });
 
   it('routes package and procurement pages to the production package workspace', () => {
@@ -460,7 +465,7 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const DesignCompliancePage = lazyWithChunkRetry(() => import('./components/DesignCompliancePage'));"
     );
     expect(appSource).toContain(`activeTab === 'design' && <DesignCompliancePage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'design'`);
+    expect(appSource).toContain(`'design'`);
     expect(designComplianceSource).toContain("import DrawingChecklistTracker from './DrawingChecklistTracker';");
     expect(designComplianceSource).toContain('<DrawingChecklistTracker project={project} job={selectedJob} user={user} />');
     expect(drawingChecklistServiceSource).toContain("'drawing_checklists'");
@@ -469,7 +474,7 @@ describe('canonical dashboard page registry', () => {
 
   it('routes admin console to a whole-system governance console with backend.html datasets', () => {
     expect(appSource).toContain(`activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'admin-console'`);
+    expect(appSource).toContain(`'admin-console'`);
     expect(adminGovernanceConsoleSource).toContain('data-testid="admin-governance-console"');
     expect(adminGovernanceConsoleSource).toContain('Whole-system governance console');
     expect(adminGovernanceConsoleSource).toContain("collectionName: 'projects'");
@@ -486,7 +491,7 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const FreelancerSubmissionsPage = lazyWithChunkRetry(() => import('./components/FreelancerSubmissionsPage'));"
     );
     expect(appSource).toContain(`activeTab === 'freelancer-submissions' && <FreelancerSubmissionsPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'freelancer-submissions'`);
+    expect(appSource).toContain(`'freelancer-submissions'`);
     expect(freelancerSubmissionsSource).toContain('Submit for BEP review');
     expect(freelancerSubmissionsSource).toContain("submissionStatus: 'submitted'");
     expect(freelancerSubmissionsSource).toContain("paymentStatus: 'review_pending'");
@@ -495,40 +500,40 @@ describe('canonical dashboard page registry', () => {
 
   it('routes freelancer assigned work to the production freelancer dashboard', () => {
     expect(appSource).toContain(`activeTab === 'freelancer-work' && <FreelancerDashboard user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'freelancer-work'`);
+    expect(appSource).toContain(`'freelancer-work'`);
   });
 
   it('routes resource sharing to the production resource booking workspace', () => {
     expect(appSource).toContain("const ResourceSharingPage = lazyWithChunkRetry(() => import('./components/ResourceSharingPage'));"
     );
     expect(appSource).toContain(`activeTab === 'resource-sharing' && <ResourceSharingPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'resource-sharing'`);
+    expect(appSource).toContain(`'resource-sharing'`);
   });
 
   it('routes toolbox to the production project file toolbox', () => {
     expect(appSource).toContain("const ProjectToolboxPage = lazyWithChunkRetry(() => import('./components/ProjectToolboxPage'));"
     );
     expect(appSource).toContain(`activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />`);
-    expect(appSource).toContain(`activeTab !== 'toolbox'`);
+    expect(appSource).toContain(`'toolbox'`);
   });
 
   it('routes knowledge to the production resource/knowledge workflow', () => {
     expect(appSource).toContain(`activeTab === 'knowledge' && <ResourceCentre user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'knowledge'`);
+    expect(appSource).toContain(`'knowledge'`);
   });
 
   it('routes resource centre to the production resource/checklist workflow', () => {
     expect(appSource).toContain("const ResourceCentre = lazyWithChunkRetry(() => import('./components/ResourceCentre'));"
     );
     expect(appSource).toContain(`activeTab === 'resource-centre' && <ResourceCentre user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'resource-centre'`);
+    expect(appSource).toContain(`'resource-centre'`);
   });
 
   it('routes tasks to the production tasks and approvals workflow with project coordination register', () => {
     expect(appSource).toContain("const TasksApprovalsPage = lazyWithChunkRetry(() => import('./components/TasksApprovalsPage'));"
     );
     expect(appSource).toContain(`activeTab === 'tasks' && <TasksApprovalsPage user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'tasks'`);
+    expect(appSource).toContain(`'tasks'`);
     expect(tasksApprovalsSource).toContain("import ProjectCoordinationRegister from './ProjectCoordinationRegister';");
     expect(tasksApprovalsSource).toContain('<ProjectCoordinationRegister project={selectedProject} job={selectedJob} user={user} />');
     expect(coordinationRegisterServiceSource).toContain("'coordination_items'");
@@ -539,42 +544,42 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const AIDrawingChecker = lazyWithChunkRetry(() => import('./components/AIDrawingChecker'));"
     );
     expect(appSource).toContain(`activeTab === 'drawing-checker' && <AIDrawingChecker user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'drawing-checker'`);
+    expect(appSource).toContain(`'drawing-checker'`);
   });
 
   it('routes client progress to the production progress reports workflow', () => {
     expect(appSource).toContain("const ClientProgressReports = lazyWithChunkRetry(() => import('./components/ClientProgressReports'));"
     );
     expect(appSource).toContain(`activeTab === 'client-progress' && <ClientProgressReports user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'client-progress'`);
+    expect(appSource).toContain(`'client-progress'`);
   });
 
   it('routes client intake to the production guided brief wizard', () => {
     expect(appSource).toContain("const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBriefWizard'));"
     );
     expect(appSource).toContain(`activeTab === 'client-intake' && <GuidedBriefWizard user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'client-intake'`);
+    expect(appSource).toContain(`'client-intake'`);
   });
 
   it('routes client proposals to the production comparison workflow', () => {
     expect(appSource).toContain("const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));"
     );
     expect(appSource).toContain(`activeTab === 'client-proposals' && <ClientProposalComparison user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'client-proposals'`);
+    expect(appSource).toContain(`'client-proposals'`);
   });
 
   it('routes BEP technical briefs to the production technical brief editor', () => {
     expect(appSource).toContain("const TechnicalBriefEditor = lazyWithChunkRetry(() => import('./components/TechnicalBriefEditor'));"
     );
     expect(appSource).toContain(`activeTab === 'technical-brief' && <TechnicalBriefEditor user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'technical-brief'`);
+    expect(appSource).toContain(`'technical-brief'`);
   });
 
   it('routes directory search to the production directory workflow', () => {
     expect(appSource).toContain("const DirectorySearch = lazyWithChunkRetry(() => import('./components/DirectorySearch'));"
     );
     expect(appSource).toContain(`activeTab === 'directory-search' && <DirectorySearch user={user} />`);
-    expect(appSource).toContain(`activeTab !== 'directory-search'`);
+    expect(appSource).toContain(`'directory-search'`);
   });
 
   it('routes the canonical profile page to the production profile workspace', () => {
@@ -582,6 +587,16 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`activeTab === 'profile' && <ProfileWorkspacePage user={user} />`);
     expect(appSource).toContain('data-testid="profile-workspace-page"');
     expect(appSource).toContain('<ProfileEditor user={user} />');
+  });
+
+  it('keeps command centre projections compatible with BEP professional aliases', () => {
+    expect(commandCentreSource).toContain('subscribeToMergedQuerySnapshots');
+    expect(commandCentreSource).toContain("where('selectedProfessionalId', '==', user.uid)");
+    expect(commandCentreSource).toContain("where('selectedBepId', '==', user.uid)");
+    expect(commandCentreSource).toContain("where('selectedArchitectId', '==', user.uid)");
+    expect(commandCentreSource).toContain("where('leadProfessionalId', '==', user.uid)");
+    expect(commandCentreSource).toContain("where('leadBepId', '==', user.uid)");
+    expect(commandCentreSource).toContain("where('leadArchitectId', '==', user.uid)");
   });
 
   it('keeps dashboard shell unsafe actions human-confirmed while production pages are integrated', () => {

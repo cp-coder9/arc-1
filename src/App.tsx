@@ -233,7 +233,37 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const REAL_WORKFLOW_PAGE_IDS = new Set(['profile', 'journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'procurement', 'packages', 'client-progress', 'drawing-register', 'drawing-checker', 'tasks', 'resource-centre', 'admin-console', 'design', 'knowledge', 'toolbox', 'freelancer-submissions', 'resource-sharing', 'freelancer-work', 'ai', 'contractor-staff', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'sans-forms', 'cpd-assessment']);
+const DIRECT_WORKFLOW_PAGE_IDS = new Set([
+  'profile',
+  'command',
+  'client-intake',
+  'client-proposals',
+  'technical-brief',
+  'directory-search',
+  'packages',
+  'procurement',
+  'client-progress',
+  'drawing-register',
+  'drawing-checker',
+  'tasks',
+  'resource-centre',
+  'knowledge',
+  'admin-console',
+  'design',
+  'toolbox',
+  'freelancer-work',
+  'freelancer-submissions',
+  'resource-sharing',
+  'ai',
+  'contractor-staff',
+  'bep-marketplace',
+  'bep-team',
+  'bep-freelancers',
+  'sans-forms',
+  'cpd-assessment',
+]);
+const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
+const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   toolbox: [
@@ -1109,8 +1139,8 @@ export default function App() {
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
-              {REAL_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'packages' && activeTab !== 'procurement' && activeTab !== 'client-progress' && activeTab !== 'drawing-register' && activeTab !== 'drawing-checker' && activeTab !== 'tasks' && activeTab !== 'resource-centre' && activeTab !== 'knowledge' && activeTab !== 'admin-console' && activeTab !== 'design' && activeTab !== 'toolbox' && activeTab !== 'freelancer-work' && activeTab !== 'freelancer-submissions' && activeTab !== 'resource-sharing' && activeTab !== 'ai' && activeTab !== 'contractor-staff' && activeTab !== 'bep-marketplace' && activeTab !== 'bep-team' && activeTab !== 'bep-freelancers' && activeTab !== 'sans-forms' && activeTab !== 'cpd-assessment' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
-              {SHELL_PAGE_IDS.has(activeTab) && activeTab !== 'profile' && activeTab !== 'command' && activeTab !== 'client-intake' && activeTab !== 'client-proposals' && activeTab !== 'technical-brief' && activeTab !== 'directory-search' && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
+              {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
