@@ -3,6 +3,7 @@ import {
   assertGovernancePrerequisites,
   buildGovernanceAuditInput,
   buildGovernanceRecord,
+  buildAdminGovernanceQueueSummary,
   getMissingGovernancePrerequisites,
   hasActiveGovernanceRecord,
   type GovernanceRecord,
@@ -79,4 +80,83 @@ describe('governanceService', () => {
   it('throws a 409-style error when governance prerequisites are missing', () => {
     expect(() => assertGovernancePrerequisites([], ['terms_acceptance'])).toThrow(/Missing governance prerequisites/);
   });
+
+  it('builds an admin governance queue summary with human gates and redaction defaults', () => {
+    const now = new Date('2026-05-21T01:00:00.000Z');
+    const summary = buildAdminGovernanceQueueSummary([
+      {
+        id: 'ai-1',
+        type: 'ai_review',
+        status: 'open',
+        projectId: 'project-1',
+        assignedRole: 'bep',
+        dueAt: '2026-05-21T00:00:00.000Z',
+        createdAt: '2026-05-20T00:00:00.000Z',
+        aiGenerated: true,
+        metadata: { findingCount: 3 },
+      },
+      {
+        id: 'pay-1',
+        type: 'payment',
+        status: 'blocked',
+        projectId: 'project-1',
+        ownerRole: 'client',
+        blockedReason: 'Escrow KYC evidence is pending',
+        personalDataPresent: true,
+      },
+      {
+        id: 'sync-closed',
+        type: 'statutory_sync',
+        status: 'resolved',
+      },
+    ], now);
+
+    expect(summary).toMatchObject({
+      generatedAt: '2026-05-21T01:00:00.000Z',
+      totalOpen: 2,
+      blockedCount: 1,
+      overdueCount: 1,
+      humanGateRequiredCount: 2,
+      aiMayNotResolve: true,
+    });
+    expect(summary.countsByType).toMatchObject({ ai_review: 1, payment: 1, statutory_sync: 0 });
+    expect(summary.items.find(item => item.id === 'pay-1')).toMatchObject({
+      id: 'pay-1',
+      severity: 'high',
+      blocked: true,
+      requiresHumanGate: true,
+      aiMayNotResolve: true,
+      redactedForAdminSummary: true,
+    });
+    expect(summary.items.find(item => item.id === 'ai-1')).toMatchObject({
+      id: 'ai-1',
+      severity: 'high',
+      requiresHumanGate: true,
+      aiMayNotResolve: true,
+      redactedForAdminSummary: true,
+      metadata: { findingCount: 3 },
+    });
+  });
+
+  it('keeps non-sensitive admin queue summaries unredacted when explicitly marked safe', () => {
+    const summary = buildAdminGovernanceQueueSummary([
+      {
+        id: 'audit-1',
+        type: 'audit_exception',
+        status: 'open',
+        severity: 'critical',
+        humanGateRequired: true,
+        personalDataPresent: false,
+      },
+    ], new Date('2026-05-21T01:00:00.000Z'));
+
+    expect(summary.criticalCount).toBe(1);
+    expect(summary.items[0]).toMatchObject({
+      id: 'audit-1',
+      priority: 400,
+      redactedForAdminSummary: false,
+      aiMayNotResolve: true,
+    });
+  });
+
 });

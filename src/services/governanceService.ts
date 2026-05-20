@@ -117,3 +117,157 @@ export function assertGovernancePrerequisites(
     throw error;
   }
 }
+
+export type AdminGovernanceQueueType =
+  | 'human_approval'
+  | 'dispute'
+  | 'payment'
+  | 'ai_review'
+  | 'statutory_sync'
+  | 'audit_exception';
+
+export type AdminGovernanceQueueSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface AdminGovernanceQueueSource {
+  id: string;
+  type: AdminGovernanceQueueType;
+  status: string;
+  projectId?: string;
+  ownerRole?: UserRole | string;
+  assignedRole?: UserRole | string;
+  dueAt?: string;
+  createdAt?: string;
+  severity?: AdminGovernanceQueueSeverity;
+  blockedReason?: string;
+  humanGateRequired?: boolean;
+  aiGenerated?: boolean;
+  personalDataPresent?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AdminGovernanceQueueItem {
+  id: string;
+  type: AdminGovernanceQueueType;
+  status: string;
+  projectId?: string;
+  ownerRole?: UserRole | string;
+  assignedRole?: UserRole | string;
+  dueAt?: string;
+  createdAt?: string;
+  severity: AdminGovernanceQueueSeverity;
+  priority: number;
+  blocked: boolean;
+  blockedReason?: string;
+  requiresHumanGate: boolean;
+  aiMayNotResolve: boolean;
+  redactedForAdminSummary: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface AdminGovernanceQueueSummary {
+  generatedAt: string;
+  totalOpen: number;
+  countsByType: Record<AdminGovernanceQueueType, number>;
+  blockedCount: number;
+  overdueCount: number;
+  criticalCount: number;
+  humanGateRequiredCount: number;
+  aiMayNotResolve: true;
+  items: AdminGovernanceQueueItem[];
+}
+
+const ADMIN_QUEUE_TYPES: AdminGovernanceQueueType[] = [
+  'human_approval',
+  'dispute',
+  'payment',
+  'ai_review',
+  'statutory_sync',
+  'audit_exception',
+];
+
+const CLOSED_ADMIN_QUEUE_STATUSES = new Set(['closed', 'resolved', 'dismissed', 'cancelled', 'approved', 'rejected']);
+
+const SEVERITY_PRIORITY: Record<AdminGovernanceQueueSeverity, number> = {
+  critical: 400,
+  high: 300,
+  medium: 200,
+  low: 100,
+};
+
+function isAdminQueueOpen(status: string): boolean {
+  return !CLOSED_ADMIN_QUEUE_STATUSES.has(status.trim().toLowerCase());
+}
+
+function normalizeAdminQueueSeverity(
+  source: AdminGovernanceQueueSource,
+  now: Date,
+): AdminGovernanceQueueSeverity {
+  if (source.severity) return source.severity;
+  if (source.blockedReason) return 'high';
+  if (source.dueAt && new Date(source.dueAt).getTime() < now.getTime()) return 'high';
+  if (source.type === 'dispute' || source.type === 'payment' || source.type === 'audit_exception') return 'high';
+  if (source.type === 'ai_review' || source.type === 'statutory_sync') return 'medium';
+  return 'low';
+}
+
+function buildAdminQueuePriority(
+  item: Pick<AdminGovernanceQueueItem, 'severity' | 'blocked' | 'dueAt' | 'createdAt'>,
+  now: Date,
+): number {
+  const dueAt = item.dueAt ? new Date(item.dueAt).getTime() : undefined;
+  const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : undefined;
+  const overdueBoost = dueAt && dueAt < now.getTime() ? 80 : 0;
+  const blockedBoost = item.blocked ? 60 : 0;
+  const ageBoost = createdAt ? Math.min(50, Math.max(0, Math.floor((now.getTime() - createdAt) / 86_400_000))) : 0;
+  return SEVERITY_PRIORITY[item.severity] + overdueBoost + blockedBoost + ageBoost;
+}
+
+export function buildAdminGovernanceQueueSummary(
+  sources: AdminGovernanceQueueSource[],
+  now = new Date(),
+): AdminGovernanceQueueSummary {
+  const countsByType = Object.fromEntries(ADMIN_QUEUE_TYPES.map(type => [type, 0])) as Record<AdminGovernanceQueueType, number>;
+
+  const items = sources
+    .filter(source => isAdminQueueOpen(source.status))
+    .map((source): AdminGovernanceQueueItem => {
+      if (!source.id?.trim()) throw new Error('Admin governance queue source id is required');
+      const severity = normalizeAdminQueueSeverity(source, now);
+      const blocked = Boolean(source.blockedReason);
+      const requiresHumanGate = source.humanGateRequired !== false || source.type === 'ai_review' || source.type === 'statutory_sync';
+      const item: AdminGovernanceQueueItem = {
+        id: source.id,
+        type: source.type,
+        status: source.status,
+        projectId: source.projectId,
+        ownerRole: source.ownerRole,
+        assignedRole: source.assignedRole,
+        dueAt: source.dueAt,
+        createdAt: source.createdAt,
+        severity,
+        priority: 0,
+        blocked,
+        blockedReason: source.blockedReason,
+        requiresHumanGate,
+        aiMayNotResolve: source.aiGenerated === true || requiresHumanGate,
+        redactedForAdminSummary: source.personalDataPresent !== false,
+        metadata: source.metadata || {},
+      };
+      return { ...item, priority: buildAdminQueuePriority(item, now) };
+    })
+    .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+
+  for (const item of items) countsByType[item.type] += 1;
+
+  return {
+    generatedAt: now.toISOString(),
+    totalOpen: items.length,
+    countsByType,
+    blockedCount: items.filter(item => item.blocked).length,
+    overdueCount: items.filter(item => item.dueAt && new Date(item.dueAt).getTime() < now.getTime()).length,
+    criticalCount: items.filter(item => item.severity === 'critical').length,
+    humanGateRequiredCount: items.filter(item => item.requiresHumanGate).length,
+    aiMayNotResolve: true,
+    items,
+  };
+}
