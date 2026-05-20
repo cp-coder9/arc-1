@@ -40,7 +40,7 @@ test.describe('Onboarding Flow', () => {
     await page.locator('input[name="region"]').fill('Gauteng');
     await page.getByPlaceholder('ST123456').fill('ST123456');
     await page.locator('select[name="mainSpecialization"]').selectOption('Residential');
-    await page.getByRole('button', { name: 'Finish Setup' }).click();
+    await page.getByRole('button', { name: 'Complete Profile' }).click();
 
     await expect(page.getByText('Create your account')).toBeVisible();
     await expect(page.getByPlaceholder('John Doe')).toBeVisible();
