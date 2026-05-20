@@ -84,6 +84,15 @@ const router = express.Router();
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_FORM_WEBHOOK_PATHS = new Set(["/payment/notify"]);
+const TRUSTED_STATIC_APP_ORIGINS = new Set([
+  "https://" + "architex.co.za",
+  "https://" + "www." + "architex.co.za",
+  "https://" + "test." + "architex.co.za",
+]);
+const TRUSTED_API_HOSTS = new Set([
+  "api." + "architex.co.za",
+  "architex-marketplace" + ".vercel.app",
+]);
 const BROWSER_FORM_CONTENT_TYPES = [
   "application/x-www-form-urlencoded",
   "multipart/form-data",
@@ -95,6 +104,18 @@ function isBrowserFormSubmission(req: express.Request): boolean {
   return BROWSER_FORM_CONTENT_TYPES.some((browserFormType) => contentType.startsWith(browserFormType));
 }
 
+function isTrustedApiHost(host: string): boolean {
+  const hostname = host.split(":")[0]?.toLowerCase();
+  return TRUSTED_API_HOSTS.has(hostname) || hostname.endsWith(".vercel.app");
+}
+
+function isTrustedStaticToApiOrigin(origin: string, host: string): boolean {
+  try {
+    return TRUSTED_STATIC_APP_ORIGINS.has(new URL(origin).origin) && isTrustedApiHost(host);
+  } catch {
+    return false;
+  }
+}
 
 function sameOriginGuard(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (SAFE_METHODS.has(req.method)) return next();
@@ -113,7 +134,7 @@ function sameOriginGuard(req: express.Request, res: express.Response, next: expr
 
   try {
     const requestOrigin = `${protocol}://${host}`;
-    if (new URL(origin).origin !== new URL(requestOrigin).origin) {
+    if (new URL(origin).origin !== new URL(requestOrigin).origin && !isTrustedStaticToApiOrigin(origin, host)) {
       return res.status(403).json({ error: "Cross-origin state-changing request blocked" });
     }
   } catch {

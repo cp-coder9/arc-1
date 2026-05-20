@@ -348,6 +348,27 @@ describe('api-router security and high-value integration routes', () => {
     }
   }, 20_000);
 
+
+  it('allows trusted static app origins to call the hosted API domain for state-changing routes', async () => {
+    vi.useRealTimers();
+    const app = await buildApp();
+
+    try {
+      const response = await request(app)
+        .post('/api/auth/check-admin')
+        .set('Authorization', 'Bearer client')
+        .set('Origin', 'https://test.architex.co.za')
+        .set('Host', 'api.architex.co.za')
+        .send({ role: 'client' });
+
+      expect(response.status).not.toBe(403);
+      expect(verifyIdToken).toHaveBeenCalled();
+    } finally {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    }
+  }, 20_000);
+
   it('blocks originless browser form submissions except trusted webhooks', async () => {
     vi.useRealTimers();
     const app = await buildApp();
