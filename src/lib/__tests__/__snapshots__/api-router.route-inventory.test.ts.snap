@@ -76,6 +76,18 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
   },
   {
     "authExpectation": "authenticated",
+    "canonicalPath": "/governance/records",
+    "domain": "governance",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/governance/records",
+    "domain": "governance",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
     "canonicalPath": "/users/:userId/profile",
     "domain": "profile",
     "method": "put",

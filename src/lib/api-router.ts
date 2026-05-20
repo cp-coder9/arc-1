@@ -35,6 +35,11 @@ import {
   type HumanSignOffInput,
 } from "../services/aiGovernanceService";
 import {
+  buildGovernanceAuditInput,
+  buildGovernanceRecord,
+  type GovernanceRecordType,
+} from "../services/governanceService";
+import {
   buildBriefInterpretation,
   buildProjectAttachmentMetadata,
   buildProjectBrief,
@@ -1568,6 +1573,62 @@ router.put("/profile/me", async (req, res) => {
       metadata: { fields: Object.keys(profileData), directoryProjected: Boolean(directoryProfile) },
     });
     res.json({ profile: updatedProfile, directoryProfile });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post(["/governance/records", "/api/governance/records"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const subjectUserId = typeof req.body.subjectUserId === 'string' && req.body.subjectUserId.trim()
+      ? req.body.subjectUserId.trim()
+      : authContext.uid;
+    if (subjectUserId !== authContext.uid && !authContext.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required to create governance records for another user' });
+    }
+
+    const record = buildGovernanceRecord({
+      type: req.body.type as GovernanceRecordType,
+      subjectUserId,
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      version: String(req.body.version || '').trim(),
+      status: req.body.status,
+      projectId: typeof req.body.projectId === 'string' ? req.body.projectId.trim() : undefined,
+      purpose: typeof req.body.purpose === 'string' ? req.body.purpose.trim() : undefined,
+      evidenceUri: typeof req.body.evidenceUri === 'string' ? req.body.evidenceUri.trim() : undefined,
+      evidenceHash: typeof req.body.evidenceHash === 'string' ? req.body.evidenceHash.trim() : undefined,
+      expiresAt: typeof req.body.expiresAt === 'string' ? req.body.expiresAt.trim() : undefined,
+      metadata: req.body.metadata && typeof req.body.metadata === 'object' && !Array.isArray(req.body.metadata) ? req.body.metadata : {},
+    });
+
+    const recordRef = adminDb.collection('governance_records').doc();
+    await recordRef.set({ id: recordRef.id, ...record });
+    const auditInput = buildGovernanceAuditInput(record);
+    await recordAuditEvent(req, auditInput);
+    res.status(201).json({ record: { id: recordRef.id, ...record } });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get(["/governance/records", "/api/governance/records"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const requestedUserId = typeof req.query.subjectUserId === 'string' && req.query.subjectUserId.trim()
+      ? req.query.subjectUserId.trim()
+      : authContext.uid;
+    if (requestedUserId !== authContext.uid && !authContext.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required to list another user governance records' });
+    }
+
+    const recordsSnap = await adminDb
+      .collection('governance_records')
+      .where('subjectUserId', '==', requestedUserId)
+      .limit(100)
+      .get();
+    const records = recordsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json({ records });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

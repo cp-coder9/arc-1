@@ -56,6 +56,7 @@ function domainFor(path: string) {
   if (normalized === '/health' || normalized === '/firebase/test') return 'platform';
   if (normalized.startsWith('/auth/')) return 'auth';
   if (normalized.startsWith('/profile/') || normalized.startsWith('/users/') || normalized.startsWith('/admin/users/')) return 'profile';
+  if (normalized.startsWith('/governance/')) return 'governance';
   if (normalized.startsWith('/directory/')) return 'directory';
   if (normalized.startsWith('/project-briefs') || normalized.startsWith('/client-briefs')) return 'briefs';
   if (normalized.startsWith('/projects/')) return 'projects';
@@ -124,7 +125,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(96);
+    expect(inventory).toHaveLength(98);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -139,6 +140,8 @@ describe('api-router route inventory', () => {
         "POST /auth/check-admin",
         "GET /profile/me",
         "PUT /profile/me",
+        "POST /governance/records",
+        "GET /governance/records",
         "PUT /users/:userId/profile",
         "PUT /admin/users/:userId/profile",
         "POST /client-briefs",
