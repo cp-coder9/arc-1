@@ -840,8 +840,8 @@ export interface KnowledgeCitation {
 // --- Project Lifecycle Types ------------------------------------------------
 
 /**
- * The 9-stage project lifecycle from Intake to Close-out.
- * Each stage represents a major phase in the architectural project delivery process.
+ * The PRD canonical 8-stage project lifecycle from Brief through Close-Out.
+ * `scoping` remains a legacy value for existing project documents and maps to the Brief stage.
  */
 export type ProjectStage =
   | 'intake'
@@ -857,7 +857,6 @@ export type ProjectStage =
 /** Canonical ordering of project stages (forward-only transitions). */
 export const PROJECT_STAGE_ORDER: ProjectStage[] = [
   'intake',
-  'scoping',
   'appointment',
   'coordination',
   'compliance',
@@ -869,15 +868,15 @@ export const PROJECT_STAGE_ORDER: ProjectStage[] = [
 
 /** Human-readable labels for each project stage. */
 export const PROJECT_STAGE_LABELS: Record<ProjectStage, string> = {
-  intake: 'Intake',
-  scoping: 'Scoping & Briefing',
-  appointment: 'Appointment',
-  coordination: 'Design Coordination',
-  compliance: 'Compliance Review',
+  intake: 'Brief & Diagnostic',
+  scoping: 'Brief & Diagnostic (Legacy Scoping)',
+  appointment: 'Team Appointment',
+  coordination: 'Design & Coordination',
+  compliance: 'Compliance & Municipal',
   tender: 'Tender & Procurement',
   delivery: 'Construction Delivery',
-  payments: 'Payments & Escrow',
-  closeout: 'Close-out',
+  payments: 'Payments & Governance',
+  closeout: 'Close-Out & Handover',
 };
 
 /** Icon names (lucide-react) for each project stage. */

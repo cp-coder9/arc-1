@@ -9,16 +9,16 @@ import { ProjectStage, PROJECT_STAGE_ORDER } from '../../types';
 
 describe('projectLifecycleService', () => {
   describe('stageIndex', () => {
-    it('returns correct index for each stage', () => {
+    it('returns correct index for each PRD canonical stage and treats scoping as legacy brief stage', () => {
       expect(stageIndex('intake')).toBe(0);
-      expect(stageIndex('scoping')).toBe(1);
-      expect(stageIndex('appointment')).toBe(2);
-      expect(stageIndex('coordination')).toBe(3);
-      expect(stageIndex('compliance')).toBe(4);
-      expect(stageIndex('tender')).toBe(5);
-      expect(stageIndex('delivery')).toBe(6);
-      expect(stageIndex('payments')).toBe(7);
-      expect(stageIndex('closeout')).toBe(8);
+      expect(stageIndex('scoping')).toBe(0);
+      expect(stageIndex('appointment')).toBe(1);
+      expect(stageIndex('coordination')).toBe(2);
+      expect(stageIndex('compliance')).toBe(3);
+      expect(stageIndex('tender')).toBe(4);
+      expect(stageIndex('delivery')).toBe(5);
+      expect(stageIndex('payments')).toBe(6);
+      expect(stageIndex('closeout')).toBe(7);
     });
 
     it('returns -1 for an invalid stage', () => {
@@ -27,8 +27,8 @@ describe('projectLifecycleService', () => {
   });
 
   describe('canTransition', () => {
-    it('allows forward transitions of exactly one step', () => {
-      expect(canTransition('intake', 'scoping')).toBe(true);
+    it('allows forward transitions of exactly one PRD stage and supports legacy scoping records', () => {
+      expect(canTransition('intake', 'appointment')).toBe(true);
       expect(canTransition('scoping', 'appointment')).toBe(true);
       expect(canTransition('appointment', 'coordination')).toBe(true);
       expect(canTransition('coordination', 'compliance')).toBe(true);
@@ -39,19 +39,22 @@ describe('projectLifecycleService', () => {
     });
 
     it('disallows backward transitions', () => {
-      expect(canTransition('scoping', 'intake')).toBe(false);
+      expect(canTransition('appointment', 'intake')).toBe(false);
+      expect(canTransition('appointment', 'scoping')).toBe(false);
       expect(canTransition('closeout', 'intake')).toBe(false);
       expect(canTransition('delivery', 'tender')).toBe(false);
     });
 
     it('disallows self-transitions', () => {
       expect(canTransition('intake', 'intake')).toBe(false);
+      expect(canTransition('scoping', 'scoping')).toBe(false);
       expect(canTransition('compliance', 'compliance')).toBe(false);
     });
 
-    it('disallows skipping stages for non-admin', () => {
-      expect(canTransition('intake', 'appointment')).toBe(false);
-      expect(canTransition('intake', 'compliance')).toBe(false);
+    it('disallows non-canonical scoping transitions and skipping stages for non-admin', () => {
+      expect(canTransition('intake', 'scoping')).toBe(false);
+      expect(canTransition('intake', 'coordination')).toBe(false);
+      expect(canTransition('appointment', 'compliance')).toBe(false);
       expect(canTransition('scoping', 'tender')).toBe(false);
     });
 
@@ -68,13 +71,13 @@ describe('projectLifecycleService', () => {
     });
 
     it('handles invalid stage gracefully', () => {
-      expect(canTransition('invalid' as ProjectStage, 'scoping')).toBe(false);
+      expect(canTransition('invalid' as ProjectStage, 'appointment')).toBe(false);
       expect(canTransition('intake', 'invalid' as ProjectStage)).toBe(false);
     });
   });
 
   describe('stageToJobStatus', () => {
-    it('maps intake and scoping to "open"', () => {
+    it('maps the PRD brief stage and legacy scoping records to "open"', () => {
       expect(stageToJobStatus('intake')).toBe('open');
       expect(stageToJobStatus('scoping')).toBe('open');
     });
@@ -94,21 +97,22 @@ describe('projectLifecycleService', () => {
   });
 
   describe('PROJECT_STAGE_ORDER', () => {
-    it('has exactly 9 stages', () => {
-      expect(PROJECT_STAGE_ORDER).toHaveLength(9);
+    it('has exactly the 8 canonical PRD stages', () => {
+      expect(PROJECT_STAGE_ORDER).toHaveLength(8);
     });
 
     it('starts with intake and ends with closeout', () => {
       expect(PROJECT_STAGE_ORDER[0]).toBe('intake');
-      expect(PROJECT_STAGE_ORDER[8]).toBe('closeout');
+      expect(PROJECT_STAGE_ORDER[7]).toBe('closeout');
     });
 
-    it('contains all defined stages', () => {
+    it('contains all PRD canonical stages and excludes legacy scoping', () => {
       const expected: ProjectStage[] = [
-        'intake', 'scoping', 'appointment', 'coordination',
+        'intake', 'appointment', 'coordination',
         'compliance', 'tender', 'delivery', 'payments', 'closeout'
       ];
       expect(PROJECT_STAGE_ORDER).toEqual(expected);
+      expect(PROJECT_STAGE_ORDER).not.toContain('scoping');
     });
   });
 });

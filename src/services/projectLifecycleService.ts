@@ -28,6 +28,7 @@ import {
  * Returns the 0-based index of a stage, or -1 if not found.
  */
 export function stageIndex(stage: ProjectStage): number {
+  if (stage === 'scoping') return PROJECT_STAGE_ORDER.indexOf('intake');
   return PROJECT_STAGE_ORDER.indexOf(stage);
 }
 
@@ -47,10 +48,12 @@ export function canTransition(
   const targetIdx = stageIndex(target);
 
   if (currentIdx === -1 || targetIdx === -1) return false;
-  if (targetIdx <= currentIdx) return false; // no backward or self-transition
+  if (current === target) return false; // no self-transition, including legacy scoping records
+  if (target === 'scoping') return false; // scoping is a legacy alias for the PRD Brief stage, not a canonical target
+  if (targetIdx <= currentIdx) return false; // no backward transition
 
   if (isAdminOverride) return true; // admin can skip ahead
-  return targetIdx === currentIdx + 1; // normal: exactly one step forward
+  return targetIdx === currentIdx + 1; // normal: exactly one canonical PRD stage forward
 }
 
 /**
