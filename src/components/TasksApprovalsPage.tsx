@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, collectionGroup, limit, onSnapshot, query, updateDoc, where, doc } from 'firebase/firestore';
+import { addDoc, collection, collectionGroup, limit, onSnapshot, query, type DocumentData, type Query, updateDoc, where, doc } from 'firebase/firestore';
 import { CheckCircle2, ClipboardCheck, Clock, Loader2, Plus, UserCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, JobCard, Project, UserProfile } from '@/types';
@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 type LoadState = 'loading' | 'ready' | 'error';
 type ApprovalRecord = { id: string; projectId?: string; jobId?: string; title?: string; description?: string; status?: string; requestedBy?: string; assignedTo?: string; dueDate?: string; createdAt?: string; category?: string };
@@ -26,20 +27,29 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function jobsForUser(user: UserProfile) {
+function jobsForUser(user: UserProfile): Query<DocumentData>[] {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, limit(25));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
-  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
-  return query(jobs, where('status', '==', 'open'), limit(25));
+  if (user.role === 'admin') return [query(jobs, limit(25))];
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(25)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(25)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(25)),
+  ];
+  if (user.role === 'freelancer') return [query(jobs, where('selectedArchitectId', '==', user.uid), limit(25))];
+  return [query(jobs, where('status', '==', 'open'), limit(25))];
 }
 
-function projectsForUser(user: UserProfile) {
+function projectsForUser(user: UserProfile): Query<DocumentData>[] {
   const projects = collection(db, 'projects');
-  if (user.role === 'admin') return query(projects, limit(25));
-  if (user.role === 'client') return query(projects, where('clientId', '==', user.uid), limit(25));
-  if (user.role === 'architect' || user.role === 'bep') return query(projects, where('leadArchitectId', '==', user.uid), limit(25));
-  return null;
+  if (user.role === 'admin') return [query(projects, limit(25))];
+  if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(projects, where('leadProfessionalId', '==', user.uid), limit(25)),
+    query(projects, where('leadBepId', '==', user.uid), limit(25)),
+    query(projects, where('leadArchitectId', '==', user.uid), limit(25)),
+  ];
+  return [];
 }
 
 function statusVariant(status?: string) {
@@ -67,15 +77,15 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setState('loading');
-    const unsubJobs = onSnapshot(jobsForUser(user), (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
+    const unsubJobs = subscribeToMergedQuerySnapshots<Job>(jobsForUser(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+      setJobs(sortByRecent(items));
       setState('ready');
     }, (error) => {
       console.error('Failed to load task jobs:', error);
       setState('error');
     });
-    const projectQuery = projectsForUser(user);
-    const unsubProjects = projectQuery ? onSnapshot(projectQuery, (snapshot) => setProjects(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)))), (error) => console.warn('Task project projection unavailable; continuing without projects:', error)) : null;
+    const projectQueries = projectsForUser(user);
+    const unsubProjects = projectQueries.length > 0 ? subscribeToMergedQuerySnapshots<Project>(projectQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project), (items) => setProjects(sortByRecent(items)), (error) => console.warn('Task project projection unavailable; continuing without projects:', error)) : null;
     return () => { unsubJobs(); unsubProjects?.(); };
   }, [user]);
 

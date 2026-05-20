@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, limit, onSnapshot, query, where } from 'firebase/firestore';
+import { addDoc, collection, limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
 import { Loader2, MessageCircle, Send, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, Message, UserProfile } from '@/types';
@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -33,17 +34,26 @@ function sortByOldest<T extends { createdAt?: unknown }>(items: T[]) {
   return [...items].sort((a, b) => timestampMs(a.createdAt) - timestampMs(b.createdAt));
 }
 
-function jobsForUser(user: UserProfile) {
+function jobsForUser(user: UserProfile): Query<DocumentData>[] {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, limit(40));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(40));
-  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(40));
-  return query(jobs, where('status', '==', 'open'), limit(40));
+  if (user.role === 'admin') return [query(jobs, limit(40))];
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(40))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(40)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(40)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(40)),
+  ];
+  if (user.role === 'freelancer') return [query(jobs, where('selectedArchitectId', '==', user.uid), limit(40))];
+  return [query(jobs, where('status', '==', 'open'), limit(40))];
+}
+
+function selectedProfessionalId(job?: Job) {
+  return String((job as unknown as Record<string, unknown> | undefined)?.selectedProfessionalId ?? (job as unknown as Record<string, unknown> | undefined)?.selectedBepId ?? job?.selectedArchitectId ?? '');
 }
 
 function scopeForJob(user: UserProfile, job?: Job): MessageScope {
   if (!job) return { canSend: false, reason: 'Select a live project or job before opening a governed message thread.' };
-  if (job.clientId === user.uid || job.selectedArchitectId === user.uid) return { canSend: true, reason: 'You are a live project participant for this thread.' };
+  if (job.clientId === user.uid || selectedProfessionalId(job) === user.uid) return { canSend: true, reason: 'You are a live project participant for this thread.' };
   if (user.role === 'admin') return { canSend: false, reason: 'Admins can monitor visible job context here, but do not impersonate project participants in client/BEP threads.' };
   return { canSend: false, reason: 'This role needs a live appointment, package award, or project-team link before direct project messaging is enabled.' };
 }
@@ -64,8 +74,8 @@ export default function ProjectMessengerPage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setState('loading');
-    const unsubscribe = onSnapshot(jobsForUser(user), (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
+    const unsubscribe = subscribeToMergedQuerySnapshots<Job>(jobsForUser(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+      setJobs(sortByRecent(items));
       setState('ready');
     }, (error) => {
       console.warn('Project messenger jobs unavailable; continuing without job context:', error);
