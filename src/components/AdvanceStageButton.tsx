@@ -3,7 +3,7 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { PROJECT_STAGE_LABELS, PROJECT_STAGE_ORDER, Project } from '../types';
-import { transitionStage } from '../services/projectLifecycleService';
+import { evaluateStageGateTransition, transitionStage } from '../services/projectLifecycleService';
 
 interface AdvanceStageButtonProps {
   project: Project;
@@ -17,10 +17,25 @@ export default function AdvanceStageButton({ project, actorId, className, varian
   const [isAdvancing, setIsAdvancing] = useState(false);
   const currentIndex = PROJECT_STAGE_ORDER.indexOf(project.currentStage);
   const nextStage = currentIndex >= 0 ? PROJECT_STAGE_ORDER[currentIndex + 1] : undefined;
+  const gateEvaluation = nextStage
+    ? evaluateStageGateTransition(project.currentStage, nextStage, project.stageGateEvidence || {})
+    : undefined;
+  const missingGateSummary = gateEvaluation?.missingRequirements
+    .map(requirement => `• ${requirement.label}: ${requirement.reason}`)
+    .join('\n');
 
   if (!nextStage) return null;
 
   const handleAdvance = async () => {
+    if (gateEvaluation && !gateEvaluation.transitionAllowed) {
+      const message = gateEvaluation.missingRequirements.length > 0
+        ? `This project cannot advance to ${PROJECT_STAGE_LABELS[nextStage]} yet. Missing stage-gate evidence:\n${missingGateSummary}`
+        : `This project cannot advance from ${PROJECT_STAGE_LABELS[project.currentStage]} to ${PROJECT_STAGE_LABELS[nextStage]}.`;
+      toast.error(message);
+      window.alert(message);
+      return;
+    }
+
     const confirmed = window.confirm(
       `Advance this project from ${PROJECT_STAGE_LABELS[project.currentStage]} to ${PROJECT_STAGE_LABELS[nextStage]}?`
     );
@@ -47,6 +62,7 @@ export default function AdvanceStageButton({ project, actorId, className, varian
       type="button"
       onClick={handleAdvance}
       disabled={isAdvancing}
+      title={missingGateSummary || undefined}
       className={className || 'rounded-full font-bold gap-2'}
       variant={variant}
       size={size}
