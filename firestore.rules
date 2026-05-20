@@ -27,6 +27,30 @@ service cloud.firestore {
         (getUserData() != null && getUserData().role == 'admin')
       );
     }
+
+    function isSelectedProfessionalJob(jobData) {
+      return isAuthenticated() && (
+        jobData.selectedProfessionalId == request.auth.uid ||
+        jobData.selectedBepId == request.auth.uid ||
+        jobData.selectedArchitectId == request.auth.uid
+      );
+    }
+
+    function isApplicationProfessional(applicationData) {
+      return isAuthenticated() && (
+        applicationData.professionalId == request.auth.uid ||
+        applicationData.bepId == request.auth.uid ||
+        applicationData.architectId == request.auth.uid
+      );
+    }
+
+    function isLeadProfessionalProject(projectData) {
+      return isAuthenticated() && (
+        projectData.leadProfessionalId == request.auth.uid ||
+        projectData.leadBepId == request.auth.uid ||
+        projectData.leadArchitectId == request.auth.uid
+      );
+    }
     
     function isVerifiedArchitect() {
       return isAuthenticated() &&
@@ -37,7 +61,7 @@ service cloud.firestore {
     function isProjectParticipant(jobId) {
       return isAuthenticated() && (
         getJob(jobId).data.clientId == request.auth.uid ||
-        getJob(jobId).data.selectedArchitectId == request.auth.uid ||
+        isSelectedProfessionalJob(getJob(jobId).data) ||
         isAdmin()
       );
     }
@@ -82,7 +106,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         isAdmin() ||
         projectData.clientId == request.auth.uid ||
-        projectData.leadArchitectId == request.auth.uid ||
+        isLeadProfessionalProject(projectData) ||
         isProjectTeamMember(projectData) ||
         (projectData.firmAccessEnabled == true && isActiveFirmMember(projectData.firmId))
       );
@@ -103,7 +127,7 @@ service cloud.firestore {
     }
 
     function isLeadArchitect(projectData) {
-      return isAuthenticated() && projectData.leadArchitectId == request.auth.uid;
+      return isLeadProfessionalProject(projectData);
     }
 
     function isTeamRosterUpdate() {
@@ -134,7 +158,7 @@ service cloud.firestore {
       return canReadProject(projectId) && (
         isAdmin() ||
         getProject(projectId).data.clientId == request.auth.uid ||
-        getProject(projectId).data.leadArchitectId == request.auth.uid
+        isLeadProfessionalProject(getProject(projectId).data)
       );
     }
 
@@ -151,10 +175,10 @@ service cloud.firestore {
         getProject(projectId).data.jobId == jobId && (
           isAdmin() ||
           getProject(projectId).data.clientId == request.auth.uid ||
-          getProject(projectId).data.leadArchitectId == request.auth.uid ||
+          isLeadProfessionalProject(getProject(projectId).data) ||
           isProjectTeamMember(getProject(projectId).data) ||
           getJob(jobId).data.clientId == request.auth.uid ||
-          getJob(jobId).data.selectedArchitectId == request.auth.uid
+          isSelectedProfessionalJob(getJob(jobId).data)
         );
     }
 
@@ -176,6 +200,7 @@ service cloud.firestore {
         data.ownerId == request.auth.uid ||
         data.contractorId == request.auth.uid ||
         data.architectId == request.auth.uid ||
+        data.bepId == request.auth.uid ||
         data.assigneeId == request.auth.uid ||
         data.assignedTo == request.auth.uid ||
         data.clientId == request.auth.uid ||
@@ -207,6 +232,8 @@ service cloud.firestore {
         data.ownerId == request.auth.uid ||
         data.contractorId == request.auth.uid ||
         data.architectId == request.auth.uid ||
+        data.bepId == request.auth.uid ||
+        data.professionalId == request.auth.uid ||
         data.fromUserId == request.auth.uid ||
         (data.participantIds is list && data.participantIds.hasAny([request.auth.uid])) ||
         (data.projectId is string && canReadProject(data.projectId))
@@ -280,7 +307,7 @@ service cloud.firestore {
     }
 
     function isBepDeliverableReviewPatch() {
-      return resource.data.architectId == request.auth.uid &&
+      return isApplicationProfessional(resource.data) &&
         resource.data.submissionStatus == 'submitted' &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status',
@@ -503,11 +530,11 @@ service cloud.firestore {
     }
 
     match /delegatedTasks/{taskId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.architectId == request.auth.uid &&
+      allow read: if isAuthenticated() && (isAdmin() || isApplicationProfessional(resource.data) || resource.data.assigneeId == request.auth.uid);
+      allow create: if isAuthenticated() && isApplicationProfessional(request.resource.data) &&
         request.resource.data.humanApprovalRequired == true;
       allow update: if isAuthenticated() && (
-        ((resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid) && isLegacyTaskStatusPatch()) ||
+        ((isApplicationProfessional(resource.data) || resource.data.assigneeId == request.auth.uid) && isLegacyTaskStatusPatch()) ||
         isFreelancerDeliverableSubmissionPatch() ||
         isBepDeliverableReviewPatch()
       );
@@ -745,7 +772,7 @@ service cloud.firestore {
       allow read: if (resource.data.status == 'open') || 
                    (isAuthenticated() && (
                      resource.data.clientId == request.auth.uid ||
-                     resource.data.selectedArchitectId == request.auth.uid ||
+                     isSelectedProfessionalJob(resource.data) ||
                      isAdmin()
                    ));
       allow create: if isAuthenticated() && hasRole('client') &&
@@ -755,8 +782,8 @@ service cloud.firestore {
         isAdmin() ||
         (resource.data.clientId == request.auth.uid &&
           request.resource.data.clientId == resource.data.clientId &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'requirements', 'deadline', 'budget', 'category', 'location', 'status', 'selectedArchitectId', 'updatedAt', 'cancelledAt', 'cancellationReason', 'statusHistory'])) ||
-        (resource.data.selectedArchitectId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'requirements', 'deadline', 'budget', 'category', 'location', 'status', 'selectedProfessionalId', 'selectedBepId', 'selectedArchitectId', 'updatedAt', 'cancelledAt', 'cancellationReason', 'statusHistory'])) ||
+        (isSelectedProfessionalJob(resource.data) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'statusHistory']))
       );
       allow delete: if isAdmin();
@@ -766,14 +793,14 @@ service cloud.firestore {
         allow read: if isAuthenticated() && (
           isAdmin() ||
           getJob(jobId).data.clientId == request.auth.uid ||
-          resource.data.architectId == request.auth.uid
+          isApplicationProfessional(resource.data)
         );
         allow create: if isAuthenticated() && 
           (hasRole('architect') || hasRole('bep')) &&
-          request.resource.data.architectId == request.auth.uid;
+          isApplicationProfessional(request.resource.data);
         allow update: if isAuthenticated() && (
           (getJob(jobId).data.clientId == request.auth.uid) ||
-          (resource.data.architectId == request.auth.uid &&
+          (isApplicationProfessional(resource.data) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'withdrawnAt', 'notes', 'updatedAt'])) ||
           isAdmin()
         );
@@ -788,16 +815,16 @@ service cloud.firestore {
           resource.data.architectId == request.auth.uid
         );
         allow create: if isAuthenticated() && (
-          (hasRole('architect') &&
-            request.resource.data.architectId == request.auth.uid &&
-            getJob(jobId).data.selectedArchitectId == request.auth.uid) ||
+          ((hasRole('architect') || hasRole('bep')) &&
+            isApplicationProfessional(request.resource.data) &&
+            isSelectedProfessionalJob(getJob(jobId).data)) ||
           (hasRole('client') &&
             getJob(jobId).data.clientId == request.auth.uid) ||
           isAdmin()
         );
         allow update: if isAuthenticated() && (
           isAdmin() ||
-          (resource.data.architectId == request.auth.uid && 
+          (isApplicationProfessional(resource.data) && 
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'aiFeedback', 'aiStructuredFeedback', 'findings', 'signOffChecklist', 'riskStatus', 'executionMode', 'visualReportUrl', 'architectComment', 'traceability']))
         );
         allow delete: if false;
@@ -808,19 +835,19 @@ service cloud.firestore {
         allow read: if isAuthenticated() && (
           isAdmin() ||
           getJob(jobId).data.clientId == request.auth.uid ||
-          resource.data.architectId == request.auth.uid ||
+          isApplicationProfessional(resource.data) ||
           resource.data.assigneeId == request.auth.uid
         );
         allow create: if isAuthenticated() && 
-          request.resource.data.architectId == request.auth.uid &&
-          getJob(jobId).data.selectedArchitectId == request.auth.uid;
+          isApplicationProfessional(request.resource.data) &&
+          isSelectedProfessionalJob(getJob(jobId).data);
         allow update: if isAuthenticated() && (
           ((resource.data.architectId == request.auth.uid || resource.data.assigneeId == request.auth.uid) && isLegacyTaskStatusPatch()) ||
           isFreelancerDeliverableSubmissionPatch() ||
           isBepDeliverableReviewPatch()
         );
         allow delete: if isAuthenticated() &&
-          resource.data.architectId == request.auth.uid;
+          isApplicationProfessional(resource.data);
       }
     }
 
@@ -1049,7 +1076,7 @@ service cloud.firestore {
 
     match /{path=**}/applications/{appId} {
       allow read: if isAuthenticated() && (
-        isAdmin() || resource.data.architectId == request.auth.uid
+        isAdmin() || isApplicationProfessional(resource.data)
       );
     }
 
@@ -1082,12 +1109,12 @@ service cloud.firestore {
  allow read: if isAuthenticated() && (
  resource.data.senderId == request.auth.uid ||
  getJob(resource.data.jobId).data.clientId == request.auth.uid ||
- getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid
+ isSelectedProfessionalJob(getJob(resource.data.jobId).data)
  );
  allow create: if isAuthenticated() && (
  request.resource.data.senderId == request.auth.uid &&
  (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
- getJob(request.resource.data.jobId).data.selectedArchitectId == request.auth.uid)
+ isSelectedProfessionalJob(getJob(request.resource.data.jobId).data))
  );
  allow update: if isAuthenticated() && resource.data.senderId != request.auth.uid && (getJob(resource.data.jobId).data.clientId == request.auth.uid || getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
  allow delete: if false;
@@ -1097,10 +1124,15 @@ service cloud.firestore {
     match /conversations/{conversationId} {
       allow read: if isAuthenticated() && (
         resource.data.clientId == request.auth.uid ||
+        resource.data.professionalId == request.auth.uid ||
+        resource.data.bepId == request.auth.uid ||
+        resource.data.professionalId == request.auth.uid ||
         resource.data.architectId == request.auth.uid
       );
       allow create: if isAuthenticated() && (
         request.resource.data.clientId == request.auth.uid ||
+        request.resource.data.professionalId == request.auth.uid ||
+        request.resource.data.bepId == request.auth.uid ||
         request.resource.data.architectId == request.auth.uid
       );
       allow update: if isAuthenticated() && (

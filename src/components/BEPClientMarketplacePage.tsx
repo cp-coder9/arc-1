@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 type ApplicationWithJob = Application & { jobId: string };
 type ApplicationDraft = { proposal: string; feeSummary: string; timeline: string; exclusions: string };
@@ -68,11 +69,14 @@ export default function BEPClientMarketplacePage({ user }: { user: UserProfile }
 
       if (liveJobs.length === 0) setLoading(false);
       liveJobs.forEach((job) => {
-        const appsQuery = query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid), limit(3));
-        const unsubApps = onSnapshot(appsQuery, (appsSnapshot) => {
+        const appQueries = [
+          query(collection(db, `jobs/${job.id}/applications`), where('professionalId', '==', user.uid), limit(3)),
+          query(collection(db, `jobs/${job.id}/applications`), where('bepId', '==', user.uid), limit(3)),
+          query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid), limit(3)),
+        ];
+        const unsubApps = subscribeToMergedQuerySnapshots<ApplicationWithJob>(appQueries, (docSnap) => ({ id: docSnap.id, jobId: job.id, ...docSnap.data() } as ApplicationWithJob), (nextForJob) => {
           setApplications((current) => {
             const withoutJob = current.filter((application) => application.jobId !== job.id);
-            const nextForJob = appsSnapshot.docs.map((docSnap) => ({ id: docSnap.id, jobId: job.id, ...docSnap.data() } as ApplicationWithJob));
             return [...withoutJob, ...nextForJob];
           });
           setLoading(false);
@@ -115,6 +119,8 @@ export default function BEPClientMarketplacePage({ user }: { user: UserProfile }
       const now = new Date().toISOString();
       await addDoc(collection(db, `jobs/${selected.job.id}/applications`), {
         jobId: selected.job.id,
+        professionalId: user.uid,
+        bepId: user.uid,
         architectId: user.uid,
         architectName: user.displayName || user.email || 'Design professional',
         applicantRole: user.role,

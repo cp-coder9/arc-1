@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from
 import { Briefcase, CheckCircle2, Clock, Loader2, Plus, Send, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, JobCard, UserProfile } from '@/types';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -35,8 +36,11 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setState('loading');
-    const jobsUnsub = onSnapshot(query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid)), (snapshot) => {
-      const loadedJobs = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job));
+    const jobsUnsub = subscribeToMergedQuerySnapshots<Job>([
+      query(collection(db, 'jobs'), where('selectedProfessionalId', '==', user.uid)),
+      query(collection(db, 'jobs'), where('selectedBepId', '==', user.uid)),
+      query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid)),
+    ], (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (loadedJobs) => {
       setJobs(loadedJobs);
       setState('ready');
     }, (error) => {
@@ -49,8 +53,12 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
       console.error('Failed to load freelancer directory:', error);
       setState('error');
     });
-    const tasksUnsub = onSnapshot(query(collection(db, 'delegatedTasks'), where('architectId', '==', user.uid)), (snapshot) => {
-      setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as JobCard)));
+    const tasksUnsub = subscribeToMergedQuerySnapshots<JobCard>([
+      query(collection(db, 'delegatedTasks'), where('professionalId', '==', user.uid)),
+      query(collection(db, 'delegatedTasks'), where('bepId', '==', user.uid)),
+      query(collection(db, 'delegatedTasks'), where('architectId', '==', user.uid)),
+    ], (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as JobCard), (items) => {
+      setTasks(items);
     }, (error) => {
       console.error('Failed to load delegated task register:', error);
     });
@@ -83,6 +91,8 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
         id: taskRef.id,
         jobId: selectedJob.id,
         jobTaskId: taskRef.id,
+        professionalId: user.uid,
+        bepId: user.uid,
         architectId: user.uid,
         assigneeId: selectedFreelancer.uid,
         assigneeName: selectedFreelancer.displayName || selectedFreelancer.email || 'Freelancer',

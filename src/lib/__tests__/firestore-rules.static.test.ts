@@ -53,6 +53,19 @@ describe('firestore security rules static regressions', () => {
     expect(rules).toContain("(hasRole('architect') || hasRole('bep'))");
   });
 
+  it('supports BEP professional aliases alongside legacy architect workflow fields', () => {
+    expect(rules).toContain('function isSelectedProfessionalJob(jobData)');
+    expect(rules).toContain('jobData.selectedProfessionalId == request.auth.uid');
+    expect(rules).toContain('jobData.selectedBepId == request.auth.uid');
+    expect(rules).toContain('function isApplicationProfessional(applicationData)');
+    expect(rules).toContain('applicationData.professionalId == request.auth.uid');
+    expect(rules).toContain('applicationData.bepId == request.auth.uid');
+    expect(rules).toContain('function isLeadProfessionalProject(projectData)');
+    expect(rules).toContain('projectData.leadProfessionalId == request.auth.uid');
+    expect(rules).toContain('projectData.leadBepId == request.auth.uid');
+    expect(rules).toContain("'status', 'selectedProfessionalId', 'selectedBepId', 'selectedArchitectId', 'updatedAt'");
+  });
+
   it('requires active contractor verification references for tender bids', () => {
     expect(rules).toContain("hasRole('contractor') || hasRole('subcontractor') || hasRole('supplier')");
     expect(rules).toContain('function isActiveContractorBidVerification(verificationId)');

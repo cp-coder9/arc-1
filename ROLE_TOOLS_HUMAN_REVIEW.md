@@ -627,3 +627,31 @@ Remaining follow-up:
 
 - Continue replacing any residual shell-style surfaces only where a production service/rules path exists.
 - Keep long-term `architect`/`bep` taxonomy reconciliation as a product decision; this pass preserved compatibility.
+
+## 2026-05-20 BEP professional alias read-compatibility pass
+
+Scope:
+- Continue the architect-to-BEP migration after the login role merge by removing remaining query fragility in design-team tools.
+- Preserve legacy `architect` document fields while also supporting current `professional` / `bep` aliases for jobs, applications, projects, delegated tasks, submissions, invoices, disputes, messages, and contracts.
+
+Implemented:
+- Added shared `subscribeToMergedQuerySnapshots` helper so pages can safely combine `selectedProfessionalId`, `selectedBepId`, and legacy `selectedArchitectId` query results without duplicate cards.
+- Migrated the following design-team pages to merged alias queries:
+  - `DisputeResolutionPage`
+  - `BEPFreelancerJobsPage`
+  - `BEPClientMarketplacePage`
+  - `AIDrawingChecker`
+  - `DesignCompliancePage`
+- New BEP/freelancer marketplace and delegated task writes now include `professionalId` and `bepId` alongside legacy `architectId` for backwards compatibility.
+- Firestore rules now include alias helpers for selected professional, application professional, and lead professional access, while keeping legacy architect fields valid.
+
+Validation:
+- `npm run lint`: passed.
+- `npx vitest run src/lib/__tests__/firestore-rules.static.test.ts src/lib/__tests__/dashboard-registry.static.test.ts --testTimeout 20000`: passed, 2 files / 63 tests.
+- `npx playwright test e2e/sidebar-harness.spec.ts --project=chromium --reporter=line`: rerun passed, 8/8 after a full-suite timeout flake.
+
+Deployment status:
+- Not uploaded yet because the harness still cannot reach `test.architex.co.za`, `api.architex.co.za`, cPanel, or FTP as of 2026-05-20T00:53Z. A 30-minute retry has been scheduled.
+
+Human review note:
+- The migration is deliberately additive. Existing legacy architect records keep working while new BEP/design-team records write and read the canonical `professionalId` / `selectedProfessionalId` / `leadProfessionalId` aliases.

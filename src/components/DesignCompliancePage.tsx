@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Loader2, Network, Users } from 'lucide-rea
 import { db } from '@/lib/firebase';
 import type { Job, Project, ProjectTeamMember, UserProfile } from '@/types';
 import { DISCIPLINE_REGISTRY } from '@/types';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 import { subscribeToProjectByJobId } from '@/services/projectLifecycleService';
 import { getDisciplineCoverage, subscribeToTeam } from '@/services/teamService';
 import ResponsibilityMatrix from './ResponsibilityMatrix';
@@ -27,11 +28,15 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function jobsForUser(user: UserProfile) {
+function jobQueriesForUser(user: UserProfile) {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, limit(25));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
-  return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
+  if (user.role === 'admin') return [query(jobs, limit(25))];
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
+  return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(25)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(25)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(25)),
+  ];
 }
 
 export default function DesignCompliancePage({ user }: { user: UserProfile }) {
@@ -43,8 +48,8 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
   const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(jobsForUser(user), (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
+    const unsubscribe = subscribeToMergedQuerySnapshots<Job>(jobQueriesForUser(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+      setJobs(sortByRecent(items));
       setState('ready');
     }, (error) => {
       console.error('Failed to load design compliance jobs:', error);

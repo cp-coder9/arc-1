@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { getSelectedProfessionalId, isSelectedProfessional } from '@/lib/professionalRoleCompatibility';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -25,12 +26,16 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function jobsForUser(user: UserProfile) {
+function jobQueriesForUser(user: UserProfile) {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, limit(40));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(40));
-  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return query(jobs, where('selectedArchitectId', '==', user.uid), limit(40));
-  return query(jobs, where('status', '==', 'open'), limit(40));
+  if (user.role === 'admin') return [query(jobs, limit(40))];
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(40))];
+  if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(40)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(40)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(40)),
+  ];
+  return [query(jobs, where('status', '==', 'open'), limit(40))];
 }
 
 function disputeQueriesForUser(user: UserProfile) {
@@ -72,8 +77,8 @@ export default function DisputeResolutionPage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setJobState('loading');
-    const unsubscribe = onSnapshot(jobsForUser(user), (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
+    const unsubscribe = subscribeToMergedQuerySnapshots<Job>(jobQueriesForUser(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+      setJobs(sortByRecent(items));
       setJobState('ready');
     }, (error) => {
       console.warn('Dispute job context unavailable:', error);

@@ -3,6 +3,7 @@ import { collection, collectionGroup, limit, onSnapshot, query, where } from 'fi
 import { AlertTriangle, Bot, CheckCircle2, Download, FileSearch, FileText, Loader2, ShieldCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, Submission, UserProfile } from '@/types';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 import FileManager from './FileManager';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -23,17 +24,25 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
   return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
 }
 
-function jobQueryForDrawingChecker(user: UserProfile) {
+function jobQueriesForDrawingChecker(user: UserProfile) {
   const jobs = collection(db, 'jobs');
-  if (user.role === 'admin') return query(jobs, limit(25));
-  if (user.role === 'client') return query(jobs, where('clientId', '==', user.uid), limit(25));
-  return query(jobs, where('selectedArchitectId', '==', user.uid), limit(25));
+  if (user.role === 'admin') return [query(jobs, limit(25))];
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
+  return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(25)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(25)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(25)),
+  ];
 }
 
-function submissionQueryForDrawingChecker(user: UserProfile) {
+function submissionQueriesForDrawingChecker(user: UserProfile) {
   const submissions = collectionGroup(db, 'submissions');
-  if (user.role === 'admin') return query(submissions, limit(50));
-  return query(submissions, where('architectId', '==', user.uid), limit(50));
+  if (user.role === 'admin') return [query(submissions, limit(50))];
+  return [
+    query(submissions, where('professionalId', '==', user.uid), limit(50)),
+    query(submissions, where('bepId', '==', user.uid), limit(50)),
+    query(submissions, where('architectId', '==', user.uid), limit(50)),
+  ];
 }
 
 function modeLabel(user: UserProfile) {
@@ -56,15 +65,15 @@ export default function AIDrawingChecker({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setState('loading');
-    const unsubscribeJobs = onSnapshot(jobQueryForDrawingChecker(user), (snapshot) => {
-      setJobs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job))));
+    const unsubscribeJobs = subscribeToMergedQuerySnapshots<Job>(jobQueriesForDrawingChecker(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+      setJobs(sortByRecent(items));
       setState('ready');
     }, (error) => {
       console.error('Failed to load drawing checker jobs:', error);
       setState('error');
     });
-    const unsubscribeSubmissions = onSnapshot(submissionQueryForDrawingChecker(user), (snapshot) => {
-      setSubmissions(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Submission))));
+    const unsubscribeSubmissions = subscribeToMergedQuerySnapshots<Submission>(submissionQueriesForDrawingChecker(user), (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Submission), (items) => {
+      setSubmissions(sortByRecent(items));
     }, (error) => console.error('Failed to load drawing checker submissions:', error));
     return () => {
       unsubscribeJobs();
