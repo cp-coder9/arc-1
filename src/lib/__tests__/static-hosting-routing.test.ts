@@ -18,4 +18,16 @@ describe('static shared-hosting routing guard', () => {
     expect(apiGuardIndex).toBeLessThan(spaFallbackIndex);
     expect(healthGuardIndex).toBeLessThan(spaFallbackIndex);
   });
+
+  it('builds the FTP upload bundle from dist with Apache dotfiles preserved', () => {
+    const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
+    const bundleScriptPath = resolve(process.cwd(), 'scripts/build-static-upload-bundle.mjs');
+    expect(packageJson.scripts?.['deploy:static:bundle']).toContain('scripts/build-static-upload-bundle.mjs');
+    expect(existsSync(bundleScriptPath)).toBe(true);
+
+    const bundleScript = readFileSync(bundleScriptPath, 'utf8');
+    expect(bundleScript).toContain("const requiredDistFiles = ['index.html', '.htaccess'];");
+    expect(bundleScript).toContain('cpSync(distDir, uploadDir');
+    expect(bundleScript).toContain('architex-co-za-upload-bundle.tgz');
+  });
 });
