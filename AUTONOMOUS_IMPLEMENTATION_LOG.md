@@ -228,3 +228,12 @@ Owner instruction: finish the Architex PRD overnight and keep JCode/agents on go
 - Added `src/services/__tests__/providerIntegrationReadinessService.test.ts` covering mock-only status, PayFast reconciliation blocking, supplier adapter approval blocking, and statutory/municipal credential blocking.
 - Validation: `npm test -- src/services/__tests__/providerIntegrationReadinessService.test.ts`; `npm run lint -- --pretty false`.
 - No push/deploy performed.
+
+
+## 2026-05-21 02:06 SAST — Hermes API deployment readiness gate
+- Live state: JCode desktop/serve processes were present with no active npm/vitest/tsc implementation process; only long-running preview/API host processes were active, so Hermes continued the next smallest provider-neutral PRD readiness slice.
+- Added `src/services/apiDeploymentReadinessService.ts` to project `api.architex.co.za` cPanel/API package readiness without uploading, deploying, calling live hosts, or recording secrets.
+- The projection gates cPanel bundle files/scripts, Node hosting enablement, TLS validity, server-only env evidence, JSON smoke evidence, and owner/Hermes-routed approval before production API enablement.
+- Added `src/services/__tests__/apiDeploymentReadinessService.test.ts` covering pass state plus blocked bundle, hosting/TLS, environment secret exposure, smoke, and governance cases.
+- Validation: `npm test -- src/services/__tests__/apiDeploymentReadinessService.test.ts`; `npm run lint -- --pretty false`.
+- No push/deploy performed.
