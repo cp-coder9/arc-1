@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildEscrowAdminReviewRecord, buildEscrowAuditInput, buildEscrowLedgerEntry, evaluateEscrowReleaseGate, type EscrowMilestoneGateInput } from '../escrowGovernanceService';
+import {
+  buildEscrowAdminReviewRecord,
+  buildEscrowAuditInput,
+  buildEscrowLedgerEntry,
+  buildEscrowReleaseApprovalGate,
+  evaluateEscrowReleaseGate,
+  type EscrowMilestoneGateInput,
+} from '../escrowGovernanceService';
 
 const milestone: EscrowMilestoneGateInput = {
   projectId: 'project-1',
@@ -27,6 +34,52 @@ describe('escrowGovernanceService', () => {
     ]));
     expect(evaluation.humanApprovalRequired).toBe(true);
     expect(evaluation.autoReleaseProhibited).toBe(true);
+  });
+
+  it('projects release requests into human approval gates before escrow ledger effects', () => {
+    const projection = buildEscrowReleaseApprovalGate({
+      milestone,
+      requestedBy: { uid: 'bep-1', role: 'bep', verificationStatus: 'verified' },
+      createdAt: '2026-05-22T10:00:00.000Z',
+    });
+
+    expect(projection.escrowEvaluation.readyForAdminReview).toBe(true);
+    expect(projection.approvalGate).toMatchObject({
+      id: 'escrow-release-payment-1',
+      domain: 'payment_release',
+      target: { type: 'escrow_milestone', id: 'payment-1' },
+      requiredApproverRoles: ['client', 'admin'],
+      risk: 'medium',
+      financialImpactCents: 100_000,
+      requiresHumanApproval: true,
+      aiMayNotApprove: true,
+      immutableRequest: true,
+    });
+    expect(projection.approvalReadiness).toMatchObject({
+      ready: true,
+      requiresAdminEscalation: true,
+      aiMayNotApprove: true,
+    });
+  });
+
+  it('keeps blocked escrow releases visible as approval gates with blockers in metadata', () => {
+    const projection = buildEscrowReleaseApprovalGate({
+      milestone: { ...milestone, status: 'funded', evidenceIds: [], certifiedBy: undefined },
+      requestedBy: { uid: 'contractor-1', role: 'contractor' },
+    });
+
+    expect(projection.escrowEvaluation.readyForAdminReview).toBe(false);
+    expect(projection.approvalGate.metadata).toMatchObject({
+      escrowBlockers: expect.arrayContaining([
+        'Milestone must be in release_requested status.',
+        'Release evidence is required.',
+        'Certifier approval is required before admin release review.',
+      ]),
+      autoReleaseProhibited: true,
+    });
+    expect(projection.approvalGate.evidence).toEqual([
+      { id: 'payment-1-missing-evidence', type: 'audit_log', label: 'Escrow release evidence missing' },
+    ]);
   });
 
   it('builds admin approval records only when the release gate is clear', () => {

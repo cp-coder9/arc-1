@@ -1,4 +1,5 @@
-import type { ProjectStage } from '../types';
+import type { ProjectStage, UserRole } from '../types';
+import { buildApprovalGateRecord, evaluateApprovalGateReadiness, type ApprovalGateActor, type ApprovalGateReadiness, type ApprovalGateRecord } from './approvalGateService';
 
 export type EscrowReleaseDecision = 'approved' | 'rejected' | 'hold';
 
@@ -30,6 +31,21 @@ export interface EscrowReleaseGateEvaluation {
   autoReleaseProhibited: true;
 }
 
+export interface EscrowReleaseApprovalGateInput {
+  milestone: EscrowMilestoneGateInput;
+  requestedBy: ApprovalGateActor;
+  requiredApproverRoles?: Array<UserRole | string>;
+  gateId?: string;
+  dueAt?: string;
+  createdAt?: string;
+}
+
+export interface EscrowReleaseApprovalGateProjection {
+  escrowEvaluation: EscrowReleaseGateEvaluation;
+  approvalGate: ApprovalGateRecord;
+  approvalReadiness: ApprovalGateReadiness;
+}
+
 export interface EscrowAdminReviewRecord extends EscrowAdminReviewInput {
   statusAfterDecision: 'release_approved' | 'release_rejected' | 'release_hold';
   createdAt: string;
@@ -45,6 +61,44 @@ function requireString(value: unknown, field: string): string {
 
 function cleanStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map(item => item.trim()) : [];
+}
+
+export function buildEscrowReleaseApprovalGate(input: EscrowReleaseApprovalGateInput): EscrowReleaseApprovalGateProjection {
+  const milestone = input.milestone;
+  const escrowEvaluation = evaluateEscrowReleaseGate(milestone);
+  const evidenceIds = cleanStringArray(milestone.evidenceIds);
+  const approvalGate = buildApprovalGateRecord({
+    id: input.gateId ?? `escrow-release-${milestone.milestoneId}`,
+    domain: payment_release,
+    projectId: milestone.projectId,
+    target: { type: escrow_milestone, id: milestone.milestoneId },
+    requestedBy: input.requestedBy,
+    requiredApproverRoles: input.requiredApproverRoles ?? [client, admin],
+    risk: milestone.amount >= 250_000 ? high : medium,
+    reason: `Escrow release for milestone ${milestone.milestoneId} requires explicit client/admin human approval before ledger effects.`,
+    evidence: evidenceIds.length > 0
+      ? evidenceIds.map((id) => ({ id, type: document as const, label: `Escrow release evidence ${id}` }))
+      : [{ id: `${milestone.milestoneId}-missing-evidence`, type: audit_log as const, label: Escrow release evidence missing }],
+    financialImpactCents: milestone.amount,
+    dueAt: input.dueAt,
+    createdAt: input.createdAt,
+    metadata: {
+      jobId: milestone.jobId,
+      stage: milestone.stage,
+      status: milestone.status,
+      certifiedBy: milestone.certifiedBy,
+      releaseConditions: cleanStringArray(milestone.releaseConditions),
+      escrowBlockers: escrowEvaluation.blockers,
+      escrowWarnings: escrowEvaluation.warnings,
+      autoReleaseProhibited: true,
+    },
+  });
+
+  return {
+    escrowEvaluation,
+    approvalGate,
+    approvalReadiness: evaluateApprovalGateReadiness(approvalGate),
+  };
 }
 
 export function evaluateEscrowReleaseGate(input: EscrowMilestoneGateInput): EscrowReleaseGateEvaluation {
