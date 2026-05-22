@@ -78,6 +78,45 @@ export interface RFQShortlistEntry extends SupplierCatalogueMatch {
 }
 
 
+
+export type DeliveryGateEvidenceType = 'delivery_note' | 'photo_evidence' | 'contractor_acceptance' | 'bep_acceptance' | 'quality_check' | 'warranty_document';
+export type DeliveryGateEvidenceStatus = 'missing' | 'submitted' | 'verified' | 'rejected';
+export type DeliveryGateReadinessStatus = 'blocked' | 'review_required' | 'ready_for_claim_review';
+
+export interface DeliveryGateEvidence {
+  type: DeliveryGateEvidenceType;
+  status: DeliveryGateEvidenceStatus;
+  uploadedBy?: string;
+  uploadedAt?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  note?: string;
+}
+
+export interface DeliveryGateReadinessInput {
+  orderId: string;
+  supplierId: string;
+  packageId: string;
+  requiredBy?: string;
+  expectedDeliveryDate?: string;
+  status: 'pending' | 'in_transit' | 'part_delivered' | 'delivered' | 'rejected';
+  evidence?: DeliveryGateEvidence[];
+  asOf?: string;
+}
+
+export interface DeliveryGateReadinessResult {
+  orderId: string;
+  supplierId: string;
+  packageId: string;
+  status: DeliveryGateReadinessStatus;
+  blockers: string[];
+  warnings: string[];
+  verifiedEvidenceTypes: DeliveryGateEvidenceType[];
+  humanReviewRequired: true;
+  aiMayReleasePayment: false;
+  governanceNote: string;
+}
+
 export type RFQAwardReadinessStatus = 'blocked' | 'review_required' | 'ready_for_award_review';
 
 export interface SupplierQuoteResponse {
@@ -402,3 +441,51 @@ export function evaluateRFQAwardReadiness(input: {
     governanceNote: 'RFQ response ranking is advisory only; supplier awards, purchase orders, escrow movements, and payment effects require recorded human approval and audit evidence.',
   };
 }
+
+
+export function evaluateDeliveryGateReadiness(input: DeliveryGateReadinessInput): DeliveryGateReadinessResult {
+  const asOf = Date.parse(input.asOf ?? new Date().toISOString());
+  if (Number.isNaN(asOf)) throw new Error('asOf must be a valid ISO date string.');
+
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const evidence = input.evidence ?? [];
+  const verifiedEvidenceTypes = evidence.filter((item) => item.status === 'verified').map((item) => item.type);
+  const hasVerified = (type: DeliveryGateEvidenceType) => verifiedEvidenceTypes.includes(type);
+
+  if (input.status === 'rejected') blockers.push(`${input.orderId} delivery has been rejected and must be resolved before claim review.`);
+  if (input.status !== 'delivered') blockers.push(`${input.orderId} must be marked delivered before the delivery gate can close.`);
+
+  if (!hasVerified('delivery_note')) blockers.push(`${input.orderId} requires a verified supplier delivery note before the delivery gate can close.`);
+  if (!hasVerified('photo_evidence')) blockers.push(`${input.orderId} requires photographic delivery evidence before the delivery gate can close.`);
+  if (!hasVerified('contractor_acceptance') && !hasVerified('bep_acceptance')) {
+    blockers.push(`${input.orderId} requires recorded contractor or BEP acceptance before downstream claims or payments.`);
+  }
+
+  evidence
+    .filter((item) => item.status === 'submitted')
+    .forEach((item) => warnings.push(`${input.orderId} ${item.type} is submitted but not verified by a human reviewer.`));
+  evidence
+    .filter((item) => item.status === 'rejected')
+    .forEach((item) => blockers.push(`${input.orderId} ${item.type} evidence was rejected and must be replaced.`));
+
+  if (input.requiredBy && input.expectedDeliveryDate && Date.parse(input.expectedDeliveryDate) > Date.parse(input.requiredBy)) {
+    warnings.push(`${input.orderId} expected delivery date is later than the programme required-by date.`);
+  }
+
+  const readinessStatus: DeliveryGateReadinessStatus = blockers.length > 0 ? 'blocked' : warnings.length > 0 ? 'review_required' : 'ready_for_claim_review';
+
+  return {
+    orderId: input.orderId,
+    supplierId: input.supplierId,
+    packageId: input.packageId,
+    status: readinessStatus,
+    blockers: [...new Set(blockers)],
+    warnings: [...new Set(warnings)],
+    verifiedEvidenceTypes: Array.from(new Set(verifiedEvidenceTypes)),
+    humanReviewRequired: true,
+    aiMayReleasePayment: false,
+    governanceNote: 'Supplier delivery gates prepare contractor/subcontractor claim review only; escrow or payment release still requires recorded human approval, audit evidence, and applicable compliance sign-off.',
+  };
+}
+

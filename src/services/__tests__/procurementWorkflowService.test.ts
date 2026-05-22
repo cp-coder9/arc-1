@@ -9,6 +9,7 @@ import {
   extractBoQBoMItems,
   matchSupplierCatalogue,
   validatePurchaseOrderIssue,
+  evaluateDeliveryGateReadiness,
 } from '../procurementWorkflowService';
 
 const tender: TenderPackage = {
@@ -270,4 +271,52 @@ describe('procurementWorkflowService', () => {
     expect(shortlist[0]).toMatchObject({ rank: 1, prequalification: { status: 'prequalified', aiMayAward: false } });
     expect(shortlist[1].prequalification.status).toBe('blocked');
   });
+
+  it('blocks supplier delivery gates until delivery note, photo evidence, and contractor acceptance are recorded', () => {
+    const blocked = evaluateDeliveryGateReadiness({
+      orderId: 'po-1',
+      supplierId: 'supplier-1',
+      packageId: tender.id,
+      requiredBy: '2026-06-15',
+      expectedDeliveryDate: '2026-06-20',
+      status: 'delivered',
+      evidence: [
+        { type: 'delivery_note', status: 'verified', uploadedBy: 'supplier-1', uploadedAt: '2026-06-20T08:00:00.000Z' },
+      ],
+      asOf: '2026-06-21T00:00:00.000Z',
+    });
+
+    expect(blocked.status).toBe('blocked');
+    expect(blocked.blockers).toEqual(expect.arrayContaining([
+      'po-1 requires photographic delivery evidence before the delivery gate can close.',
+      'po-1 requires recorded contractor or BEP acceptance before downstream claims or payments.',
+    ]));
+    expect(blocked.warnings).toContain('po-1 expected delivery date is later than the programme required-by date.');
+    expect(blocked).toMatchObject({ humanReviewRequired: true, aiMayReleasePayment: false });
+
+    const ready = evaluateDeliveryGateReadiness({
+      orderId: 'po-1',
+      supplierId: 'supplier-1',
+      packageId: tender.id,
+      requiredBy: '2026-06-15',
+      expectedDeliveryDate: '2026-06-14',
+      status: 'delivered',
+      evidence: [
+        { type: 'delivery_note', status: 'verified', uploadedBy: 'supplier-1', uploadedAt: '2026-06-14T08:00:00.000Z' },
+        { type: 'photo_evidence', status: 'verified', uploadedBy: 'supplier-1', uploadedAt: '2026-06-14T08:05:00.000Z' },
+        { type: 'contractor_acceptance', status: 'verified', uploadedBy: 'contractor-1', uploadedAt: '2026-06-14T10:00:00.000Z', verifiedBy: 'bep-1' },
+      ],
+      asOf: '2026-06-14T12:00:00.000Z',
+    });
+
+    expect(ready).toMatchObject({
+      status: 'ready_for_claim_review',
+      blockers: [],
+      warnings: [],
+      verifiedEvidenceTypes: ['delivery_note', 'photo_evidence', 'contractor_acceptance'],
+      aiMayReleasePayment: false,
+    });
+    expect(ready.governanceNote).toMatch(/escrow or payment release/i);
+  });
+
 });
