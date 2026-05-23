@@ -65,6 +65,7 @@ export function inferVerificationProvider(input: Pick<VerificationSubmissionInpu
   if (body === 'CIDB') return 'cidb';
   if (body === 'NHBRC') return 'nhbrc';
   if (body === 'CIPC') return 'cipc';
+  if (body) return 'manual';
   if (input.subjectType === 'bep') return 'sacap';
   if (input.subjectType === 'contractor' || input.subjectType === 'subcontractor') return 'cidb';
   if (input.subjectType === 'supplier') return 'cipc';
@@ -186,5 +187,121 @@ export function applyVerificationReview<T extends UserVerification | Record<stri
       ...(input.metadata || {}),
     },
     updatedAt: now,
+  };
+}
+
+
+export type VerificationQueuePriority = 'urgent' | 'high' | 'medium' | 'low';
+
+export interface VerificationQueueItem {
+  id: string;
+  userId: string;
+  subjectType: VerificationSubjectType;
+  statutoryBody?: string;
+  provider: VerificationProvider;
+  status: VerificationStatus;
+  priority: VerificationQueuePriority;
+  action: string;
+  requiresHumanReview: boolean;
+  blocker?: string;
+  submittedAt?: string;
+  expiresAt?: string;
+  score: number;
+}
+
+export interface VerificationQueueProjection {
+  items: VerificationQueueItem[];
+  summary: {
+    total: number;
+    pending: number;
+    overdue: number;
+    dueForRecheck: number;
+    rejected: number;
+  };
+}
+
+export interface VerificationQueueProjectionOptions {
+  now?: Date;
+  slaHours?: number;
+  recheckWithinDays?: number;
+}
+
+function hoursBetween(start: string | undefined, end: Date): number | undefined {
+  if (!start) return undefined;
+  const parsed = Date.parse(start);
+  if (Number.isNaN(parsed)) return undefined;
+  return (end.getTime() - parsed) / 3_600_000;
+}
+
+function resolveQueueAction(verification: UserVerification | Record<string, any>, provider: VerificationProvider, dueForRecheck: boolean): string {
+  const statutoryBody = normalizeStatutoryBody((verification as any).statutoryBody);
+  if (dueForRecheck) return 'Queue public-register recheck before verified status expires';
+  if (provider === 'sacap') return 'Run SACAP public-register verification and route result for admin review';
+  if (provider === 'cidb') return 'Run CIDB contractor-register verification and route result for admin review';
+  if (provider === 'cipc') return 'Review uploaded evidence manually against official CIPC record';
+  if (provider === 'nhbrc') return 'Run NHBRC enrolment/registration verification and route result for admin review';
+  return `Review uploaded evidence manually against official ${statutoryBody || 'statutory'} record`;
+}
+
+function resolveQueuePriority(status: VerificationStatus, overdue: boolean, dueForRecheck: boolean): VerificationQueuePriority {
+  if (overdue) return 'urgent';
+  if (dueForRecheck) return 'high';
+  if (status === 'pending') return 'medium';
+  return 'low';
+}
+
+function priorityScore(priority: VerificationQueuePriority): number {
+  if (priority === 'urgent') return 400;
+  if (priority === 'high') return 300;
+  if (priority === 'medium') return 200;
+  return 100;
+}
+
+export function buildVerificationQueueProjection<T extends UserVerification | Record<string, any>>(
+  verifications: T[],
+  options: VerificationQueueProjectionOptions = {},
+): VerificationQueueProjection {
+  const now = options.now || new Date();
+  const slaHours = options.slaHours ?? 48;
+  const recheckWithinDays = options.recheckWithinDays ?? 30;
+
+  const items = verifications.map((verification) => {
+    const provider = inferVerificationProvider({
+      subjectType: verification.subjectType,
+      statutoryBody: verification.statutoryBody,
+    });
+    const ageHours = hoursBetween(verification.submittedAt, now) ?? 0;
+    const lifecycle = getVerificationLifecycle(verification as Pick<UserVerification, 'status' | 'expiresAt'>, { now, dueWithinDays: recheckWithinDays });
+    const overdue = verification.status === 'pending' && ageHours > slaHours;
+    const dueForRecheck = lifecycle.isDueForRecheck && verification.status === 'verified';
+    const priority = resolveQueuePriority(verification.status, overdue, dueForRecheck);
+    const blocker = overdue ? `Verification has exceeded the ${slaHours} hour SLA.` : undefined;
+
+    return {
+      id: String(verification.id),
+      userId: verification.userId,
+      subjectType: verification.subjectType,
+      statutoryBody: normalizeStatutoryBody(verification.statutoryBody),
+      provider,
+      status: verification.status,
+      priority,
+      action: resolveQueueAction(verification, provider, dueForRecheck),
+      requiresHumanReview: true,
+      blocker,
+      submittedAt: verification.submittedAt,
+      expiresAt: verification.expiresAt,
+      score: priorityScore(priority) + Math.min(Math.floor(ageHours), 99),
+    };
+  }).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+
+  return {
+    items,
+    summary: {
+      total: items.length,
+      pending: items.filter((item) => item.status === 'pending').length,
+      overdue: items.filter((item) => item.blocker?.includes('SLA')).length,
+      dueForRecheck: items.filter((item) => item.action.includes('recheck')).length,
+      rejected: items.filter((item) => item.status === 'rejected').length,
+    },
   };
 }

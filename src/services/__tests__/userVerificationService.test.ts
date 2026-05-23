@@ -4,6 +4,7 @@ import {
   assertReviewStatus,
   assertVerificationSubjectType,
   buildUserVerification,
+  buildVerificationQueueProjection,
   getVerificationLifecycle,
   inferVerificationProvider,
   isActiveVerifiedVerification,
@@ -139,8 +140,88 @@ describe('userVerificationService', () => {
   });
 
 
+
+  it('prioritizes verification queues across SACAP, ECSA, CIPC and manual evidence with SLA and recheck signals', () => {
+    const now = new Date('2026-05-23T10:00:00.000Z');
+    const queue = buildVerificationQueueProjection([
+      {
+        id: 'ver-bep-expiring',
+        userId: 'bep-1',
+        subjectType: 'bep',
+        status: 'verified',
+        statutoryBody: 'SACAP',
+        registrationNumber: 'SACAP-123',
+        submittedAt: '2026-05-01T08:00:00.000Z',
+        submittedBy: 'bep-1',
+        source: 'public_register',
+        expiresAt: '2026-05-28T00:00:00.000Z',
+        createdAt: '2026-05-01T08:00:00.000Z',
+        updatedAt: '2026-05-01T08:00:00.000Z',
+      },
+      {
+        id: 'ver-company-overdue',
+        userId: 'supplier-1',
+        subjectType: 'supplier',
+        status: 'pending',
+        statutoryBody: 'CIPC',
+        source: 'document_upload',
+        submittedAt: '2026-05-18T08:00:00.000Z',
+        submittedBy: 'supplier-1',
+        evidenceDocumentIds: ['doc-cipc'],
+        createdAt: '2026-05-18T08:00:00.000Z',
+        updatedAt: '2026-05-18T08:00:00.000Z',
+      },
+      {
+        id: 'ver-ecsa-new',
+        userId: 'engineer-1',
+        subjectType: 'bep',
+        status: 'pending',
+        statutoryBody: 'ECSA',
+        source: 'document_upload',
+        submittedAt: '2026-05-23T09:00:00.000Z',
+        submittedBy: 'engineer-1',
+        registrationNumber: 'ECSA-789',
+        createdAt: '2026-05-23T09:00:00.000Z',
+        updatedAt: '2026-05-23T09:00:00.000Z',
+      },
+      {
+        id: 'ver-rejected',
+        userId: 'contractor-1',
+        subjectType: 'contractor',
+        status: 'rejected',
+        statutoryBody: 'CIDB',
+        source: 'document_upload',
+        submittedAt: '2026-05-20T08:00:00.000Z',
+        submittedBy: 'contractor-1',
+        rejectionReason: 'Invalid certificate',
+        createdAt: '2026-05-20T08:00:00.000Z',
+        updatedAt: '2026-05-20T08:00:00.000Z',
+      },
+    ], { now, slaHours: 48, recheckWithinDays: 14 });
+
+    expect(queue.summary).toEqual({ total: 4, pending: 2, overdue: 1, dueForRecheck: 1, rejected: 1 });
+    expect(queue.items.map((item) => item.id)).toEqual(['ver-company-overdue', 'ver-bep-expiring', 'ver-ecsa-new', 'ver-rejected']);
+    expect(queue.items[0]).toMatchObject({
+      id: 'ver-company-overdue',
+      provider: 'cipc',
+      priority: 'urgent',
+      action: 'Review uploaded evidence manually against official CIPC record',
+      blocker: 'Verification has exceeded the 48 hour SLA.',
+      requiresHumanReview: true,
+    });
+    expect(queue.items[1]).toMatchObject({
+      id: 'ver-bep-expiring',
+      provider: 'sacap',
+      priority: 'high',
+      action: 'Queue public-register recheck before verified status expires',
+    });
+    expect(queue.items[2]).toMatchObject({ provider: 'manual', priority: 'medium', action: 'Review uploaded evidence manually against official ECSA record' });
+  });
+
   it('rejects unsupported subject and review statuses', () => {
     expect(() => assertVerificationSubjectType('architect')).toThrow('Unsupported');
     expect(() => assertReviewStatus('pending')).toThrow('Unsupported');
   });
+
+
 });
