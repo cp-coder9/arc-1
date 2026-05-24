@@ -188,7 +188,10 @@ describe('canonical dashboard page registry', () => {
   it('implements backend.html role-specific toolbox content instead of one shared generic toolbox', () => {
     expect(projectToolboxSource).toContain('const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig>');
     expect(projectToolboxSource).toContain('toolGroups: ToolboxGroup[]');
+    expect(projectToolboxSource).toContain('primaryResponsibilities: string[]');
+    expect(projectToolboxSource).toContain('handoffBoundaries: string[]');
     expect(projectToolboxSource).toContain('config.toolGroups.map((group)');
+    expect(projectToolboxSource).toContain('data-testid={`toolbox-responsibilities-${user.role}`}');
     expect(projectToolboxSource).toContain('Subcontractor Package Toolbox');
     expect(projectToolboxSource).toContain('Supplier Delivery Toolbox');
     expect(projectToolboxSource).toContain('Assigned Package Scope');
@@ -199,6 +202,9 @@ describe('canonical dashboard page registry', () => {
     expect(projectToolboxSource).toContain('Payment Tracker');
     expect(projectToolboxSource).toContain('Supplier access is delivery/procurement scoped');
     expect(projectToolboxSource).toContain('Subcontractor access is package-scoped');
+    expect(projectToolboxSource).toContain('Cannot approve own payment claim or completion status');
+    expect(projectToolboxSource).toContain('Cannot mark deliveries accepted without contractor/client evidence');
+    expect(projectToolboxSource).toContain('Cannot execute payments or statutory actions without recorded authorization');
     expect(projectToolboxSource).toContain('data-testid={`toolbox-group-${user.role}-${group.id}`}');
     expect(appSource).toContain("activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />");
   });

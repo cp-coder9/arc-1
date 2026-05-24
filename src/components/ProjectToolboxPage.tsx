@@ -24,6 +24,8 @@ type RoleToolboxConfig = {
   title: string;
   subtitle: string;
   scope: string;
+  primaryResponsibilities: string[];
+  handoffBoundaries: string[];
   toolGroups: ToolboxGroup[];
 };
 
@@ -32,6 +34,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Client Project Toolbox',
     subtitle: 'Brief, approval, payment, progress, and handover tools for the project owner.',
     scope: 'Client-facing decisions only. Professional sign-off, statutory submissions, and payment releases stay human-confirmed.',
+    primaryResponsibilities: ['Create and clarify project brief', 'Review proposals and appointments', 'Approve milestones and payment evidence'],
+    handoffBoundaries: ['Cannot certify professional compliance', 'Cannot submit statutory forms without accountable professional review'],
     toolGroups: [
       { id: 'brief-appointment', label: 'Brief and appointment', description: 'Tools for turning the client need into an appointment-ready project record.', tools: [
         { label: 'Guided Brief Wizard', description: 'Create or refine the client brief and project requirements.', pageId: 'client-intake' },
@@ -47,6 +51,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'BEP / Professional Toolbox',
     subtitle: 'Technical brief, design coordination, compliance, municipal, freelancer, and delivery tools.',
     scope: 'BEP tools prepare and coordinate professional work; statutory sign-off remains explicit and auditable.',
+    primaryResponsibilities: ['Convert client brief into technical scope', 'Coordinate design-team deliverables', 'Prepare compliance and municipal evidence'],
+    handoffBoundaries: ['AI checks are advisory only', 'Municipal and compliance submissions require verified human sign-off'],
     toolGroups: [
       { id: 'brief-compliance', label: 'Technical brief and compliance', description: 'Professional scope, SANS checks, compliance evidence, and design-governance tools.', tools: [
         { label: 'Technical Brief Editor', description: 'Convert the client brief into professional scope and deliverables.', pageId: 'technical-brief' },
@@ -62,6 +68,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Architect / Design-Team Toolbox',
     subtitle: 'Architectural delivery tools aligned to the BEP professional workflow.',
     scope: 'Architect is treated as a BEP subtype for authorization while keeping familiar role labels in the UI.',
+    primaryResponsibilities: ['Refine architectural scope and drawings', 'Coordinate design review evidence', 'Prepare statutory package inputs'],
+    handoffBoundaries: ['No AI-generated compliance certification', 'No statutory release without accountable sign-off'],
     toolGroups: [
       { id: 'architectural-compliance', label: 'Architectural compliance', description: 'Scope, drawing review, and statutory-form preparation for architect-led delivery.', tools: [
         { label: 'Technical Brief Editor', description: 'Refine architectural scope, assumptions, and exclusions.', pageId: 'technical-brief' },
@@ -77,6 +85,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Main Contractor Toolbox',
     subtitle: 'Tender, procurement, programme, staff, claims, site instruction, and package controls.',
     scope: 'Contractor tools manage the whole construction delivery layer but do not bypass client/admin approvals.',
+    primaryResponsibilities: ['Manage procurement and package scopes', 'Maintain programme, labour, plant, and site records', 'Prepare claims with evidence'],
+    handoffBoundaries: ['Cannot release client funds directly', 'Cannot override professional design or statutory approval gates'],
     toolGroups: [
       { id: 'commercial-procurement', label: 'Commercial and procurement', description: 'Procurement, package scopes, supplier commitments, and governed commercial evidence.', tools: [
         { label: 'BoQ / BoM Procurement', description: 'Create procurement lists, compare quotes, and manage supplier commitments.', pageId: 'procurement' },
@@ -92,6 +102,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Subcontractor Package Toolbox',
     subtitle: 'Assigned package scope, RFIs, shop drawings, samples, claims, snags, and close-out evidence.',
     scope: 'Subcontractor access is package-scoped. It cannot control whole-project procurement, supplier catalogues, or client approvals.',
+    primaryResponsibilities: ['Deliver assigned package scope', 'Submit shop drawings, samples, RFIs, and claims', 'Upload close-out and warranty evidence'],
+    handoffBoundaries: ['Cannot issue project-wide procurement commitments', 'Cannot approve own payment claim or completion status'],
     toolGroups: [
       { id: 'package-scope', label: 'Package scope and submissions', description: 'Subcontract-order scope, shop drawings, samples, and package coordination tools.', tools: [
         { label: 'Assigned Package Scope', description: 'Review subcontract order scope, deliverables, and readiness gates.', pageId: 'packages' },
@@ -107,6 +119,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Supplier Delivery Toolbox',
     subtitle: 'Supplier quote path, catalogue, product data, lead times, delivery notes, warranties, and payment evidence.',
     scope: 'Supplier access is delivery/procurement scoped. It is separate from subcontractor execution tools and cannot issue subcontract orders.',
+    primaryResponsibilities: ['Maintain catalogue and lead-time evidence', 'Respond to quotes and purchase orders', 'Upload delivery notes, product data, and warranties'],
+    handoffBoundaries: ['Cannot issue subcontractor execution records', 'Cannot mark deliveries accepted without contractor/client evidence'],
     toolGroups: [
       { id: 'catalogue-quotes', label: 'Catalogue and quotes', description: 'Supplier catalogue, alternatives, lead times, quotation, and purchase-order response tools.', tools: [
         { label: 'Supplier API Catalogue', description: 'Maintain catalogue, alternatives, availability, prices, and lead times.', pageId: 'procurement' },
@@ -122,6 +136,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Freelancer Work Toolbox',
     subtitle: 'Assigned tasks, submissions, feedback, drawing checks, resources, and invoice preparation.',
     scope: 'Freelancer tools are task-scoped and do not grant project-owner, contractor, or statutory authority.',
+    primaryResponsibilities: ['Complete assigned deliverables', 'Submit revisions and feedback evidence', 'Use resource/checklist support for quality control'],
+    handoffBoundaries: ['Cannot appoint project team members', 'Cannot certify statutory compliance or release invoices'],
     toolGroups: [
       { id: 'assigned-deliverables', label: 'Assigned deliverables', description: 'Task-scoped work, submissions, revision cycles, and feedback records.', tools: [
         { label: 'Assigned Work', description: 'View assigned work packages, brief files, and deliverable requirements.', pageId: 'freelancer-work' },
@@ -137,6 +153,8 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
     title: 'Admin Governance Toolbox',
     subtitle: 'Whole-system governance, audits, role tools, AI review, payment settings, disputes, and platform configuration.',
     scope: 'Admin tools govern the platform but still require auditable reasons for overrides and sensitive decisions.',
+    primaryResponsibilities: ['Monitor verification, disputes, and audit queues', 'Review AI and sensitive workflow exceptions', 'Configure platform governance settings'],
+    handoffBoundaries: ['Cannot silently override user-facing decisions', 'Cannot execute payments or statutory actions without recorded authorization'],
     toolGroups: [
       { id: 'platform-governance', label: 'Platform governance', description: 'System-wide user, project, verification, dispute, and governance-queue oversight.', tools: [
         { label: 'Admin Console', description: 'Review users, projects, verification, disputes, tools, rates, and governance queues.', pageId: 'admin-console' },
@@ -170,6 +188,20 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
         </CardHeader>
         <CardContent className="p-6 space-y-5">
           <div className="space-y-5" data-testid={`toolbox-actions-${user.role}`}>
+            <section className="grid grid-cols-1 gap-4 lg:grid-cols-2" data-testid={`toolbox-responsibilities-${user.role}`}>
+              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+                <h3 className="font-heading text-lg font-black tracking-[-0.03em] text-foreground">Role responsibilities</h3>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {config.primaryResponsibilities.map((responsibility) => <li key={responsibility}>• {responsibility}</li>)}
+                </ul>
+              </div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
+                <h3 className="font-heading text-lg font-black tracking-[-0.03em] text-foreground">Handoff boundaries</h3>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {config.handoffBoundaries.map((boundary) => <li key={boundary}>• {boundary}</li>)}
+                </ul>
+              </div>
+            </section>
             {config.toolGroups.map((group) => (
               <section key={group.id} className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm" data-testid={`toolbox-group-${user.role}-${group.id}`}>
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
