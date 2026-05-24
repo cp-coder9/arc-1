@@ -96,14 +96,14 @@ async function firstVisible(page: Page, selectors: string[]) {
   return null;
 }
 
-function scoreResultText(text: string, term: string): { status: VerificationStatus; requiresHumanReview: boolean } {
+export function assessVerificationRegisterText(text: string, term: string): { status: VerificationStatus; requiresHumanReview: boolean } {
   const normalizedText = text.toLowerCase();
   const normalizedTerm = term.toLowerCase();
   if (normalizedText.includes(normalizedTerm) && !normalizedText.includes('no record') && !normalizedText.includes('not found')) {
     return { status: 'verified', requiresHumanReview: false };
   }
   if (normalizedText.includes('no record') || normalizedText.includes('not found') || normalizedText.includes('no result')) {
-    return { status: 'rejected', requiresHumanReview: true };
+    return { status: 'rejected', requiresHumanReview: false };
   }
   return { status: 'pending', requiresHumanReview: true };
 }
@@ -172,7 +172,7 @@ async function runGenericBrowserProvider(config: BrowserProviderConfig, input: V
     }
     if (!resultText) resultText = (await page.locator('body').innerText({ timeout: 5000 }).catch(() => '')).slice(0, 5000);
 
-    const score = scoreResultText(resultText, term);
+    const score = assessVerificationRegisterText(resultText, term);
     return {
       provider: config.provider,
       status: score.status,

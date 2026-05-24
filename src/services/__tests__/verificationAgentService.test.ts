@@ -40,12 +40,29 @@ describe('verificationAgentService', () => {
       officialUrl: expect.stringContaining('search.mymembership.co.za'),
     });
   });
-
   it('does not simulate results when required search data is missing', async () => {
     const { runVerificationBrowserAgent } = await import('../verificationAgentService');
     const result = await runVerificationBrowserAgent({ subjectType: 'bep', statutoryBody: 'SACAP' });
     expect(result.status).toBe('pending');
     expect(result.requiresHumanReview).toBe(true);
     expect(result.error).toContain('display name');
+  });
+
+  it('classifies clear official no-record text as rejected without human review', async () => {
+    const { assessVerificationRegisterText } = await import('../verificationAgentService');
+
+    expect(assessVerificationRegisterText('No record found for CIDB-404', 'CIDB-404')).toEqual({
+      status: 'rejected',
+      requiresHumanReview: false,
+    });
+  });
+
+  it('keeps ambiguous official register text pending for human review', async () => {
+    const { assessVerificationRegisterText } = await import('../verificationAgentService');
+
+    expect(assessVerificationRegisterText('The register is temporarily unavailable. Try again later.', 'CIDB-123')).toEqual({
+      status: 'pending',
+      requiresHumanReview: true,
+    });
   });
 });
