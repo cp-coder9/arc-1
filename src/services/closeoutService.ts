@@ -42,9 +42,50 @@ export interface CloseoutGateValidationResult {
   audit: { reviewedBy?: string; reviewedAt?: string; source: string };
 }
 
+export interface CloseoutSnagRecord {
+  id: string;
+  title: string;
+  status?: string;
+  trade?: string;
+  subcontractorId?: string;
+  dueDate?: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical' | string;
+  drawingRef?: string;
+  evidenceUrls?: string[];
+}
+
+export interface SnagRectificationTask {
+  snagId: string;
+  title: string;
+  assignedTo: string;
+  trade: string;
+  priority: 'normal' | 'high' | 'urgent';
+  dueDate?: string;
+  drawingRef?: string;
+  requiresPhotoEvidence: boolean;
+  paymentGate: 'blocked_until_evidence' | 'ready_for_professional_review';
+  nextAction: string;
+}
+
 const CLOSED_SNAG_STATUSES = new Set(['closed', 'resolved', 'accepted']);
 const ACCEPTED_DOCUMENT_STATUSES = new Set(['approved', 'accepted', 'closed', 'issued']);
 const APPROVED_FINAL_ACCOUNT_STATUSES = new Set(['approved', 'accepted', 'settled', 'closed']);
+
+function normaliseStatus(value?: string): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function hasEvidence(urls?: string[]): boolean {
+  return (urls ?? []).some((url) => typeof url === 'string' && url.trim().length > 0);
+}
+
+function priorityForSnag(snag: CloseoutSnagRecord, todayIso?: string): SnagRectificationTask['priority'] {
+  const severity = normaliseStatus(snag.severity);
+  if (severity === 'critical' || severity === 'high') return 'urgent';
+  if (snag.dueDate && todayIso && snag.dueDate < todayIso) return 'urgent';
+  if (severity === 'medium') return 'high';
+  return 'normal';
+}
 
 function hasUsableUrl(value?: string): boolean {
   return typeof value === 'string' && value.trim().length > 0;
@@ -84,6 +125,30 @@ export function evaluateCloseoutGate(input: CloseoutGateValidationInput = {}): C
     blockers,
     audit: { reviewedBy: input.audit?.reviewedBy, reviewedAt: input.audit?.reviewedAt, source: input.audit?.source ?? 'closeout_gate' },
   };
+}
+
+export function buildSnagRectificationPlan(snags: CloseoutSnagRecord[] = [], options: { defaultAssignee?: string; todayIso?: string } = {}): SnagRectificationTask[] {
+  return snags
+    .filter((snag) => !CLOSED_SNAG_STATUSES.has(normaliseStatus(snag.status)))
+    .map((snag) => {
+      const assignedTo = snag.subcontractorId?.trim() || options.defaultAssignee?.trim() || 'unassigned_trade_lead';
+      const trade = snag.trade?.trim() || 'general';
+      const evidenceProvided = hasEvidence(snag.evidenceUrls);
+      return {
+        snagId: snag.id,
+        title: snag.title,
+        assignedTo,
+        trade,
+        priority: priorityForSnag(snag, options.todayIso),
+        dueDate: snag.dueDate,
+        drawingRef: snag.drawingRef,
+        requiresPhotoEvidence: !evidenceProvided,
+        paymentGate: evidenceProvided ? 'ready_for_professional_review' : 'blocked_until_evidence',
+        nextAction: evidenceProvided
+          ? 'Professional team to inspect uploaded rectification evidence before retention release.'
+          : `Assign ${trade} rectification and upload photographic evidence before final retention can progress.`,
+      };
+    });
 }
 
 function hasPersistedCloseoutArtifacts(project: Project, certificateData?: Record<string, unknown>, reportData?: Record<string, unknown>): boolean {
@@ -203,5 +268,5 @@ export async function archiveProject(projectId: string): Promise<void> {
   });
 }
 
-export const closeoutService = { getProjectSummary, generateCompletionCertificate, generateFinalReport, archiveProject, summaryHasPersistedCloseoutArtifacts, evaluateCloseoutGate };
+export const closeoutService = { getProjectSummary, generateCompletionCertificate, generateFinalReport, archiveProject, summaryHasPersistedCloseoutArtifacts, evaluateCloseoutGate, buildSnagRectificationPlan };
 export default closeoutService;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as firestore from 'firebase/firestore';
-import { archiveProject, CLOSEOUT_ARTIFACTS_REQUIRED_ERROR, CLOSEOUT_GATE_REQUIRED_ERROR, evaluateCloseoutGate, getProjectSummary, summaryHasPersistedCloseoutArtifacts } from '../closeoutService';
+import { archiveProject, buildSnagRectificationPlan, CLOSEOUT_ARTIFACTS_REQUIRED_ERROR, CLOSEOUT_GATE_REQUIRED_ERROR, evaluateCloseoutGate, getProjectSummary, summaryHasPersistedCloseoutArtifacts } from '../closeoutService';
 
 vi.mock('@/lib/firebase', () => ({ db: { name: 'mock-db' } }));
 vi.mock('@/lib/uploadService', () => ({ uploadAndTrackFile: vi.fn() }));
@@ -86,6 +86,41 @@ describe('closeoutService', () => {
       blockers: [],
       audit: { reviewedBy: 'architect-1', reviewedAt: '2026-08-01T00:00:00.000Z', source: 'professional_review' },
     });
+  });
+
+  it('builds subcontractor snag rectification tasks and blocks retention until evidence exists', () => {
+    const plan = buildSnagRectificationPlan([
+      { id: 'snag-1', title: 'Leaking trap', status: 'open', trade: 'plumbing', subcontractorId: 'sub-plumb', dueDate: '2026-07-01', severity: 'high', drawingRef: 'A-501' },
+      { id: 'snag-2', title: 'Paint touch-up', status: 'resolved', trade: 'painting', subcontractorId: 'sub-paint' },
+      { id: 'snag-3', title: 'Door closer adjustment', status: 'in_progress', trade: '', evidenceUrls: ['https://files/evidence.jpg'], severity: 'medium' },
+      { id: 'snag-4', title: 'Late glazing bead', status: 'open', dueDate: '2026-06-01', severity: 'low' },
+    ], { defaultAssignee: 'main-contractor', todayIso: '2026-06-15' });
+
+    expect(plan).toEqual([
+      expect.objectContaining({
+        snagId: 'snag-1',
+        assignedTo: 'sub-plumb',
+        trade: 'plumbing',
+        priority: 'urgent',
+        drawingRef: 'A-501',
+        requiresPhotoEvidence: true,
+        paymentGate: 'blocked_until_evidence',
+      }),
+      expect.objectContaining({
+        snagId: 'snag-3',
+        assignedTo: 'main-contractor',
+        trade: 'general',
+        priority: 'high',
+        requiresPhotoEvidence: false,
+        paymentGate: 'ready_for_professional_review',
+      }),
+      expect.objectContaining({
+        snagId: 'snag-4',
+        assignedTo: 'main-contractor',
+        priority: 'urgent',
+        paymentGate: 'blocked_until_evidence',
+      }),
+    ]);
   });
 
   it('rejects archive attempts until both project fields and artifact documents are persisted', async () => {
