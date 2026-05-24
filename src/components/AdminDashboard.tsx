@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
@@ -28,7 +28,7 @@ import { format } from 'date-fns';
 import { JobCard, MunicipalCredential } from '../types';
 import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
-import { getVerificationLifecycle } from '../services/userVerificationService';
+import { buildVerificationQueueProjection, getVerificationLifecycle } from '../services/userVerificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
 import { pdfGenerationService } from "../services/pdfGenerationService";
@@ -765,6 +765,8 @@ export default function AdminDashboard({
 
   const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
   const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+  const verificationQueue = useMemo(() => buildVerificationQueueProjection(userVerifications), [userVerifications]);
+  const verificationsById = useMemo(() => new Map(userVerifications.map(verification => [verification.id, verification])), [userVerifications]);
   const pendingSubmissionCount = submissions.filter(submission => ['ai_passed', 'admin_reviewing'].includes(submission.status)).length;
   const failedSubmissionCount = submissions.filter(submission => ['ai_failed', 'admin_rejected'].includes(submission.status)).length;
   const tabTriggerClass = "min-h-11 w-full rounded-2xl px-3 py-2 gap-2 font-bold text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm";
@@ -1302,7 +1304,12 @@ export default function AdminDashboard({
                 <h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-primary" /> Verification Agent Queue</h2>
                 <p className="text-sm text-muted-foreground mt-1">Review records created by the Architex browser verification agent against official registers.</p>
               </div>
-              <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{userVerifications.length} records</Badge>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.total} records</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.pending} pending</Badge>
+                <Badge variant={verificationQueue.summary.overdue > 0 ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.overdue} SLA overdue</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.dueForRecheck} rechecks</Badge>
+              </div>
             </div>
             <div className="rounded-2xl border border-border overflow-hidden">
               <Table>
@@ -1317,7 +1324,9 @@ export default function AdminDashboard({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {userVerifications.map(verification => {
+                  {verificationQueue.items.map(queueItem => {
+                    const verification = verificationsById.get(queueItem.id);
+                    if (!verification) return null;
                     const agentResult = verification.metadata?.verificationAgent as any;
                     const lifecycle = getVerificationLifecycle(verification);
                     const agentStatus = verification.metadata?.verificationAgentStatus as string | undefined;
@@ -1332,6 +1341,7 @@ export default function AdminDashboard({
                         <TableCell>
                           <div className="flex flex-col items-start gap-1">
                             <Badge variant={verification.status === 'verified' ? 'secondary' : verification.status === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verification.status}</Badge>
+                            <Badge variant={queueItem.priority === 'urgent' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{queueItem.priority} priority</Badge>
                             {(lifecycle.isDueForRecheck || agentStatus) && (
                               <Badge variant={lifecycle.isExpired ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">
                                 {agentStatus === 'queued' ? 'Agent queued' : lifecycle.lifecycleStatus.replace(/_/g, ' ')}
@@ -1343,6 +1353,8 @@ export default function AdminDashboard({
                           {agentResult?.officialUrl ? (
                             <a className="text-primary underline" href={agentResult.officialUrl} target="_blank" rel="noreferrer">{agentResult.provider} official check</a>
                           ) : 'Queued or not yet checked'}
+                          <p className="mt-1 font-medium text-foreground">{queueItem.action}</p>
+                          {queueItem.blocker && <p className="mt-1 text-red-600">{queueItem.blocker}</p>}
                           {agentResult?.error && <p className="mt-1 line-clamp-2 text-red-600">{agentResult.error}</p>}
                         </TableCell>
                         <TableCell className="text-right">
