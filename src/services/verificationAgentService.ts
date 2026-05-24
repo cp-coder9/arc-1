@@ -120,16 +120,32 @@ async function firstVisible(page: Page, selectors: string[]) {
   return null;
 }
 
+const NO_RECORD_PHRASES = [
+  'no record',
+  'not found',
+  'no result',
+  'no matching record',
+  'no matching records',
+  'no matches',
+  '0 results',
+  'zero results',
+];
+
+function containsNoRecordSignal(normalizedText: string): boolean {
+  return NO_RECORD_PHRASES.some((phrase) => normalizedText.includes(phrase));
+}
+
 export function assessVerificationRegisterText(text: string, term: string): { status: VerificationStatus; requiresHumanReview: boolean } {
   const normalizedText = text.toLowerCase();
   const normalizedTerm = term.toLowerCase();
   const comparableText = normalizeRegisterComparable(text);
   const comparableTerm = normalizeRegisterComparable(term);
   const containsTerm = normalizedText.includes(normalizedTerm) || (comparableTerm.length >= 4 && comparableText.includes(comparableTerm));
-  if (containsTerm && !normalizedText.includes('no record') && !normalizedText.includes('not found')) {
+  const hasNoRecordSignal = containsNoRecordSignal(normalizedText);
+  if (containsTerm && !hasNoRecordSignal) {
     return { status: 'verified', requiresHumanReview: false };
   }
-  if (normalizedText.includes('no record') || normalizedText.includes('not found') || normalizedText.includes('no result')) {
+  if (hasNoRecordSignal) {
     return { status: 'rejected', requiresHumanReview: false };
   }
   return { status: 'pending', requiresHumanReview: true };

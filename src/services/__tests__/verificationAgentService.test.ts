@@ -105,6 +105,28 @@ describe('verificationAgentService', () => {
     });
   });
 
+  it('classifies official zero-match register language as rejected without human review', async () => {
+    const { assessVerificationRegisterText } = await import('../verificationAgentService');
+
+    expect(assessVerificationRegisterText('Search complete: no matching records for ECSA-404', 'ECSA-404')).toEqual({
+      status: 'rejected',
+      requiresHumanReview: false,
+    });
+    expect(assessVerificationRegisterText('0 results returned for registration CIDB/404', 'CIDB/404')).toEqual({
+      status: 'rejected',
+      requiresHumanReview: false,
+    });
+  });
+
+  it('lets explicit no-record signals override echoed search terms', async () => {
+    const { assessVerificationRegisterText } = await import('../verificationAgentService');
+
+    expect(assessVerificationRegisterText('No matching records. You searched for SACAP-123.', 'SACAP-123')).toEqual({
+      status: 'rejected',
+      requiresHumanReview: false,
+    });
+  });
+
   it('keeps ambiguous official register text pending for human review', async () => {
     const { assessVerificationRegisterText } = await import('../verificationAgentService');
 
