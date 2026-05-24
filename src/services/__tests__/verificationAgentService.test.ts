@@ -48,6 +48,22 @@ describe('verificationAgentService', () => {
     expect(result.error).toContain('display name');
   });
 
+  it('routes ECSA checks through the configured public-register provider', async () => {
+    const { chromium } = await import('playwright');
+    const { runVerificationBrowserAgent } = await import('../verificationAgentService');
+    const result = await runVerificationBrowserAgent({ subjectType: 'bep', statutoryBody: 'ECSA' });
+
+    expect(result).toMatchObject({
+      provider: 'ecsa',
+      status: 'pending',
+      source: 'automated_browser_agent',
+      officialUrl: expect.stringContaining('ecsa.co.za'),
+      requiresHumanReview: true,
+      error: expect.stringContaining('registration number'),
+    });
+    expect(chromium.launch).not.toHaveBeenCalled();
+  });
+
   it('classifies clear official no-record text as rejected without human review', async () => {
     const { assessVerificationRegisterText } = await import('../verificationAgentService');
 

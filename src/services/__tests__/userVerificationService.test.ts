@@ -18,6 +18,7 @@ describe('userVerificationService', () => {
     expect(normalizeRegistrationNumber('  SACAP   123  ')).toBe('SACAP 123');
     expect(normalizeStatutoryBody(' sacap ')).toBe('SACAP');
     expect(inferVerificationProvider({ subjectType: 'bep', statutoryBody: 'SACAP' })).toBe('sacap');
+    expect(inferVerificationProvider({ subjectType: 'bep', statutoryBody: 'ECSA' })).toBe('ecsa');
     expect(inferVerificationProvider({ subjectType: 'contractor' })).toBe('cidb');
     expect(inferVerificationProvider({ subjectType: 'supplier' })).toBe('cipc');
   });
@@ -215,7 +216,7 @@ describe('userVerificationService', () => {
       priority: 'high',
       action: 'Queue public-register recheck before verified status expires',
     });
-    expect(queue.items[2]).toMatchObject({ provider: 'manual', priority: 'medium', action: 'Review uploaded evidence manually against official ECSA record' });
+    expect(queue.items[2]).toMatchObject({ provider: 'ecsa', priority: 'medium', action: 'Run ECSA public-register verification and route result for admin review' });
   });
 
   it('rejects unsupported subject and review statuses', () => {

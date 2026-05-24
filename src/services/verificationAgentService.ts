@@ -29,6 +29,22 @@ interface BrowserProviderConfig {
 }
 
 const PROVIDER_CONFIGS: Record<Exclude<VerificationProvider, 'sacap' | 'manual'>, BrowserProviderConfig> = {
+  ecsa: {
+    provider: 'ecsa',
+    statutoryBody: 'ECSA',
+    officialUrl: 'https://www.ecsa.co.za/registered-persons/',
+    source: 'automated_browser_agent',
+    searchInputSelectors: [
+      'input[type="search"]',
+      'input[placeholder*="Search" i]',
+      'input[placeholder*="registration" i]',
+      'input[name*="search" i]',
+      'input[id*="search" i]',
+      'input[type="text"]',
+    ],
+    submitSelectors: ['button[type="submit"]', 'button:has-text("Search")', 'input[type="submit"]'],
+    resultContainerSelectors: ['table', '[role="table"]', '.table', '.results', '[class*="result" i]', 'body'],
+  },
   cidb: {
     provider: 'cidb',
     statutoryBody: 'CIDB',

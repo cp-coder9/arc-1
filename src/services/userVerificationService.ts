@@ -1,6 +1,6 @@
 import type { UserVerification, VerificationSource, VerificationStatus, VerificationSubjectType } from '../types';
 
-export type VerificationProvider = 'sacap' | 'cidb' | 'nhbrc' | 'cipc' | 'manual';
+export type VerificationProvider = 'sacap' | 'ecsa' | 'cidb' | 'nhbrc' | 'cipc' | 'manual';
 
 export interface VerificationSubmissionInput {
   userId: string;
@@ -62,6 +62,7 @@ export function normalizeStatutoryBody(value?: string): string | undefined {
 export function inferVerificationProvider(input: Pick<VerificationSubmissionInput, 'subjectType' | 'statutoryBody'>): VerificationProvider {
   const body = normalizeStatutoryBody(input.statutoryBody);
   if (body === 'SACAP') return 'sacap';
+  if (body === 'ECSA') return 'ecsa';
   if (body === 'CIDB') return 'cidb';
   if (body === 'NHBRC') return 'nhbrc';
   if (body === 'CIPC') return 'cipc';
@@ -237,6 +238,7 @@ function resolveQueueAction(verification: UserVerification | Record<string, any>
   const statutoryBody = normalizeStatutoryBody((verification as any).statutoryBody);
   if (dueForRecheck) return 'Queue public-register recheck before verified status expires';
   if (provider === 'sacap') return 'Run SACAP public-register verification and route result for admin review';
+  if (provider === 'ecsa') return 'Run ECSA public-register verification and route result for admin review';
   if (provider === 'cidb') return 'Run CIDB contractor-register verification and route result for admin review';
   if (provider === 'cipc') return 'Review uploaded evidence manually against official CIPC record';
   if (provider === 'nhbrc') return 'Run NHBRC enrolment/registration verification and route result for admin review';
