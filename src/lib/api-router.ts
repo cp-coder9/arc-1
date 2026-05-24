@@ -5660,10 +5660,21 @@ router.get("/admin/verifications", async (req, res) => {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
     const status = req.query.status as string | undefined;
+    const subjectType = typeof req.query.subjectType === 'string' ? req.query.subjectType : undefined;
+    const statutoryBody = typeof req.query.statutoryBody === 'string' ? normalizeStatutoryBody(req.query.statutoryBody) : undefined;
+    const provider = typeof req.query.provider === 'string' ? req.query.provider.trim().toLowerCase() : undefined;
+    if (subjectType) assertVerificationSubjectType(subjectType);
     const collectionRef = adminDb.collection('user_verifications');
     const queryRef = status ? collectionRef.where('status', '==', status) : collectionRef;
     const snapshot = await queryRef.limit(250).get();
-    const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const records = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter((record: Record<string, any>) => {
+        if (subjectType && record.subjectType !== subjectType) return false;
+        if (statutoryBody && normalizeStatutoryBody(record.statutoryBody) !== statutoryBody) return false;
+        if (provider && inferVerificationProvider({ subjectType: record.subjectType, statutoryBody: record.statutoryBody }) !== provider) return false;
+        return true;
+      });
     if (req.query.view === 'queue') {
       res.json(buildVerificationQueueProjection(records as UserVerification[], {
         slaHours: parsePositiveIntegerQuery(req.query.slaHours, 48, { min: 1, max: 720 }),

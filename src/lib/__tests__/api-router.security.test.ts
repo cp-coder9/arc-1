@@ -1313,6 +1313,48 @@ describe('api-router security and high-value integration routes', () => {
     expect(invalidPolicyQueue.body.summary.overdue).toBe(0);
   });
 
+  it('lets admins filter verification queues by registry lane', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('user_verifications/ver-sacap-lane', {
+      userId: 'architect-1',
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      registrationNumber: 'SACAP-789',
+      status: 'pending',
+      source: 'automated_browser_agent',
+      submittedAt: '2026-01-02T00:00:00.000Z',
+      submittedBy: 'architect-1',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    });
+    mockAdminDb.seed('user_verifications/ver-cipc-lane', {
+      userId: 'supplier-1',
+      subjectType: 'supplier',
+      statutoryBody: 'CIPC',
+      status: 'pending',
+      source: 'document_upload',
+      submittedAt: '2026-01-02T00:00:00.000Z',
+      submittedBy: 'supplier-1',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    const sacapQueue = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue', provider: 'sacap', statutoryBody: 'sacap', subjectType: 'bep' })
+      .set(authHeader('admin'));
+    const invalidSubject = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue', subjectType: 'owner' })
+      .set(authHeader('admin'));
+
+    expect(sacapQueue.status).toBe(200);
+    expect(sacapQueue.body.summary).toMatchObject({ total: 1, pending: 1 });
+    expect(sacapQueue.body.items.map((item: any) => item.id)).toEqual(['ver-sacap-lane']);
+    expect(sacapQueue.body.items[0]).toMatchObject({ provider: 'sacap', statutoryBody: 'SACAP', subjectType: 'bep' });
+    expect(invalidSubject.status).toBe(400);
+  });
+
   it('allows admins to review verification records and mirrors SACAP legacy records', async () => {
     const app = await buildApp();
     mockAdminDb.seed('user_verifications/ver-1', {
