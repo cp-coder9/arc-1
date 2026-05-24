@@ -1855,23 +1855,17 @@ function ProfessionOrbit({ onGetStarted }: { onGetStarted: () => void }) {
           </div>
           <Button onClick={onGetStarted} variant="outline" className="rounded-full border-[#04302c]/20 bg-transparent font-black hover:bg-[#04302c] hover:text-[#F8FAFC]">Find my role <ArrowRight className="ml-2 h-4 w-4" /></Button>
         </div>
-        <div className="mb-6 grid gap-5 lg:grid-cols-[0.95fr_1.05fr] lg:items-stretch">
-          <ArchitexThreeExperience
-            variant="role-constellation"
-            className="min-h-[28rem] border-[#04302c]/10 bg-[#04302c] text-[#F8FAFC] shadow-[0_30px_100px_rgba(4,48,44,0.24)]"
-          />
-          <div className="rounded-[2.5rem] border border-[#04302c]/10 bg-[#04302c] p-6 text-[#F8FAFC] shadow-[0_30px_100px_rgba(4,48,44,0.18)] sm:p-8">
-            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#7cd7c3]">Hallmark behaviour</p>
-            <h3 className="mt-4 font-heading text-4xl font-black tracking-[-0.06em] sm:text-5xl">The bird is not a mascot. It is the operating symbol.</h3>
-            <p className="mt-5 text-base font-medium leading-relaxed text-[#F8FAFC]/64">On the homepage it behaves like a living project compass: roles form around it, unresolved gates stay visible, and the next action is always pulled back to one verified project truth.</p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              {[["Roles", "orbit the project"], ["Gates", "protect sign-off"], ["Evidence", "feeds every claim"]].map(([value, label]) => (
-                <div key={value} className="rounded-3xl border border-white/10 bg-white/[0.055] p-4">
-                  <p className="font-heading text-2xl font-black tracking-[-0.04em]">{value}</p>
-                  <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#F8FAFC]/45">{label}</p>
-                </div>
-              ))}
-            </div>
+        <div className="mb-6 rounded-[2.5rem] border border-[#04302c]/10 bg-[#04302c] p-6 text-[#F8FAFC] shadow-[0_30px_100px_rgba(4,48,44,0.18)] sm:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#7cd7c3]">Hallmark behaviour</p>
+          <h3 className="mt-4 max-w-4xl font-heading text-4xl font-black tracking-[-0.06em] sm:text-5xl">The bird is not a mascot. It is the operating symbol.</h3>
+          <p className="mt-5 max-w-4xl text-base font-medium leading-relaxed text-[#F8FAFC]/64">On the homepage it behaves like a living project compass: roles form around it, unresolved gates stay visible, and the next action is always pulled back to one verified project truth.</p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            {[["Roles", "orbit the project"], ["Gates", "protect sign-off"], ["Evidence", "feeds every claim"]].map(([value, label]) => (
+              <div key={value} className="rounded-3xl border border-white/10 bg-white/[0.055] p-4">
+                <p className="font-heading text-2xl font-black tracking-[-0.04em]">{value}</p>
+                <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#F8FAFC]/45">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1910,16 +1904,10 @@ function ProcessRail() {
   return (
     <section className="bg-[#F8FAFC] px-4 pb-16 text-[#04302c] sm:px-8 lg:px-16">
       <div className="mx-auto max-w-7xl rounded-[2.5rem] bg-[#04302c] p-6 text-[#F8FAFC] sm:p-8 lg:p-10">
-        <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_24rem] lg:items-center">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#0f6b62]">The line of control</p>
-            <h2 className="mt-2 font-heading text-3xl font-black tracking-[-0.055em] sm:text-5xl">From first idea to accountable handover.</h2>
-            <p className="mt-4 max-w-3xl text-sm font-medium leading-relaxed text-[#F8FAFC]/56">A Three.js stage-gate ribbon visualises what Architex exists to do: prevent the next phase from moving until role, evidence, approval, funding, and compliance are aligned.</p>
-          </div>
-          <ArchitexThreeExperience
-            variant="stage-gate-ribbon"
-            className="h-72 rounded-[2rem] border-white/10 bg-[#02231f]"
-          />
+        <div className="mb-8 max-w-4xl">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#0f6b62]">The line of control</p>
+          <h2 className="mt-2 font-heading text-3xl font-black tracking-[-0.055em] sm:text-5xl">From first idea to accountable handover.</h2>
+          <p className="mt-4 text-sm font-medium leading-relaxed text-[#F8FAFC]/56">Architex prevents the next phase from moving until role, evidence, approval, funding, and compliance are aligned.</p>
         </div>
         <div className="grid gap-3 lg:grid-cols-4">
           {steps.map(([title, copy], index) => (
