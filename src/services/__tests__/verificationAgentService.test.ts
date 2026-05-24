@@ -40,6 +40,24 @@ describe('verificationAgentService', () => {
       officialUrl: expect.stringContaining('search.mymembership.co.za'),
     });
   });
+
+  it('matches SACAP registration numbers case-insensitively against official register details', async () => {
+    const { runVerificationBrowserAgent } = await import('../verificationAgentService');
+    const result = await runVerificationBrowserAgent({
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      registrationNumber: ' sacap-123 ',
+      displayName: 'Architect One',
+    });
+
+    expect(result).toMatchObject({
+      provider: 'sacap',
+      status: 'verified',
+      requiresHumanReview: false,
+      details: { registrationMatches: true },
+    });
+  });
+
   it('does not simulate results when required search data is missing', async () => {
     const { runVerificationBrowserAgent } = await import('../verificationAgentService');
     const result = await runVerificationBrowserAgent({ subjectType: 'bep', statutoryBody: 'SACAP' });

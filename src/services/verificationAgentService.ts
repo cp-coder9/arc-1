@@ -100,6 +100,10 @@ function chooseSearchTerm(input: VerificationAgentInput): { term?: string; mode:
   return { term: undefined, mode: 'registration_number' };
 }
 
+function canonicalRegistrationNumber(value?: string): string | undefined {
+  return normalizeRegistrationNumber(value)?.toUpperCase();
+}
+
 async function firstVisible(page: Page, selectors: string[]) {
   for (const selector of selectors) {
     const locator = page.locator(selector).first();
@@ -237,8 +241,8 @@ export async function runVerificationBrowserAgent(input: VerificationAgentInput)
       };
     }
     const result = await verifySACAPByName(name);
-    const requestedRegistration = normalizeRegistrationNumber(input.registrationNumber);
-    const resultRegistration = normalizeRegistrationNumber(result.registrationDetails?.registrationNumber);
+    const requestedRegistration = canonicalRegistrationNumber(input.registrationNumber);
+    const resultRegistration = canonicalRegistrationNumber(result.registrationDetails?.registrationNumber);
     const registrationMatches = !requestedRegistration || !resultRegistration || requestedRegistration === resultRegistration;
     const verified = result.verified === true && registrationMatches;
     return {
