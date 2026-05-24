@@ -67,9 +67,38 @@ export interface SnagRectificationTask {
   nextAction: string;
 }
 
+export type HandoverPackDocumentCategory = 'final_account' | 'safety_sheet' | 'compliance_certificate' | 'manufacturer_warranty' | 'manual' | 'as_built' | 'other';
+
+export interface HandoverPackDocumentInput {
+  id: string;
+  title: string;
+  category?: HandoverPackDocumentCategory | string;
+  type?: string;
+  status?: string;
+  url?: string;
+  packageId?: string;
+  uploadedBy?: string;
+  uploadedAt?: string;
+}
+
+export interface HandoverPackManifestItem extends HandoverPackDocumentInput {
+  category: HandoverPackDocumentCategory;
+  ready: boolean;
+  blockers: string[];
+}
+
+export interface HandoverPackManifest {
+  ready: boolean;
+  items: HandoverPackManifestItem[];
+  missingCategories: HandoverPackDocumentCategory[];
+  blockers: string[];
+  documentCount: number;
+}
+
 const CLOSED_SNAG_STATUSES = new Set(['closed', 'resolved', 'accepted']);
 const ACCEPTED_DOCUMENT_STATUSES = new Set(['approved', 'accepted', 'closed', 'issued']);
 const APPROVED_FINAL_ACCOUNT_STATUSES = new Set(['approved', 'accepted', 'settled', 'closed']);
+const REQUIRED_HANDOVER_CATEGORIES: HandoverPackDocumentCategory[] = ['final_account', 'safety_sheet', 'compliance_certificate', 'manufacturer_warranty'];
 
 function normaliseStatus(value?: string): string {
   return String(value ?? '').trim().toLowerCase();
@@ -149,6 +178,36 @@ export function buildSnagRectificationPlan(snags: CloseoutSnagRecord[] = [], opt
           : `Assign ${trade} rectification and upload photographic evidence before final retention can progress.`,
       };
     });
+}
+
+export function buildHandoverPackManifest(documents: HandoverPackDocumentInput[] = []): HandoverPackManifest {
+  const items = documents.map((document) => {
+    const category = normaliseHandoverCategory(document.category ?? document.type);
+    const blockers: string[] = [];
+    if (!ACCEPTED_DOCUMENT_STATUSES.has(normaliseStatus(document.status))) blockers.push('Document must be approved, accepted, issued, or closed.');
+    if (!hasUsableUrl(document.url)) blockers.push('Document must include a persisted file link.');
+    return { ...document, category, ready: blockers.length === 0, blockers };
+  });
+
+  const readyCategories = new Set(items.filter((item) => item.ready).map((item) => item.category));
+  const missingCategories = REQUIRED_HANDOVER_CATEGORIES.filter((category) => !readyCategories.has(category));
+  const blockers = [
+    ...missingCategories.map((category) => `Missing ready handover document category: ${category.replaceAll('_', ' ')}.`),
+    ...items.flatMap((item) => item.blockers.map((blocker) => `${item.title}: ${blocker}`)),
+  ];
+
+  return { ready: blockers.length === 0, items, missingCategories, blockers, documentCount: items.length };
+}
+
+function normaliseHandoverCategory(value?: string): HandoverPackDocumentCategory {
+  const normalised = normaliseStatus(value).replaceAll('-', '_').replaceAll(' ', '_');
+  if (['final_account', 'final_account_statement', 'final_accounts'].includes(normalised)) return 'final_account';
+  if (['safety_sheet', 'material_safety_sheet', 'msds', 'sds'].includes(normalised)) return 'safety_sheet';
+  if (['compliance_certificate', 'certificate', 'coc', 'completion_certificate'].includes(normalised)) return 'compliance_certificate';
+  if (['manufacturer_warranty', 'warranty'].includes(normalised)) return 'manufacturer_warranty';
+  if (['manual', 'operation_manual', 'maintenance_manual'].includes(normalised)) return 'manual';
+  if (['as_built', 'as_built_drawing', 'record_drawing'].includes(normalised)) return 'as_built';
+  return 'other';
 }
 
 function hasPersistedCloseoutArtifacts(project: Project, certificateData?: Record<string, unknown>, reportData?: Record<string, unknown>): boolean {

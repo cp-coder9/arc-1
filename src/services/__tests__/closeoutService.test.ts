@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as firestore from 'firebase/firestore';
-import { archiveProject, buildSnagRectificationPlan, CLOSEOUT_ARTIFACTS_REQUIRED_ERROR, CLOSEOUT_GATE_REQUIRED_ERROR, evaluateCloseoutGate, getProjectSummary, summaryHasPersistedCloseoutArtifacts } from '../closeoutService';
+import { archiveProject, buildHandoverPackManifest, buildSnagRectificationPlan, CLOSEOUT_ARTIFACTS_REQUIRED_ERROR, CLOSEOUT_GATE_REQUIRED_ERROR, evaluateCloseoutGate, getProjectSummary, summaryHasPersistedCloseoutArtifacts } from '../closeoutService';
 
 vi.mock('@/lib/firebase', () => ({ db: { name: 'mock-db' } }));
 vi.mock('@/lib/uploadService', () => ({ uploadAndTrackFile: vi.fn() }));
@@ -121,6 +121,43 @@ describe('closeoutService', () => {
         paymentGate: 'blocked_until_evidence',
       }),
     ]);
+  });
+
+  it('builds a governed handover pack manifest and flags missing or unapproved close-out records', () => {
+    const manifest = buildHandoverPackManifest([
+      { id: 'final-account', title: 'Final account statement', category: 'final accounts', status: 'approved', url: 'https://files/final-account.pdf' },
+      { id: 'coc', title: 'Electrical COC', type: 'coc', status: 'issued', url: 'https://files/coc.pdf' },
+      { id: 'warranty', title: 'Waterproofing warranty', type: 'warranty', status: 'submitted', url: 'https://files/warranty.pdf' },
+      { id: 'manual', title: 'Pump operation manual', category: 'manual', status: 'closed', url: 'https://files/manual.pdf' },
+    ]);
+
+    expect(manifest.ready).toBe(false);
+    expect(manifest.documentCount).toBe(4);
+    expect(manifest.items.map((item) => [item.id, item.category, item.ready])).toEqual([
+      ['final-account', 'final_account', true],
+      ['coc', 'compliance_certificate', true],
+      ['warranty', 'manufacturer_warranty', false],
+      ['manual', 'manual', true],
+    ]);
+    expect(manifest.missingCategories).toEqual(['safety_sheet', 'manufacturer_warranty']);
+    expect(manifest.blockers).toEqual(expect.arrayContaining([
+      'Missing ready handover document category: safety sheet.',
+      'Missing ready handover document category: manufacturer warranty.',
+      'Waterproofing warranty: Document must be approved, accepted, issued, or closed.',
+    ]));
+  });
+
+  it('marks handover manifest ready when required final account, safety, certificates, and warranties are persisted', () => {
+    const manifest = buildHandoverPackManifest([
+      { id: 'final-account', title: 'Final account statement', category: 'final_account', status: 'approved', url: 'https://files/final-account.pdf' },
+      { id: 'msds', title: 'Paint material safety sheet', type: 'MSDS', status: 'accepted', url: 'https://files/msds.pdf' },
+      { id: 'coc', title: 'Electrical COC', type: 'certificate', status: 'issued', url: 'https://files/coc.pdf' },
+      { id: 'warranty', title: 'Waterproofing warranty', type: 'manufacturer warranty', status: 'closed', url: 'https://files/warranty.pdf' },
+    ]);
+
+    expect(manifest.ready).toBe(true);
+    expect(manifest.missingCategories).toEqual([]);
+    expect(manifest.blockers).toEqual([]);
   });
 
   it('rejects archive attempts until both project fields and artifact documents are persisted', async () => {
