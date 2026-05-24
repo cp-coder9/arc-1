@@ -17,6 +17,7 @@ import {
   applyVerificationReview,
   assertVerificationSubjectType,
   buildUserVerification,
+  buildVerificationQueueProjection,
   inferVerificationProvider,
   isActiveVerifiedVerification,
   normalizeRegistrationNumber,
@@ -5651,7 +5652,12 @@ router.get("/admin/verifications", async (req, res) => {
     const collectionRef = adminDb.collection('user_verifications');
     const queryRef = status ? collectionRef.where('status', '==', status) : collectionRef;
     const snapshot = await queryRef.limit(250).get();
-    res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if (req.query.view === 'queue') {
+      res.json(buildVerificationQueueProjection(records as UserVerification[]));
+      return;
+    }
+    res.json(records);
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

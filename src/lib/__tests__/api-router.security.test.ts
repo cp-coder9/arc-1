@@ -1226,6 +1226,55 @@ describe('api-router security and high-value integration routes', () => {
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'verification.submitted')).toBe(true);
   });
 
+  it('projects the admin verification queue with prioritized next actions', async () => {
+    const app = await buildApp();
+    mockAdminDb.seed('user_verifications/ver-overdue-cipc', {
+      userId: 'supplier-1',
+      subjectType: 'supplier',
+      statutoryBody: 'CIPC',
+      status: 'pending',
+      source: 'document_upload',
+      submittedAt: '2020-01-01T00:00:00.000Z',
+      submittedBy: 'supplier-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockAdminDb.seed('user_verifications/ver-sacap-expiring', {
+      userId: 'architect-1',
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      registrationNumber: 'SACAP-123',
+      status: 'verified',
+      source: 'public_register',
+      submittedAt: '2026-01-02T00:00:00.000Z',
+      submittedBy: 'architect-1',
+      expiresAt: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    const forbidden = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue' })
+      .set(authHeader('architect'));
+    const response = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue' })
+      .set(authHeader('admin'));
+
+    expect(forbidden.status).toBe(403);
+    expect(response.status).toBe(200);
+    expect(response.body.summary).toMatchObject({ total: 2, pending: 1, overdue: 1, dueForRecheck: 1 });
+    expect(response.body.items.map((item: any) => item.id)).toEqual(['ver-overdue-cipc', 'ver-sacap-expiring']);
+    expect(response.body.items[0]).toMatchObject({
+      provider: 'cipc',
+      priority: 'urgent',
+      blocker: 'Verification has exceeded the 48 hour SLA.',
+      action: 'Review uploaded evidence manually against official CIPC record',
+    });
+    expect(response.body.items[1]).toMatchObject({ priority: 'high', action: 'Queue public-register recheck before verified status expires' });
+  });
+
   it('allows admins to review verification records and mirrors SACAP legacy records', async () => {
     const app = await buildApp();
     mockAdminDb.seed('user_verifications/ver-1', {
