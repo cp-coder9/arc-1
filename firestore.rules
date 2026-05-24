@@ -1203,6 +1203,26 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Subscriptions collection
+    // Subscription status is readable by the owning user, active firm members,
+    // and admins, but browser clients cannot self-activate or repair billing
+    // state. Provider/webhook reconciliation must run through privileged server
+    // paths.
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid || (resource.data.firmId is string && isActiveFirmMember(resource.data.firmId)));
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Credits collection
+    // Credit balances and allocations are financial state and must not be
+    // directly mutated by browser users. Users may only read their own balance.
+    match /credits/{creditId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
     // Central financial ledger
     match /ledger/{entryId} {
       allow read: if isAuthenticated() && (

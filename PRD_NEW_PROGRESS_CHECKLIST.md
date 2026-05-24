@@ -49,7 +49,7 @@ Important note: the repo does not contain a file literally named prdnew.md; the 
 - [x] Phase 5 financial domain/readiness service present.
 - [x] Verify all new-flow platform fees use the intended one percent configuration in server/client paths. Implemented shared PRD platform fee policy in `src/services/platformFeePolicy.ts` and covered server/client fee defaults with focused tests.
 - [ ] Add/verify PayFast subscription, activation, credits, duplicate ITN, and failed-payment release-gate tests with sandbox credentials.
-- [ ] Confirm users cannot directly mutate ledger/subscription/credit state in Firestore rules tests.
+- [x] Confirm users cannot directly mutate ledger/subscription/credit state in Firestore rules tests. Added explicit `subscriptions` and `credits` Firestore rules with owner-scoped reads, admin/server-owned writes, and static regression coverage alongside append-only ledger assertions.
 
 ### Phase 3 - CPD
 

@@ -235,6 +235,16 @@ describe('firestore security rules static regressions', () => {
     ])).toBe(true);
   });
 
+  it('keeps subscription, credit, and ledger state server-owned with owner-scoped reads only', () => {
+    expect(rules).toContain('match /subscriptions/{subscriptionId}');
+    expect(rules).toContain('match /credits/{creditId}');
+    expect(rules).toContain('allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid || (resource.data.firmId is string && isActiveFirmMember(resource.data.firmId)));');
+    expect(rules).toContain('allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);');
+    expect(rules).toContain('allow create, update: if isAdmin();');
+    expect(rules).toContain('allow create: if isAuthenticated() && isAdmin() &&');
+    expect(rules).toContain('allow update, delete: if false;');
+  });
+
   it('documents human-only AI signoff controls and verification recheck persistence', () => {
     expect(aiGovernanceDocs).toContain('AI and system actors cannot create human sign-off records');
     expect(aiGovernanceDocs).toContain('requiresHumanConfirmation');
