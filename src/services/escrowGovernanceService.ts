@@ -1,4 +1,4 @@
-import type { ProjectStage, UserRole } from '../types';
+import type { LedgerEntry, ProjectStage, UserRole } from '../types';
 import { buildApprovalGateRecord, evaluateApprovalGateReadiness, type ApprovalGateActor, type ApprovalGateReadiness, type ApprovalGateRecord } from './approvalGateService';
 
 export type EscrowReleaseDecision = 'approved' | 'rejected' | 'hold';
@@ -54,6 +54,36 @@ export interface EscrowAdminReviewRecord extends EscrowAdminReviewInput {
   autoReleaseProhibited: true;
 }
 
+export interface FinalEscrowClosureInput {
+  projectId: string;
+  jobId: string;
+  projectStage: ProjectStage | string;
+  archived?: boolean;
+  closeoutGateReady?: boolean;
+  ledgerEntries?: Array<Pick<LedgerEntry, 'type' | 'amount'>>;
+  unresolvedDisputes?: number;
+  unresolvedApprovalGates?: number;
+  adminId?: string;
+  reviewedAt?: string;
+}
+
+export interface FinalEscrowClosureEvaluation {
+  ready: boolean;
+  escrowHeld: number;
+  blockers: string[];
+  warnings: string[];
+  closureRecord?: {
+    projectId: string;
+    jobId: string;
+    status: 'ready_for_wallet_closure';
+    reviewedBy: string;
+    reviewedAt: string;
+    escrowHeld: number;
+    humanApprovalRequired: true;
+    autoClosureProhibited: true;
+  };
+}
+
 function requireString(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) throw Object.assign(new Error(`${field} is required`), { status: 400 });
   return value.trim();
@@ -61,6 +91,54 @@ function requireString(value: unknown, field: string): string {
 
 function cleanStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map(item => item.trim()) : [];
+}
+
+function calculateHeldEscrow(entries: Array<Pick<LedgerEntry, 'type' | 'amount'>> = []): number {
+  const held = entries.reduce((sum, entry) => {
+    if (entry.type === 'escrow_deposit') return sum + entry.amount;
+    if (entry.type === 'milestone_release' || entry.type === 'refund') return sum - entry.amount;
+    return sum;
+  }, 0);
+  return Math.max(0, Math.round(held * 100) / 100);
+}
+
+function formatZarAmount(amount: number): string {
+  return amount.toLocaleString('en-ZA').replace(/\u00a0/g, ' ');
+}
+
+export function evaluateFinalEscrowClosure(input: FinalEscrowClosureInput): FinalEscrowClosureEvaluation {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const escrowHeld = calculateHeldEscrow(input.ledgerEntries);
+
+  if (!input.projectId?.trim()) blockers.push('Project ID is required for escrow wallet closure.');
+  if (!input.jobId?.trim()) blockers.push('Job ID is required for escrow wallet closure.');
+  if (input.projectStage !== 'closeout') blockers.push('Project must be in close-out stage before final escrow wallet closure.');
+  if (!input.archived) blockers.push('Project file must be archived before final escrow wallet closure.');
+  if (!input.closeoutGateReady) blockers.push('Close-out gate must be ready before final escrow wallet closure.');
+  if (escrowHeld > 0) blockers.push(`Escrow wallet still holds ZAR ${formatZarAmount(escrowHeld)}; release or refund must be resolved first.`);
+  if ((input.unresolvedDisputes ?? 0) > 0) blockers.push(`${input.unresolvedDisputes} unresolved dispute${input.unresolvedDisputes === 1 ? '' : 's'} must be closed before wallet closure.`);
+  if ((input.unresolvedApprovalGates ?? 0) > 0) blockers.push(`${input.unresolvedApprovalGates} approval gate${input.unresolvedApprovalGates === 1 ? '' : 's'} remain open before wallet closure.`);
+  if (!input.adminId?.trim()) blockers.push('Admin reviewer is required for final escrow wallet closure.');
+  if (!input.reviewedAt?.trim()) warnings.push('No reviewedAt timestamp supplied; closure record will use the current time when built.');
+
+  const ready = blockers.length === 0;
+  return {
+    ready,
+    escrowHeld,
+    blockers,
+    warnings,
+    closureRecord: ready ? {
+      projectId: input.projectId.trim(),
+      jobId: input.jobId.trim(),
+      status: 'ready_for_wallet_closure',
+      reviewedBy: input.adminId!.trim(),
+      reviewedAt: input.reviewedAt?.trim() || new Date().toISOString(),
+      escrowHeld,
+      humanApprovalRequired: true,
+      autoClosureProhibited: true,
+    } : undefined,
+  };
 }
 
 export function buildEscrowReleaseApprovalGate(input: EscrowReleaseApprovalGateInput): EscrowReleaseApprovalGateProjection {

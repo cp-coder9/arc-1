@@ -4,6 +4,7 @@ import {
   buildEscrowAuditInput,
   buildEscrowLedgerEntry,
   buildEscrowReleaseApprovalGate,
+  evaluateFinalEscrowClosure,
   evaluateEscrowReleaseGate,
   type EscrowMilestoneGateInput,
 } from '../escrowGovernanceService';
@@ -124,6 +125,68 @@ describe('escrowGovernanceService', () => {
       resourceType: 'escrow_milestone',
       resourceId: 'payment-1',
       metadata: { decision: 'approved', humanApprovalRequired: true, autoReleaseProhibited: true },
+    });
+  });
+
+  it('blocks final escrow wallet closure until close-out archive, disputes, approvals, and held funds are clear', () => {
+    const evaluation = evaluateFinalEscrowClosure({
+      projectId: 'project-1',
+      jobId: 'job-1',
+      projectStage: 'payments',
+      archived: false,
+      closeoutGateReady: false,
+      ledgerEntries: [
+        { type: 'escrow_deposit', amount: 100_000 },
+        { type: 'milestone_release', amount: 75_000 },
+      ],
+      unresolvedDisputes: 1,
+      unresolvedApprovalGates: 2,
+    });
+
+    expect(evaluation.ready).toBe(false);
+    expect(evaluation.escrowHeld).toBe(25_000);
+    expect(evaluation.closureRecord).toBeUndefined();
+    expect(evaluation.blockers).toEqual(expect.arrayContaining([
+      'Project must be in close-out stage before final escrow wallet closure.',
+      'Project file must be archived before final escrow wallet closure.',
+      'Close-out gate must be ready before final escrow wallet closure.',
+      'Escrow wallet still holds ZAR 25 000; release or refund must be resolved first.',
+      '1 unresolved dispute must be closed before wallet closure.',
+      '2 approval gates remain open before wallet closure.',
+      'Admin reviewer is required for final escrow wallet closure.',
+    ]));
+  });
+
+  it('creates a human-governed final escrow closure record when the wallet is settled after archive', () => {
+    const evaluation = evaluateFinalEscrowClosure({
+      projectId: ' project-1 ',
+      jobId: ' job-1 ',
+      projectStage: 'closeout',
+      archived: true,
+      closeoutGateReady: true,
+      ledgerEntries: [
+        { type: 'escrow_deposit', amount: 100_000 },
+        { type: 'milestone_release', amount: 80_000 },
+        { type: 'platform_fee', amount: 1_000 },
+        { type: 'refund', amount: 20_000 },
+      ],
+      unresolvedDisputes: 0,
+      unresolvedApprovalGates: 0,
+      adminId: ' admin-1 ',
+      reviewedAt: '2026-08-02T00:00:00.000Z',
+    });
+
+    expect(evaluation.ready).toBe(true);
+    expect(evaluation.blockers).toEqual([]);
+    expect(evaluation.closureRecord).toEqual({
+      projectId: 'project-1',
+      jobId: 'job-1',
+      status: 'ready_for_wallet_closure',
+      reviewedBy: 'admin-1',
+      reviewedAt: '2026-08-02T00:00:00.000Z',
+      escrowHeld: 0,
+      humanApprovalRequired: true,
+      autoClosureProhibited: true,
     });
   });
 });
