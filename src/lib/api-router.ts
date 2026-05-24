@@ -167,6 +167,17 @@ function isAllowedBlobUrl(url: string): boolean {
   }
 }
 
+function parsePositiveIntegerQuery(value: unknown, fallback: number, options: { min?: number; max?: number } = {}): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== 'string' || raw.trim() === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed)) return fallback;
+  const min = options.min ?? 1;
+  const max = options.max ?? Number.MAX_SAFE_INTEGER;
+  if (parsed < min || parsed > max) return fallback;
+  return parsed;
+}
+
 async function getAdminLLMConfig() {
   try {
     const doc = await adminDb.collection("system_settings").doc("llm_config").get();
@@ -5654,7 +5665,10 @@ router.get("/admin/verifications", async (req, res) => {
     const snapshot = await queryRef.limit(250).get();
     const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     if (req.query.view === 'queue') {
-      res.json(buildVerificationQueueProjection(records as UserVerification[]));
+      res.json(buildVerificationQueueProjection(records as UserVerification[], {
+        slaHours: parsePositiveIntegerQuery(req.query.slaHours, 48, { min: 1, max: 720 }),
+        recheckWithinDays: parsePositiveIntegerQuery(req.query.recheckWithinDays, 30, { min: 1, max: 365 }),
+      }));
       return;
     }
     res.json(records);

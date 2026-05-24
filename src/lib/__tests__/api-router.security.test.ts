@@ -1275,6 +1275,44 @@ describe('api-router security and high-value integration routes', () => {
     expect(response.body.items[1]).toMatchObject({ priority: 'high', action: 'Queue public-register recheck before verified status expires' });
   });
 
+  it('lets admins tune verification queue SLA and recheck policy windows safely', async () => {
+    const app = await buildApp();
+    const submittedAt = new Date(Date.now() - 36 * 3_600_000).toISOString();
+    mockAdminDb.seed('user_verifications/ver-policy-window', {
+      userId: 'architect-1',
+      subjectType: 'bep',
+      statutoryBody: 'SACAP',
+      registrationNumber: 'SACAP-456',
+      status: 'pending',
+      source: 'automated_browser_agent',
+      submittedAt,
+      submittedBy: 'architect-1',
+      createdAt: submittedAt,
+      updatedAt: submittedAt,
+    });
+
+    const defaultQueue = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue' })
+      .set(authHeader('admin'));
+    const stricterQueue = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue', slaHours: '24', recheckWithinDays: '14' })
+      .set(authHeader('admin'));
+    const invalidPolicyQueue = await request(app)
+      .get('/api/admin/verifications')
+      .query({ view: 'queue', slaHours: '-1', recheckWithinDays: 'not-a-number' })
+      .set(authHeader('admin'));
+
+    expect(defaultQueue.status).toBe(200);
+    expect(defaultQueue.body.summary.overdue).toBe(0);
+    expect(defaultQueue.body.items[0]).toMatchObject({ id: 'ver-policy-window', priority: 'medium' });
+    expect(stricterQueue.status).toBe(200);
+    expect(stricterQueue.body.summary.overdue).toBe(1);
+    expect(stricterQueue.body.items[0]).toMatchObject({ id: 'ver-policy-window', priority: 'urgent', blocker: 'Verification has exceeded the 24 hour SLA.' });
+    expect(invalidPolicyQueue.body.summary.overdue).toBe(0);
+  });
+
   it('allows admins to review verification records and mirrors SACAP legacy records', async () => {
     const app = await buildApp();
     mockAdminDb.seed('user_verifications/ver-1', {
