@@ -1,3 +1,4 @@
+import { PRD_PLATFORM_FEE_PERCENT } from './platformFeePolicy';
 import type { Firestore } from 'firebase/firestore';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -134,7 +135,7 @@ export const DEFAULT_FEE_ESTIMATOR_SETTINGS: FeeEstimatorSettings = {
     urgent: 1.1,
     express: 1.2,
   },
-  platformFeePercent: 5,
+  platformFeePercent: PRD_PLATFORM_FEE_PERCENT,
   councilAdminFee: 3500,
   vatRate: 15,
   minimumProfessionalFee: 7500,

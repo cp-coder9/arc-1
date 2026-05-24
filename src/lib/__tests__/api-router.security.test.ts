@@ -1131,13 +1131,13 @@ describe('api-router security and high-value integration routes', () => {
     expect(initialized.status).toBe(200);
     expect(initialized.body.paymentUrl).toContain('signature=');
     const payment = mockAdminDb.listCollection('payments')[0].data;
-    expect(payment).toMatchObject({ payerId: 'client-1', payeeId: 'architect-1', amount: 105000, status: 'pending' });
-    expect(mockAdminDb.getDoc('escrow/job-1')).toMatchObject({ totalAmount: 105000, status: 'pending' });
+    expect(payment).toMatchObject({ payerId: 'client-1', payeeId: 'architect-1', amount: 101000, status: 'pending' });
+    expect(mockAdminDb.getDoc('escrow/job-1')).toMatchObject({ totalAmount: 101000, status: 'pending' });
     expect(mockAdminDb.listCollection('audit_logs')[0].data).toMatchObject({
       category: 'payment',
       action: 'payment.escrow_initiated',
       target: { type: 'payment' },
-      metadata: { totalAmount: 105000, platformFee: 5000 },
+      metadata: { totalAmount: 101000, platformFee: 1000 },
     });
   });
 
@@ -1560,14 +1560,14 @@ describe('api-router security and high-value integration routes', () => {
     expect(response.status).toBe(201);
     expect(response.body.project.projectCode).toMatch(/^ARC-20260102-/);
     expect(response.body.project).toMatchObject({ clientBriefId: 'brief-appoint', technicalBriefId: 'brief-appoint', clientId: 'client-1', leadArchitectId: 'architect-1', currentStage: 'appointment' });
-    expect(response.body.contract).toMatchObject({ status: 'generated_pending_acceptance', professionalFee: 200000, platformFee: 10000, totalEscrowAmount: 210000, verificationId: 'architect-1_bep_SACAP_SACAP-123' });
+    expect(response.body.contract).toMatchObject({ status: 'generated_pending_acceptance', professionalFee: 200000, platformFee: 2000, totalEscrowAmount: 202000, verificationId: 'architect-1_bep_SACAP_SACAP-123' });
     expect(response.body.contract.milestones).toHaveLength(5);
     expect(response.body.invoices).toHaveLength(5);
     expect(response.body.invoices.reduce((sum: number, invoice: any) => sum + invoice.totalAmount, 0)).toBe(200000);
     expect(mockAdminDb.listCollection('projects')).toHaveLength(1);
     const projectId = response.body.project.id;
     expect(mockAdminDb.getDoc(`appointment_contracts/${projectId}`)).toMatchObject({ projectId, clientBriefId: 'brief-appoint' });
-    expect(mockAdminDb.getDoc(`escrow/${projectId}`)).toMatchObject({ totalAmount: 210000, platformFeeAmount: 10000, status: 'pending', payeeId: 'architect-1' });
+    expect(mockAdminDb.getDoc(`escrow/${projectId}`)).toMatchObject({ totalAmount: 202000, platformFeeAmount: 2000, status: 'pending', payeeId: 'architect-1' });
     expect(mockAdminDb.getDoc('client_briefs/brief-appoint')).toMatchObject({ status: 'appointed', projectId, appointmentContractId: projectId });
     expect(mockAdminDb.getDoc('technical_briefs/brief-appoint')).toMatchObject({ projectId, appointmentContractId: projectId });
     expect(mockAdminDb.listCollection('audit_logs').some(({ data }) => data.action === 'contract.appointment_generated')).toBe(true);

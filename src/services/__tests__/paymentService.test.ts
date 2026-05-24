@@ -88,6 +88,14 @@ describe('PaymentService Phase 5 stage escrow', () => {
     paymentService = (await import('../paymentService')).paymentService;
   });
 
+  it('uses the PRD-mandated one percent platform fee default for escrow calculations', () => {
+    expect(paymentService.calculateEscrowAmounts(100_000)).toEqual({
+      architectAmount: 100_000,
+      platformFee: 1_000,
+      total: 101_000,
+    });
+  });
+
   it('initializeStageEscrow creates six milestones with expected percentages and amounts', async () => {
     await paymentService.initializeStageEscrow(project, 100000);
 

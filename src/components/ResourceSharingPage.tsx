@@ -161,7 +161,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
         accessModel: newResource.accessModel.trim(),
         hourlyRateCents: Math.max(0, Math.round(Number(newResource.hourlyRate || 0) * 100)),
         currency: 'ZAR',
-        platformFeeBps: 1000,
+        platformFeeBps: 100,
         minimumBillableMinutes: 60,
         visibilityRoles: ['bep', 'architect', 'freelancer'],
         status: 'active',
