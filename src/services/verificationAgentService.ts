@@ -104,6 +104,10 @@ function canonicalRegistrationNumber(value?: string): string | undefined {
   return normalizeRegistrationNumber(value)?.toUpperCase();
 }
 
+function normalizeRegisterComparable(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 async function firstVisible(page: Page, selectors: string[]) {
   for (const selector of selectors) {
     const locator = page.locator(selector).first();
@@ -119,7 +123,10 @@ async function firstVisible(page: Page, selectors: string[]) {
 export function assessVerificationRegisterText(text: string, term: string): { status: VerificationStatus; requiresHumanReview: boolean } {
   const normalizedText = text.toLowerCase();
   const normalizedTerm = term.toLowerCase();
-  if (normalizedText.includes(normalizedTerm) && !normalizedText.includes('no record') && !normalizedText.includes('not found')) {
+  const comparableText = normalizeRegisterComparable(text);
+  const comparableTerm = normalizeRegisterComparable(term);
+  const containsTerm = normalizedText.includes(normalizedTerm) || (comparableTerm.length >= 4 && comparableText.includes(comparableTerm));
+  if (containsTerm && !normalizedText.includes('no record') && !normalizedText.includes('not found')) {
     return { status: 'verified', requiresHumanReview: false };
   }
   if (normalizedText.includes('no record') || normalizedText.includes('not found') || normalizedText.includes('no result')) {

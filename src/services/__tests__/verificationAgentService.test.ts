@@ -91,6 +91,20 @@ describe('verificationAgentService', () => {
     });
   });
 
+  it('matches official register numbers despite punctuation or spacing differences', async () => {
+    const { assessVerificationRegisterText } = await import('../verificationAgentService');
+
+    expect(assessVerificationRegisterText('Registered person: SACAP 123, active', 'SACAP-123')).toEqual({
+      status: 'verified',
+      requiresHumanReview: false,
+    });
+
+    expect(assessVerificationRegisterText('Contractor registration CIDB/2024/0007 is active', 'CIDB-2024-0007')).toEqual({
+      status: 'verified',
+      requiresHumanReview: false,
+    });
+  });
+
   it('keeps ambiguous official register text pending for human review', async () => {
     const { assessVerificationRegisterText } = await import('../verificationAgentService');
 
