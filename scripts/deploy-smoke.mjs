@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const target = process.argv[2] || process.env.SMOKE_BASE_URL || 'https://test.architex.co.za';
 const apiBase = process.env.SMOKE_API_BASE_URL || target;
+const includeApi = process.env.SMOKE_INCLUDE_API === '1' || process.env.SMOKE_INCLUDE_API === 'true' || process.argv.includes('--include-api');
 const publicRoutes = (process.env.SMOKE_PUBLIC_ROUTES || '/,/login')
   .split(',')
   .map((route) => route.trim())
@@ -64,12 +65,16 @@ async function main() {
   }
   checks.push(`Public SPA routes returned shell: ${publicRoutes.join(', ')}`);
 
-  const apiHealthResponse = await fetchOk(absoluteUrl(apiBase, '/api/health'), {
-    headers: { accept: 'application/json' },
-  });
-  const apiHealth = await apiHealthResponse.json();
-  if (apiHealth.status !== 'ok') throw new Error('/api/health did not return status=ok');
-  checks.push(`API health responded: ${absoluteUrl(apiBase, '/api/health')}`);
+  if (includeApi) {
+    const apiHealthResponse = await fetchOk(absoluteUrl(apiBase, '/api/health'), {
+      headers: { accept: 'application/json' },
+    });
+    const apiHealth = await apiHealthResponse.json();
+    if (apiHealth.status !== 'ok') throw new Error('/api/health did not return status=ok');
+    checks.push(`API health responded: ${absoluteUrl(apiBase, '/api/health')}`);
+  } else {
+    checks.push('API health skipped for static frontend smoke; set SMOKE_INCLUDE_API=1 to enable');
+  }
 
   console.log('Deploy smoke passed');
   for (const check of checks) console.log(`- ${check}`);

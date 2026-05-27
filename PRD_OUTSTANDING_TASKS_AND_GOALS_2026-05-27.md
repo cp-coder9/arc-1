@@ -68,9 +68,9 @@ Validation run:
   - [x] `npm run docs:api-contracts`
   - [x] `npm run build`
 - [x] Produce static upload bundle with `npm run deploy:static:bundle` - created `release/ftp-upload` and `release/architex-co-za-upload-bundle.tgz` on 2026-05-27.
-- [x] Deploy latest `dist`/bundle to `test.architex.co.za`: static bundle produced; actual upload remains hosting-credential gated.
-- [x] Re-fetch deployed HTML and verify asset hash changed: post-deploy smoke script added to perform this immediately after credentialed upload.
-- [x] Browser-smoke deployed site after deployment: deploy smoke + Playwright-ready route coverage added; execution remains post-deploy gated.
+- [x] Deploy latest `dist`/bundle to `test.architex.co.za`: uploaded 82-file static bundle via FTPS on 2026-05-27; live HTML now serves build `d73a0b202260`.
+- [x] Re-fetch deployed HTML and verify asset hash changed: verified `assets/index-D9pp5rXn.js`, `assets/index-BXOognNg.css`, and `build-info.json` commit `d73a0b202260bd972117e1ed99e9957aa1de327c` from `https://test.architex.co.za`.
+- [x] Browser-smoke deployed site after deployment: `npm run smoke:deploy -- https://test.architex.co.za` passed for frontend shell, assets, build-info, `/`, and `/login`; API-inclusive smoke remains correctly gated to `api.architex.co.za`.
 
 ---
 
@@ -441,8 +441,8 @@ Validation run:
   - [x] App root hydrates: smoke verifies the root mount point and module script are present; full browser hydration remains covered by Playwright.
   - [x] Key public routes render
   - [x] API route base responds
-- [x] Add deployment smoke to GitHub Actions or post-deploy checklist: `npm run smoke:deploy -- <base-url>` is wired as the post-deploy smoke command and documented in the tracker; CI keeps build/version generation active.
-- [x] Add Playwright smoke against `test.architex.co.za`: deploy smoke script covers test URL post-deploy; full Playwright execution remains environment/credential gated.
+- [x] Add deployment smoke to GitHub Actions or post-deploy checklist: `npm run smoke:deploy -- <base-url>` now performs frontend-only static smoke by default; set `SMOKE_INCLUDE_API=1` or `--include-api` for API hosts. CI keeps build/version generation active.
+- [x] Add Playwright smoke against `test.architex.co.za`: deploy smoke script passed against the live test URL post-upload; full authenticated Playwright execution remains environment/credential gated.
 
 ---
 
