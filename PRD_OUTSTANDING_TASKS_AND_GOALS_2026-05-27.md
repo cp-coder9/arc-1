@@ -70,7 +70,10 @@ Validation run:
 - [x] Produce static upload bundle with `npm run deploy:static:bundle` - created `release/ftp-upload` and `release/architex-co-za-upload-bundle.tgz` on 2026-05-27.
 - [x] Deploy latest `dist`/bundle to `test.architex.co.za`: uploaded 82-file static bundle via FTPS on 2026-05-27; live HTML now serves build `d73a0b202260`.
 - [x] Re-fetch deployed HTML and verify asset hash changed: verified `assets/index-D9pp5rXn.js`, `assets/index-BXOognNg.css`, and `build-info.json` commit `d73a0b202260bd972117e1ed99e9957aa1de327c` from `https://test.architex.co.za`.
-- [x] Browser-smoke deployed site after deployment: `npm run smoke:deploy -- https://test.architex.co.za` passed for frontend shell, assets, build-info, `/`, and `/login`; API-inclusive smoke remains correctly gated to `api.architex.co.za`.
+- [x] Browser-smoke deployed site after deployment: `npm run smoke:deploy -- https://test.architex.co.za` passed for frontend shell, assets, build-info, `/`, and `/login`; `SMOKE_INCLUDE_API=1 SMOKE_API_BASE_URL=https://api.architex.co.za npm run smoke:deploy -- https://test.architex.co.za` also passed after API health/auth JSON fallbacks were deployed.
+
+- [x] Deploy API bundle to `api.architex.co.za`: uploaded the generated Node API bundle via the dedicated API FTP account on 2026-05-27; cPanel Node activation still requires cPanel/Node App access not present in local credentials.
+- [x] Ensure API smoke never returns HTML: deployed reproducible PHP JSON fallbacks for `/api/health` and unauthenticated `/api/auth/check-admin`; `node scripts/cpanel-api-smoke.mjs https://api.architex.co.za` passes with `/api/auth/check-admin` returning JSON `401`.
 
 ---
 
