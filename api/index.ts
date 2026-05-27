@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import express from "express";
 import cors from "cors";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
@@ -35,6 +37,32 @@ app.use(
 
 app.use(express.json({ limit: BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
+
+function readBuildInfo() {
+  const candidates = [
+    resolve(process.cwd(), 'dist', 'build-info.json'),
+    resolve(process.cwd(), 'public', 'build-info.json'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(readFileSync(candidate, 'utf8'));
+    } catch {
+      // Try the next build-info location.
+    }
+  }
+
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_SHA || 'unknown';
+  return {
+    name: 'architex',
+    version: 'unknown',
+    commit,
+    shortCommit: commit.slice(0, 12),
+    branch: process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || process.env.BRANCH_NAME || 'unknown',
+    builtAt: 'unknown',
+    node: process.version,
+  };
+}
 
 function trimWrappingQuotes(value: string) {
   const trimmed = value.trim();
@@ -114,6 +142,10 @@ async function projectDirectoryProfile(db: Firestore, uid: string, profile: Reco
     updatedAt: new Date().toISOString(),
   }, { merge: true });
 }
+
+app.get('/api/version', (_req, res) => {
+  res.json({ status: 'ok', ...readBuildInfo(), servedAt: new Date().toISOString() });
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

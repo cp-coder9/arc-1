@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +9,7 @@ process.env.BLOB_READ_WRITE_TOKEN = 'blob-token';
 process.env.VITE_PAYFAST_MERCHANT_ID = '10000100';
 process.env.VITE_PAYFAST_MERCHANT_KEY = 'merchant-key';
 process.env.VITE_PAYFAST_SANDBOX = 'true';
+process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 process.env.APP_BASE_URL = 'https://architex.test';
 
 type StoredDoc = Record<string, any>;
@@ -251,6 +253,27 @@ function authHeader(token = 'client') {
   return { Authorization: `Bearer ${token}`, Origin: 'http://127.0.0.1', Host: '127.0.0.1' };
 }
 
+function signPayFastPayload(payload: Record<string, string>) {
+  const sortedKeys = Object.keys(payload).sort();
+  let paramString = sortedKeys
+    .filter((key) => payload[key] !== undefined && payload[key] !== '')
+    .map((key) => `${key}=${encodeURIComponent(payload[key].trim()).replace(/%20/g, '+')}`)
+    .join('&');
+  paramString += `&passphrase=${encodeURIComponent(process.env.PAYFAST_PASSPHRASE || '').replace(/%20/g, '+')}`;
+  return crypto.createHash('md5').update(paramString).digest('hex');
+}
+
+function payFastItnPayload(overrides: Record<string, string> = {}) {
+  const payload = {
+    m_payment_id: 'payment-1',
+    pf_payment_id: 'pf-1',
+    payment_status: 'COMPLETE',
+    amount_gross: '1010.00',
+    ...overrides,
+  };
+  return { ...payload, signature: signPayFastPayload(payload) };
+}
+
 function seedVerifiedBepVerification(userId = 'architect-1', overrides: StoredDoc = {}) {
   mockAdminDb.seed(`user_verifications/${userId}_bep_SACAP_SACAP-123`, {
     userId,
@@ -314,6 +337,7 @@ describe('api-router security and high-value integration routes', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    vi.stubGlobal('fetch', vi.fn(async () => ({ text: async () => 'VALID' })));
     mockAdminDb.reset();
     mockAdminDb.seed('users/client-1', { role: 'client', displayName: 'Client One', email: 'client@example.com' });
     mockAdminDb.seed('users/architect-1', { role: 'architect', displayName: 'Architect One', sacapNumber: 'SACAP-123', mainSpecialization: 'residential' });
@@ -392,6 +416,91 @@ describe('api-router security and high-value integration routes', () => {
 
       expect(webhook.status).toBe(400);
       expect(webhook.text).toContain('No payment ID provided');
+    } finally {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    }
+  }, 20_000);
+
+  it('funds escrow only after valid PayFast ITN with exact amount and ignores duplicate replays', async () => {
+    vi.useRealTimers();
+    const app = await buildApp();
+    mockAdminDb.seed('payments/payment-1', { jobId: 'job-1', amount: 101000, status: 'pending', metadata: {} });
+    mockAdminDb.seed('escrow/job-1', { status: 'pending', heldAmount: 0 });
+
+    try {
+      const first = await request(app)
+        .post('/api/payment/notify')
+        .set('Host', 'architex.test')
+        .send(payFastItnPayload());
+      const replay = await request(app)
+        .post('/api/payment/notify')
+        .set('Host', 'architex.test')
+        .send(payFastItnPayload({ pf_payment_id: 'pf-1-replay' }));
+
+      expect(first.status).toBe(200);
+      expect(replay.status).toBe(200);
+      expect(mockAdminDb.getDoc('payments/payment-1')?.status).toBe('completed');
+      expect(mockAdminDb.getDoc('escrow/job-1')).toMatchObject({ status: 'funded', heldAmount: 101000 });
+      expect(mockAdminDb.writes.filter((write) => write.path === 'escrow/job-1' && write.op === 'update')).toHaveLength(1);
+      expect(mockAdminDb.listCollection('audit_logs').map(({ data }) => data.action)).toEqual(expect.arrayContaining([
+        'payment.payfast_itn_completed',
+        'payment.payfast_itn_duplicate_ignored',
+      ]));
+    } finally {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    }
+  }, 20_000);
+
+  it('rejects invalid signatures and partial PayFast amounts without funding escrow', async () => {
+    vi.useRealTimers();
+    const app = await buildApp();
+    mockAdminDb.seed('payments/payment-1', { jobId: 'job-1', amount: 101000, status: 'pending', metadata: {} });
+    mockAdminDb.seed('escrow/job-1', { status: 'pending', heldAmount: 0 });
+
+    try {
+      const invalid = await request(app)
+        .post('/api/payment/notify')
+        .set('Host', 'architex.test')
+        .send({ ...payFastItnPayload(), signature: 'bad' });
+      const partial = await request(app)
+        .post('/api/payment/notify')
+        .set('Host', 'architex.test')
+        .send(payFastItnPayload({ amount_gross: '1009.99' }));
+
+      expect(invalid.status).toBe(400);
+      expect(invalid.text).toContain('Invalid signature');
+      expect(partial.status).toBe(400);
+      expect(partial.text).toContain('Payment amount mismatch');
+      expect(mockAdminDb.getDoc('payments/payment-1')?.status).toBe('amount_mismatch');
+      expect(mockAdminDb.getDoc('escrow/job-1')).toMatchObject({ status: 'pending', heldAmount: 0 });
+      expect(mockAdminDb.listCollection('audit_logs').map(({ data }) => data.action)).toEqual(expect.arrayContaining([
+        'payment.payfast_itn_invalid_signature',
+        'payment.payfast_itn_amount_mismatch',
+      ]));
+    } finally {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
+    }
+  }, 20_000);
+
+  it('records failed PayFast ITNs without funding escrow', async () => {
+    vi.useRealTimers();
+    const app = await buildApp();
+    mockAdminDb.seed('payments/payment-1', { jobId: 'job-1', amount: 101000, status: 'pending', metadata: {} });
+    mockAdminDb.seed('escrow/job-1', { status: 'pending', heldAmount: 0 });
+
+    try {
+      const response = await request(app)
+        .post('/api/payment/notify')
+        .set('Host', 'architex.test')
+        .send(payFastItnPayload({ payment_status: 'FAILED' }));
+
+      expect(response.status).toBe(200);
+      expect(mockAdminDb.getDoc('payments/payment-1')).toMatchObject({ status: 'failed' });
+      expect(mockAdminDb.getDoc('escrow/job-1')).toMatchObject({ status: 'pending', heldAmount: 0 });
+      expect(mockAdminDb.listCollection('audit_logs').map(({ data }) => data.action)).toContain('payment.payfast_itn_failed');
     } finally {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));

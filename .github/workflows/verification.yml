@@ -42,6 +42,9 @@ jobs:
       - name: Run test suite
         run: npm test
 
+      - name: Run Firestore emulator security rules tests
+        run: npm run test:firestore:rules
+
       - name: Validate API contract docs
         run: npm run docs:api-contracts
 

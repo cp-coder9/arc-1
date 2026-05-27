@@ -1165,11 +1165,11 @@ export default function AdminDashboard({
                 <div className="space-y-3">
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
                     <span className="text-muted-foreground">API Latency</span>
-                    <span className="font-bold text-green-600">142ms</span>
+                    <span className="font-bold text-primary-light">142ms</span>
                   </div>
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
                     <span className="text-muted-foreground">Database Connectivity</span>
-                    <span className="font-bold text-green-600">Stable</span>
+                    <span className="font-bold text-primary-light">Stable</span>
                   </div>
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
                     <span className="text-muted-foreground">Agent Response Rate</span>

@@ -14,6 +14,7 @@ function collectTests(dir) {
   return entries.flatMap(entry => {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) return collectTests(fullPath);
+    if (/\.emulator\.(test|spec)\.(ts|tsx|js|jsx)$/.test(entry.name)) return [];
     return /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(entry.name) ? [fullPath] : [];
   });
 }

@@ -71,4 +71,5 @@ test-results/
 # Generated verification and release artifacts
 release/
 reports/
+public/build-info.json
 12/
