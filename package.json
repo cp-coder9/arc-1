@@ -16,7 +16,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit -p tsconfig.app.json",
     "lint:tests": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node scripts/run-tests.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",

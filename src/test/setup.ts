@@ -114,20 +114,22 @@ Object.defineProperty(globalThis, 'crypto', {
   disconnect: jest.fn<any>(),
 }));
 
-// Mock matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn<any>().mockImplementation(query => ({
-    matches: false,
-    media: query as any,
-    onchange: null,
-    addListener: jest.fn<any>(),
-    removeListener: jest.fn<any>(),
-    addEventListener: jest.fn<any>(),
-    removeEventListener: jest.fn<any>(),
-    dispatchEvent: jest.fn<any>(),
-  })),
-});
+// Mock matchMedia when a browser-like environment is available.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn<any>().mockImplementation(query => ({
+      matches: false,
+      media: query as any,
+      onchange: null,
+      addListener: jest.fn<any>(),
+      removeListener: jest.fn<any>(),
+      addEventListener: jest.fn<any>(),
+      removeEventListener: jest.fn<any>(),
+      dispatchEvent: jest.fn<any>(),
+    })),
+  });
+}
 
 // Suppress console errors during tests
 const originalConsoleError = console.error;
