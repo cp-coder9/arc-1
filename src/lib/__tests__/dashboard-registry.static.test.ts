@@ -209,15 +209,17 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />");
   });
 
-  it('keeps external API integrations backed by deterministic local mock fixtures until credentials are live', () => {
+  it('keeps external API integrations explicit about live/provider-gated/mock status', () => {
     expect(externalApiMockSource).toContain('export const MOCK_EXTERNAL_API_INTEGRATIONS');
     for (const integration of ['payfast-sandbox', 'cpd-statutory-sync', 'supplier-catalogue', 'municipal-portal']) {
       expect(externalApiMockSource).toContain(`id: '${integration}'`);
     }
+    expect(externalApiMockSource).toContain("mode: 'live_gateway'");
+    expect(externalApiMockSource).toContain("mode: 'provider_gated'");
     expect(externalApiMockSource).toContain("mode: 'local_mock'");
-    expect(externalApiMockSource).toContain('No live payment, statutory, municipal, or supplier-provider action is performed by this fixture.');
+    expect(externalApiMockSource).toContain('Provider status is explicit');
     expect(projectToolboxSource).toContain("import { MOCK_EXTERNAL_API_INTEGRATIONS, MOCK_EXTERNAL_API_NOTICE } from '@/data/mockExternalApiIntegrations';");
-    expect(projectToolboxSource).toContain('External API mock fixtures');
+    expect(projectToolboxSource).toContain('Provider integration status');
   });
 
   it('keeps registry ids unique and every shell-backed page statically routable', () => {

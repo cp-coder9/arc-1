@@ -232,10 +232,10 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
           <div className="rounded-2xl border border-dashed border-primary/30 bg-background/80 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="font-heading text-lg font-black tracking-[-0.03em]">External API mock fixtures</h3>
+                <h3 className="font-heading text-lg font-black tracking-[-0.03em]">Provider integration status</h3>
                 <p className="text-sm text-muted-foreground">{MOCK_EXTERNAL_API_NOTICE}</p>
               </div>
-              <Badge variant="secondary" className="w-fit rounded-full">local mocks</Badge>
+              <Badge variant="secondary" className="w-fit rounded-full">live + gated + fixtures</Badge>
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               {MOCK_EXTERNAL_API_INTEGRATIONS.map((integration) => (

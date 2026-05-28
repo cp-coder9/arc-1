@@ -33,7 +33,7 @@ export interface ProviderIntegrationReadinessProjection {
     source: 'backend.html';
     localMockNotice: string;
     providerNeutral: true;
-    noLiveProviderCalls: true;
+    liveGatewayInventory: true;
     humanApprovalPreserved: true;
   };
 }
@@ -83,7 +83,9 @@ export function projectProviderIntegrationReadiness(
     const blockers = [
       ...missingEvidence.map((missing) => `Missing ${missing} for ${integration.label}.`),
       ...(integration.mode === 'local_mock' ? [`${integration.label} is local_mock only and must not be treated as a live provider integration.`] : []),
+      ...(integration.mode === 'provider_gated' ? [`${integration.label} is provider_gated until credentials/API terms and production adapter checks pass.`] : []),
       ...(integration.status === 'credentials_required' ? [`${integration.label} requires credentials before production use.`] : []),
+      ...(integration.status === 'provider_terms_required' ? [`${integration.label} requires provider terms/commercial approval before production use.`] : []),
     ];
 
     const productionEnabled = blockers.length === 0;
@@ -127,7 +129,7 @@ export function projectProviderIntegrationReadiness(
       source: 'backend.html',
       localMockNotice: MOCK_EXTERNAL_API_NOTICE,
       providerNeutral: true,
-      noLiveProviderCalls: true,
+      liveGatewayInventory: true,
       humanApprovalPreserved: true,
     } satisfies ProviderIntegrationReadinessProjection['audit'],
   });
