@@ -5,6 +5,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
+$architexLocalEnvPath = __DIR__ . '/env.local.php';
+if (is_readable($architexLocalEnvPath)) {
+    /** @noinspection PhpIncludeInspection */
+    require_once $architexLocalEnvPath;
+}
+
 function architex_env(string $key, ?string $default = null): ?string
 {
     $value = getenv($key);
@@ -182,11 +188,24 @@ function architex_verify_firebase_id_token(string $jwt): array
 
 function architex_service_account(): ?array
 {
-    $raw = architex_env('FIREBASE_SERVICE_ACCOUNT') ?? architex_env('FIREBASE_SERVICE_ACCOUNT_KEY');
+    $raw = architex_env('FIREBASE_SERVICE_ACCOUNT_KEY') ?? architex_env('FIREBASE_SERVICE_ACCOUNT');
     if ($raw === null) {
         return null;
     }
     $decoded = json_decode($raw, true);
+    if (!is_array($decoded) && strpos($raw, '"private_key"') !== false) {
+        $repaired = preg_replace_callback(
+            '/("private_key"\s*:\s*")(.*?)("\s*,\s*"client_email")/s',
+            function (array $matches): string {
+                $privateKey = str_replace(["\r\n", "\r", "\n"], '\\n', $matches[2]);
+                return $matches[1] . $privateKey . $matches[3];
+            },
+            $raw
+        );
+        if (is_string($repaired)) {
+            $decoded = json_decode($repaired, true);
+        }
+    }
     if (!is_array($decoded)) {
         $maybeJson = base64_decode($raw, true);
         if ($maybeJson !== false) {
@@ -370,7 +389,8 @@ function architex_firestore_set_document(string $collection, string $documentId,
         'body' => json_encode(architex_firestore_encode_fields($data)),
     ]);
     if (($response['status'] ?? 0) < 200 || ($response['status'] ?? 0) >= 300 || !is_array($response['body'])) {
-        throw new RuntimeException('Firestore document write failed.');
+        $detail = is_array($response['body']) ? json_encode($response['body']) : (string) ($response['raw'] ?? '');
+        throw new RuntimeException('Firestore document write failed: HTTP ' . (string) ($response['status'] ?? 0) . ' ' . substr($detail, 0, 500));
     }
     return architex_firestore_decode_document($response['body']);
 }

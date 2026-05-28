@@ -112,3 +112,21 @@ function architex_not_implemented(string $route, string $message = 'This endpoin
         'migrationStatus' => 'planned',
     ]);
 }
+
+set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
+    if (!(error_reporting() & $severity)) return false;
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+set_exception_handler(function (Throwable $error): void {
+    if (!headers_sent()) {
+        architex_json(500, [
+            'error' => 'Internal Server Error',
+            'message' => 'The PHP API gateway failed while processing the request.',
+            'requestId' => bin2hex(random_bytes(8)),
+        ]);
+    }
+    http_response_code(500);
+    echo json_encode(['error' => 'Internal Server Error']);
+    exit;
+});

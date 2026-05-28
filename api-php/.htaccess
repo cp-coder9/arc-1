@@ -2,6 +2,7 @@
   RewriteEngine On
   RewriteBase /
 
+  RewriteRule ^env\.local\.php$ - [F,L]
   RewriteRule ^api/?$ index.php [L,QSA]
   RewriteRule ^api/(.*)$ index.php [L,QSA]
 </IfModule>
