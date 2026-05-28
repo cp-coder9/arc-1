@@ -116,6 +116,8 @@ const AdminDashboard = lazyWithChunkRetry(() => import('./components/AdminDashbo
 const FreelancerDashboard = lazyWithChunkRetry(() => import('./components/FreelancerDashboard'));
 const BEPDashboard = lazyWithChunkRetry(() => import('./components/BEPDashboard'));
 const ContractorDashboard = lazyWithChunkRetry(() => import('./components/ContractorDashboard'));
+const SubcontractorDashboard = lazyWithChunkRetry(() => import('./components/SubcontractorDashboard'));
+const SupplierDashboard = lazyWithChunkRetry(() => import('./components/SupplierDashboard'));
 const FirmDashboard = lazyWithChunkRetry(() => import('./components/FirmDashboard'));
 const UserSettings = lazyWithChunkRetry(() => import('./components/UserSettings'));
 const ProfileEditor = lazyWithChunkRetry(() => import('./components/ProfileEditor'));
@@ -1179,7 +1181,8 @@ export default function App() {
                   {user.role === 'freelancer' && <FreelancerDashboard user={user} />}
                   {user.role === 'bep' && <BEPDashboard user={user} />}
                   {user.role === 'contractor' && <ContractorDashboard user={user} />}
-                  {(user.role === 'subcontractor' || user.role === 'supplier') && <RoleLegacyFallbackPage activeTab={activeTab} user={user} onNavigate={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
+                  {user.role === 'subcontractor' && <SubcontractorDashboard user={user} />}
+                  {user.role === 'supplier' && <SupplierDashboard user={user} />}
                 </>
               )}
             </Suspense>
