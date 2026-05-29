@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { API_ROUTE_DOMAINS, API_ROUTE_DOMAIN_LABELS, API_ROUTE_REGISTRY, getApiRouteDomainForPath, requireApiRouteDomainForPath } from '../routes';
 
 type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 type AuthExpectation = 'public' | 'authenticated' | 'admin' | 'service-or-admin' | 'webhook' | 'signed-callback';
@@ -52,24 +53,7 @@ function canonicalPath(paths: string[]) {
 }
 
 function domainFor(path: string) {
-  const normalized = path.replace(/^\/api/, '');
-  if (normalized === '/health' || normalized === '/firebase/test') return 'platform';
-  if (normalized.startsWith('/auth/')) return 'auth';
-  if (normalized.startsWith('/profile/') || normalized.startsWith('/users/') || normalized.startsWith('/admin/users/')) return 'profile';
-  if (normalized.startsWith('/governance/')) return 'governance';
-  if (normalized.startsWith('/directory/')) return 'directory';
-  if (normalized.startsWith('/project-briefs') || normalized.startsWith('/client-briefs')) return 'briefs';
-  if (normalized.startsWith('/projects/')) return 'projects';
-  if (normalized.startsWith('/jobs/') || normalized.startsWith('/marketplace/') || normalized.startsWith('/proposals')) return 'marketplace';
-  if (normalized.startsWith('/review') || normalized.startsWith('/gemini/') || normalized.startsWith('/ai/') || normalized.startsWith('/admin/ai-review')) return 'ai';
-  if (normalized.startsWith('/agent/')) return 'agent';
-  if (normalized.startsWith('/files/')) return 'files';
-  if (normalized.startsWith('/notifications/')) return 'notifications';
-  if (normalized.startsWith('/payment/')) return 'payments';
-  if (normalized.startsWith('/resources/')) return 'resources';
-  if (normalized.startsWith('/municipal/') || normalized.startsWith('/track-municipality')) return 'municipal';
-  if (normalized.startsWith('/verifications/') || normalized.startsWith('/admin/verifications') || normalized.startsWith('/architect/verify-sacap')) return 'verifications';
-  return 'uncategorized';
+  return requireApiRouteDomainForPath(path);
 }
 
 function authExpectationFor(method: HttpMethod, path: string): AuthExpectation {
@@ -233,6 +217,30 @@ describe('api-router route inventory', () => {
   it('categorizes canonical routes by implemented domain and auth expectation', () => {
     expect(inventory.filter(route => route.domain === 'uncategorized')).toEqual([]);
     expect(inventory.map(({ method, canonicalPath, domain, authExpectation }) => ({ method, canonicalPath, domain, authExpectation }))).toMatchSnapshot();
+  });
+
+  it('keeps the API route spine registry aligned with every canonical route', () => {
+    expect(API_ROUTE_DOMAINS).toEqual([
+      'platform',
+      'auth',
+      'profile',
+      'governance',
+      'directory',
+      'briefs',
+      'projects',
+      'marketplace',
+      'ai',
+      'agent',
+      'files',
+      'notifications',
+      'payments',
+      'resources',
+      'municipal',
+      'verifications',
+    ]);
+    expect(API_ROUTE_DOMAIN_LABELS.projects).toBe('Project OS spine');
+    expect(new Set(API_ROUTE_REGISTRY.map(entry => entry.domain))).toEqual(new Set(API_ROUTE_DOMAINS));
+    expect(inventory.filter(route => !getApiRouteDomainForPath(route.canonicalPath))).toEqual([]);
   });
 
   it('flags non-public canonical routes that lack a static auth gate signal', () => {
