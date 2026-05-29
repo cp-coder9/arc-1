@@ -11,6 +11,24 @@ interface ArchitexThreeExperienceProps {
 
 const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
+export const HERO_PANEL_LABEL_SAFE_INSET_PX = 24;
+export const HERO_PANEL_LABEL_BOTTOM_RESERVED_PX = 132;
+
+export function clampHeroPanelLabelPosition(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const safeInset = HERO_PANEL_LABEL_SAFE_INSET_PX;
+  const safeBottom = Math.max(safeInset, height - HERO_PANEL_LABEL_BOTTOM_RESERVED_PX);
+
+  return {
+    x: Math.min(Math.max(x, safeInset), Math.max(safeInset, width - safeInset)),
+    y: Math.min(Math.max(y, safeInset), safeBottom),
+  };
+}
+
 const NODE_PALETTES: Record<ArchitexThreeExperienceVariant, Array<{ label: string; color: string; radius: number }>> = {
   'command-atlas': [
     { label: 'Brief', color: '#f8fafc', radius: 2.55 },
@@ -76,6 +94,7 @@ export function ArchitexThreeExperience({
     const root = new THREE.Group();
     const orbitGroup = new THREE.Group();
     const latticeGroup = new THREE.Group();
+    root.position.y = 0.42;
     scene.add(root);
     root.add(latticeGroup, orbitGroup);
 
@@ -208,8 +227,9 @@ export function ArchitexThreeExperience({
       const rect = mount.getBoundingClientRect();
       labels.forEach(({ element, position }) => {
         const projected = position.clone().applyMatrix4(orbitGroup.matrixWorld).project(camera);
-        const x = (projected.x * 0.5 + 0.5) * rect.width;
-        const y = (-projected.y * 0.5 + 0.5) * rect.height;
+        const rawX = (projected.x * 0.5 + 0.5) * rect.width;
+        const rawY = (-projected.y * 0.5 + 0.5) * rect.height;
+        const { x, y } = clampHeroPanelLabelPosition(rawX, rawY, rect.width, rect.height);
         element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
         element.style.opacity = projected.z > 1 ? '0' : '1';
       });
@@ -267,7 +287,7 @@ export function ArchitexThreeExperience({
         referrerPolicy="no-referrer"
       />
       <div ref={mountRef} className="absolute inset-0 z-20" aria-hidden="true" />
-      <div className="pointer-events-none absolute bottom-5 left-5 right-5 z-30 flex flex-wrap items-end justify-between gap-3">
+      <div className="pointer-events-none absolute bottom-7 left-6 right-6 z-30 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#b6fff1]/72">Bird OS spatial layer</p>
           <p className="mt-1 max-w-sm text-sm font-medium leading-relaxed text-[#f8fafc]/62">The Architex bird sits at the centre: every role, gate, evidence trail, and payment orbiting one accountable project truth.</p>

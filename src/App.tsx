@@ -1746,7 +1746,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                 <ArchitexThreeExperience
                   variant="command-atlas"
                   prefersReducedMotion={Boolean(prefersReducedMotion)}
-                  className="mx-auto h-[28rem] w-full max-w-[36rem] sm:h-[34rem] lg:h-[40rem]"
+                  className="mx-auto h-[28rem] w-full max-w-[36rem] sm:h-[34rem] lg:h-[37rem] lg:-translate-y-4"
                 />
               </div>
             </section>
