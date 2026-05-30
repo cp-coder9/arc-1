@@ -547,9 +547,47 @@ export interface NotificationPreferences {
 }
 
 // Message types
+export type ProjectCommunicationCaptureType =
+  | 'chat'
+  | 'voice_note'
+  | 'document_upload'
+  | 'drawing_comment'
+  | 'approval_request'
+  | 'site_photo'
+  | 'site_voice_note'
+  | 'rfi'
+  | 'site_instruction'
+  | 'payment_note'
+  | 'closeout_evidence';
+
+export type ProjectCommunicationStructuredStatus = 'raw' | 'converted' | 'linked' | 'archived';
+export type ProjectCommunicationVisibility = 'job_participants' | 'project_team' | 'client_professional' | 'admin_only';
+
+export interface ProjectRecordLink {
+  recordType: string;
+  recordId: string;
+}
+
+export interface ProjectCommunicationLocation {
+  latitude: number;
+  longitude: number;
+  label?: string;
+}
+
 export interface Message {
   id: string;
   jobId: string;
+  /** New project communication engine metadata; optional for legacy job-scoped messages. */
+  projectId?: string;
+  phase?: ProjectStage;
+  captureType?: ProjectCommunicationCaptureType;
+  structuredStatus?: ProjectCommunicationStructuredStatus;
+  actionIds?: string[];
+  recordLinks?: ProjectRecordLink[];
+  aiTags?: string[];
+  transcribedText?: string;
+  visibility?: ProjectCommunicationVisibility;
+  location?: ProjectCommunicationLocation;
   senderId: string;
   senderRole: UserRole;
   content: string;

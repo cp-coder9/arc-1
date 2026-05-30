@@ -65,4 +65,56 @@ describe('communicationWorkflowService', () => {
       metadata: { messageId: 'message-1', auditVisible: true },
     });
   });
+
+  it('adds phase-aware communication metadata while preserving legacy jobId compatibility', () => {
+    const message = buildProjectMessage({
+      threadId: 'thread-1',
+      jobId: 'job-1',
+      projectId: 'project-1',
+      phase: 'delivery',
+      captureType: 'site_photo',
+      senderId: 'contractor-1',
+      senderRole: 'contractor',
+      participantIds: ['contractor-1', 'bep-1'],
+      content: 'Uploaded waterproofing photo for inspection',
+      actionIds: ['action-1'],
+      recordLinks: [{ recordType: 'site_log', recordId: 'site-log-1' }],
+      aiTags: ['site-evidence', 'inspection'],
+      transcribedText: 'Uploaded waterproofing photo for inspection',
+      visibility: 'project_team',
+      location: { latitude: -33.9249, longitude: 18.4241 },
+    });
+
+    expect(message).toMatchObject({
+      jobId: 'job-1',
+      projectId: 'project-1',
+      phase: 'delivery',
+      captureType: 'site_photo',
+      structuredStatus: 'raw',
+      actionIds: ['action-1'],
+      recordLinks: [{ recordType: 'site_log', recordId: 'site-log-1' }],
+      aiTags: ['site-evidence', 'inspection'],
+      transcribedText: 'Uploaded waterproofing photo for inspection',
+      visibility: 'project_team',
+      location: { latitude: -33.9249, longitude: 18.4241 },
+    });
+  });
+
+  it('falls back old project messages to raw structured status and job visibility', () => {
+    const message = buildProjectMessage({
+      threadId: 'thread-1',
+      jobId: 'legacy-job',
+      senderId: 'client-1',
+      senderRole: 'client',
+      participantIds: ['client-1', 'bep-1'],
+      content: 'Legacy message still works',
+    });
+
+    expect(message.jobId).toBe('legacy-job');
+    expect(message.projectId).toBeUndefined();
+    expect(message.phase).toBeUndefined();
+    expect(message.structuredStatus).toBe('raw');
+    expect(message.visibility).toBe('job_participants');
+  });
+
 });

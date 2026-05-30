@@ -1,7 +1,21 @@
-import type { UserRole } from '../types';
+import type { ProjectStage, UserRole } from '../types';
 
 export type ProjectThreadType = 'client_professional' | 'project_team' | 'package' | 'admin_observer';
 export type NotificationTriggerType = 'message_sent' | 'mention' | 'approval_requested' | 'document_status_changed' | 'payment_action_required';
+export type ProjectMessageCaptureType = 'chat' | 'voice_note' | 'document_upload' | 'drawing_comment' | 'approval_request' | 'site_photo' | 'site_voice_note' | 'rfi' | 'site_instruction' | 'payment_note' | 'closeout_evidence';
+export type ProjectMessageStructuredStatus = 'raw' | 'converted' | 'linked' | 'archived';
+export type ProjectMessageVisibility = 'job_participants' | 'project_team' | 'client_professional' | 'admin_only';
+
+export interface ProjectRecordLink {
+  recordType: string;
+  recordId: string;
+}
+
+export interface ProjectMessageLocation {
+  latitude: number;
+  longitude: number;
+  label?: string;
+}
 
 export interface ProjectThreadInput {
   projectId?: string;
@@ -26,6 +40,16 @@ export interface ProjectThreadRecord extends ProjectThreadInput {
 export interface ProjectMessageInput {
   threadId: string;
   jobId: string;
+  projectId?: string;
+  phase?: ProjectStage;
+  captureType?: ProjectMessageCaptureType;
+  structuredStatus?: ProjectMessageStructuredStatus;
+  actionIds?: string[];
+  recordLinks?: ProjectRecordLink[];
+  aiTags?: string[];
+  transcribedText?: string;
+  visibility?: ProjectMessageVisibility;
+  location?: ProjectMessageLocation;
   senderId: string;
   senderRole: UserRole;
   participantIds: string[];
@@ -113,6 +137,16 @@ export function buildProjectMessage(input: ProjectMessageInput): ProjectMessageR
     senderId,
     content,
     attachments: (input.attachments || []).map(attachment => ({ ...attachment, name: requireString(attachment.name, 'attachment.name'), url: requireString(attachment.url, 'attachment.url') })),
+    projectId: input.projectId?.trim(),
+    phase: input.phase,
+    captureType: input.captureType || 'chat',
+    structuredStatus: input.structuredStatus || 'raw',
+    actionIds: uniqueStrings(input.actionIds || [], 'actionIds'),
+    recordLinks: (input.recordLinks || []).map(link => ({ recordType: requireString(link.recordType, 'recordLink.recordType'), recordId: requireString(link.recordId, 'recordLink.recordId') })),
+    aiTags: uniqueStrings(input.aiTags || [], 'aiTags'),
+    transcribedText: input.transcribedText?.trim(),
+    visibility: input.visibility || 'job_participants',
+    location: input.location ? { ...input.location } : undefined,
     mentions,
     participantIds,
     auditVisible: true,
