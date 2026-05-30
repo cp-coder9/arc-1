@@ -128,6 +128,7 @@ const MunicipalTracker = lazyWithChunkRetry(() => import('./components/Municipal
 const KnowledgeSources = lazyWithChunkRetry(() => import('./components/KnowledgeSources').then((module) => ({ default: module.KnowledgeSources })));
 const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));
 const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));
+const ProjectCommunicationCentrePage = lazyWithChunkRetry(() => import('./components/ProjectCommunicationCentrePage'));
 const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBriefWizard'));
 const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));
 const BEPClientMarketplacePage = lazyWithChunkRetry(() => import('./components/BEPClientMarketplacePage'));
@@ -200,7 +201,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'toolbox', label: 'Project Toolbox', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Files size={18} />, summary: 'Guided, role-aware project tools and checklists from the backend.html reference.', backedBy: ['FileManager', 'current project metadata'] },
   { id: 'journey', label: 'Project Journey', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Workflow size={18} />, summary: 'Lifecycle navigation shell for stage progress, decisions, and next actions.', backedBy: ['StageProgressTracker', 'AdvanceStageButton'] },
   { id: 'tasks', label: 'Tasks & Approvals', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <ClipboardCheck size={18} />, summary: 'Role-filtered task and approval command surface.', backedBy: ['delegatedTasks', 'job status workflows'] },
-  { id: 'messages', label: 'Project Messenger', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Mail size={18} />, summary: 'Job-linked communication shell using existing chat capabilities.', backedBy: ['Chat'] },
+  { id: 'messages', label: 'Project Messenger', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Mail size={18} />, summary: 'Native project chat applet and desktop message centre for phase-aware capture, AI draft suggestions, conversions, approvals, and audit links.', backedBy: ['ProjectChatApplet', 'ProjectMessageCentre', 'projectCommunicationCentreService'] },
   { id: 'programme', label: 'Programme / Gantt', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Workflow size={18} />, summary: 'Shared programme/Gantt surface with role-specific views.', backedBy: ['GanttChart'] },
   { id: 'disputes', label: 'Dispute Resolution', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <ShieldCheck size={18} />, summary: 'Dispute centre shell linked to project/job dispute records.', backedBy: ['jobDisputes', 'AdminDashboard disputes'] },
   { id: 'payments', label: 'Payments & Governance', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <CreditCard size={18} />, summary: 'Payment governance shell. Invoice handling is available separately while escrow/payment APIs mature.', backedBy: ['InvoiceManagement'] },
@@ -264,8 +265,9 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'bep-freelancers',
   'sans-forms',
   'cpd-assessment',
+  'messages',
 ]);
-const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
+const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
@@ -1171,6 +1173,7 @@ export default function App() {
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
+              {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
