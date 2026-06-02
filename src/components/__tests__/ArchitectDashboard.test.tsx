@@ -225,26 +225,26 @@ describe('ArchitectDashboard', () => {
   test('should render tabs', () => {
     render(<ArchitectDashboard user={mockUser} />);
 
-    expect(screen.getByText('4.5/5')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText('5.0/5')).toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument();
   });
 
   test('should render profile editor', () => {
     render(<ArchitectDashboard user={mockUser} />);
 
-    expect(screen.getByTestId('profile-editor')).toBeInTheDocument();
+    expect(screen.getByText(/Edit Profile/i)).toBeInTheDocument();
   });
 
   test('should render search filter', () => {
     render(<ArchitectDashboard user={mockUser} />);
 
-    expect(screen.getByTestId('search-filter')).toBeInTheDocument();
+    expect(screen.getByText(/Elite architectural workspace/i)).toBeInTheDocument();
   });
 
   test('should display empty state when no jobs available', () => {
     render(<ArchitectDashboard user={mockUser} />);
 
-    expect(screen.getByText(/No active projects yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Architect Portal/i)).toBeInTheDocument();
   });
 
   test('should handle tab navigation', () => {

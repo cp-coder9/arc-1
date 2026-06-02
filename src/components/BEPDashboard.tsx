@@ -97,10 +97,10 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#7046a8' }}>
         <div className="flex-1">
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">
+            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">
               Professional Portal
             </h1>
             <ProfileEditor user={user} />
@@ -129,14 +129,14 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
         <div className="flex gap-2">
           <Button
             variant={activeView === 'overview' ? 'default' : 'outline'}
-            className="rounded-full px-6 h-12 font-bold shadow-sm"
+            className="rounded-full px-6 h-12 font-bold beos-button-shadow"
             onClick={() => setActiveView('overview')}
           >
             Overview
           </Button>
           <Button
             variant={activeView === 'marketplace' ? 'default' : 'outline'}
-            className="rounded-full px-6 h-12 font-bold shadow-sm"
+            className="rounded-full px-6 h-12 font-bold beos-button-shadow"
             onClick={() => setActiveView('marketplace')}
           >
             Marketplace
@@ -156,7 +156,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
             {recommendedJobs.length > 0 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-heading font-bold tracking-tight flex items-center gap-2">
+                  <h2 className="text-2xl font-heading font-black tracking-[-0.04em] flex items-center gap-2">
                     <Zap className="text-primary fill-primary" size={24} /> Recommended Projects
                   </h2>
                   <Button variant="ghost" size="sm" className="text-primary font-bold" onClick={() => setActiveView('marketplace')}>
@@ -211,7 +211,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
           </div>
 
           <div className="space-y-8">
-            <Card className="border-border shadow-sm bg-card rounded-3xl overflow-hidden">
+            <Card className="beos-section-card">
               <CardHeader className="bg-primary/5 p-6 border-b border-border flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                   <Star size={16} className="text-yellow-500" /> Feedback
@@ -346,7 +346,7 @@ function BEPJobCard({ task, user }: { task: JobCard, user: UserProfile }) {
   };
 
   return (
-    <Card className="interactive-card border-border shadow-sm bg-card overflow-hidden group flex flex-col rounded-3xl">
+    <Card className="beos-record-card overflow-hidden group flex flex-col">
       <div className="p-8 flex-1 space-y-6">
         <div className="flex justify-between items-start">
           <Badge className={`text-[10px] uppercase tracking-widest ${taskStatusStyles[task.status]}`}>
@@ -417,7 +417,7 @@ function MarketplaceJobCard({ job, user }: { job: Job, user: UserProfile }) {
   };
 
   return (
-    <Card className="interactive-card border-border shadow-sm bg-card hover:border-primary/50 rounded-[2.5rem] overflow-hidden flex flex-col group hover:shadow-2xl">
+    <Card className="beos-record-card overflow-hidden flex flex-col group">
       <CardHeader className="p-8">
         <Badge variant="secondary" className="w-fit bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest mb-4 font-bold">
           {job.category}
@@ -450,14 +450,14 @@ function StatCard({ label, value, icon, tone = "default" }: { label: string, val
   }[tone];
 
   return (
-    <Card className="interactive-card border-border shadow-sm bg-card rounded-[2rem] overflow-hidden">
+    <Card className="beos-stat-card">
       <CardContent className="p-8 flex items-center gap-6">
         <div className={`p-4 rounded-2xl ${toneClass}`}>
           {icon}
         </div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
-          <p className="text-3xl font-heading font-bold tracking-tight">{value}</p>
+          <p className="beos-label-caps text-muted-foreground mb-1">{label}</p>
+          <p className="beos-metric">{value}</p>
         </div>
       </CardContent>
     </Card>

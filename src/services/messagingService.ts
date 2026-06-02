@@ -16,13 +16,23 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { Message, Conversation, UserRole } from '../types';
+import { Message, Conversation, UserRole, ProjectCommunicationCaptureType, ProjectCommunicationStructuredStatus, ProjectCommunicationVisibility, ProjectRecordLink, ProjectStage, ProjectCommunicationLocation } from '../types';
 import DOMPurify from 'dompurify';
 
 export interface SendMessageParams {
   jobId: string;
+  projectId?: string;
+  phase?: ProjectStage;
+  captureType?: ProjectCommunicationCaptureType;
+  structuredStatus?: ProjectCommunicationStructuredStatus;
+  actionIds?: string[];
+  recordLinks?: ProjectRecordLink[];
+  aiTags?: string[];
+  transcribedText?: string;
+  visibility?: ProjectCommunicationVisibility;
+  location?: ProjectCommunicationLocation;
   senderId: string;
-  senderRole: 'client' | 'architect' | 'admin' | 'freelancer';
+  senderRole: UserRole;
   content: string;
   attachments?: { name: string; url: string; type: string }[];
 }
@@ -50,7 +60,7 @@ class MessagingService {
    * Send a message
    */
   async sendMessage(params: SendMessageParams): Promise<string> {
-    const { jobId, senderId, senderRole, content, attachments } = params;
+    const { jobId, senderId, senderRole, content, attachments, projectId, phase, captureType, structuredStatus, actionIds, recordLinks, aiTags, transcribedText, visibility, location } = params;
 
     // Sanitize content before storing
     const sanitizedContent = this.sanitizeContent(content);
@@ -65,6 +75,16 @@ class MessagingService {
       senderRole,
       content: sanitizedContent,
       attachments: attachments || [],
+      projectId,
+      phase,
+      captureType,
+      structuredStatus: structuredStatus || (phase || captureType ? 'raw' : undefined),
+      actionIds: actionIds || [],
+      recordLinks: recordLinks || [],
+      aiTags: aiTags || [],
+      transcribedText,
+      visibility,
+      location,
       isRead: false,
       createdAt: new Date().toISOString(),
     };

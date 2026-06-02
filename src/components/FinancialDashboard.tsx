@@ -1,34 +1,128 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
+import { collection, doc, limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
+import { AlertTriangle, CheckCircle2, CreditCard, Filter, Landmark, ReceiptText, RotateCcw } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { EscrowV2, LedgerEntry, Project } from '@/types';
+import { EscrowV2, Job, LedgerEntry, Project, UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
-export default function FinancialDashboard() {
+const PAYMENT_GUARD_STEPS = [
+  'Invoice, claim, contract, and milestone evidence must match before any payment is requested.',
+  'Client/BEP/contractor/admin approvals must be recorded outside this read-only dashboard before provider action.',
+  'PayFast/payment provider calls, escrow releases, refunds, and supplier orders remain disabled until explicit backend flags and human confirmations are active.',
+  'This dashboard can surface pending releases and ledger state, but it cannot create money movement by itself.',
+];
+
+function timestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value === 'object' && 'seconds' in value && typeof value.seconds === 'number') return value.seconds * 1000;
+  return 0;
+}
+
+function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(items: T[]) {
+  return [...items].sort((a, b) => timestampMs(b.updatedAt ?? b.createdAt) - timestampMs(a.updatedAt ?? a.createdAt));
+}
+
+function projectQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
+  const projects = collection(db, 'projects');
+  if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(100))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(projects, where('leadProfessionalId', '==', user.uid), limit(100)),
+    query(projects, where('leadBepId', '==', user.uid), limit(100)),
+    query(projects, where('leadArchitectId', '==', user.uid), limit(100)),
+  ];
+  return [];
+}
+
+function jobQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
+  const jobs = collection(db, 'jobs');
+  if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(100))];
+  if (user.role === 'architect' || user.role === 'bep') return [
+    query(jobs, where('selectedProfessionalId', '==', user.uid), limit(100)),
+    query(jobs, where('selectedBepId', '==', user.uid), limit(100)),
+    query(jobs, where('selectedArchitectId', '==', user.uid), limit(100)),
+  ];
+  return [];
+}
+
+export default function FinancialDashboard({ user }: { user?: UserProfile }) {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [escrows, setEscrows] = useState<EscrowV2[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [visibleJobIds, setVisibleJobIds] = useState<string[]>([]);
   const [projectFilter, setProjectFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
   useEffect(() => {
-    const unsubLedger = onSnapshot(query(collection(db, 'ledger'), orderBy('createdAt', 'desc'), limit(500)), (snapshot) => {
-      setLedger(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as LedgerEntry)));
-    });
-    const unsubEscrow = onSnapshot(query(collection(db, 'escrow'), orderBy('updatedAt', 'desc'), limit(200)), (snapshot) => {
-      setEscrows(snapshot.docs.map((docSnap) => ({ jobId: docSnap.id, ...docSnap.data() } as EscrowV2)));
-    });
-    const unsubProjects = onSnapshot(query(collection(db, 'projects'), limit(200)), (snapshot) => {
-      setProjects(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)));
-    });
-    return () => { unsubLedger(); unsubEscrow(); unsubProjects(); };
-  }, []);
+    const unsubs: Array<() => void> = [];
+    const ledgerMap = new Map<string, LedgerEntry>();
+
+    if (!user || user.role === 'admin') {
+      unsubs.push(onSnapshot(query(collection(db, 'ledger'), limit(500)), (snapshot) => {
+        setLedger(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as LedgerEntry)));
+      }, (error) => { console.warn('Admin ledger projection unavailable:', error); setLedger([]); }));
+      unsubs.push(onSnapshot(query(collection(db, 'escrow'), limit(200)), (snapshot) => {
+        setEscrows(snapshot.docs.map((docSnap) => ({ jobId: docSnap.id, ...docSnap.data() } as EscrowV2)));
+      }, (error) => { console.warn('Admin escrow projection unavailable:', error); setEscrows([]); }));
+      unsubs.push(onSnapshot(query(collection(db, 'projects'), limit(200)), (snapshot) => {
+        setProjects(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)));
+      }, (error) => { console.warn('Admin financial project projection unavailable:', error); setProjects([]); }));
+      return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    }
+
+    const mergeLedger = (snapshot: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
+      snapshot.docs.forEach((docSnap) => ledgerMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as LedgerEntry));
+      setLedger(sortByRecent(Array.from(ledgerMap.values())));
+    };
+
+    unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payerId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payer ledger projection unavailable:', error)));
+    unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payeeId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payee ledger projection unavailable:', error)));
+
+    const projectQueries = projectQueriesForFinancialUser(user);
+    if (projectQueries.length > 0) {
+      unsubs.push(subscribeToMergedQuerySnapshots<Project>(projectQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project), (items) => {
+        setProjects(sortByRecent(items));
+      }, (error) => { console.warn('Financial project projection unavailable:', error); setProjects([]); }));
+    } else {
+      setProjects([]);
+    }
+
+    const jobQueries = jobQueriesForFinancialUser(user);
+    if (jobQueries.length > 0) {
+      unsubs.push(subscribeToMergedQuerySnapshots<Job>(jobQueries, (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (items) => {
+        setVisibleJobIds(items.map((job) => job.id));
+      }, (error) => { console.warn('Financial job projection unavailable:', error); setVisibleJobIds([]); }));
+    } else {
+      setVisibleJobIds([]);
+    }
+
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role === 'admin') return undefined;
+    if (!['client', 'architect', 'bep'].includes(user.role) || visibleJobIds.length === 0) {
+      setEscrows([]);
+      return undefined;
+    }
+
+    const escrowMap = new Map<string, EscrowV2>();
+    const unsubs = visibleJobIds.slice(0, 25).map((jobId) => onSnapshot(doc(db, 'escrow', jobId), (snapshot) => {
+      if (snapshot.exists()) escrowMap.set(snapshot.id, { jobId: snapshot.id, ...snapshot.data() } as EscrowV2);
+      else escrowMap.delete(jobId);
+      setEscrows(sortByRecent(Array.from(escrowMap.values())));
+    }, (error) => console.warn(`Escrow projection unavailable for job ${jobId}:`, error)));
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [user, visibleJobIds]);
 
   const filteredLedger = useMemo(() => ledger.filter((entry) => {
     const projectMatch = !projectFilter || entry.projectId.toLowerCase().includes(projectFilter.toLowerCase()) || entry.jobId.toLowerCase().includes(projectFilter.toLowerCase());
@@ -42,6 +136,10 @@ export default function FinancialDashboard() {
     pendingReleases: escrows.reduce((sum, escrow) => sum + (escrow.milestones || []).filter((milestone) => milestone.status === 'release_requested').length, 0),
     refunds: ledger.filter((entry) => entry.type === 'refund').reduce((sum, entry) => sum + entry.amount, 0),
   }), [ledger, escrows]);
+
+  const releaseRequestedMilestones = useMemo(() => escrows.flatMap((escrow) => (escrow.milestones || [])
+    .filter((milestone) => milestone.status === 'release_requested')
+    .map((milestone) => ({ escrow, milestone }))), [escrows]);
 
   const monthlyRevenue = useMemo(() => {
     const buckets = new Map<string, number>();
@@ -69,6 +167,27 @@ export default function FinancialDashboard() {
         <SummaryCard icon={<CreditCard />} label="Pending Releases" value={summary.pendingReleases.toString()} />
         <SummaryCard icon={<RotateCcw />} label="Refunds" value={currency.format(summary.refunds)} />
       </div>
+
+      <Card className="rounded-[2rem] border-amber-200 bg-amber-50/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold uppercase tracking-widest text-amber-950 flex items-center gap-2"><AlertTriangle size={16} /> Payment and escrow execution guard</CardTitle>
+          <CardDescription className="text-amber-900">Human-confirmed governance boundary for provider calls, invoice payments, milestone releases, refunds, and escrow actions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-amber-950">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {PAYMENT_GUARD_STEPS.map((step) => <div key={step} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><span>{step}</span></div>)}
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Initiate payment disabled</Button>
+            <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Release escrow disabled</Button>
+            <Button type="button" disabled className="rounded-xl bg-amber-900 text-white disabled:opacity-80">Provider submission disabled</Button>
+          </div>
+          <div className="rounded-2xl border border-amber-300 bg-white/70 p-4">
+            <p className="font-bold">Pending release requests visible: {releaseRequestedMilestones.length}</p>
+            <p className="mt-1 text-xs text-amber-900">Use this count to triage human review. No release instruction is generated from this browser view.</p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-[2rem] border-border bg-white shadow-sm">
         <CardHeader>

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import dotenv from "dotenv";
 import express from "express";
 import { createServer as createViteServer } from "vite";
@@ -12,6 +14,31 @@ dotenv.config({
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function readBuildInfo() {
+  const candidates = [
+    resolve(process.cwd(), "dist", "build-info.json"),
+    resolve(process.cwd(), "public", "build-info.json"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(readFileSync(candidate, "utf8"));
+    } catch {
+      // Try the next build-info location.
+    }
+  }
+
+  return {
+    name: "architex",
+    version: "unknown",
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_SHA || "unknown",
+    shortCommit: (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_SHA || "unknown").slice(0, 12),
+    branch: process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || process.env.BRANCH_NAME || "unknown",
+    builtAt: "unknown",
+    node: process.version,
+  };
+}
 
 async function startServer() {
   const app = express();
@@ -43,8 +70,20 @@ async function startServer() {
     next();
   });
 
+  app.get("/api/version", (_req, res) => {
+    res.json({ status: "ok", ...readBuildInfo(), servedAt: new Date().toISOString() });
+  });
+
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  app.post("/api/auth/check-admin", (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing authorization header" });
+    }
+    return next();
   });
 
   // Mount the shared API router lazily. Firebase Admin / Firestore can add a
@@ -61,6 +100,10 @@ async function startServer() {
         details: error instanceof Error ? error.message : String(error),
       });
     }
+  });
+
+  app.use("/api", (req, res) => {
+    res.status(404).json({ error: "API route not found", path: req.originalUrl });
   });
 
   // --- Local Development Notification Worker ---
@@ -121,7 +164,7 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
     });
     app.use(vite.middlewares);

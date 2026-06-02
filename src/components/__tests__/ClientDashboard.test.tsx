@@ -195,13 +195,13 @@ describe('ClientDashboard', () => {
   test('should render active jobs section by default', () => {
     render(<ClientDashboard user={mockUser} />);
 
-    expect(screen.getByText(/You haven't posted any jobs yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Post New Job/i)).toBeInTheDocument();
   });
 
   test('should render profile editor', () => {
     render(<ClientDashboard user={mockUser} />);
 
-    expect(screen.getByTestId('profile-editor')).toBeInTheDocument();
+    expect(screen.getByText(/Edit Profile/i)).toBeInTheDocument();
   });
 
   test('should handle tab changes', () => {

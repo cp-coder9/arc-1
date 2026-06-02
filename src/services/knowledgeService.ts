@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import { db, auth } from "../lib/firebase";
 import {
   collection,
@@ -209,7 +210,7 @@ export const webSearchForAgent = async (query: string, agentRole: string, agentI
     if (!user) throw new Error("User must be authenticated for web search");
 
     const idToken = await user.getIdToken();
-    const response = await fetch("/api/agent/search", {
+    const response = await apiFetch("/api/agent/search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

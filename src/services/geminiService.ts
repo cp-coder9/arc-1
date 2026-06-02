@@ -3,6 +3,7 @@
  * Handles drawing review through specialized built-environment agents.
  */
 
+import { apiFetch } from '../lib/apiClient';
 import { auth, db } from "../lib/firebase";
 import { collection, query, where, doc, getDoc, updateDoc, addDoc, getDocs } from "firebase/firestore";
 import {
@@ -126,7 +127,7 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES):
 }
 
 export async function callGeminiProxy(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig, agent?: Agent, drawingUrls?: string[]): Promise<string> {
-  const response = await fetch(GEMINI_PROXY_URL, {
+  const response = await apiFetch(GEMINI_PROXY_URL, {
     method: 'POST',
     headers: await getAuthenticatedHeaders(),
     body: JSON.stringify({ systemInstruction, prompt, drawingUrl, drawingUrls, config, agentId: agent?.id })
@@ -407,7 +408,7 @@ async function callAgent(agent: Agent, prompt: string, files: DrawingReference[]
 }
 
 async function callScopeAgent(scopePrompt: string, files: DrawingReference[]): Promise<string> {
-  const response = await fetch('/api/agent/scope', {
+  const response = await apiFetch('/api/agent/scope', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt: scopePrompt, files })
@@ -639,7 +640,7 @@ function findingsToCategories(findings: Finding[]): AICategory[] {
 }
 
 async function callAgentReview(systemInstruction: string, prompt: string, drawingUrl?: string, config?: LLMConfig, agent?: Agent, drawingUrls?: string[]): Promise<string> {
-  const response = await fetch('/api/review', {
+  const response = await apiFetch('/api/review', {
     method: 'POST',
     headers: await getAuthenticatedHeaders(),
     body: JSON.stringify({ systemInstruction, prompt, drawingUrl, drawingUrls, config, agentId: agent?.id })

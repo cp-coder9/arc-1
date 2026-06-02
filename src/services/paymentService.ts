@@ -1,4 +1,5 @@
 import { db, auth } from '../lib/firebase';
+import { apiFetch as configuredApiFetch, buildApiUrl } from '../lib/apiClient';
 import {
   collection,
   query,
@@ -17,6 +18,7 @@ import { getIdToken } from 'firebase/auth';
 import { LedgerEntry, Payment, Escrow, EscrowMilestone, EscrowV2, Job, Project, ProjectStage, PROJECT_STAGE_ORDER, UserProfile } from '../types';
 import { notificationService } from './notificationService';
 import { recordTransaction } from './financialLedgerService';
+import { PRD_PLATFORM_FEE_PERCENTAGE } from './platformFeePolicy';
 import { toast } from 'sonner';
 import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
@@ -41,9 +43,9 @@ async function requireIdToken(): Promise<string> {
 }
 
 /** Thin wrapper for authenticated server API calls. */
-async function apiFetch(path: string, body: object): Promise<any> {
+async function postApiJson(path: string, body: object): Promise<any> {
   const idToken = await requireIdToken();
-  const res = await fetch(path, {
+  const res = await configuredApiFetch(path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -75,7 +77,7 @@ const PAYFAST_CONFIG = {
     : 'https://www.payfast.co.za/eng/process',
 };
 
-const PLATFORM_FEE_PERCENTAGE = 0.05;
+const PLATFORM_FEE_PERCENTAGE = PRD_PLATFORM_FEE_PERCENTAGE;
 const VAT_PERCENTAGE = 0.15;
 
 const STAGE_ESCROW_MILESTONES: Array<{ id: string; name: string; stage: ProjectStage; percentage: number; releaseConditions: string[] }> = [
@@ -204,7 +206,7 @@ class PaymentService {
    * Initialize escrow for a job — delegates to server for privileged write.
    */
   async initializeEscrow(job: Job, client: UserProfile): Promise<{ paymentUrl: string; paymentId: string }> {
-    const data = await apiFetch('/api/payment/escrow/init', { jobId: job.id });
+    const data = await postApiJson('/api/payment/escrow/init', { jobId: job.id });
     const paymentUrl = await this.generatePayFastUrl(data.paymentId, data.totalAmount, job.title, client);
     return { paymentUrl, paymentId: data.paymentId };
   }
@@ -319,7 +321,7 @@ class PaymentService {
  * The server handles notification; we only toast based on response.
  */
 async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise<void> {
- const data = await apiFetch('/api/payment/confirm', { paymentId, pfData });
+ const data = await postApiJson('/api/payment/confirm', { paymentId, pfData });
  if (data.success === true) {
  toast.success('Escrow funded successfully!');
  } else {
@@ -335,7 +337,7 @@ async confirmPayment(paymentId: string, pfData: Record<string, string>): Promise
     milestone: 'initial' | 'draft' | 'final',
     requestingUserId: string
   ): Promise<void> {
-    const data = await apiFetch('/api/payment/milestone/release', { jobId: job.id, milestone });
+    const data = await postApiJson('/api/payment/milestone/release', { jobId: job.id, milestone });
     if (job.selectedArchitectId) {
       await notificationService.notifyPaymentReleased(
         job.selectedArchitectId,
@@ -356,7 +358,7 @@ async requestMilestoneRelease(
  milestone: 'initial' | 'draft' | 'final',
  architectId: string
 ): Promise<void> {
- await apiFetch('/api/payment/milestone/request', { jobId: job.id, milestone });
+ await postApiJson('/api/payment/milestone/request', { jobId: job.id, milestone });
  toast.success('Payment release requested');
 }
 
@@ -370,7 +372,7 @@ async processRefund(
  reason: string,
  requestingUserId: string
 ): Promise<void> {
- const data = await apiFetch('/api/payment/refund', { jobId: job.id, amount, reason });
+ const data = await postApiJson('/api/payment/refund', { jobId: job.id, amount, reason });
  toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
 }
 
@@ -386,9 +388,9 @@ async processRefund(
     // PayFast requires absolute URLs for redirects. 
     // We point to our backend routes so the server can handle any quick pre-processing 
     // and then 302 redirect the user back to the SPA dashboards.
-    const returnUrl = `${window.location.origin}/api/payment/success?payment_id=${paymentId}`;
-    const cancelUrl = `${window.location.origin}/api/payment/cancel?payment_id=${paymentId}`;
-    const notifyUrl = `${window.location.origin}/api/payment/notify`;
+    const returnUrl = buildApiUrl(`/api/payment/success?payment_id=${encodeURIComponent(paymentId)}`);
+    const cancelUrl = buildApiUrl(`/api/payment/cancel?payment_id=${encodeURIComponent(paymentId)}`);
+    const notifyUrl = buildApiUrl("/api/payment/notify");
 
     const data: Record<string, string> = {
       merchant_id: PAYFAST_CONFIG.merchantId as string,

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { UserProfile, ArchitectProfile, JobCategory } from '../types';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -11,6 +12,7 @@ import { User, Settings, Save, Loader2, Plus, Trash2, Image as ImageIcon, Shield
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { uploadAndTrackFile } from '../lib/uploadService';
+import { OptimizedImage } from './ui/optimized-image';
 
 interface ProfileEditorProps {
   user: UserProfile;
@@ -76,7 +78,7 @@ export default function ProfileEditor({ user, trigger, isAdminEditing = false }:
     setIsVerifying(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/architect/verify-sacap', {
+      const res = await apiFetch('/api/architect/verify-sacap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,7 +143,7 @@ const handleSave = async (e: React.FormEvent) => {
         try {
           // Call server-side API for SACAP verification
           const idToken = await auth.currentUser?.getIdToken();
-          const response = await fetch('/api/architect/verify-sacap', {
+          const response = await apiFetch('/api/architect/verify-sacap', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -418,7 +420,7 @@ const handleSave = async (e: React.FormEvent) => {
                       {portfolioImages.map((img, idx) => (
                         <div key={idx} className="bg-secondary/20 p-4 rounded-2xl border border-border flex gap-4">
                           <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center overflow-hidden shrink-0 border border-border">
-                            <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
+                            <OptimizedImage src={img.url} alt={img.title} className="w-full h-full object-cover" sizes="96px" />
                           </div>
                           <div className="flex-1 space-y-2">
                             <Input

@@ -3,6 +3,7 @@
  * Handles in-app, email (SendGrid), and push (FCM) notifications
  */
 
+import { apiFetch } from '../lib/apiClient';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 import {
@@ -75,6 +76,10 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Firm Invitation',
     channels: ['in_app', 'email'],
   },
+  firm_invite_accepted: {
+    title: 'Firm Invitation Accepted',
+    channels: ['in_app', 'email'],
+  },
   firm_role_changed: {
     title: 'Firm Role Updated',
     channels: ['in_app', 'email'],
@@ -82,6 +87,46 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
   firm_member_removed: {
     title: 'Firm Access Removed',
     channels: ['in_app', 'email'],
+  },
+  firm_subscription_updated: {
+    title: 'Firm Subscription Updated',
+    channels: ['in_app', 'email'],
+  },
+  directory_invitation: {
+    title: 'Directory Invitation',
+    channels: ['in_app', 'email'],
+  },
+  material_request_created: {
+    title: 'Material Request Created',
+    channels: ['in_app', 'email'],
+  },
+  material_quote_received: {
+    title: 'Material Quote Received',
+    channels: ['in_app', 'email', 'push'],
+  },
+  procurement_order_updated: {
+    title: 'Procurement Order Updated',
+    channels: ['in_app', 'email'],
+  },
+  cpd_course_published: {
+    title: 'CPD Course Published',
+    channels: ['in_app', 'email'],
+  },
+  cpd_certificate_issued: {
+    title: 'CPD Certificate Issued',
+    channels: ['in_app', 'email', 'push'],
+  },
+  subscription_status_changed: {
+    title: 'Subscription Status Changed',
+    channels: ['in_app', 'email'],
+  },
+  refund_processed: {
+    title: 'Refund Processed',
+    channels: ['in_app', 'email'],
+  },
+  contractor_delivery_update: {
+    title: 'Contractor Delivery Update',
+    channels: ['in_app', 'email', 'push'],
   },
 };
 
@@ -226,8 +271,19 @@ class NotificationService {
       invoice_sent: '📄',
       invoice_paid: '💰',
       firm_invite: '🏢',
+      firm_invite_accepted: '✅',
       firm_role_changed: '🪪',
       firm_member_removed: '🚪',
+      firm_subscription_updated: '🏢',
+      directory_invitation: '📨',
+      material_request_created: '📦',
+      material_quote_received: '🏷️',
+      procurement_order_updated: '🚚',
+      cpd_course_published: '🎓',
+      cpd_certificate_issued: '📜',
+      subscription_status_changed: '💳',
+      refund_processed: '↩️',
+      contractor_delivery_update: '🏗️',
     };
 
     toast(`${icons[type] || '🔔'} ${title}`, {
@@ -258,7 +314,7 @@ class NotificationService {
       const user = auth.currentUser;
       if (!user) return;
       const idToken = await user.getIdToken();
-      await fetch('/api/notifications/token', {
+      await apiFetch('/api/notifications/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -470,7 +526,7 @@ class NotificationService {
   ): Promise<void> {
     await this.sendNotification(
       clientId,
-      'payment_released',
+      'refund_processed',
       `Refund of R${amount.toLocaleString()} processed. Reason: ${reason}`,
       { jobId }
     );
@@ -509,6 +565,15 @@ class NotificationService {
     );
   }
 
+  async notifyFirmInviteAccepted(userId: string, firmId: string, firmInviteId: string, memberName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_invite_accepted',
+      `${memberName} accepted a firm workspace invitation.`,
+      { firmId, firmInviteId }
+    );
+  }
+
   async notifyFirmRoleChanged(userId: string, firmId: string, role: string, senderId: string): Promise<void> {
     await this.sendNotification(
       userId,
@@ -524,6 +589,78 @@ class NotificationService {
       'firm_member_removed',
       'Your access to a firm workspace has been removed.',
       { firmId, senderId }
+    );
+  }
+
+  async notifyFirmSubscriptionUpdated(userId: string, firmId: string, subscriptionId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_subscription_updated',
+      `Firm subscription status changed to ${status.replace('_', ' ')}.`,
+      { firmId, subscriptionId }
+    );
+  }
+
+  async notifyMaterialRequestCreated(userId: string, projectId: string, materialRequestId: string, packageName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'material_request_created',
+      `New material request created for ${packageName}.`,
+      { projectId, materialRequestId }
+    );
+  }
+
+  async notifyMaterialQuoteReceived(userId: string, projectId: string, materialRequestId: string, quoteId: string, supplierName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'material_quote_received',
+      `${supplierName} submitted a material quote.`,
+      { projectId, materialRequestId, quoteId }
+    );
+  }
+
+  async notifyProcurementOrderUpdated(userId: string, projectId: string, procurementOrderId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'procurement_order_updated',
+      `Procurement order status changed to ${status.replace('_', ' ')}.`,
+      { projectId, procurementOrderId }
+    );
+  }
+
+  async notifyCPDCoursePublished(userId: string, courseId: string, courseTitle: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'cpd_course_published',
+      `New CPD course published: ${courseTitle}.`,
+      { courseId }
+    );
+  }
+
+  async notifyCPDCertificateIssued(userId: string, courseId: string, certificateId: string, courseTitle: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'cpd_certificate_issued',
+      `Your CPD certificate for ${courseTitle} is ready.`,
+      { courseId, certificateId }
+    );
+  }
+
+  async notifySubscriptionStatusChanged(userId: string, subscriptionId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'subscription_status_changed',
+      `Subscription status changed to ${status.replace('_', ' ')}.`,
+      { subscriptionId }
+    );
+  }
+
+  async notifyContractorDeliveryUpdate(userId: string, projectId: string, deliveryId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'contractor_delivery_update',
+      `Contractor delivery status changed to ${status.replace('_', ' ')}.`,
+      { projectId, deliveryId }
     );
   }
 }

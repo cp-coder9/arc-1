@@ -7,8 +7,6 @@ import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import { NotificationType } from '../../types';
 import * as firestore from 'firebase/firestore';
 
-const { notificationService } = await import('../notificationService');
-
 const mockAddDoc = jest.fn<(...args: any[]) => Promise<{ id: string }>>(() => Promise.resolve({ id: 'new-notification-id' }));
 const mockCollection = jest.fn<(...args: any[]) => { path: string }>((_db: any, path: string) => ({ path }));
 const mockDoc = jest.fn<(...args: any[]) => { path: string; id: string }>((_db: any, path: string, id: string) => ({ path, id }));
@@ -48,6 +46,8 @@ jest.mock('firebase/firestore', () => ({
 jest.mock('sonner', () => ({
   toast: jest.fn(),
 }));
+
+const { notificationService } = await import('../notificationService');
 
 describe('NotificationService', () => {
   let notificationWrites: any[];
@@ -134,6 +134,25 @@ describe('NotificationService', () => {
       await notificationService.sendNotification('user-1', 'message', 'Muted message');
 
       expect(mockAddDoc).not.toHaveBeenCalled();
+    });
+
+    test('supports directory invitation notifications for persisted invite workflows', async () => {
+      await notificationService.sendNotification('bep-1', 'directory_invitation', 'You have been invited to a project', {
+        invitationId: 'invite-1',
+        projectId: 'project-1',
+        senderId: 'client-1',
+      });
+
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        { path: 'notifications' },
+        expect.objectContaining({
+          userId: 'bep-1',
+          type: 'directory_invitation',
+          title: 'Directory Invitation',
+          channels: ['in_app', 'email'],
+          data: { invitationId: 'invite-1', projectId: 'project-1', senderId: 'client-1' },
+        })
+      );
     });
   });
 
@@ -282,6 +301,86 @@ describe('NotificationService', () => {
       expect(mockAddDoc).toHaveBeenCalledWith(
         { path: 'notifications' },
         expect.objectContaining({ type: 'council_update', userId: 'client-1' })
+      );
+    });
+
+    test('notifyRefundProcessed uses dedicated refund_processed type', async () => {
+      await notificationService.notifyRefundProcessed('client-1', 1500, 'duplicate payment', 'job-1');
+
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        { path: 'notifications' },
+        expect.objectContaining({
+          type: 'refund_processed',
+          title: 'Refund Processed',
+          userId: 'client-1',
+          data: { jobId: 'job-1' },
+        })
+      );
+    });
+
+    test('supports Phase 5 firm and subscription triggers', async () => {
+      await notificationService.notifyFirmInviteAccepted('owner-1', 'firm-1', 'invite-1', 'New Member');
+      await notificationService.notifyFirmSubscriptionUpdated('owner-1', 'firm-1', 'sub-1', 'past_due');
+      await notificationService.notifySubscriptionStatusChanged('user-1', 'sub-2', 'active');
+
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        1,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'firm_invite_accepted', data: { firmId: 'firm-1', firmInviteId: 'invite-1' } })
+      );
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        2,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'firm_subscription_updated', data: { firmId: 'firm-1', subscriptionId: 'sub-1' } })
+      );
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        3,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'subscription_status_changed', data: { subscriptionId: 'sub-2' } })
+      );
+    });
+
+    test('supports Phase 5 materials and procurement triggers', async () => {
+      await notificationService.notifyMaterialRequestCreated('supplier-1', 'project-1', 'mr-1', 'Concrete package');
+      await notificationService.notifyMaterialQuoteReceived('contractor-1', 'project-1', 'mr-1', 'quote-1', 'Supplier Co');
+      await notificationService.notifyProcurementOrderUpdated('contractor-1', 'project-1', 'po-1', 'in_transit');
+
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        1,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'material_request_created', data: { projectId: 'project-1', materialRequestId: 'mr-1' } })
+      );
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        2,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'material_quote_received', data: { projectId: 'project-1', materialRequestId: 'mr-1', quoteId: 'quote-1' } })
+      );
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        3,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'procurement_order_updated', data: { projectId: 'project-1', procurementOrderId: 'po-1' } })
+      );
+    });
+
+    test('supports Phase 5 CPD and contractor delivery triggers', async () => {
+      await notificationService.notifyCPDCoursePublished('architect-1', 'course-1', 'Fire Safety');
+      await notificationService.notifyCPDCertificateIssued('architect-1', 'course-1', 'cert-1', 'Fire Safety');
+      await notificationService.notifyContractorDeliveryUpdate('client-1', 'project-1', 'delivery-1', 'delivered');
+
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        1,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'cpd_course_published', data: { courseId: 'course-1' } })
+      );
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        2,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'cpd_certificate_issued', data: { courseId: 'course-1', certificateId: 'cert-1' } })
+      );
+      expect(mockAddDoc).toHaveBeenNthCalledWith(
+        3,
+        { path: 'notifications' },
+        expect.objectContaining({ type: 'contractor_delivery_update', data: { projectId: 'project-1', deliveryId: 'delivery-1' } })
       );
     });
   });

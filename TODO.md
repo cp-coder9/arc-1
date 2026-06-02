@@ -107,13 +107,13 @@ All previously critical items have been completed:
 
 - [x] Implement route/component code splitting for dashboard bundles
 - [x] Lazy-load heavy dashboard, file, invoice, settings, and onboarding components
-- [ ] Add image optimization for portfolio and uploaded media
+- [x] Add image optimization for portfolio and uploaded media
 - [ ] Implement virtual scrolling for very large lists
 - [x] Add offline persistence for Firestore
 
 ### UX Improvements
 
-- [ ] Add keyboard navigation shortcuts
+- [x] Add keyboard navigation shortcuts
 - [x] Add tour/onboarding for new users
 - [x] Add dark mode toggle
 - [x] Improve mobile sidebar/dashboard responsiveness
@@ -130,7 +130,7 @@ All previously critical items have been completed:
 - [x] Initialize Firebase Analytics when supported
 - [x] Create admin analytics dashboard
 - [x] Add dashboard tab analytics event tracking
-- [ ] Add detailed feature-level user activity event tracking
+- [x] Add detailed feature-level user activity event tracking
 
 ---
 

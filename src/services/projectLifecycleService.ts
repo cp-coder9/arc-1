@@ -24,10 +24,82 @@ import {
 
 // ─── Stage Transition Rules ─────────────────────────────────────────────────
 
+export type StageGateEvidenceKey =
+  | 'clientBriefCompleted'
+  | 'technicalBriefApproved'
+  | 'verifiedProfessionalAppointed'
+  | 'appointmentAgreementSigned'
+  | 'escrowPlanInitialized'
+  | 'designPackageApproved'
+  | 'drawingRegisterReady'
+  | 'complianceFindingsResolved'
+  | 'municipalSubmissionReady'
+  | 'procurementPackageApproved'
+  | 'contractorInstructionIssued'
+  | 'constructionEvidenceSubmitted'
+  | 'paymentClaimCertified'
+  | 'escrowReleaseApproved'
+  | 'snagsResolved'
+  | 'certificatesUploaded'
+  | 'finalAccountApproved'
+  | 'handoverPackGenerated';
+
+export type StageGateEvidence = Partial<Record<StageGateEvidenceKey, boolean>>;
+
+export interface StageGateRequirement {
+  key: StageGateEvidenceKey;
+  label: string;
+  reason: string;
+}
+
+export interface StageGateEvaluation {
+  currentStage: ProjectStage;
+  targetStage: ProjectStage;
+  transitionAllowed: boolean;
+  transitionRulePassed: boolean;
+  missingRequirements: StageGateRequirement[];
+}
+
+export const STAGE_GATE_REQUIREMENTS: Record<Exclude<ProjectStage, 'intake' | 'scoping'>, StageGateRequirement[]> = {
+  appointment: [
+    { key: 'clientBriefCompleted', label: 'Client brief completed', reason: 'A client brief is required before marketplace/proposal routing.' },
+    { key: 'technicalBriefApproved', label: 'Technical brief approved', reason: 'A BEP-reviewed technical scope is required before appointment.' },
+  ],
+  coordination: [
+    { key: 'verifiedProfessionalAppointed', label: 'Verified professional appointed', reason: 'Design coordination requires an appointed verified lead professional.' },
+    { key: 'appointmentAgreementSigned', label: 'Appointment agreement signed', reason: 'Professional work cannot proceed without appointment acceptance/signature.' },
+    { key: 'escrowPlanInitialized', label: 'Escrow/payment plan initialized', reason: 'Commercial terms must be recorded before coordinated delivery.' },
+  ],
+  compliance: [
+    { key: 'designPackageApproved', label: 'Design package approved', reason: 'Compliance review requires an approved design package.' },
+    { key: 'drawingRegisterReady', label: 'Drawing register ready', reason: 'Compliance findings must reference controlled drawing revisions.' },
+  ],
+  tender: [
+    { key: 'complianceFindingsResolved', label: 'Compliance findings resolved or accepted', reason: 'Tender/procurement cannot rely on unresolved compliance blockers.' },
+    { key: 'municipalSubmissionReady', label: 'Municipal submission package ready', reason: 'Procurement must understand approval and submission constraints.' },
+  ],
+  delivery: [
+    { key: 'procurementPackageApproved', label: 'Procurement/tender package approved', reason: 'Construction delivery requires approved package scope and procurement basis.' },
+    { key: 'contractorInstructionIssued', label: 'Contractor instruction issued', reason: 'A contractor cannot start regulated work without appointment or instruction.' },
+  ],
+  payments: [
+    { key: 'constructionEvidenceSubmitted', label: 'Construction/progress evidence submitted', reason: 'Milestone payments require linked deliverable or site evidence.' },
+    { key: 'paymentClaimCertified', label: 'Payment claim certified', reason: 'Funds cannot be released before the required certifier/approver gate.' },
+    { key: 'escrowReleaseApproved', label: 'Escrow release approved', reason: 'Payment release requires human approval under the escrow state model.' },
+  ],
+  closeout: [
+    { key: 'snagsResolved', label: 'Snags resolved', reason: 'Close-out cannot complete while snags remain unresolved.' },
+    { key: 'certificatesUploaded', label: 'Certificates and warranties uploaded', reason: 'Close-out requires compliance certificates, warranties, and handover evidence.' },
+    { key: 'finalAccountApproved', label: 'Final account approved', reason: 'Commercial close-out requires a final account decision.' },
+    { key: 'handoverPackGenerated', label: 'Handover pack generated', reason: 'The long-term project record must be assembled before archive.' },
+  ],
+};
+
 /**
  * Returns the 0-based index of a stage, or -1 if not found.
  */
 export function stageIndex(stage: ProjectStage): number {
+  if (stage === 'scoping') return PROJECT_STAGE_ORDER.indexOf('intake');
   return PROJECT_STAGE_ORDER.indexOf(stage);
 }
 
@@ -47,10 +119,56 @@ export function canTransition(
   const targetIdx = stageIndex(target);
 
   if (currentIdx === -1 || targetIdx === -1) return false;
-  if (targetIdx <= currentIdx) return false; // no backward or self-transition
+  if (current === target) return false; // no self-transition, including legacy scoping records
+  if (target === 'scoping') return false; // scoping is a legacy alias for the PRD Brief stage, not a canonical target
+  if (targetIdx <= currentIdx) return false; // no backward transition
 
   if (isAdminOverride) return true; // admin can skip ahead
-  return targetIdx === currentIdx + 1; // normal: exactly one step forward
+  return targetIdx === currentIdx + 1; // normal: exactly one canonical PRD stage forward
+}
+
+export function getStageGateRequirements(targetStage: ProjectStage): StageGateRequirement[] {
+  if (targetStage === 'intake' || targetStage === 'scoping') return [];
+  return STAGE_GATE_REQUIREMENTS[targetStage] || [];
+}
+
+export function getMissingStageGateRequirements(
+  targetStage: ProjectStage,
+  evidence: StageGateEvidence = {},
+): StageGateRequirement[] {
+  return getStageGateRequirements(targetStage).filter(requirement => evidence[requirement.key] !== true);
+}
+
+export function evaluateStageGateTransition(
+  currentStage: ProjectStage,
+  targetStage: ProjectStage,
+  evidence: StageGateEvidence = {},
+  isAdminOverride = false,
+): StageGateEvaluation {
+  const transitionRulePassed = canTransition(currentStage, targetStage, isAdminOverride);
+  const missingRequirements = getMissingStageGateRequirements(targetStage, evidence);
+
+  return {
+    currentStage,
+    targetStage,
+    transitionAllowed: transitionRulePassed && missingRequirements.length === 0,
+    transitionRulePassed,
+    missingRequirements,
+  };
+}
+
+export function assertStageGateTransitionAllowed(evaluation: StageGateEvaluation): void {
+  if (!evaluation.transitionRulePassed) {
+    throw new Error(`Invalid transition: ${evaluation.currentStage} → ${evaluation.targetStage}`);
+  }
+
+  if (evaluation.missingRequirements.length > 0) {
+    const labels = evaluation.missingRequirements.map(requirement => requirement.label).join(', ');
+    const error = new Error(`Stage gate blocked: ${labels}`);
+    (error as Error & { status?: number; missingRequirements?: StageGateRequirement[] }).status = 409;
+    (error as Error & { status?: number; missingRequirements?: StageGateRequirement[] }).missingRequirements = evaluation.missingRequirements;
+    throw error;
+  }
 }
 
 /**
@@ -82,6 +200,8 @@ const PROJECTS_COL = 'projects';
 
 export interface TransitionStageOptions {
   isAdminOverride?: boolean;
+  enforceStageGates?: boolean;
+  stageGateEvidence?: StageGateEvidence;
 }
 
 /**
@@ -168,10 +288,24 @@ export async function transitionStage(
     ? optionsOrOverride
     : optionsOrOverride.isAdminOverride === true;
 
-  if (!canTransition(project.currentStage, targetStage, isAdminOverride)) {
-    throw new Error(
-      `Invalid transition: ${project.currentStage} → ${targetStage}`
-    );
+  const enforceStageGates = typeof optionsOrOverride === 'boolean'
+    ? true
+    : optionsOrOverride.enforceStageGates !== false;
+
+  const stageGateEvidence = {
+    ...(project.stageGateEvidence || {}),
+    ...(typeof optionsOrOverride === 'boolean' ? {} : optionsOrOverride.stageGateEvidence || {}),
+  } as StageGateEvidence;
+
+  if (enforceStageGates) {
+    assertStageGateTransitionAllowed(evaluateStageGateTransition(
+      project.currentStage,
+      targetStage,
+      stageGateEvidence,
+      isAdminOverride,
+    ));
+  } else if (!canTransition(project.currentStage, targetStage, isAdminOverride)) {
+    throw new Error(`Invalid transition: ${project.currentStage} → ${targetStage}`);
   }
 
   const now = new Date().toISOString();

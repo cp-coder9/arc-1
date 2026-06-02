@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { MunicipalityType, CouncilSubmission, TrackingEvent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -32,12 +33,19 @@ import {
 } from 'lucide-react';
 import { db, auth } from '@/lib/firebase';
 import { pdfGenerationService } from '@/services/pdfGenerationService';
+import { uploadAndTrackFile } from '@/lib/uploadService';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { AnimatePresence } from 'framer-motion';
 
 interface MunicipalTrackerProps {
   user: any;
 }
+
+const readJsonOrNull = async (response: Response) => {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return null;
+  return response.json();
+};
 
 export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const [submissions, setSubmissions] = useState<CouncilSubmission[]>([]);
@@ -74,13 +82,13 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const fetchHeatmap = async (muni: MunicipalityType) => {
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch(`/api/municipal/heatmap/${muni}`, {
+      const res = await apiFetch(`/api/municipal/heatmap/${muni}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
+      const data = await readJsonOrNull(res);
       setHeatmap(data);
     } catch (e) {
-      console.error(e);
+      setHeatmap(null);
     }
   };
 
@@ -88,7 +96,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
     setIsScraping(true);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/municipal/scrape', {
+      const res = await apiFetch('/api/municipal/scrape', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -96,7 +104,11 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
         },
         body: JSON.stringify({ municipality: activeMuni })
       });
-      const result = await res.json();
+      const result = await readJsonOrNull(res);
+      if (!result) {
+        toast.error('Portal automation endpoint is unavailable in this environment.');
+        return;
+      }
       if (result.success) {
         toast.success(`Portal automation found ${result.count} updates for ${activeMuni}`);
       } else {
@@ -115,7 +127,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
 
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/municipal/credentials', {
+      const res = await apiFetch('/api/municipal/credentials', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -131,7 +143,11 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
         })
       });
 
-      const result = await res.json();
+      const result = await readJsonOrNull(res);
+      if (!result) {
+        toast.error('Council login endpoint is unavailable in this environment.');
+        return;
+      }
       if (!result.success) {
         toast.error(result.error || 'Failed to save council login');
         return;
@@ -152,18 +168,28 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
     setOcrLoading(true);
     toast.info("Analyzing receipt with Vision AI...");
     try {
-      const mockUrl = "https://public.blob.vercel-storage.com/receipt-sample.png";
+      const receiptUrl = await uploadAndTrackFile(file, {
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        uploadedBy: user.uid,
+        context: 'submission',
+      });
 
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/municipal/ocr', {
+      const res = await apiFetch('/api/municipal/ocr', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ imageUrl: mockUrl })
+        body: JSON.stringify({ imageUrl: receiptUrl })
       });
-      const result = await res.json();
+      const result = await readJsonOrNull(res);
+      if (!result) {
+        toast.error('OCR endpoint is unavailable in this environment.');
+        return;
+      }
 
       if (result.success) {
         toast.success(`Extracted Reference: ${result.data.referenceNumber}`);
@@ -217,7 +243,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
   const submitCrowdsource = async (status: string, backlog: 'low' | 'medium' | 'high') => {
     try {
       const token = await auth.currentUser?.getIdToken();
-      await fetch('/api/municipal/crowdsource', {
+      await apiFetch('/api/municipal/crowdsource', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

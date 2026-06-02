@@ -8,6 +8,7 @@
     "**/*.spec.tsx",
     "src/test/**",
     "e2e/**",
-    "dist/**"
+    "dist/**",
+    "release/**"
   ]
 }

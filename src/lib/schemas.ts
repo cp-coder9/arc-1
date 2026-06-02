@@ -6,10 +6,10 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
-export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected']);
+export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected', 'withdrawn']);
 export const SubmissionStatusEnum = z.enum([
   'processing',
   'pending_ai',
@@ -35,7 +35,8 @@ export const NotificationTypeEnum = z.enum([
   'invoice_paid',
   'firm_invite',
   'firm_role_changed',
-  'firm_member_removed'
+  'firm_member_removed',
+  'directory_invitation'
 ]);
 export const PaymentTypeEnum = z.enum([
   'escrow_deposit',
@@ -275,6 +276,9 @@ export const NotificationSchema = z.object({
     applicationId: z.string().optional(),
     firmId: z.string().optional(),
     firmInviteId: z.string().optional(),
+    invitationId: z.string().optional(),
+    workPackageId: z.string().optional(),
+    discipline: z.string().optional(),
   }).optional(),
   isRead: z.boolean().default(false),
   channels: z.array(z.enum(['in_app', 'email', 'push'])).default(['in_app']),

@@ -48,4 +48,15 @@ describe('messagingService', () => {
       })
     ).rejects.toThrow('Message content cannot be empty');
   });
+
+  test("should accept BEP/design-team roles for backend.html project threads", async () => {
+    await expect(
+      messagingService.sendMessage({
+        jobId: "test-job",
+        senderId: "bep-1",
+        senderRole: "bep",
+        content: "<b>Design coordination update</b>"
+      })
+    ).resolves.toBeDefined();
+  });
 });

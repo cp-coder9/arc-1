@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import FileManager from '../FileManager';
 import { UserProfile } from '../../types';
 
 const mockFile = {
@@ -18,6 +17,8 @@ const mockFile = {
 
 const mockAddDoc = jest.fn(() => Promise.resolve({ id: 'submission-177847582' }));
 const mockUpdateDoc = jest.fn(() => Promise.resolve());
+const mockGetDocs = jest.fn(() => Promise.resolve({ docs: [] }));
+const mockWhere = jest.fn((field, op, value) => ({ field, op, value }));
 const mockGetDoc = jest.fn(() => Promise.resolve({
   exists: () => true,
   id: '177847582',
@@ -40,10 +41,10 @@ jest.mock('../../lib/firebase', () => ({
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((db, path) => ({ path })),
   query: jest.fn((...args) => args),
-  where: jest.fn(),
+  where: (...args: any[]) => mockWhere(...args),
   orderBy: jest.fn(),
   doc: jest.fn((db, path, id) => ({ path, id })),
-  getDocs: jest.fn(() => Promise.resolve({ docs: [] })),
+  getDocs: (...args: any[]) => mockGetDocs(...args),
   getDoc: (...args: any[]) => mockGetDoc(...args),
   addDoc: (...args: any[]) => mockAddDoc(...args),
   updateDoc: (...args: any[]) => mockUpdateDoc(...args),
@@ -103,9 +104,27 @@ jest.mock('../ui/badge', () => ({
   badgeVariants: () => 'badge',
 }));
 
-jest.mock('lucide-react', () => new Proxy({}, {
-  get: () => () => <span />,
-}));
+jest.mock('lucide-react', () => {
+  const Icon = () => <span />;
+  return {
+    File: Icon,
+    FileText: Icon,
+    Image: Icon,
+    FileCode: Icon,
+    Download: Icon,
+    Trash2: Icon,
+    Search: Icon,
+    Filter: Icon,
+    Clock: Icon,
+    User: Icon,
+    ExternalLink: Icon,
+    Loader2: Icon,
+    FileArchive: Icon,
+    HardDrive: Icon,
+  };
+});
+
+const { default: FileManager } = await import('../FileManager');
 
 describe('FileManager quick scan workflow', () => {
   const architect: UserProfile = {
@@ -118,6 +137,7 @@ describe('FileManager quick scan workflow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetDocs.mockResolvedValue({ docs: [] });
     jest.spyOn(window, 'prompt').mockReturnValue('Reviewed AI feedback and sent annotated comments to the client.');
   });
 
@@ -166,6 +186,22 @@ describe('FileManager quick scan workflow', () => {
       '177847582',
       'submission-177847582'
     );
+  });
+
+  test('loads BEP project files across current and legacy selected-professional aliases', async () => {
+    const bep: UserProfile = {
+      ...architect,
+      uid: 'bep-177847582',
+      role: 'bep',
+    };
+
+    render(<FileManager user={bep} />);
+
+    await waitFor(() => expect(mockGetDocs).toHaveBeenCalledTimes(3));
+
+    expect(mockWhere).toHaveBeenCalledWith('selectedProfessionalId', '==', 'bep-177847582');
+    expect(mockWhere).toHaveBeenCalledWith('selectedBepId', '==', 'bep-177847582');
+    expect(mockWhere).toHaveBeenCalledWith('selectedArchitectId', '==', 'bep-177847582');
   });
 
   test('allows architect to upload a new floor plan for job 177847582 before scanning', async () => {

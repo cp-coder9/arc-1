@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, updateDoc, collectionGroup, getDocs, addDoc, setDoc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, Firm } from '../types';
+import { UserProfile, Job, Submission, TraceLog, Agent, SystemLog, UserRole, LLMConfig, LLMProvider, AIReviewResult, AICategory, Dispute, ExecutionMode, DrawingReference, Project, Firm, UserVerification } from '../types';
+import { apiFetch } from '../lib/apiClient';
 import { paginateItems, safeFormat, safeLocale, totalPages } from '../lib/utils';
 import ProfileEditor from './ProfileEditor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -27,6 +28,7 @@ import { format } from 'date-fns';
 import { JobCard, MunicipalCredential } from '../types';
 import { seedAgents, reviewDrawing, AIProgress } from '../services/geminiService';
 import { notificationService } from '../services/notificationService';
+import { buildVerificationQueueProjection, getVerificationLifecycle } from '../services/userVerificationService';
 import ComplianceReport from './ComplianceReport';
 import AgentKnowledgeManager from './AgentKnowledgeManager';
 import { pdfGenerationService } from "../services/pdfGenerationService";
@@ -39,6 +41,7 @@ import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import AdvanceStageButton from './AdvanceStageButton';
 import FinancialDashboard from './FinancialDashboard';
+import { getSelectedProfessionalId } from '../lib/professionalRoleCompatibility';
 
 const PROVIDER_CONFIGS = {
   gemini: {
@@ -138,6 +141,100 @@ function createBlankAgent(): Agent {
   }, 'nvidia');
 }
 
+function AdminGovernanceToolsPanel({ agents, logs, users, jobs, onNavigate }: { agents: Agent[]; logs: SystemLog[]; users: UserProfile[]; jobs: Job[]; onNavigate?: (tab: string) => void }) {
+  const aiNotifications = logs.filter((log) => /ai|agent|llm|review|signoff|governance/i.test(`${log.source} ${log.message}`));
+  const toolSetRows = [
+    { label: 'Agent tool set', value: agents.length, detail: `${agents.filter((agent) => agent.status === 'online').length} online agents`, action: 'compliance' },
+    { label: 'Audit trail viewer', value: logs.length, detail: `${logs.filter((log) => log.level === 'error' || log.level === 'critical').length} errors or critical records`, action: 'audit' },
+    { label: 'Payment rate settings', value: 'Live', detail: 'Configured through admin FeeEstimator settings', action: 'fees' },
+    { label: 'AI notification feed', value: aiNotifications.length, detail: 'Filtered from live system log events', action: 'audit' },
+  ];
+  const roleCounts = users.reduce<Record<string, number>>((acc, profile) => {
+    acc[profile.role] = (acc[profile.role] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6" data-testid="admin-governance-tools-panel">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        {toolSetRows.map((row) => (
+          <Card key={row.label} className="rounded-2xl border-border bg-white shadow-sm">
+            <CardContent className="p-5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{row.label}</p>
+              <p className="mt-2 font-heading text-3xl font-black text-primary">{row.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{row.detail}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-4 rounded-xl" onClick={() => onNavigate?.(row.action)}>Open source tool</Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm overflow-hidden">
+          <CardHeader className="border-b border-border bg-primary/5">
+            <CardTitle className="font-heading text-2xl flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Audit Trail Viewer</CardTitle>
+            <CardDescription>Live `system_logs` stream for administrators. Records are read-only from the browser and remain append-only in governance rules.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-secondary/30">
+                <TableRow><TableHead>Level</TableHead><TableHead>Source</TableHead><TableHead>Message</TableHead><TableHead>Time</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.slice(0, 8).map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell><Badge variant={log.level === 'error' || log.level === 'critical' ? 'destructive' : 'outline'} className="uppercase text-[10px]">{log.level}</Badge></TableCell>
+                    <TableCell className="font-mono text-xs">{log.source}</TableCell>
+                    <TableCell className="text-xs">{log.message}</TableCell>
+                    <TableCell className="text-[10px] text-muted-foreground">{safeFormat(log.timestamp, 'MMM d, HH:mm')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {logs.length === 0 && <p className="p-6 text-sm text-muted-foreground">No system log records are currently visible.</p>}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader className="border-b border-border bg-primary/5">
+            <CardTitle className="font-heading text-2xl flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI Notification Feed</CardTitle>
+            <CardDescription>AI, agent, review, and governance notifications filtered from live system logs. No synthetic alerts are generated.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-5 space-y-3">
+            {aiNotifications.length === 0 ? <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No AI notification events are currently visible.</p> : aiNotifications.slice(0, 10).map((log) => (
+              <div key={log.id} className="rounded-xl border border-border bg-secondary/20 p-4 text-sm">
+                <div className="flex items-center justify-between gap-3"><Badge variant="outline" className="uppercase text-[10px]">{log.source}</Badge><span className="text-[10px] text-muted-foreground">{safeFormat(log.timestamp, 'MMM d, HH:mm')}</span></div>
+                <p className="mt-2 text-xs text-muted-foreground">{log.message}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Settings2 className="h-5 w-5 text-primary" /> Tool Set Management</CardTitle><CardDescription>Production coverage map from live agents, users, and jobs. Configuration actions stay in their dedicated admin tabs.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            {agents.slice(0, 8).map((agent) => <div key={agent.id} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-sm"><div><p className="font-semibold">{agent.name}</p><p className="text-xs text-muted-foreground">{agent.role} · {(agent.executionModes ?? []).join(', ') || 'No modes'}</p></div><Badge variant={agent.status === 'online' ? 'default' : 'outline'}>{agent.status}</Badge></div>)}
+            {agents.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No agent tool set records are currently visible.</p>}
+          </CardContent>
+        </Card>
+        <Card className="rounded-[2rem] border-border bg-white shadow-sm">
+          <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" /> Payment Rate Settings</CardTitle><CardDescription>Admin fee and payment settings are managed by the production FeeEstimator. This panel surfaces platform scale and links to the live editor.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Users</p><p className="text-2xl font-heading font-black">{users.length}</p></div>
+              <div className="rounded-xl border border-border p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Jobs</p><p className="text-2xl font-heading font-black">{jobs.length}</p></div>
+            </div>
+            <div className="flex flex-wrap gap-2">{Object.entries(roleCounts).map(([role, count]) => <Badge key={role} variant="outline" className="capitalize">{role}: {count}</Badge>)}</div>
+            <Button type="button" className="rounded-xl" onClick={() => onNavigate?.('fees')}>Open payment rate settings</Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // Agent Card Component
 function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent; key?: React.Key; isNew?: boolean; onCreated?: () => void; onCancel?: () => void }) {
   const [editing, setEditing] = useState(isNew);
@@ -170,7 +267,7 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
     setIsTesting(true);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/agent/test-settings', {
+      const res = await apiFetch('/api/agent/test-settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -530,6 +627,8 @@ export default function AdminDashboard({
     activeTab === 'fees' ? 'fees' :
     activeTab === 'financial' ? 'financial' :
     activeTab === 'firms' ? 'firms' :
+    activeTab === 'verifications' ? 'verifications' :
+    activeTab === 'governance-tools' ? 'governance-tools' :
     activeTab === 'knowledge' ? 'knowledge' :
     activeTab === 'projects' ? 'jobs' :
     'submissions';
@@ -547,6 +646,7 @@ export default function AdminDashboard({
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [projectsByJobId, setProjectsByJobId] = useState<Record<string, Project>>({});
   const [firms, setFirms] = useState<Firm[]>([]);
+  const [userVerifications, setUserVerifications] = useState<UserVerification[]>([]);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
@@ -625,6 +725,13 @@ export default function AdminDashboard({
       },
       handleListenerError('firms')
     );
+    const unsubVerifications = onSnapshot(
+      query(collection(db, 'user_verifications'), limit(250)),
+      (snapshot) => {
+        setUserVerifications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserVerification)));
+      },
+      handleListenerError('verifications')
+    );
     return () => {
       unsubSubmissions();
       unsubAgents();
@@ -634,6 +741,7 @@ export default function AdminDashboard({
       unsubUsers();
       unsubProjects();
       unsubFirms();
+      unsubVerifications();
     };
   }, []);
 
@@ -657,6 +765,8 @@ export default function AdminDashboard({
 
   const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
   const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+  const verificationQueue = useMemo(() => buildVerificationQueueProjection(userVerifications), [userVerifications]);
+  const verificationsById = useMemo(() => new Map(userVerifications.map(verification => [verification.id, verification])), [userVerifications]);
   const pendingSubmissionCount = submissions.filter(submission => ['ai_passed', 'admin_reviewing'].includes(submission.status)).length;
   const failedSubmissionCount = submissions.filter(submission => ['ai_failed', 'admin_rejected'].includes(submission.status)).length;
   const tabTriggerClass = "min-h-11 w-full rounded-2xl px-3 py-2 gap-2 font-bold text-[10px] sm:text-xs uppercase tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm";
@@ -762,11 +872,68 @@ export default function AdminDashboard({
     }
   };
 
+  const reviewUserVerification = async (verification: UserVerification, status: 'verified' | 'rejected') => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Admin session expired');
+      const rejectionReason = status === 'rejected'
+        ? window.prompt('Enter rejection reason for audit log') || ''
+        : undefined;
+      if (status === 'rejected' && rejectionReason.trim().length < 5) {
+        toast.error('A clear rejection reason is required');
+        return;
+      }
+      const response = await apiFetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/review`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status,
+          rejectionReason,
+          adminReviewNote: status === 'verified' ? 'Admin confirmed automated browser verification evidence.' : rejectionReason,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Verification review failed');
+      }
+      toast.success(status === 'verified' ? 'Verification approved' : 'Verification rejected');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Failed to review verification');
+    }
+  };
+  const recheckUserVerification = async (verification: UserVerification) => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Admin session expired');
+      const response = await apiFetch(`/api/admin/verifications/${encodeURIComponent(verification.id)}/recheck`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: 'Admin queued official register recheck from verification console' }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Verification recheck failed');
+      }
+      toast.success('Verification recheck queued');
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'Failed to queue verification recheck');
+    }
+  };
+
+
   return (
     <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#ba1a1a' }}>
         <div>
-          <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground flex items-center gap-4">
+          <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground flex items-center gap-4">
              <Shield className="text-primary w-12 h-12" /> Admin Command Center
           </h1>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl mt-2 leading-relaxed">Platform orchestration and agent supervision.</p>
@@ -784,11 +951,13 @@ export default function AdminDashboard({
           fees: 'fees',
           financial: 'financial',
           firms: 'firms',
+          verifications: 'verifications',
+          'governance-tools': 'governance-tools',
           submissions: 'overview'
         };
         onTabChange?.(reverseMapping[val] || val);
       }} className="w-full">
-        <div className="mb-8 rounded-[2rem] border border-border bg-white/80 p-3 shadow-sm">
+        <div className="mb-8 rounded-[1.25rem] border border-border beos-glass p-3 beos-soft-shadow">
           <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-[1.5rem] bg-secondary/40 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             <TabsTrigger value="submissions" className={tabTriggerClass}>
               <FileText size={16} /> Submissions
@@ -826,6 +995,12 @@ export default function AdminDashboard({
             <TabsTrigger value="firms" className={tabTriggerClass}>
               <Building2 size={16} /> Firms
             </TabsTrigger>
+            <TabsTrigger value="verifications" className={tabTriggerClass}>
+              <ShieldCheck size={16} /> Verify
+            </TabsTrigger>
+            <TabsTrigger value="governance-tools" className={tabTriggerClass}>
+              <Settings2 size={16} /> Tool Sets
+            </TabsTrigger>
             <TabsTrigger value="settings" className={tabTriggerClass}>
               <Settings2 size={16} /> LLM Settings
             </TabsTrigger>
@@ -836,7 +1011,7 @@ export default function AdminDashboard({
         </div>
 
         <TabsContent value="submissions">
-           <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-border space-y-6 shadow-sm">
+           <div className="beos-section-card p-5 md:p-8 space-y-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">Submissions Review Pipeline</h2>
@@ -879,7 +1054,7 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="disputes">
-          <div className="bg-white p-8 rounded-[2rem] border border-border space-y-6">
+          <div className="beos-section-card p-8 space-y-6">
             <h2 className="text-2xl font-bold">Dispute Mediation</h2>
             <div className="space-y-3">
               {pagedDisputes.map(dispute => <div key={dispute.id}><DisputeRow dispute={dispute} /></div>)}
@@ -943,7 +1118,7 @@ export default function AdminDashboard({
                   <h3 className="font-bold mb-2">{job.title}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
                   <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
-                    <span>Budget: R {job.budget.toLocaleString()}</span>
+                    <span>Budget: R {(job.budget ?? 0).toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
                   </div>
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
@@ -990,11 +1165,11 @@ export default function AdminDashboard({
                 <div className="space-y-3">
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
                     <span className="text-muted-foreground">API Latency</span>
-                    <span className="font-bold text-green-600">142ms</span>
+                    <span className="font-bold text-primary-light">142ms</span>
                   </div>
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
                     <span className="text-muted-foreground">Database Connectivity</span>
-                    <span className="font-bold text-green-600">Stable</span>
+                    <span className="font-bold text-primary-light">Stable</span>
                   </div>
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
                     <span className="text-muted-foreground">Agent Response Rate</span>
@@ -1122,6 +1297,87 @@ export default function AdminDashboard({
           <FinancialDashboard />
         </TabsContent>
 
+        <TabsContent value="verifications">
+          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden space-y-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-primary" /> Verification Agent Queue</h2>
+                <p className="text-sm text-muted-foreground mt-1">Review records created by the Architex browser verification agent against official registers.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.total} records</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.pending} pending</Badge>
+                <Badge variant={verificationQueue.summary.overdue > 0 ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.overdue} SLA overdue</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.dueForRecheck} rechecks</Badge>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Register</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Agent Evidence</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {verificationQueue.items.map(queueItem => {
+                    const verification = verificationsById.get(queueItem.id);
+                    if (!verification) return null;
+                    const agentResult = verification.metadata?.verificationAgent as any;
+                    const lifecycle = getVerificationLifecycle(verification);
+                    const agentStatus = verification.metadata?.verificationAgentStatus as string | undefined;
+                    return (
+                      <TableRow key={verification.id}>
+                        <TableCell className="font-mono text-xs">{verification.userId}</TableCell>
+                        <TableCell><Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verification.subjectType}</Badge></TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {verification.statutoryBody || 'Unspecified'} · {verification.registrationNumber || 'No number'}
+                          {verification.expiresAt && <p className="mt-1">Expires {safeFormat(verification.expiresAt, 'MMM d, yyyy')}</p>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant={verification.status === 'verified' ? 'secondary' : verification.status === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verification.status}</Badge>
+                            <Badge variant={queueItem.priority === 'urgent' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{queueItem.priority} priority</Badge>
+                            {(lifecycle.isDueForRecheck || agentStatus) && (
+                              <Badge variant={lifecycle.isExpired ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">
+                                {agentStatus === 'queued' ? 'Agent queued' : lifecycle.lifecycleStatus.replace(/_/g, ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[320px] text-xs text-muted-foreground">
+                          {agentResult?.officialUrl ? (
+                            <a className="text-primary underline" href={agentResult.officialUrl} target="_blank" rel="noreferrer">{agentResult.provider} official check</a>
+                          ) : 'Queued or not yet checked'}
+                          <p className="mt-1 font-medium text-foreground">{queueItem.action}</p>
+                          {queueItem.blocker && <p className="mt-1 text-red-600">{queueItem.blocker}</p>}
+                          {agentResult?.error && <p className="mt-1 line-clamp-2 text-red-600">{agentResult.error}</p>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" variant="outline" onClick={() => recheckUserVerification(verification)} disabled={verification.status === 'pending'}>Recheck</Button>
+                            <Button size="sm" onClick={() => reviewUserVerification(verification, 'verified')} disabled={verification.status === 'verified'}>Approve</Button>
+                            <Button size="sm" variant="destructive" onClick={() => reviewUserVerification(verification, 'rejected')} disabled={verification.status === 'rejected'}>Reject</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {userVerifications.length === 0 && <p className="text-muted-foreground italic">No verification records have been submitted yet.</p>}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="governance-tools">
+          <AdminGovernanceToolsPanel agents={agents} logs={logs} users={allUsers} jobs={allJobs} onNavigate={onTabChange} />
+        </TabsContent>
+
         <TabsContent value="firms">
           <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden space-y-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1193,7 +1449,8 @@ export default function AdminDashboard({
         <DialogContent className="max-w-[95vw] w-[1100px] max-h-[90vh] overflow-y-auto rounded-[2rem] p-0">
           {selectedJob && (() => {
             const client = allUsers.find(u => u.uid === selectedJob.clientId);
-            const architect = selectedJob.selectedArchitectId ? allUsers.find(u => u.uid === selectedJob.selectedArchitectId) : null;
+            const selectedProfessionalId = getSelectedProfessionalId(selectedJob);
+            const architect = selectedProfessionalId ? allUsers.find(u => u.uid === selectedProfessionalId) : null;
             const jobSubmissions = submissions.filter(submission => submission.jobId === selectedJob.id);
             const jobDisputes = disputes.filter(dispute => dispute.jobId === selectedJob.id);
 
@@ -1245,7 +1502,7 @@ export default function AdminDashboard({
                     <DetailPanel title="Stakeholders">
                       <StakeholderBlock label="Client" user={client} fallbackId={selectedJob.clientId} />
                       <div className="mt-4 pt-4 border-t border-border">
-                        <StakeholderBlock label="Selected Architect" user={architect} fallbackId={selectedJob.selectedArchitectId} empty="No architect selected yet" />
+                        <StakeholderBlock label="Selected BEP / Design Professional" user={architect} fallbackId={selectedProfessionalId} empty="No design professional selected yet" />
                       </div>
                     </DetailPanel>
 
@@ -1430,10 +1687,10 @@ function DisputeRow({ dispute }: { dispute: Dispute }) {
 
 function StatCard({ title, value }: { title: string; value: number }) {
   return (
-    <Card className="border-border shadow-sm bg-white rounded-3xl">
+    <Card className="beos-stat-card">
       <CardHeader>
-        <CardDescription className="uppercase text-[10px] tracking-widest font-bold">{title}</CardDescription>
-        <CardTitle className="text-3xl font-heading">{value}</CardTitle>
+        <CardDescription className="beos-label-caps text-muted-foreground">{title}</CardDescription>
+        <CardTitle className="beos-metric">{value}</CardTitle>
       </CardHeader>
     </Card>
   );
@@ -1441,7 +1698,7 @@ function StatCard({ title, value }: { title: string; value: number }) {
 
 function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
       <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
       <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
       <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>

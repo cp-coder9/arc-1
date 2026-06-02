@@ -1,6 +1,7 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, orderBy, getDoc, addDoc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, orderBy, getDoc, addDoc, updateDoc, getDocs, Query } from 'firebase/firestore';
 
 import { UserProfile, UploadedFile, Job, AIProgress } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -28,10 +29,15 @@ import {
   HardDrive
 } from 'lucide-react';
 import { safeFormat, cn } from '@/lib/utils';
+import { OptimizedImage } from '@/components/ui/optimized-image';
+import { getSelectedProfessionalId } from '@/lib/professionalRoleCompatibility';
 
 interface FileManagerProps {
   user: UserProfile;
 }
+
+const DESIGN_PROFESSIONAL_ROLES = new Set(['architect', 'bep']);
+const DESIGN_PROFESSIONAL_JOB_FIELDS = ['selectedProfessionalId', 'selectedBepId', 'selectedArchitectId'] as const;
 
 export default function FileManager({ user }: FileManagerProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -76,7 +82,7 @@ export default function FileManager({ user }: FileManagerProps) {
       publish();
     };
 
-    const subscribeToFiles = (fileQuery: ReturnType<typeof query>) => {
+    const subscribeToFiles = (fileQuery: Query) => {
       const unsubscribe = onSnapshot(fileQuery, applySnapshot, (error) => {
         console.error("Error fetching files:", error);
         toast.error(
@@ -102,16 +108,25 @@ export default function FileManager({ user }: FileManagerProps) {
       // the File Manager hiding project files uploaded by a client, architect, or
       // admin when the current user did not personally upload the file.
       const jobIds = new Set<string>();
-      const jobQueries = user.role === 'client'
-        ? [query(collection(db, 'jobs'), where('clientId', '==', user.uid))]
-        : user.role === 'architect'
-          ? [query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid))]
+      const jobsCollection = collection(db, 'jobs');
+      const jobQueries: Query[] = user.role === 'client'
+        ? [query(jobsCollection, where('clientId', '==', user.uid))]
+        : DESIGN_PROFESSIONAL_ROLES.has(user.role)
+          ? DESIGN_PROFESSIONAL_JOB_FIELDS.map(field =>
+              query(jobsCollection, where(field, '==', user.uid))
+            )
           : [];
 
-      for (const jobQuery of jobQueries) {
-        const snapshot = await getDocs(jobQuery);
-        snapshot.docs.forEach(jobDoc => jobIds.add(jobDoc.id));
-      }
+      const jobResults = await Promise.allSettled(jobQueries.map(jobQuery => getDocs(jobQuery)));
+      jobResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          result.value.docs.forEach(jobDoc => jobIds.add(jobDoc.id));
+          return;
+        }
+
+        const field = user.role === 'client' ? 'clientId' : DESIGN_PROFESSIONAL_JOB_FIELDS[index];
+        console.warn('Unable to load project-file visibility query for jobs.' + field + ':', result.reason);
+      });
 
       const ids = Array.from(jobIds);
       for (let i = 0; i < ids.length; i += 10) {
@@ -143,7 +158,7 @@ export default function FileManager({ user }: FileManagerProps) {
       if (!idToken) throw new Error("Not authenticated");
 
       // 2. Call secure server-side delete endpoint
-      const response = await fetch('/api/files/delete', {
+      const response = await apiFetch('/api/files/delete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,12 +206,13 @@ export default function FileManager({ user }: FileManagerProps) {
 
       const job = { id: jobSnap.id, ...jobSnap.data() } as Job;
 
-      // Security guard: only the assigned architect (or job owner if no architect assigned) may run a quick scan
-      if (job.selectedArchitectId && job.selectedArchitectId !== user.uid) {
-        throw new Error('Only the assigned architect for this job can run a quick scan.');
+      // Security guard: only the assigned design professional (or job owner if no professional is assigned) may run a quick scan
+      const selectedProfessionalId = getSelectedProfessionalId(job);
+      if (selectedProfessionalId && selectedProfessionalId !== user.uid) {
+        throw new Error('Only the assigned BEP / design professional for this job can run a quick scan.');
       }
 
-      const architectId = job.selectedArchitectId || user.uid;
+      const architectId = selectedProfessionalId || user.uid;
 
       submissionRef = await addDoc(collection(db, `jobs/${file.jobId}/submissions`), {
         jobId: file.jobId,
@@ -342,10 +358,24 @@ export default function FileManager({ user }: FileManagerProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const filteredFiles = files.filter(f => 
-    f.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    f.context.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const normalizedSearchTerm = searchTerm.toLowerCase();
+  const filteredFiles = files.filter(f => {
+    const legacyFilename = (f as UploadedFile & { filename?: string }).filename;
+    const fileName = (f.fileName ?? legacyFilename ?? '').toLowerCase();
+    const context = (f.context ?? '').toLowerCase();
+    return fileName.includes(normalizedSearchTerm) || context.includes(normalizedSearchTerm);
+  });
+
+  const displayFileName = (file: UploadedFile) => {
+    const legacyFilename = (file as UploadedFile & { filename?: string }).filename;
+    return file.fileName ?? legacyFilename ?? 'Untitled file';
+  };
+
+  const displayFileType = (file: UploadedFile) => {
+    const legacyType = (file as UploadedFile & { type?: string; contentType?: string }).type;
+    const legacyContentType = (file as UploadedFile & { type?: string; contentType?: string }).contentType;
+    return file.fileType ?? legacyType ?? legacyContentType ?? 'application/octet-stream';
+  };
 
   if (loading) {
     return (
@@ -413,16 +443,16 @@ export default function FileManager({ user }: FileManagerProps) {
         {filteredFiles.map((file) => (
           <Card key={file.id} className="group overflow-hidden rounded-[1.5rem] border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white">
             <div className="aspect-video bg-secondary/30 flex items-center justify-center relative group-hover:bg-secondary/10 transition-colors">
-              {file.fileType.startsWith('image/') ? (
-                <img 
-                  src={file.url} 
-                  alt={file.fileName} 
+              {displayFileType(file).startsWith('image/') ? (
+                <OptimizedImage
+                  src={file.url}
+                  alt={displayFileName(file)}
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                  referrerPolicy="no-referrer"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 />
               ) : (
                 <div className="p-6 bg-white rounded-2xl shadow-sm border border-border">
-                  {getFileIcon(file.fileType)}
+                  {getFileIcon(displayFileType(file))}
                 </div>
               )}
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
@@ -457,11 +487,11 @@ export default function FileManager({ user }: FileManagerProps) {
             </div>
             <CardContent className="p-5">
               <div className="flex flex-col gap-1 mb-3">
-                <h4 className="font-bold text-sm truncate" title={file.fileName}>{file.fileName}</h4>
+                <h4 className="font-bold text-sm truncate" title={displayFileName(file)}>{displayFileName(file)}</h4>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   <span className="font-medium">{formatSize(file.fileSize)}</span>
                   <span>•</span>
-                  <span>{file.fileType?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                  <span>{displayFileType(file).split('/')[1]?.toUpperCase() || 'FILE'}</span>
                 </div>
               </div>
               
@@ -471,7 +501,7 @@ export default function FileManager({ user }: FileManagerProps) {
                   {safeFormat(file.uploadedAt, 'MMM d, yyyy')}
                 </div>
                 <div className="flex items-center gap-2">
-                  {user.role === 'architect' && (file.fileType === 'application/pdf' || file.fileType.startsWith('image/')) && (
+                  {user.role === 'architect' && (displayFileType(file) === 'application/pdf' || displayFileType(file).startsWith('image/')) && (
                     <Button
                       variant="ghost"
                       size="sm"

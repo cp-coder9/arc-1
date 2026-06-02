@@ -89,7 +89,7 @@ describe('Phase 6 lifecycle integration', () => {
   });
 
   it('archives atomically only after certificate and final report are persisted', async () => {
-    const project = { id: 'project-1', jobId: 'job-1', clientId: 'client-1', leadArchitectId: 'architect-1', currentStage: 'payments', stageHistory: [{ stage: 'payments', enteredAt: '2026-01-01', actorId: 'architect-1' }], closeoutArtifacts: { completionCertificateUrl: 'https://files/cert.pdf', finalReport: '# Final report' }, createdAt: '2026-01-01' };
+    const project = { id: 'project-1', jobId: 'job-1', clientId: 'client-1', leadArchitectId: 'architect-1', currentStage: 'payments', stageHistory: [{ stage: 'payments', enteredAt: '2026-01-01', actorId: 'architect-1' }], closeoutArtifacts: { completionCertificateUrl: 'https://files/cert.pdf', finalReport: '# Final report' }, closeoutGate: completeCloseoutGate(), createdAt: '2026-01-01' };
     const transaction = { get: vi.fn(), update: vi.fn() };
     transaction.get.mockImplementation(async (ref: any) => {
       if (ref.path[0] === 'projects' && ref.path.length === 2) return snap('project-1', project);
@@ -105,3 +105,15 @@ describe('Phase 6 lifecycle integration', () => {
     expect(transaction.update).toHaveBeenCalledWith(expect.objectContaining({ path: ['jobs', 'job-1'] }), expect.objectContaining({ status: 'completed' }));
   });
 });
+
+function completeCloseoutGate() {
+  return {
+    snags: [{ id: 'snag-1', title: 'Paint touch-up', status: 'closed' }],
+    certificates: [{ id: 'cert-1', title: 'Electrical COC', status: 'approved', url: 'https://files/cert.pdf' }],
+    warranties: [{ id: 'warranty-1', title: 'Waterproofing warranty', status: 'accepted', url: 'https://files/warranty.pdf' }],
+    finalAccount: { status: 'approved', approvedBy: 'qs-1', approvedAt: '2026-08-01T00:00:00.000Z', amount: 125000 },
+    handoverPack: { status: 'approved', url: 'https://files/handover.zip', documentCount: 5, approvedBy: 'architect-1', approvedAt: '2026-08-01T00:00:00.000Z' },
+    unresolvedBlockers: [],
+    audit: { reviewedBy: 'architect-1', reviewedAt: '2026-08-01T00:00:00.000Z', source: 'professional_review' },
+  };
+}

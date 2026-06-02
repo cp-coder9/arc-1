@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, orderBy } from 'firebase/firestore';
@@ -126,10 +127,10 @@ export default function ArchitectDashboard({
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-border shadow-sm">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-4xl md:text-6xl font-heading font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Architect Portal</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Architect Portal</h1>
             <ProfileEditor user={user} />
           </div>
           <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Elite architectural workspace with SANS-powered compliance verification.</p>
@@ -148,7 +149,7 @@ export default function ArchitectDashboard({
           </Button>
           <Button
             onClick={() => onTabChange?.('marketplace')}
-            className="rounded-full h-14 px-8 font-bold shadow-xl shadow-primary/20"
+            className="rounded-full h-14 px-8 font-bold beos-button-shadow"
           >
             <Search className="mr-2 w-5 h-5" /> Browse Jobs
           </Button>
@@ -157,7 +158,7 @@ export default function ArchitectDashboard({
 
       <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">
         <ScrollArea className="w-full whitespace-nowrap mb-8">
-          <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit inline-flex mb-1">
+          <TabsList className="beos-glass border border-border p-1 rounded-full w-fit inline-flex mb-1">
             <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
               <LayoutList size={16} /> Overview
             </TabsTrigger>
@@ -195,14 +196,14 @@ export default function ArchitectDashboard({
                   ))}
                   {myJobs.length > pageSize && <PaginationControls page={projectsPage} totalPages={totalPages(myJobs.length, pageSize)} onPageChange={setProjectsPage} />}
                   {myJobs.length === 0 && (
-                    <div className="py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
+                    <div className="empty-state py-20 text-center">
                       <p className="text-muted-foreground italic">No active projects yet. Browse the marketplace to apply!</p>
                     </div>
                   )}
                 </div>
              </div>
              <div className="space-y-8">
-                <Card className="border-primary/10 shadow-xl shadow-primary/5 bg-white/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500">
+                <Card className="beos-section-card">
                   <CardHeader className="bg-primary/5 p-6 border-b border-border">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <Star size={16} className="text-yellow-500" /> Client Reviews
@@ -247,7 +248,7 @@ export default function ArchitectDashboard({
                 <div key={`${application.jobId}:${application.id}`}><ApplicationCard application={application} /></div>
               ))}
               {uniqueApplications.length === 0 && (
-                <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                <div className="empty-state col-span-full py-20 text-center">
                   <p className="text-muted-foreground italic">No applications submitted yet.</p>
                 </div>
               )}
@@ -262,7 +263,7 @@ export default function ArchitectDashboard({
               <div key={job.id}><ActiveProjectCard job={job} user={user} /></div>
             ))}
             {myJobs.length === 0 && (
-              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+              <div className="empty-state col-span-full py-20 text-center">
                 <p className="text-muted-foreground italic">You don't have any active projects yet. Apply for jobs to get started.</p>
               </div>
             )}
@@ -781,7 +782,7 @@ function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('You must be logged in to apply');
 
-      const response = await fetch(`/api/jobs/${job.id}/applications`, {
+      const response = await apiFetch(`/api/jobs/${job.id}/applications`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -805,7 +806,7 @@ function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
   };
 
   return (
-    <Card className="border-border shadow-sm bg-white rounded-3xl p-8 hover:border-primary/50 transition-all flex flex-col group">
+    <Card className="beos-record-card p-8 flex flex-col group">
        <div className="flex justify-between items-start mb-4">
           <Badge className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest">{job.category}</Badge>
           <span className="text-sm font-bold text-primary font-mono">R {job.budget.toLocaleString()}</span>
@@ -859,7 +860,7 @@ function ApplicationCard({ application }: { application: Application }) {
   };
 
   return (
-    <Card className="border-border shadow-sm bg-white rounded-3xl p-6 space-y-4">
+    <Card className="beos-record-card p-6 space-y-4">
       <div className="flex justify-between gap-4">
         <div>
           <h3 className="font-bold">Application</h3>
@@ -879,7 +880,7 @@ function ApplicationCard({ application }: { application: Application }) {
 
 function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-3">
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
       <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
       <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
       <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>

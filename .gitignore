@@ -67,3 +67,9 @@ firebase-debug.log
 # Test artifacts
 playwright-report/
 test-results/
+
+# Generated verification and release artifacts
+release/
+reports/
+public/build-info.json
+12/

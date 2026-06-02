@@ -105,6 +105,9 @@ export interface Job {
   category: JobCategory;
   location?: string;
   status: 'open' | 'in-progress' | 'completed' | 'cancelled';
+  selectedProfessionalId?: string;
+  selectedBepId?: string;
+  /** @deprecated Use selectedProfessionalId/selectedBepId for new writes. */
   selectedArchitectId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -123,6 +126,9 @@ export interface JobStatusHistory {
 export interface Application {
   id: string;
   jobId: string;
+  professionalId?: string;
+  bepId?: string;
+  /** @deprecated Use professionalId/bepId for new writes. */
   architectId: string;
   architectName: string;
   proposal: string;
@@ -423,6 +429,7 @@ export interface SystemLog {
 export interface DelegatedTask {
   id: string;
   jobId: string;
+  jobTaskId?: string;
   architectId: string;
   assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
@@ -430,7 +437,14 @@ export interface DelegatedTask {
   deadline: string;
   notes: string;
   status: 'pending' | 'in-progress' | 'completed';
+  submissionStatus?: 'not_submitted' | 'submitted' | 'changes_requested' | 'approved';
+  submittedAt?: string | null;
+  completedAt?: string | null;
+  reviewFeedback?: string;
+  reviewedAt?: string;
+  paymentStatus?: 'not_ready' | 'review_pending' | 'ready_for_invoice' | 'invoice_created' | 'paid';
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface JobCard extends DelegatedTask {
@@ -465,8 +479,19 @@ export type NotificationType =
   | 'invoice_sent'
   | 'invoice_paid'
   | 'firm_invite'
+  | 'firm_invite_accepted'
   | 'firm_role_changed'
-  | 'firm_member_removed';
+  | 'firm_member_removed'
+  | 'firm_subscription_updated'
+  | 'directory_invitation'
+  | 'material_request_created'
+  | 'material_quote_received'
+  | 'procurement_order_updated'
+  | 'cpd_course_published'
+  | 'cpd_certificate_issued'
+  | 'subscription_status_changed'
+  | 'refund_processed'
+  | 'contractor_delivery_update';
 
 export interface Notification {
   id: string;
@@ -482,6 +507,17 @@ export interface Notification {
     applicationId?: string;
     firmId?: string;
     firmInviteId?: string;
+    invitationId?: string;
+    workPackageId?: string;
+    discipline?: string;
+    materialRequestId?: string;
+    quoteId?: string;
+    procurementOrderId?: string;
+    courseId?: string;
+    certificateId?: string;
+    subscriptionId?: string;
+    refundId?: string;
+    deliveryId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -511,9 +547,47 @@ export interface NotificationPreferences {
 }
 
 // Message types
+export type ProjectCommunicationCaptureType =
+  | 'chat'
+  | 'voice_note'
+  | 'document_upload'
+  | 'drawing_comment'
+  | 'approval_request'
+  | 'site_photo'
+  | 'site_voice_note'
+  | 'rfi'
+  | 'site_instruction'
+  | 'payment_note'
+  | 'closeout_evidence';
+
+export type ProjectCommunicationStructuredStatus = 'raw' | 'converted' | 'linked' | 'archived';
+export type ProjectCommunicationVisibility = 'job_participants' | 'project_team' | 'client_professional' | 'admin_only';
+
+export interface ProjectRecordLink {
+  recordType: string;
+  recordId: string;
+}
+
+export interface ProjectCommunicationLocation {
+  latitude: number;
+  longitude: number;
+  label?: string;
+}
+
 export interface Message {
   id: string;
   jobId: string;
+  /** New project communication engine metadata; optional for legacy job-scoped messages. */
+  projectId?: string;
+  phase?: ProjectStage;
+  captureType?: ProjectCommunicationCaptureType;
+  structuredStatus?: ProjectCommunicationStructuredStatus;
+  actionIds?: string[];
+  recordLinks?: ProjectRecordLink[];
+  aiTags?: string[];
+  transcribedText?: string;
+  visibility?: ProjectCommunicationVisibility;
+  location?: ProjectCommunicationLocation;
   senderId: string;
   senderRole: UserRole;
   content: string;
@@ -607,7 +681,7 @@ export interface LedgerEntry {
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired';
 
 export type VerificationSubjectType = 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'freelancer' | 'admin';
-export type VerificationSource = 'professional_body_api' | 'public_register' | 'manual_admin_review' | 'document_upload' | 'privyseal' | 'other';
+export type VerificationSource = 'professional_body_api' | 'public_register' | 'automated_browser_agent' | 'manual_admin_review' | 'document_upload' | 'privyseal' | 'other';
 
 export interface UserVerification {
   id: string;
@@ -765,7 +839,7 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'site_log';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'site_log' | 'brief';
   jobId?: string;
   submissionId?: string;
 };
@@ -822,8 +896,8 @@ export interface KnowledgeCitation {
 // --- Project Lifecycle Types ------------------------------------------------
 
 /**
- * The 9-stage project lifecycle from Intake to Close-out.
- * Each stage represents a major phase in the architectural project delivery process.
+ * The PRD canonical 8-stage project lifecycle from Brief through Close-Out.
+ * `scoping` remains a legacy value for existing project documents and maps to the Brief stage.
  */
 export type ProjectStage =
   | 'intake'
@@ -839,7 +913,6 @@ export type ProjectStage =
 /** Canonical ordering of project stages (forward-only transitions). */
 export const PROJECT_STAGE_ORDER: ProjectStage[] = [
   'intake',
-  'scoping',
   'appointment',
   'coordination',
   'compliance',
@@ -851,15 +924,15 @@ export const PROJECT_STAGE_ORDER: ProjectStage[] = [
 
 /** Human-readable labels for each project stage. */
 export const PROJECT_STAGE_LABELS: Record<ProjectStage, string> = {
-  intake: 'Intake',
-  scoping: 'Scoping & Briefing',
-  appointment: 'Appointment',
-  coordination: 'Design Coordination',
-  compliance: 'Compliance Review',
+  intake: 'Brief & Diagnostic',
+  scoping: 'Brief & Diagnostic (Legacy Scoping)',
+  appointment: 'Team Appointment',
+  coordination: 'Design & Coordination',
+  compliance: 'Compliance & Municipal',
   tender: 'Tender & Procurement',
   delivery: 'Construction Delivery',
-  payments: 'Payments & Escrow',
-  closeout: 'Close-out',
+  payments: 'Payments & Governance',
+  closeout: 'Close-Out & Handover',
 };
 
 /** Icon names (lucide-react) for each project stage. */
@@ -892,8 +965,13 @@ export interface Project {
   id: string;
   jobId: string;
   clientId: string;
+  leadProfessionalId?: string;
+  leadBepId?: string;
+  /** @deprecated Use leadProfessionalId/leadBepId for new writes. */
   leadArchitectId?: string;
   currentStage: ProjectStage;
+  /** PRD stage-gate evidence flags used to block premature legal, financial, or professional progression. */
+  stageGateEvidence?: Partial<Record<string, boolean>>;
   stageHistory: StageHistoryEntry[];
   teamMembers: ProjectTeamMember[];
   firmId?: string;
@@ -959,6 +1037,7 @@ export interface Bid {
   methodology: string;
   qualifications: string;
   attachments: { name: string; url: string }[];
+  verificationId: string;
   status: BidStatus;
   aiScore?: number;
   aiNotes?: string;
@@ -974,11 +1053,19 @@ export interface GanttTask {
   title: string;
   startDate: string;
   endDate: string;
+  baselineStartDate?: string;
+  baselineEndDate?: string;
+  forecastEndDate?: string;
   progress: number;
   dependsOn?: string[];
   assignedTo?: string;
   phase: string;
   status: 'not_started' | 'in_progress' | 'completed' | 'delayed';
+  isCritical?: boolean;
+  recoveryPlan?: string;
+  baselineChangeReason?: string;
+  baselineChangeStatus?: 'pending_review' | 'approved' | 'rejected';
+  humanApprovalRequired?: boolean;
   color?: string;
   createdAt: string;
   updatedAt?: string;
@@ -1040,4 +1127,40 @@ export interface InspectionItem {
   standard?: string;
   result: 'pass' | 'fail' | 'na';
   comment?: string;
+}
+
+// Agent workflow types for platform-wide agent orchestration
+export type AgentOwnerType = 'user' | 'project';
+export type AgentSurface = 'dashboard' | 'chat' | 'notification' | 'document' | 'workflow' | 'admin';
+export type AgentActionStatus = 'draft' | 'suggested' | 'requires_approval' | 'approved' | 'rejected' | 'applied';
+
+export interface AgentEvent {
+  id: string;
+  type: string;
+  ownerType: AgentOwnerType;
+  ownerId: string;
+  jobId?: string;
+  userId?: string;
+  phase?: string;
+  source: AgentSurface;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentRecommendation {
+  id: string;
+  agentId: string;
+  jobId?: string;
+  userId?: string;
+  surface: AgentSurface;
+  title: string;
+  summary: string;
+  suggestedAction?: {
+    label: string;
+    actionType: string;
+    payload: Record<string, unknown>;
+  };
+  status: AgentActionStatus;
+  requiresHumanApproval: boolean;
+  createdAt: string;
 }

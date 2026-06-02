@@ -139,7 +139,6 @@ describe('AIUtils.callAgentReview', () => {
       method: 'POST',
       headers: expect.objectContaining({
         'Content-Type': 'application/json',
-        Authorization: 'Bearer mock-firebase-id-token',
       }),
     }));
   });

@@ -46,20 +46,13 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
   };
 
   const renderRoleSelection = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
       <RoleCard
         icon={<Users className="w-8 h-8" />}
         title="Client"
         description="I want to hire professionals for my building project"
         onClick={() => handleRoleSelect('client')}
         data-testid="role-select-client"
-      />
-      <RoleCard
-        icon={<Briefcase className="w-8 h-8" />}
-        title="Architect"
-        description="I am a SACAP registered architect looking for work"
-        onClick={() => handleRoleSelect('architect')}
-        data-testid="role-select-architect"
       />
       <RoleCard
         icon={<Sparkles className="w-8 h-8" />}
@@ -70,8 +63,8 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
       />
       <RoleCard
         icon={<Construction className="w-8 h-8" />}
-        title="BEP"
-        description="Built Environment Professional (Builder, Tiler, etc.)"
+        title="BEP / Design Team"
+        description="Architects, engineers, QSs, technologists, and design-team leads"
         onClick={() => handleRoleSelect('bep')}
         data-testid="role-select-bep"
       />
@@ -81,6 +74,20 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
         description="I manage construction delivery, tenders, and site teams"
         onClick={() => handleRoleSelect('contractor')}
         data-testid="role-select-contractor"
+      />
+      <RoleCard
+        icon={<HardHat className="w-8 h-8" />}
+        title="Subcontractor"
+        description="I deliver trade packages, evidence, and close-out items"
+        onClick={() => handleRoleSelect('subcontractor')}
+        data-testid="role-select-subcontractor"
+      />
+      <RoleCard
+        icon={<Building2 className="w-8 h-8" />}
+        title="Supplier"
+        description="I supply products, deliveries, warranties, and support"
+        onClick={() => handleRoleSelect('supplier')}
+        data-testid="role-select-supplier"
       />
     </div>
   );
@@ -178,14 +185,14 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
             className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm"
             required
           >
-            <option value="">Select your trade...</option>
-            <option value="Builder">General Builder</option>
-            <option value="Tiler">Professional Tiler</option>
-            <option value="Plumber">Plumber</option>
-            <option value="Electrician">Electrician</option>
-            <option value="Carpenter">Carpenter</option>
-            <option value="Painter">Painter</option>
+            <option value="">Select your profession...</option>
+            <option value="Architect">Architect / SACAP professional</option>
             <option value="Engineer">Civil/Structural Engineer</option>
+            <option value="Quantity Surveyor">Quantity Surveyor</option>
+            <option value="Project Manager">Project Manager</option>
+            <option value="Technologist">Architectural Technologist</option>
+            <option value="Interior Designer">Interior Designer</option>
+            <option value="Builder">General Builder</option>
           </select>
         </div>
         <div className="space-y-2">
@@ -199,6 +206,38 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
           />
         </div>
       </div>
+
+      {formData.professionalLabel === 'Architect' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <BadgeCheck size={14} /> SACAP Registration #
+            </label>
+            <Input
+              name="sacapNumber"
+              placeholder="ST123456"
+              className="h-10 rounded-lg bg-white"
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Briefcase size={14} /> Main specialization
+            </label>
+            <select
+              name="mainSpecialization"
+              onChange={handleInputChange}
+              className="w-full h-10 px-3 rounded-lg border border-border bg-white text-xs"
+            >
+              <option value="">Select specialization...</option>
+              <option value="Residential">Residential</option>
+              <option value="Urban Design">Urban Design</option>
+              <option value="Sustainable Design">Sustainable Design</option>
+              <option value="Heritage">Heritage</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {(formData.professionalLabel === 'Builder' || formData.professionalLabel === 'Engineer') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
@@ -321,6 +360,41 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
     </div>
   );
 
+  const renderPackageParticipantOnboarding = () => {
+    const isSupplier = role === 'supplier';
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">{isSupplier ? 'Supply Category' : 'Trade Category'}</label>
+            <Input name={isSupplier ? 'supplyCategory' : 'tradeCategory'} placeholder={isSupplier ? 'e.g. windows, concrete, sanitaryware' : 'e.g. electrical, wet works, ceilings'} className="h-12 rounded-xl" onChange={handleInputChange} required />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Service Region</label>
+            <Input name="serviceRegion" placeholder="e.g. Gauteng, Cape Town" className="h-12 rounded-xl" onChange={handleInputChange} required />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Package Type</label>
+            <Input name="packageType" placeholder="e.g. labour-only, supply-and-install, product supply" className="h-12 rounded-xl" onChange={handleInputChange} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Warranty / Support Details</label>
+            <Input name="warrantySupportDetails" placeholder="Warranty period, product support, or workmanship guarantee" className="h-12 rounded-xl" onChange={handleInputChange} />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Compliance and close-out evidence you can provide</label>
+          <textarea name="closeOutDocumentationRequirements" className="w-full p-4 rounded-2xl border border-border bg-white text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="COCs, delivery notes, warranties, test certificates, photos, data sheets..." onChange={handleInputChange} />
+        </div>
+        <Button onClick={() => onComplete(formData)} className="w-full h-14 rounded-2xl font-bold text-lg group">
+          Complete {isSupplier ? 'Supplier' : 'Subcontractor'} Profile <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+        </Button>
+      </div>
+    );
+  };
+
   const renderFreelancerOnboarding = () => (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -369,33 +443,33 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 backdrop-blur-sm fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-secondary/30 px-3 py-3 backdrop-blur-sm sm:px-4 sm:py-6 lg:items-center">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl w-full my-8"
+        className={`${step === 1 ? 'max-w-5xl' : 'max-w-2xl'} w-full pb-[max(env(safe-area-inset-bottom),0px)] lg:my-8`}
       >
-        <Card className="border-border shadow-2xl bg-white/95 backdrop-blur-md rounded-[2.5rem] overflow-hidden">
-          <CardHeader className="text-center bg-primary/5 pb-10 pt-12 relative">
-            <div className="flex justify-between items-center mb-6 absolute top-6 left-6 right-6">
+        <Card className="overflow-hidden rounded-[1.75rem] border-border bg-white/95 shadow-2xl backdrop-blur-md sm:rounded-[2.5rem]">
+          <CardHeader className="relative bg-primary/5 px-5 pb-6 pt-16 text-center sm:px-6 sm:pb-8 sm:pt-12">
+            <div className="absolute left-4 right-4 top-4 flex items-center justify-between sm:left-6 sm:right-6 sm:top-6">
               {step > 1 && (
-                <Button variant="ghost" size="sm" onClick={prevStep} className="rounded-full hover:bg-white">
+                <Button variant="ghost" size="sm" onClick={prevStep} className="rounded-full bg-white/55 px-3 hover:bg-white">
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back
                 </Button>
               )}
               <div className="flex-1" />
-              <Button variant="ghost" size="sm" onClick={onCancel} className="rounded-full hover:bg-white">
+              <Button variant="ghost" size="sm" onClick={onCancel} className="rounded-full bg-white/55 px-3 hover:bg-white">
                 Cancel
               </Button>
             </div>
-            <CardTitle className="text-4xl font-heading font-bold tracking-tight">
+            <CardTitle className="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
               {step === 1 ? 'Join Architex' : `Welcome, ${role?.toUpperCase()}`}
             </CardTitle>
-            <CardDescription className="text-base mt-2">
-              {step === 1 ? 'Select your professional role to get started' : 'Complete your profile to access the marketplace'}
+            <CardDescription className="mt-2 text-sm sm:text-base">
+              {step === 1 ? 'Select your professional role to get started' : 'Complete your profile to access your workspace'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-10">
+          <CardContent className="p-4 sm:p-6 lg:p-8">
             <AnimatePresence mode="wait">
               <motion.div
                 key={step}
@@ -406,9 +480,9 @@ export default function OnboardingFlow({ onComplete, onCancel }: OnboardingFlowP
               >
                 {step === 1 && renderRoleSelection()}
                 {step === 2 && role === 'client' && renderClientOnboarding()}
-                {step === 2 && role === 'architect' && renderArchitectOnboarding()}
                 {step === 2 && role === 'bep' && renderBEPOnboarding()}
                 {step === 2 && role === 'contractor' && renderContractorOnboarding()}
+                {step === 2 && (role === 'subcontractor' || role === 'supplier') && renderPackageParticipantOnboarding()}
                 {step === 2 && role === 'freelancer' && renderFreelancerOnboarding()}
               </motion.div>
             </AnimatePresence>
@@ -424,17 +498,17 @@ function RoleCard({ icon, title, description, onClick, ...props }: { icon: React
     <button
       onClick={onClick}
       aria-label={`Select ${title} role`}
-      className="group p-8 text-left border border-border rounded-3xl hover:border-primary hover:bg-primary/5 transition-all duration-300 flex flex-col gap-6 bg-white shadow-sm hover:shadow-xl"
+      className="group flex min-h-[118px] gap-4 rounded-3xl border border-border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-xl sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5"
       {...props}
     >
-      <div className="p-4 bg-secondary rounded-2xl group-hover:bg-primary/10 group-hover:text-primary transition-all group-hover:scale-110">
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-secondary transition-all group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary sm:h-14 sm:w-14">
         {icon}
       </div>
-      <div className="space-y-2">
-        <h3 className="font-heading font-bold text-2xl">{title}</h3>
+      <div className="min-w-0 space-y-1.5 sm:space-y-2">
+        <h3 className="font-heading text-xl font-bold sm:text-2xl">{title}</h3>
         <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </div>
-      <div className="mt-auto pt-4 border-t border-border/50 w-full">
+      <div className="mt-auto hidden w-full border-t border-border/50 pt-3 sm:block">
         <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
           Get Started <ArrowRight className="w-4 h-4" />
         </span>

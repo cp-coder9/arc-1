@@ -45,8 +45,14 @@ describe('tenderService', () => {
     expect(setDocMock).toHaveBeenCalledWith(expect.objectContaining({ path: ['tender_packages', 'generated-id'] }), expect.objectContaining({ id: 'generated-id', status: 'draft', createdAt: expect.any(String), updatedAt: expect.any(String) }));
   });
 
-  it('submits bids under tender package subcollection', async () => {
+  it('submits bids under deterministic contractor document after verifying contractor credentials', async () => {
     const { submitBid } = await import('../tenderService');
+    getDocsMock.mockResolvedValueOnce({
+      docs: [{
+        id: 'contractor-1_contractor_CIDB_CIDB-5GB',
+        data: () => ({ userId: 'contractor-1', subjectType: 'contractor', statutoryBody: 'CIDB', status: 'verified' }),
+      }],
+    });
 
     const bidId = await submitBid('tender-1', {
       contractorId: 'contractor-1',
@@ -60,8 +66,27 @@ describe('tenderService', () => {
       attachments: [],
     });
 
-    expect(bidId).toBe('generated-id');
-    expect(setDocMock).toHaveBeenCalledWith(expect.objectContaining({ path: ['tender_packages', 'tender-1', 'bids', 'generated-id'] }), expect.objectContaining({ tenderPackageId: 'tender-1', status: 'submitted' }));
+    expect(bidId).toBe('contractor_contractor-1');
+    expect(whereMock).toHaveBeenCalledWith('subjectType', '==', 'contractor');
+    expect(setDocMock).toHaveBeenCalledWith(expect.objectContaining({ path: ['tender_packages', 'tender-1', 'bids', 'contractor_contractor-1'] }), expect.objectContaining({ tenderPackageId: 'tender-1', status: 'submitted', verificationId: 'contractor-1_contractor_CIDB_CIDB-5GB' }));
+  });
+
+  it('blocks tender bids when no active contractor verification exists', async () => {
+    const { submitBid } = await import('../tenderService');
+    getDocsMock.mockResolvedValue({ docs: [] });
+
+    await expect(submitBid('tender-1', {
+      contractorId: 'contractor-1',
+      contractorName: 'Build Co',
+      totalAmount: 100000,
+      lineItems: [],
+      proposedTimeline: '10 weeks',
+      proposedStartDate: '2026-07-01',
+      methodology: 'Standard construction',
+      qualifications: 'CIDB 5GB',
+      attachments: [],
+    })).rejects.toThrow('Active contractor verification is required');
+    expect(setDocMock).not.toHaveBeenCalled();
   });
 
   it('awards tender and awarded bid', async () => {
@@ -79,6 +104,7 @@ describe('tenderService', () => {
       methodology: 'Standard construction',
       qualifications: 'CIDB 5GB',
       attachments: [],
+      verificationId: 'contractor-1_contractor_CIDB_CIDB-5GB',
       status: 'submitted',
       createdAt: '2026-01-01T00:00:00.000Z',
     });

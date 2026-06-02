@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Briefcase, Building2, CheckCircle2, Clock, FileText, HardHat, Search, ShieldCheck, TrendingUp } from 'lucide-react';
+import BidSubmission from './BidSubmission';
 
 export default function ContractorDashboard({ user }: { user: UserProfile }) {
   const [publishedTenders, setPublishedTenders] = useState<TenderPackage[]>([]);
   const [myBids, setMyBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showBidSubmission, setShowBidSubmission] = useState(false);
 
   useEffect(() => {
     const unsubscribeTenders = onSnapshot(
@@ -57,14 +59,14 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#2f72a7' }}>
         <div className="flex-1">
           <div className="flex items-center gap-4 mb-2">
             <div className="h-14 w-14 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
               <HardHat className="h-7 w-7" />
             </div>
             <div>
-              <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">Contractor Portal</h1>
+              <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Contractor Portal</h1>
               <p className="text-muted-foreground text-base md:text-lg max-w-2xl mt-2 leading-relaxed">Tender opportunities, construction readiness, and delivery workspace access.</p>
             </div>
           </div>
@@ -85,14 +87,14 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
-        <Card className="border-border shadow-sm bg-card rounded-[2.5rem] overflow-hidden">
+        <Card className="beos-section-card">
           <CardHeader className="p-8 border-b border-border bg-primary/5">
             <CardTitle className="font-heading text-2xl flex items-center gap-2"><Search className="text-primary" /> Tender Marketplace</CardTitle>
             <CardDescription>Published tender packages available to eligible contractors.</CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-4">
             {publishedTenders.map((tender) => (
-              <div key={tender.id} className="rounded-3xl border border-border bg-white p-5 hover:border-primary/30 transition-colors">
+              <div key={tender.id} className="beos-record-card p-5">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                   <div>
                     <Badge variant="secondary" className="uppercase text-[10px] tracking-widest mb-3">{tender.status}</Badge>
@@ -106,7 +108,7 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
                   {tender.requiredDisciplines?.slice(0, 4).map((discipline) => <Badge key={discipline} variant="outline" className="text-[10px] uppercase tracking-widest">{discipline}</Badge>)}
-                  <Button size="sm" className="ml-auto rounded-full font-bold" disabled title="Bid preparation flow is not connected yet">Prepare Bid</Button>
+                  <Button size="sm" className="ml-auto rounded-full font-bold" onClick={() => setShowBidSubmission(true)}>Prepare Bid</Button>
                 </div>
               </div>
             ))}
@@ -119,8 +121,19 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
+        {showBidSubmission && (
+          <div className="lg:col-span-2">
+            <BidSubmission
+              tenders={publishedTenders}
+              contractorId={user.uid}
+              contractorName={user.displayName || user.email || 'Contractor'}
+              onSubmitted={() => setShowBidSubmission(false)}
+            />
+          </div>
+        )}
+
         <div className="space-y-6">
-          <Card className="border-border shadow-sm bg-card rounded-3xl overflow-hidden">
+          <Card className="beos-section-card">
             <CardHeader className="bg-primary text-primary-foreground p-8">
               <CardTitle className="font-heading text-2xl flex items-center gap-2"><Building2 /> Firm-ready</CardTitle>
               <CardDescription className="text-primary-foreground/75">Contractor accounts can be linked into firm workspaces for team delivery in future phases.</CardDescription>
@@ -133,7 +146,7 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
             </CardContent>
           </Card>
 
-          <Card className="border-border shadow-sm bg-card rounded-3xl overflow-hidden">
+          <Card className="beos-section-card">
             <CardHeader className="p-6 border-b border-border bg-secondary/30">
               <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><ShieldCheck size={16} /> Compliance readiness</CardTitle>
             </CardHeader>
@@ -155,12 +168,12 @@ function StatCard({ label, value, icon, tone = 'default' }: { label: string; val
   }[tone];
 
   return (
-    <Card className="interactive-card border-border shadow-sm bg-card rounded-[2rem] overflow-hidden">
+    <Card className="beos-stat-card">
       <CardContent className="p-8 flex items-center gap-6">
         <div className={`p-4 rounded-2xl ${toneClass}`}>{icon}</div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
-          <p className="text-3xl font-heading font-bold tracking-tight">{value}</p>
+          <p className="beos-label-caps text-muted-foreground mb-1">{label}</p>
+          <p className="beos-metric">{value}</p>
         </div>
       </CardContent>
     </Card>

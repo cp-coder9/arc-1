@@ -1,0 +1,187 @@
+# CPD Service Contract Examples
+
+Date: 2026-05-15  
+Scope: deterministic, non-production service contract examples for `src/services/cpdService.ts`. These examples document pure backend-domain helper behaviour only. They do not call statutory CPD providers, issue legally recognized CPD certificates, sync to councils, send email, or certify professional standing.
+
+## Assessment scoring contract
+
+Input assessment:
+
+```json
+{
+  "id": "assessment-1",
+  "courseId": "course-sans-10400",
+  "passMarkPercent": 75,
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "Which form records competent person appointment?",
+      "type": "single_choice",
+      "points": 2,
+      "correctOptionIds": ["a"]
+    },
+    {
+      "id": "q2",
+      "prompt": "Select required close-out evidence.",
+      "type": "multiple_choice",
+      "points": 2,
+      "correctOptionIds": ["b", "c"]
+    }
+  ]
+}
+```
+
+Passing submission:
+
+```json
+{
+  "userId": "bep-1",
+  "assessmentId": "assessment-1",
+  "submittedAt": "2026-05-15T10:00:00.000Z",
+  "answers": {
+    "q1": ["a"],
+    "q2": ["c", "b", "b"]
+  }
+}
+```
+
+Expected scoring result when graded at `2026-05-15T10:01:00.000Z`:
+
+```json
+{
+  "userId": "bep-1",
+  "assessmentId": "assessment-1",
+  "score": 4,
+  "maxScore": 4,
+  "scorePercent": 100,
+  "passed": true,
+  "submittedAt": "2026-05-15T10:00:00.000Z",
+  "gradedAt": "2026-05-15T10:01:00.000Z",
+  "questionResults": [
+    { "questionId": "q1", "earnedPoints": 2, "maxPoints": 2, "correct": true },
+    { "questionId": "q2", "earnedPoints": 2, "maxPoints": 2, "correct": true }
+  ]
+}
+```
+
+The duplicate `b` answer in `q2` is ignored before exact-set comparison. A partial multi-select answer earns zero points for that question:
+
+```json
+{
+  "userId": "bep-1",
+  "assessmentId": "assessment-1",
+  "score": 2,
+  "maxScore": 4,
+  "scorePercent": 50,
+  "passed": false,
+  "submittedAt": "2026-05-15T10:00:00.000Z",
+  "gradedAt": "2026-05-15T10:01:00.000Z",
+  "questionResults": [
+    { "questionId": "q1", "earnedPoints": 2, "maxPoints": 2, "correct": true },
+    { "questionId": "q2", "earnedPoints": 0, "maxPoints": 2, "correct": false }
+  ]
+}
+```
+
+## Assessment validation errors
+
+`scoreCPDAttempt` fails before grading when core assessment invariants are broken:
+
+```json
+[
+  {
+    "case": "pass mark above 100",
+    "error": "CPD assessment passMarkPercent must be between 0 and 100."
+  },
+  {
+    "case": "empty question set",
+    "error": "CPD assessment must contain at least one question."
+  },
+  {
+    "case": "non-positive question points",
+    "error": "CPD question q1 must have positive points."
+  },
+  {
+    "case": "missing correct option ids",
+    "error": "CPD question q1 must define at least one correct option."
+  },
+  {
+    "case": "submission points at another assessment",
+    "error": "CPD submission assessmentId does not match assessment."
+  }
+]
+```
+
+## Certificate verification fields
+
+`createCPDCertificateVerificationFields` returns a random verification code and deterministic SHA-256 verification hash over certificate identity fields and the issuer key.
+
+Input identity fields:
+
+```json
+{
+  "userId": "bep-1",
+  "courseId": "course-sans-10400",
+  "attemptId": "attempt-1",
+  "issuedAt": "2026-05-15T10:05:00.000Z",
+  "expiresAt": "2027-05-15T10:05:00.000Z",
+  "issuerKey": "test-secret"
+}
+```
+
+Example generated fields:
+
+```json
+{
+  "verificationCode": "CPD-COURSE-S-ABCDEF123456",
+  "verificationHash": "64-character-sha256-hex-string-generated-from-certificate-fields",
+  "verificationVersion": "cpd-cert-v1"
+}
+```
+
+For deterministic lookup tests, `hashCPDCertificate` can be called directly with a fixed verification code:
+
+```json
+{
+  "userId": "bep-1",
+  "courseId": "course-1",
+  "attemptId": "attempt-1",
+  "issuedAt": "2026-05-15T10:05:00.000Z",
+  "verificationCode": "CPD-COURSE-ABC123",
+  "issuerKey": "secret"
+}
+```
+
+Verification recomputes the same hash only when all certificate identity fields match. Tampering with `userId`, `courseId`, `attemptId`, `issuedAt`, `expiresAt`, `verificationCode`, or the issuer key must fail verification.
+
+## Statutory sync planning
+
+Missing provider configuration blocks sync and returns all missing fields:
+
+```json
+{
+  "status": "blocked_provider_not_configured",
+  "canSync": false,
+  "reason": "No statutory CPD provider sync will be attempted until a real provider endpoint, API key, provider name, and enabled flag are configured.",
+  "requiredFields": ["enabled", "providerName", "endpointUrl", "apiKey"]
+}
+```
+
+Complete provider configuration only marks the plan ready. It still does not perform the external sync:
+
+```json
+{
+  "status": "ready",
+  "canSync": true,
+  "providerName": "Professional Body API",
+  "endpointUrl": "https://cpd.example.test/sync"
+}
+```
+
+## Human confirmations still required
+
+- Statutory CPD provider identity, endpoint ownership, and credentials.
+- Whether CPD certificates generated by the platform have legal/statutory standing or are internal attendance evidence only.
+- Certificate expiry policy by course/category/provider.
+- Retention and privacy requirements for assessment attempts, certificate hashes, and provider sync responses.
+- Whether failed attempts can be retried immediately, require cooldown, or need human review.

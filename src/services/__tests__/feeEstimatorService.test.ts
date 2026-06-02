@@ -7,6 +7,27 @@ import {
 } from '../feeEstimatorService';
 
 describe('feeEstimatorService', () => {
+  test('uses the PRD-mandated one percent platform fee default', () => {
+    expect(DEFAULT_FEE_ESTIMATOR_SETTINGS.platformFeePercent).toBe(1);
+
+    const estimate = estimateArchitecturalFee({
+      ...DEFAULT_FEE_ESTIMATOR_INPUT,
+      constructionValue: 1_000_000,
+      includePlatformFee: true,
+      includeCouncilAdmin: false,
+      deliverables: [],
+    }, {
+      ...DEFAULT_FEE_ESTIMATOR_SETTINGS,
+      baseFeePercentByProjectType: { ...DEFAULT_FEE_ESTIMATOR_SETTINGS.baseFeePercentByProjectType, residential: 10 },
+      complexityMultipliers: { ...DEFAULT_FEE_ESTIMATOR_SETTINGS.complexityMultipliers, standard: 1 },
+      urgencyMultipliers: { ...DEFAULT_FEE_ESTIMATOR_SETTINGS.urgencyMultipliers, standard: 1 },
+      minimumProfessionalFee: 0,
+      vatRate: 0,
+    });
+
+    expect(estimate.professionalFee).toBeGreaterThan(0);
+    expect(estimate.platformFee).toBeCloseTo(estimate.professionalFee * 0.01, 6);
+  });
   test('calculates an itemized estimate with VAT, platform and council fees', () => {
     const estimate = estimateArchitecturalFee({
       ...DEFAULT_FEE_ESTIMATOR_INPUT,

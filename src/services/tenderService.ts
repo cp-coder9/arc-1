@@ -9,7 +9,8 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { Bid, TenderPackage } from '../types';
+import { Bid, TenderPackage, UserVerification, VerificationSubjectType } from '../types';
+import { isActiveVerifiedVerification } from './userVerificationService';
 
 const TENDERS_COL = 'tender_packages';
 
@@ -17,9 +18,33 @@ export type CreateTenderPackageData = Omit<TenderPackage, 'id' | 'status' | 'cre
   status?: TenderPackage['status'];
 };
 
-export type SubmitBidData = Omit<Bid, 'id' | 'tenderPackageId' | 'status' | 'createdAt' | 'updatedAt'> & {
+export type SubmitBidData = Omit<Bid, 'id' | 'tenderPackageId' | 'status' | 'createdAt' | 'updatedAt' | 'verificationId'> & {
   status?: Bid['status'];
+  verificationId?: string;
 };
+
+const TENDER_BID_VERIFICATION_REQUIREMENTS: Array<{ subjectType: VerificationSubjectType; statutoryBody: string }> = [
+  { subjectType: 'contractor', statutoryBody: 'CIDB' },
+  { subjectType: 'subcontractor', statutoryBody: 'CIDB' },
+  { subjectType: 'contractor', statutoryBody: 'NHBRC' },
+];
+
+export async function getActiveTenderBidVerification(contractorId: string): Promise<UserVerification | null> {
+  for (const requirement of TENDER_BID_VERIFICATION_REQUIREMENTS) {
+    const verificationQuery = query(
+      collection(db, 'user_verifications'),
+      where('userId', '==', contractorId),
+      where('subjectType', '==', requirement.subjectType),
+      where('status', '==', 'verified'),
+    );
+    const snapshot = await getDocs(verificationQuery);
+    const active = snapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }) as UserVerification)
+      .find((verification) => isActiveVerifiedVerification(verification, requirement));
+    if (active) return active;
+  }
+  return null;
+}
 
 export async function createTenderPackage(data: CreateTenderPackageData): Promise<string> {
   const tenderRef = doc(collection(db, TENDERS_COL));
@@ -45,12 +70,21 @@ export async function closeTender(tenderId: string): Promise<void> {
 }
 
 export async function submitBid(tenderId: string, bidData: SubmitBidData): Promise<string> {
-  const bidRef = doc(collection(db, TENDERS_COL, tenderId, 'bids'));
+  const verification = bidData.verificationId
+    ? ({ id: bidData.verificationId } as UserVerification)
+    : await getActiveTenderBidVerification(bidData.contractorId);
+
+  if (!verification?.id) {
+    throw new Error('Active contractor verification is required before submitting tender bids');
+  }
+
+  const bidRef = doc(db, TENDERS_COL, tenderId, 'bids', `contractor_${bidData.contractorId}`);
   const now = new Date().toISOString();
   const bid: Bid = {
     ...bidData,
     id: bidRef.id,
     tenderPackageId: tenderId,
+    verificationId: verification.id,
     status: bidData.status ?? 'submitted',
     createdAt: now,
     updatedAt: now,

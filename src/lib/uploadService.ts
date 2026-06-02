@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient';
 import { auth } from './firebase';
 import { getIdToken } from 'firebase/auth';
 import { UploadedFile } from '../types';
@@ -46,7 +47,7 @@ export async function uploadAndTrackFile(
     reader.readAsDataURL(fileData);
   });
 
-  const res = await fetch('/api/files/upload', {
+  const res = await apiFetch('/api/files/upload', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

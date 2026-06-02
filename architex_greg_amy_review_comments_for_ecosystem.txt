@@ -1,0 +1,128 @@
+ARCHITEX ECOSYSTEM REVIEW COMMENTS — GREG / AMY
+
+Reviewed package: architex_greg_amy_project_communication_package.zip
+Reviewer note: The package is directionally strong and should be absorbed into Architex as a native communication layer, not treated as a separate side application.
+
+1. Executive recommendation
+
+Proceed with the concept, but implement it as an Architex Project Communication Engine inside the existing PWA ecosystem.
+
+The right product architecture is:
+- Mobile: a WhatsApp-familiar Project Chat Applet for fast capture, comments, photos, documents, voice notes, RFIs, approvals and site/design/planning records.
+- Desktop: a Project Message Centre inside the Architex project workspace for review, filtering, assignment, conversion, linking, audit and administration.
+- Backend: one shared Firestore-backed communication record, using existing Architex project permissions, lifecycle stages, file storage and AI review routes.
+
+Do not build a separate native desktop chat app at this stage. That would split the product, duplicate permissions, duplicate project context, and weaken the audit trail. The value is in bringing chat behaviour into Architex, not in creating another chat tool.
+
+2. What should be added to the Architex ecosystem
+
+Add this as a first-class Architex module:
+
+Feature area:
+Project Communications / Project Message Centre
+
+Core surfaces:
+- ProjectChatApplet: mobile-first project chat and capture surface.
+- ProjectMessageCentre: desktop project workspace surface.
+- ProjectCommunicationPanel: reusable embedded panel for project pages.
+
+Core services:
+- projectCommunicationService: wraps/extents existing messagingService rather than replacing it.
+- aiCommunicationService: phase-aware classification, summarisation and suggested conversions.
+- phaseCommunicationConfig: maps Architex lifecycle stages to capture tools, suggested prompts, file focus and next actions.
+
+Core data extensions:
+Extend the existing Message model in a backward-compatible way:
+- projectId while retaining jobId compatibility.
+- phase / ProjectStage.
+- captureType.
+- structuredStatus: raw, converted, linked, archived.
+- actionIds.
+- recordLinks.
+- aiTags.
+- transcribedText.
+- visibility.
+- optional location.
+
+Supporting records:
+- projectActions.
+- projectCaptureRecords.
+- projectRecordLinks.
+- projectCommunicationSummaries.
+
+3. Product comments
+
+The package gets the product direction right:
+- Chat is the entry point, not the whole system.
+- Desktop is control and governance, not another chat client.
+- The phase selector must change behaviour, not just label the conversation.
+- Delivery/construction must stay site-heavy.
+- Earlier phases need equally useful capture flows: intake, scoping, appointment, coordination, compliance, tender, payments and closeout.
+- AI should suggest, classify, summarise and route; it must not issue formal outputs without human approval.
+
+This should become the structured communication memory layer across the project lifecycle. Ordinary WhatsApp-style chat loses decisions, files and accountability. Architex should preserve the speed of chat while turning it into structured project intelligence.
+
+4. Integration comments for development
+
+Implementation should be incremental:
+
+Slice 1: Data model and configuration
+- Add phaseCommunicationConfig.
+- Extend current Message types without breaking existing messages.
+- Confirm actual ProjectStage enum values in the current repo before merging.
+- Keep jobId compatibility.
+
+Slice 2: Mobile applet
+- Build a real ProjectChatApplet backed by authorised projects, not demo projects.
+- Include project switcher, phase indicator, chat, capture, actions, AI suggested prompts and files/records.
+- Composer should remain simple and familiar.
+
+Slice 3: Desktop Message Centre
+- Add inside the project workspace.
+- Include search, filters, split-pane conversation + structured detail, conversion actions, assignment, approvals and audit visibility.
+
+Slice 4: AI support
+- Reuse or extend existing /api/review / Gemini/OpenAI-compatible proxy.
+- AI outputs must be draft/suggested until approved.
+- Add classification by phase, urgency and capture type.
+
+Slice 5: File and record linking
+- Use Vercel Blob for attachments if that is the established Architex file path.
+- Link files/messages to drawings, submissions, tenders, RFIs, site logs, invoices and closeout records.
+
+5. Important issue found in the supplied review sample
+
+The browser review sample 02_FULL_REVIEW_SAMPLE_mobile_and_desktop.html contains a functional bug in the phase dropdown population.
+
+Current code:
+Object.entries(([k,v])=>{ ... })
+
+This should be:
+Object.entries(phases).forEach(([k,v]) => { ... })
+
+Observed result:
+- The page loads.
+- The desktop/mobile default delivery phase renders.
+- The project dropdown has options.
+- The phase dropdown is empty, so reviewers cannot switch phases in the combined mobile + desktop sample.
+
+The standalone cellphone sample works correctly and has 9 phase options.
+
+6. Quality gates before merging
+
+Before this enters the Architex codebase:
+- Replace demoProjects with real authorised project/job data.
+- Confirm ProjectStage naming matches the production src/types.ts exactly.
+- Ensure Firestore indexes exist for jobId + createdAt and any projectId/phase filters.
+- Confirm security rules enforce project membership and message visibility.
+- Add tests for phase config coverage, message creation, project filtering, conversion metadata and permission boundaries.
+- Add fallback handling for old messages without projectId, phase or structuredStatus.
+- Ensure all formal issue/approval/instruction workflows require explicit human confirmation.
+
+7. Suggested comment to add to the Architex ecosystem issue/backlog
+
+Add the Project Communication Engine as a native Architex ecosystem module, not a separate chat app. The module should extend existing messaging into a shared project communication backend with two responsive surfaces: a phone-first Project Chat Applet for fast WhatsApp-style project capture, and a desktop Project Message Centre inside the project workspace for review, filtering, conversion, linking, assignment, audit and approvals. It must use the existing Architex project lifecycle, permissions, Firestore messaging, Vercel Blob file approach and AI review/proxy infrastructure. The phase selector must drive actual behaviour: capture tools, suggested prompts, next actions, file focus and conversion routes must change by ProjectStage. Existing messages must remain backward-compatible via jobId while new metadata adds projectId, phase, captureType, structuredStatus, actionIds, recordLinks, aiTags, visibility and transcription support. AI may classify, suggest, summarise and draft, but no AI output may be treated as formally issued or approved without human confirmation. Fix the combined HTML review sample phase dropdown before sharing further: Object.entries(phases).forEach(...) is required.
+
+8. Recommendation
+
+Approve this for integration planning and first implementation slice. Treat the supplied code as a starter/prototype, not production-ready code. The product idea is strong; the implementation needs to be tied carefully into existing Architex services, permissions, data model, lifecycle stages and audit behaviour.
