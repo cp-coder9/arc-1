@@ -11,17 +11,32 @@
     ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],
     "paths": {
       "@/*": [
         "./src/*"
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "types": [
+      "vite/client",
+      "jest",
+      "@testing-library/jest-dom"
+    ]
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test/**",
+    "e2e/**"
+  ]
 }

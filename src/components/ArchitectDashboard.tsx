@@ -1,9 +1,11 @@
+import { apiFetch } from '../lib/apiClient';
 import React, { useState, useEffect, useRef } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, getDocs, getDoc, orderBy } from 'firebase/firestore';
 import { uploadAndTrackFile } from '../lib/uploadService';
-import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult } from '../types';
+import { UserProfile, Job, Application, Submission, DelegatedTask, AIReviewResult, ArchitectProfile, JobCard, Review, Project, ProjectTeamMember, DISCIPLINE_REGISTRY } from '../types';
 import ProfileEditor from './ProfileEditor';
+import RatingSystem from './RatingSystem';
 import { Chat, ChatButton } from './Chat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
@@ -13,17 +15,31 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
-import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle } from 'lucide-react';
-import { reviewDrawing, AIProgress } from '../services/geminiService';
+import { Search, Briefcase, FileUp, CheckCircle2, Clock, AlertCircle, ExternalLink, CreditCard, Landmark, Building, UploadCloud, ShieldCheck, History, Star, Send, Loader2, Sparkles, User, Cpu, Shield, ArrowRight, Users, Plus, Eye, MessageCircle, UserCircle, LayoutList, MoreHorizontal, MapPin, Upload, HardHat, ClipboardCheck } from 'lucide-react';
+import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
 import { SubmissionItem } from './SubmissionItem';
 import { OrchestrationProgressModal } from './OrchestrationProgressModal';
 import { notificationService } from '../services/notificationService';
 import ReactMarkdown from 'react-markdown';
-import { format } from 'date-fns';
+import { safeLocale } from '@/lib/utils';
+import { paginateItems, totalPages } from '@/lib/utils';
 import { SearchFilter, SearchFilters } from './SearchFilter';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
+import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 // import { motion } from 'framer-motion';
+import MunicipalTracker from './MunicipalTracker';
+import FeeEstimator from './FeeEstimator';
+import StageProgressTracker from './StageProgressTracker';
+import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
+import AdvanceStageButton from './AdvanceStageButton';
+import ResponsibilityMatrix from './ResponsibilityMatrix';
+import TeamBuilder from './TeamBuilder';
+import { getDisciplineCoverage, subscribeToTeam } from '../services/teamService';
+import GanttChart from './GanttChart';
+import SiteLogManager from './SiteLogManager';
+import RFIManager from './RFIManager';
+import CloseoutWizard from './CloseoutWizard';
 
 export default function ArchitectDashboard({ 
   user, 
@@ -34,8 +50,12 @@ export default function ArchitectDashboard({
   activeTab?: string, 
   onTabChange?: (tab: string) => void 
 }) {
+  const currentTab = activeTab || 'overview';
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [myJobs, setMyJobs] = useState<Job[]>([]);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
     category: '',
@@ -46,905 +66,331 @@ export default function ArchitectDashboard({
     postedWithin: 0,
     sortBy: 'posted',
   });
-
-  // Map sidebar tabs to internal dashboard tabs
-  const internalTab = activeTab === 'marketplace' ? 'browse' : activeTab === 'projects' ? 'active' : 'browse';
+  const [marketplacePage, setMarketplacePage] = useState(1);
+  const [projectsPage, setProjectsPage] = useState(1);
+  const [applicationsPage, setApplicationsPage] = useState(1);
+  const pageSize = 6;
+  const uniqueApplications = Array.from(
+    new Map<string, Application>(myApplications.map(application => [`${application.jobId}:${application.id}`, application])).values()
+  );
+  const pagedMarketplaceJobs = paginateItems<Job>(availableJobs, marketplacePage, pageSize);
+  const pagedMyJobs = paginateItems<Job>(myJobs, projectsPage, pageSize);
+  const pagedApplications = paginateItems<Application>(uniqueApplications, applicationsPage, pageSize);
 
   useEffect(() => {
-    // Available jobs
-    const qAll = query(collection(db, 'jobs'), where('status', '==', 'open'));
-    const unsubAll = onSnapshot(qAll, (snapshot) => {
-      setAvailableJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'jobs');
+    const qJobs = query(collection(db, 'jobs'), where('status', '==', 'open'));
+    const unsubJobs = onSnapshot(qJobs, (snap) => {
+      setAvailableJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
+      setLoading(false);
     });
 
-    // My jobs (where I'm hired)
-    const qMy = query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid));
-    const unsubMy = onSnapshot(qMy, (snapshot) => {
-      setMyJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'jobs (my)');
+    const qMyJobs = query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid));
+    const unsubMyJobs = onSnapshot(qMyJobs, (snap) => {
+      setMyJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
+    });
+
+    const qReviews = query(collection(db, 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
+    const unsubReviews = onSnapshot(qReviews, (snap) => {
+      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
     });
 
     return () => {
-      unsubAll();
-      unsubMy();
+      unsubJobs();
+      unsubMyJobs();
+      unsubReviews();
     };
   }, [user.uid]);
 
-  const filteredJobs = availableJobs
-    .filter(job => {
-      const matchesSearch = !filters.query || 
-        job.title.toLowerCase().includes(filters.query.toLowerCase()) || 
-        job.description.toLowerCase().includes(filters.query.toLowerCase());
-      
-      const matchesCategory = !filters.category || job.category === filters.category;
-      
-      const matchesBudget = job.budget >= filters.minBudget && job.budget <= filters.maxBudget;
-      
-      // matchesLocation could be added if job has location field
-      
-      let matchesDeadline = true;
-      if (filters.deadlineWithin > 0) {
-        const daysToDeadline = differenceInDays(parseISO(job.deadline), new Date());
-        matchesDeadline = daysToDeadline >= 0 && daysToDeadline <= filters.deadlineWithin;
-      }
+  useEffect(() => {
+    const trackedJobs = Array.from(
+      new Map([...availableJobs, ...myJobs].map(job => [job.id, job])).values()
+    );
+    if (trackedJobs.length === 0) {
+      setMyApplications([]);
+      return;
+    }
 
-      let matchesPosted = true;
-      if (filters.postedWithin > 0) {
-        const daysSincePosted = differenceInDays(new Date(), parseISO(job.createdAt));
-        matchesPosted = daysSincePosted <= filters.postedWithin;
-      }
-
-      return matchesSearch && matchesCategory && matchesBudget && matchesDeadline && matchesPosted;
-    })
-    .sort((a, b) => {
-      if (filters.sortBy === 'budget_desc') return b.budget - a.budget;
-      if (filters.sortBy === 'budget_asc') return a.budget - b.budget;
-      if (filters.sortBy === 'deadline') return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); // default: posted (newest)
+    const applicationMap = new Map<string, Application>();
+    const unsubscribes = trackedJobs.map((job) => {
+      const q = query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid));
+      return onSnapshot(q, (snap) => {
+        [...applicationMap.keys()]
+          .filter(key => applicationMap.get(key)?.jobId === job.id)
+          .forEach(key => applicationMap.delete(key));
+        snap.docs.forEach(d => applicationMap.set(`${job.id}:${d.id}`, { id: d.id, ...d.data() } as Application));
+        setMyApplications(Array.from(applicationMap.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      });
     });
 
+    return () => unsubscribes.forEach(unsub => unsub());
+  }, [availableJobs, myJobs, user.uid]);
 
   return (
     <div className="space-y-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 bg-white p-10 rounded-[2.5rem] border border-border shadow-sm">
+      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-5xl font-heading font-bold tracking-tighter text-foreground">Architect Studio</h1>
+            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Architect Portal</h1>
             <ProfileEditor user={user} />
           </div>
-          <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">Find new opportunities and submit your SANS compliant drawings on Architex.</p>
+          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Elite architectural workspace with SANS-powered compliance verification.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+           <StatPill icon={<Star size={14} className="text-yellow-500" />} label="Rating" value={`${Number(user.averageRating || 5.0).toFixed(1)}/5`} />
+           <StatPill icon={<CheckCircle2 size={14} className="text-green-500" />} label="Jobs" value={user.completedJobs || 0} />
+        </div>
+        <div className="relative z-10 flex gap-4">
+          <Button
+            onClick={() => onTabChange?.('files')}
+            variant="outline"
+            className="rounded-full h-14 px-8 font-bold border-primary/20 hover:bg-primary/5"
+          >
+            <Upload className="mr-2 w-5 h-5" /> Quick Scan
+          </Button>
+          <Button
+            onClick={() => onTabChange?.('marketplace')}
+            className="rounded-full h-14 px-8 font-bold beos-button-shadow"
+          >
+            <Search className="mr-2 w-5 h-5" /> Browse Jobs
+          </Button>
         </div>
       </div>
 
-      <Tabs value={internalTab} onValueChange={(val) => onTabChange?.(val === 'browse' ? 'marketplace' : 'projects')} className="w-full">
-        <TabsList className="bg-secondary/50 border border-border p-1 rounded-full w-fit">
-          <TabsTrigger value="browse" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">Browse Jobs</TabsTrigger>
-          <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-8">My Active Projects</TabsTrigger>
-        </TabsList>
+      <Tabs value={currentTab} onValueChange={onTabChange} className="w-full">
+        <ScrollArea className="w-full whitespace-nowrap mb-8">
+          <TabsList className="beos-glass border border-border p-1 rounded-full w-fit inline-flex mb-1">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <LayoutList size={16} /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="marketplace" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Briefcase size={16} /> Marketplace
+            </TabsTrigger>
+            <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Users size={16} /> Team & Match
+            </TabsTrigger>
+            <TabsTrigger value="coordination" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Users size={16} /> Coordination
+            </TabsTrigger>
+            <TabsTrigger value="construction" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <HardHat size={16} /> Construction
+            </TabsTrigger>
+            <TabsTrigger value="closeout" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <CheckCircle2 size={16} /> Close-out
+            </TabsTrigger>
+            <TabsTrigger value="fees" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <CreditCard size={16} /> Fee Estimator
+            </TabsTrigger>
+            <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-6 md:px-8 gap-2 font-bold text-xs uppercase tracking-widest">
+              <Send size={16} /> Applications
+            </TabsTrigger>
+          </TabsList>
+        </ScrollArea>
 
-        <TabsContent value="browse" className="mt-8 space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-heading font-bold tracking-tight">Find Your Next Project</h2>
-              <p className="text-muted-foreground">{filteredJobs.length} open jobs matching your criteria</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="px-4 py-2 bg-primary/5 rounded-2xl border border-primary/10">
-                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Total Open Jobs</p>
-                <p className="text-xl font-bold text-primary">{availableJobs.length}</p>
+        <TabsContent value="overview">
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             <div className="lg:col-span-2 space-y-8">
+                <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><Briefcase className="text-primary" /> Active Projects</h2>
+                <div className="grid grid-cols-1 gap-6">
+                  {pagedMyJobs.map(job => (
+                    <div key={job.id}><ActiveProjectCard job={job} user={user} /></div>
+                  ))}
+                  {myJobs.length > pageSize && <PaginationControls page={projectsPage} totalPages={totalPages(myJobs.length, pageSize)} onPageChange={setProjectsPage} />}
+                  {myJobs.length === 0 && (
+                    <div className="empty-state py-20 text-center">
+                      <p className="text-muted-foreground italic">No active projects yet. Browse the marketplace to apply!</p>
+                    </div>
+                  )}
+                </div>
+             </div>
+             <div className="space-y-8">
+                <Card className="beos-section-card">
+                  <CardHeader className="bg-primary/5 p-6 border-b border-border">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <Star size={16} className="text-yellow-500" /> Client Reviews
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                    {reviews.map(review => (
+                      <div key={review.id} className="p-4 rounded-2xl bg-secondary/5 border border-border/50 hover:bg-secondary/10 transition-colors duration-300 mb-4 last:mb-0">
+                        <div className="flex justify-between items-center mb-1">
+                           <div className="flex text-yellow-400">
+                             {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? 'scale-110' : 'opacity-30'} />)}
+                           </div>
+                           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs italic text-foreground leading-relaxed">"{review.comment}"</p>
+                      </div>
+                    ))}
+                    {reviews.length === 0 && <p className="text-xs text-center text-muted-foreground py-10">No reviews yet.</p>}
+                  </CardContent>
+                </Card>
+             </div>
+           </div>
+        </TabsContent>
+
+        <TabsContent value="marketplace">
+           <div className="space-y-8">
+              <SearchFilter filters={filters} onFiltersChange={setFilters} totalResults={availableJobs.length} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                 {pagedMarketplaceJobs.map(job => (
+                   <div key={job.id}><JobCardUI job={job} user={user} /></div>
+                 ))}
               </div>
+              {availableJobs.length > pageSize && <PaginationControls page={marketplacePage} totalPages={totalPages(availableJobs.length, pageSize)} onPageChange={setMarketplacePage} />}
             </div>
-          </div>
+         </TabsContent>
 
-          <SearchFilter 
-            filters={filters} 
-            onFiltersChange={setFilters} 
-            totalResults={filteredJobs.length} 
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {filteredJobs.map(job => (
-              <BrowseJobItem key={job.id} job={job} user={user} />
-            ))}
-            {filteredJobs.length === 0 && (
-              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
-                <p className="text-muted-foreground italic">No jobs match your current filters. Try adjusting your search.</p>
-              </div>
-            )}
+        <TabsContent value="applications" className="mt-8">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-heading font-bold">My Applications</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {pagedApplications.map(application => (
+                <div key={`${application.jobId}:${application.id}`}><ApplicationCard application={application} /></div>
+              ))}
+              {uniqueApplications.length === 0 && (
+                <div className="empty-state col-span-full py-20 text-center">
+                  <p className="text-muted-foreground italic">No applications submitted yet.</p>
+                </div>
+              )}
+            </div>
+            {uniqueApplications.length > pageSize && <PaginationControls page={applicationsPage} totalPages={totalPages(uniqueApplications.length, pageSize)} onPageChange={setApplicationsPage} />}
           </div>
         </TabsContent>
 
-        <TabsContent value="active" className="mt-8">
+        <TabsContent value="projects" className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {myJobs.map(job => (
-              <ActiveProjectItem key={job.id} job={job} user={user} />
+              <div key={job.id}><ActiveProjectCard job={job} user={user} /></div>
             ))}
             {myJobs.length === 0 && (
-              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+              <div className="empty-state col-span-full py-20 text-center">
                 <p className="text-muted-foreground italic">You don't have any active projects yet. Apply for jobs to get started.</p>
               </div>
             )}
           </div>
         </TabsContent>
+
+        <TabsContent value="team" className="mt-8">
+          <TeamManager user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="coordination" className="mt-8">
+          <CoordinationDashboard user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="construction" className="mt-8">
+          <ConstructionDashboard user={user} myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="closeout" className="mt-8">
+          <CloseoutDashboard myJobs={myJobs} />
+        </TabsContent>
+
+        <TabsContent value="fees" className="mt-8">
+          <FeeEstimator role="architect" />
+        </TabsContent>
+
+<TabsContent value="municipal" className="mt-8">
+              <MunicipalTracker user={user} />
+            </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function BrowseJobItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
-  const [proposal, setProposal] = useState('');
-  const [portfolioUrl, setPortfolioUrl] = useState('');
-  const [isApplying, setIsApplying] = useState(false);
-  const [hasApplied, setHasApplied] = useState(false);
-  const [appCount, setAppCount] = useState(0);
-  const [clientProfile, setClientProfile] = useState<UserProfile | null>(null);
+function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
+  const [client, setClient] = useState<UserProfile | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
-    const checkApplied = async () => {
-      const q = query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid));
-      const snap = await getDocs(q);
-      setHasApplied(!snap.empty);
-    };
-    
-    const fetchAppCount = async () => {
-      const q = query(collection(db, `jobs/${job.id}/applications`));
-      const snap = await getDocs(q);
-      setAppCount(snap.size);
-    };
-
-    const fetchClient = async () => {
-      const snap = await getDoc(doc(db, 'users', job.clientId));
-      if (snap.exists()) {
-        setClientProfile(snap.data() as UserProfile);
-      }
-    };
-
-    checkApplied();
-    fetchAppCount();
-    fetchClient();
-  }, [job.id, user.uid, job.clientId]);
-
-  const handleApply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // Fetch architect profile for denormalization
-      const profileDoc = await getDoc(doc(db, 'architect_profiles', user.uid));
-      const profileData = profileDoc.exists() ? profileDoc.data() : null;
-
-      await addDoc(collection(db, `jobs/${job.id}/applications`), {
-        jobId: job.id,
-        architectId: user.uid,
-        architectName: user.displayName,
-        proposal,
-        portfolioUrl,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        // Denormalized fields
-        sacapNumber: profileData?.sacapNumber || '',
-        specializations: (profileData?.specializations || []).slice(0, 3),
-        completedJobs: profileData?.completedJobs || 0,
-        averageRating: profileData?.averageRating || 0,
-        portfolioThumbnail: profileData?.portfolioImages?.[0]?.url || ''
-      });
-      
-      // Notify the client of new application
-      await notificationService.notifyNewApplication(
-        job.clientId,
-        user.displayName,
-        job.title,
-        job.id
-      );
-      
-      setHasApplied(true);
-      setIsApplying(false);
-      setAppCount(prev => prev + 1);
-      toast.success("Application submitted");
-    } catch (error) {
-      toast.error("Failed to submit application");
+    if (job.clientId) {
+      const fetchClient = async () => {
+        const clientDoc = await getDoc(doc(db, 'users', job.clientId));
+        if (clientDoc.exists()) setClient({ uid: clientDoc.id, ...clientDoc.data() } as UserProfile);
+      };
+      fetchClient();
     }
-  };
+  }, [job.clientId]);
 
-  const daysLeft = differenceInDays(parseISO(job.deadline), new Date());
-  
-  const categoryColors: Record<string, string> = {
-    'Residential': 'bg-blue-500',
-    'Commercial': 'bg-purple-500',
-    'Industrial': 'bg-orange-500',
-    'Renovation': 'bg-emerald-500',
-    'Interior': 'bg-rose-500',
-    'Landscape': 'bg-green-500'
-  };
+  useEffect(() => {
+    const unsubscribe = subscribeToProjectByJobId(job.id, setProject);
+    return () => unsubscribe();
+  }, [job.id]);
 
   return (
-    <Card className="border-border shadow-sm bg-white hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden group border-t-0">
-      <div className={`h-1.5 w-full ${categoryColors[job.category] || 'bg-primary'}`} />
-      <CardHeader className="p-6 pb-4">
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[9px] tracking-widest px-2 py-0.5">Open</Badge>
-            <Badge variant="outline" className="border-primary/20 text-primary uppercase text-[9px] tracking-widest px-2 py-0.5">{job.category}</Badge>
-            {daysLeft >= 0 && (
-              <Badge className={`${daysLeft <= 3 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'} uppercase text-[9px] tracking-widest px-2 py-0.5`}>
-                <Clock size={10} className="mr-1" /> {daysLeft === 0 ? 'Due Today' : `${daysLeft} days left`}
-              </Badge>
+    <Card className="border-border shadow-sm bg-white overflow-hidden rounded-3xl hover:border-primary/30 transition-all group">
+      <div className="p-8 space-y-6">
+        <div className="flex justify-between items-start">
+           <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest font-bold">
+             {job.category}
+           </Badge>
+           <Badge variant="outline" className="rounded-full px-3 uppercase text-[10px] font-bold tracking-widest">In Progress</Badge>
+        </div>
+        <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
+        {project && (
+          <div className="space-y-3">
+            <StageProgressTracker currentStage={project.currentStage} stageHistory={project.stageHistory} />
+            {project.leadArchitectId === user.uid && (
+              <div className="flex justify-end">
+                <AdvanceStageButton project={project} actorId={user.uid} />
+              </div>
             )}
           </div>
-          <span className="text-base font-bold text-primary font-mono whitespace-nowrap">R {job.budget.toLocaleString()}</span>
-        </div>
-        <CardTitle className="font-heading font-bold text-xl group-hover:text-primary transition-colors tracking-tight line-clamp-1">{job.title}</CardTitle>
-        <CardDescription className="line-clamp-2 text-xs leading-relaxed mt-2 h-8">{job.description}</CardDescription>
-      </CardHeader>
-      
-      <CardContent className="p-6 pt-0 space-y-4">
-        {/* Requirements Tags */}
-        <div className="flex flex-wrap gap-1.5">
-          {job.requirements.slice(0, 3).map((req, i) => (
-            <Badge key={i} variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0 max-w-[120px] truncate">
-              {req}
-            </Badge>
-          ))}
-          {job.requirements.length > 3 && (
-            <Badge variant="secondary" className="text-[10px] bg-secondary/50 text-muted-foreground font-medium px-2 py-0">
-              +{job.requirements.length - 3} more
-            </Badge>
-          )}
-        </div>
-
-        {/* Client Info & Application Count */}
-        <div className="flex items-center justify-between pt-4 border-t border-border/50">
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                {clientProfile?.displayName?.[0] || 'C'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-foreground leading-none">{clientProfile?.displayName || 'Architex Client'}</span>
-              <span className="text-[9px] text-muted-foreground">Client</span>
+        )}
+        {client && (
+          <div className="flex items-center justify-between pt-4 border-t border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{client.displayName[0]}</div>
+              <div>
+                <p className="text-sm font-bold text-foreground">{client.displayName}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Client</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <Users size={12} />
-            <span className="text-[10px] font-bold">{appCount} applications</span>
-          </div>
-        </div>
-      </CardContent>
-
-      <CardFooter className="bg-secondary/10 p-4 border-t border-border mt-auto">
-        <Dialog open={isApplying} onOpenChange={setIsApplying}>
-          <DialogTrigger render={
-            <Button disabled={hasApplied} variant={hasApplied ? "secondary" : "outline"} className="w-full h-10 rounded-xl text-[10px] uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">
-              {hasApplied ? 'Already Applied' : 'Apply for Job'}
+            <Button variant="ghost" size="sm" className="rounded-full gap-2" onClick={() => setIsChatOpen(true)}>
+              <MessageCircle size={16} /> Chat
             </Button>
-          } />
-          <DialogContent className="sm:max-w-[600px] border-border bg-white/95 backdrop-blur-md p-0 overflow-hidden rounded-3xl">
-            <div className="bg-primary/5 p-8 border-b border-border">
-              <DialogHeader>
-                <DialogTitle className="font-heading text-3xl font-bold">Submit Proposal</DialogTitle>
-                <DialogDescription className="text-muted-foreground">Tell the client why you are the best fit for this project.</DialogDescription>
-              </DialogHeader>
-            </div>
-            <form onSubmit={handleApply} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Your Proposal</label>
-                <Textarea 
-                  placeholder="Describe your approach, timeline, and experience with similar SANS 10400 projects..." 
-                  value={proposal}
-                  onChange={e => setProposal(e.target.value)}
-                  required
-                  className="min-h-[150px] border-border focus-visible:ring-primary rounded-xl leading-relaxed"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Portfolio URL</label>
-                <Input 
-                  placeholder="https://behance.net/your-portfolio" 
-                  value={portfolioUrl}
-                  onChange={e => setPortfolioUrl(e.target.value)}
-                  className="border-border focus-visible:ring-primary h-12 rounded-xl"
-                />
-              </div>
-              <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20">Submit Application</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardFooter>
+          </div>
+        )}
+        <DelegatedTasksList job={job} user={user} />
+      </div>
+      {isChatOpen && client && (
+        <Chat job={job} currentUser={user} otherUser={client} isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      )}
     </Card>
   );
 }
 
-function ActiveProjectItem({ job, user }: { job: Job, user: UserProfile, key?: any }) {
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [drawingUrl, setDrawingUrl] = useState('');
-  const [drawingName, setDrawingName] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
-  const [isRating, setIsRating] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [isPreChecking, setIsPreChecking] = useState(false);
-  const [preCheckResult, setPreCheckResult] = useState<AIReviewResult | null>(null);
-  const [aiProgress, setAiProgress] = useState<AIProgress | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isImage, setIsImage] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [clientProfile, setClientProfile] = useState<UserProfile | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load client profile for chat
-  useEffect(() => {
-    if (job.clientId) {
-      const loadClient = async () => {
-        const clientDoc = await getDoc(doc(db, 'users', job.clientId));
-        if (clientDoc.exists()) {
-          setClientProfile(clientDoc.data() as UserProfile);
-        }
-      };
-      loadClient();
-    }
-  }, [job.clientId]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleUpload(file);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleUpload(file);
-  };
-
-  const handleUpload = async (file: File) => {
-    if (!file) return;
-    
-    // Validate file type (PDF, CAD-like extensions, or images)
-    const validTypes = ['application/pdf', 'image/vnd.dwg', 'application/acad', 'application/x-acad', 'application/autocad_dwg', 'image/x-dwg', 'application/dwg'];
-    const isPdf = file.type === 'application/pdf';
-    const isDwg = file.name.toLowerCase().endsWith('.dwg');
-    const isImg = file.type.startsWith('image/');
-    
-    if (!isPdf && !isDwg && !isImg) {
-      toast.error("Please upload a PDF, DWG, or Image file.");
-      return;
-    }
-
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error("File size exceeds 20MB limit.");
-      return;
-    }
-
-    setIsImage(isImg);
-    setIsUploading(true);
-    setUploadProgress(0);
-    setDrawingName(file.name.split('.')[0]);
-
-    try {
-      const url = await uploadAndTrackFile(file, {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        uploadedBy: user.uid,
-        context: 'submission',
-        jobId: job.id,
-      });
-      setDrawingUrl(url);
-      setIsUploading(false);
-      toast.success("File uploaded successfully!");
-      
-      // Automatically run AI pre-check
-      handlePreCheck(url, file.name.split('.')[0]);
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("Upload failed.");
-      setIsUploading(false);
-    }
-  };
-
-  useEffect(() => {
-    const q = query(collection(db, `jobs/${job.id}/submissions`), where('architectId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Submission)));
-    });
-    return () => unsub();
-  }, [job.id, user.uid]);
-
-  useEffect(() => {
-    setPreCheckResult(null);
-  }, [drawingUrl, drawingName]);
-
-  const handlePreCheck = async (url?: string, name?: string) => {
-    const targetUrl = url || drawingUrl;
-    const targetName = name || drawingName;
-
-    if (!targetUrl || !targetName) {
-      toast.error("Please upload a drawing first.");
-      return;
-    }
-    
-    setIsPreChecking(true);
-    setPreCheckResult(null);
-    setAiProgress({
-      percentage: 0,
-      agentName: 'Orchestrator',
-      activity: 'Initializing AI Orchestration Engine...',
-      completedAgents: []
-    });
-    
-    try {
-      // Log start of pre-check
-      const { logSystemEvent } = await import('../services/geminiService');
-      await logSystemEvent('info', 'Architect Studio', `Architect ${user.displayName} initiated AI Pre-check for ${targetName}`);
-
-      const result = await reviewDrawing(targetUrl, targetName, (progress) => {
-        setAiProgress(progress);
-      });
-      
-      setPreCheckResult(result);
-      if (result.status === 'passed') {
-        toast.success("AI Pre-check Passed!");
-      } else {
-        toast.warning("AI Pre-check identified issues.");
-      }
-    } catch (error) {
-      console.error("Pre-check error:", error);
-      toast.error("AI Pre-check failed.");
-    } finally {
-      setIsPreChecking(false);
-      // Keep progress visible for a moment if successful, or clear it
-      setTimeout(() => setAiProgress(null), 1000);
-    }
-  };
-
-  const handleSubmitDrawing = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setIsSubmitting(false);
-      toast.info("Starting AI Compliance Review...");
-      
-      const newSub = {
-        jobId: job.id,
-        architectId: user.uid,
-        drawingUrl,
-        drawingName,
-        status: 'processing' as const,
-        traceability: [{
-          timestamp: new Date().toISOString(),
-          actor: 'Architect',
-          action: 'Submission Initiated',
-          details: `Drawing "${drawingName}" uploaded to secure vault.`
-        }],
-        createdAt: new Date().toISOString()
-      };
-
-      const docRef = await addDoc(collection(db, `jobs/${job.id}/submissions`), newSub);
-
-      // Notify Client
-      await notificationService.notifyDrawingSubmitted(job.clientId, drawingName, job.id, docRef.id);
-
-      // Update to AI Reviewing
-      await updateDoc(doc(db, `jobs/${job.id}/submissions`, docRef.id), {
-        status: 'ai_reviewing',
-        traceability: [
-          ...newSub.traceability,
-          {
-            timestamp: new Date().toISOString(),
-            actor: 'System',
-            action: 'Status Change',
-            details: 'Routing to AI Compliance Orchestrator.'
-          }
-        ]
-      });
-
-      // Trigger AI Review
-      const aiResult = await reviewDrawing(drawingUrl, drawingName, (progress) => {
-        setAiProgress(progress);
-      });
-      
-      const finalStatus = aiResult.status === 'passed' ? 'admin_reviewing' : 'ai_failed';
-      const statusLabel = aiResult.status === 'passed' ? 'Awaiting Admin Approval' : 'AI Review Failed';
-
-      await updateDoc(doc(db, `jobs/${job.id}/submissions`, docRef.id), {
-        status: finalStatus,
-        aiFeedback: aiResult.feedback,
-        aiStructuredFeedback: aiResult.categories,
-        traceability: [
-          ...newSub.traceability,
-          {
-            timestamp: new Date().toISOString(),
-            actor: 'System',
-            action: 'Status Change',
-            details: 'Routing to AI Compliance Orchestrator.'
-          },
-          {
-            timestamp: new Date().toISOString(),
-            actor: 'AI Orchestrator',
-            action: 'Compliance Check Completed',
-            details: aiResult.traceLog
-          },
-          {
-            timestamp: new Date().toISOString(),
-            actor: 'System',
-            action: 'Status Change',
-            details: `Submission moved to: ${statusLabel}`
-          }
-        ]
-      });
-
-      // Notify parties of AI completion
-      await notificationService.notifyAIReviewComplete(
-        job.clientId,
-        user.uid,
-        drawingName,
-        aiResult.status === 'passed' ? 'passed' : 'failed',
-        job.id,
-        docRef.id
-      );
-
-      if (aiResult.status === 'passed') {
-        toast.success("AI Review Passed! Sent to Admin for final approval.");
-      } else {
-        toast.error("AI Review Failed. Please check feedback.");
-      }
-      setDrawingName('');
-      setDrawingUrl('');
-    } catch (error) {
-      toast.error("Submission failed");
-    }
-  };
-
-  const handleSubmitReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addDoc(collection(db, 'reviews'), {
-        jobId: job.id,
-        fromId: user.uid,
-        toId: job.clientId,
-        rating,
-        comment,
-        type: 'architect_to_client',
-        createdAt: new Date().toISOString()
-      });
-      setIsRating(false);
-      toast.success("Review submitted! Thank you.");
-    } catch (error) {
-      toast.error("Failed to submit review");
-    }
-  };
-
-  const isApproved = submissions.some(s => s.status === 'approved');
-
-  return (
-    <Card className="border-border shadow-sm bg-white overflow-hidden group hover:border-primary/30 transition-all flex flex-col rounded-3xl hover:shadow-xl">
-      <div className="p-8 flex-1">
-        <div className="flex justify-between items-start mb-6">
-          <div className="space-y-2">
-            <Badge className="bg-primary/10 text-primary border-primary/20 uppercase tracking-widest text-[10px] px-3 py-1">Active Project</Badge>
-            <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
-          </div>
-          <div className="text-right">
-            <p className="text-xl font-bold text-primary font-mono">R {job.budget.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Budget</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 mb-8">
-          <div className="flex items-center justify-between p-5 rounded-2xl bg-secondary/30 border border-border">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-white text-primary shadow-sm">
-                <CreditCard size={20} />
-              </div>
-              <div>
-                <p className="text-sm font-bold">Escrow Status</p>
-                <p className="text-[10px] text-primary font-bold uppercase tracking-widest flex items-center gap-1">
-                  <ShieldCheck size={12} /> Funds Secured
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-mono font-bold">20% Released</p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-5 rounded-2xl bg-secondary/30 border border-border">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-white text-primary shadow-sm">
-                <Landmark size={20} />
-              </div>
-              <div>
-                <p className="text-sm font-bold">Council Readiness</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                  {isApproved ? 'Ready for Submission' : 'Awaiting Final Approval'}
-                </p>
-              </div>
-            </div>
-            {isApproved && <CheckCircle2 size={20} className="text-primary" />}
-          </div>
-        </div>
-
-        <div className="space-y-4 mb-8">
-          <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-            <Users size={14} className="text-primary" /> Team Delegation
-          </h4>
-          <DelegatedTasksList job={job} user={user} />
-        </div>
-
-        <div className="space-y-4">
-          <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-            <History size={14} className="text-primary" /> Recent Submissions
-          </h4>
-          <div className="space-y-3">
-            {submissions.slice(0, 3).map(sub => (
-              <SubmissionItem key={sub.id} sub={sub} userRole={user.role} />
-            ))}
-            {submissions.length === 0 && <p className="text-xs text-muted-foreground italic">No drawings submitted yet.</p>}
-          </div>
-        </div>
-      </div>
-
-      <CardFooter className="bg-secondary/20 p-6 border-t border-border gap-3">
-        {job.status === 'completed' ? (
-          <Dialog open={isRating} onOpenChange={setIsRating}>
-            <DialogTrigger render={<Button variant="outline" className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">Rate Client</Button>} />
-            <DialogContent className="sm:max-w-[500px] border-border bg-white rounded-3xl p-0 overflow-hidden">
-              <div className="bg-primary/5 p-8 border-b border-border">
-                <DialogHeader>
-                  <DialogTitle className="font-heading text-3xl font-bold">Rate Client</DialogTitle>
-                  <DialogDescription>Share your experience working with this client.</DialogDescription>
-                </DialogHeader>
-              </div>
-              <form onSubmit={handleSubmitReview} className="p-8 space-y-6">
-                <div className="space-y-4">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Rating</label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        className={`p-2 rounded-xl transition-all ${rating >= star ? 'text-primary bg-primary/10' : 'text-muted-foreground bg-secondary/50'}`}
-                      >
-                        <Star size={24} fill={rating >= star ? 'currentColor' : 'none'} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Your Feedback</label>
-                  <Textarea 
-                    placeholder="How was the communication, clarity of brief, and payment timeliness?" 
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    required
-                    className="min-h-[120px] border-border rounded-xl"
-                  />
-                </div>
-                <Button type="submit" className="w-full bg-primary text-primary-foreground h-14 rounded-xl font-bold gap-2">
-                  <Send size={18} /> Submit Review
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        ) : (
-          <Dialog open={isSubmitting} onOpenChange={setIsSubmitting}>
-            <DialogTrigger render={<Button variant="outline" className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all">Submit New Drawing</Button>} />
-            <DialogContent className="max-w-2xl border-border bg-white/95 backdrop-blur-md p-0 overflow-hidden rounded-[2rem] shadow-2xl">
-              <div className="bg-primary/5 p-10 border-b border-border">
-                <DialogHeader>
-                  <DialogTitle className="font-heading font-bold text-4xl tracking-tighter">Submit Drawing</DialogTitle>
-                  <DialogDescription className="text-muted-foreground text-base mt-2">Upload technical drawings for AI SANS 10400 compliance check.</DialogDescription>
-                </DialogHeader>
-              </div>
-              <form onSubmit={handleSubmitDrawing} className="p-10 space-y-8">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  onChange={handleFileSelect}
-                  accept=".pdf,.dwg,image/*"
-                />
-                <div 
-                  className={`border-2 border-dashed rounded-[2rem] p-16 text-center transition-all relative overflow-hidden ${
-                    isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 bg-secondary/20'
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                >
-                  {isUploading && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 z-10">
-                      <div className="w-full max-w-xs space-y-4 text-center">
-                        <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
-                        <p className="text-sm font-bold text-primary">Uploading drawing to secure vault...</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">This may take a moment</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col items-center gap-4">
-                    {drawingUrl && isImage ? (
-                      <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden border border-border shadow-sm mb-2">
-                        <img src={drawingUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </div>
-                    ) : (
-                      <div className="p-6 bg-white rounded-full text-primary shadow-xl shadow-primary/10">
-                        <UploadCloud size={48} />
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-lg font-bold tracking-tight">
-                        {drawingUrl ? 'File Ready' : 'Drag and drop your PDF/CAD/Image file'}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {drawingUrl ? drawingName : 'Maximum file size: 20MB'}
-                      </p>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="mt-4 rounded-full px-8 border-primary/20 font-bold"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {drawingUrl ? 'Change File' : 'Browse Files'}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Drawing Name</label>
-                    <Input 
-                      placeholder="e.g. Ground Floor Plan - Rev A" 
-                      value={drawingName}
-                      onChange={e => setDrawingName(e.target.value)}
-                      required
-                      className="border-border focus-visible:ring-primary h-12 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Drawing URL</label>
-                    <Input 
-                      placeholder="Upload a file to get URL" 
-                      value={drawingUrl}
-                      readOnly
-                      required
-                      className="border-border focus-visible:ring-primary h-12 rounded-xl bg-secondary/20 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-6 bg-primary/5 border border-primary/20 rounded-2xl flex flex-col gap-4">
-                  <div className="flex gap-4">
-                    <Sparkles className="text-primary shrink-0" size={24} />
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold text-foreground">AI Compliance Pre-check</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Run an autonomous scan for **SANS 10400** compliance before final submission.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {preCheckResult ? (
-                    <div className={`p-6 rounded-2xl border ${preCheckResult.status === 'passed' ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
-                      <div className="flex items-center gap-2 mb-4">
-                        {preCheckResult.status === 'passed' ? (
-                          <CheckCircle2 className="text-green-600" size={20} />
-                        ) : (
-                          <AlertCircle className="text-red-600" size={20} />
-                        )}
-                        <span className={`text-sm font-bold uppercase tracking-widest ${preCheckResult.status === 'passed' ? 'text-green-700' : 'text-red-700'}`}>
-                          AI Pre-check: {preCheckResult.status}
-                        </span>
-                      </div>
-                      
-                      {preCheckResult.categories && preCheckResult.categories.length > 0 ? (
-                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
-                          {preCheckResult.categories.map((cat, i) => (
-                            <div key={i} className="space-y-2">
-                              <p className="text-[10px] font-bold text-muted-foreground uppercase">{cat.name}</p>
-                              <div className="space-y-2">
-                                {cat.issues.map((issue, j) => (
-                                  <div key={j} className="text-xs bg-white/50 p-3 rounded-xl border border-black/5">
-                                    <p className="font-bold">{issue.description}</p>
-                                    <p className="text-[10px] text-muted-foreground mt-1">Action: {issue.actionItem}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-foreground/80 markdown-body">
-                          <ReactMarkdown>{preCheckResult.feedback}</ReactMarkdown>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {isPreChecking && (
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center px-1">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-primary animate-pulse">
-                              AI Orchestration in Progress...
-                            </p>
-                            <p className="text-[10px] font-mono font-bold text-muted-foreground">{aiProgress?.percentage || 0}%</p>
-                          </div>
-                          <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary transition-all duration-300"
-                              style={{ width: `${aiProgress?.percentage || 0}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      <Button 
-                        type="button" 
-                        onClick={() => handlePreCheck()} 
-                        disabled={isPreChecking || !drawingUrl}
-                        className="w-full bg-white text-primary border border-primary/20 hover:bg-primary/5 h-12 rounded-xl font-bold gap-2"
-                      >
-                        {isPreChecking ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                        {isPreChecking ? 'Analyzing SANS Compliance...' : 'Run AI Pre-compliance Check'}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <Button 
-                  type="submit" 
-                  disabled={isPreChecking}
-                  className="w-full bg-primary text-primary-foreground h-16 rounded-2xl font-bold text-xl shadow-xl shadow-primary/20"
-                >
-                  Submit for AI Review
-                </Button>
-              </form>
-            </DialogContent>
-</Dialog>
-      )}
-      {clientProfile && (
-        <>
-          <Button
-            variant="outline"
-            className="w-full h-12 rounded-xl text-xs uppercase tracking-widest font-bold border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all"
-            onClick={() => setIsChatOpen(true)}
-          >
-            <MessageCircle size={16} className="mr-2" />
-            Message Client
-          </Button>
-          <Chat
-            job={job}
-            currentUser={user}
-            otherUser={clientProfile}
-            isOpen={isChatOpen}
-            onClose={() => setIsChatOpen(false)}
-          />
-        </>
-      )}
-    </CardFooter>
-    <OrchestrationProgressModal progress={aiProgress} isOpen={!!aiProgress} />
-  </Card>
-);
-}
-
 function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
-  const [tasks, setTasks] = useState<DelegatedTask[]>([]);
+  const [tasks, setTasks] = useState<(DelegatedTask | JobCard)[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [assigneeName, setAssigneeName] = useState('');
   const [assigneeRole, setAssigneeRole] = useState('');
   const [deadline, setDeadline] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [estimatedHours, setEstimatedHours] = useState<string>('');
+  const [requirements, setRequirements] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DelegatedTask)));
+      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JobCard)));
     });
     return () => unsub();
   }, [job.id, user.uid]);
+
+  const handleUpdateStatus = async (taskId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, `jobs/${job.id}/tasks`, taskId), {
+        status: newStatus,
+        completedAt: newStatus === 'completed' ? new Date().toISOString() : null
+      });
+      toast.success("Status updated");
+    } catch (error) {
+      toast.error("Failed to update status");
+    }
+  };
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -956,105 +402,488 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
         assigneeRole,
         deadline,
         notes,
+        priority,
+        estimatedHours: estimatedHours ? Number(estimatedHours) : null,
+        requirements: requirements.split('\n').map(item => item.trim()).filter(Boolean),
         status: 'pending',
         createdAt: new Date().toISOString()
       });
-      setIsAdding(false);
       setAssigneeName('');
       setAssigneeRole('');
       setDeadline('');
       setNotes('');
-      toast.success("Task delegated successfully");
-    } catch (error) {
-      toast.error("Failed to delegate task");
-    }
-  };
-
-  const handleUpdateStatus = async (taskId: string, newStatus: string) => {
-    try {
-      await updateDoc(doc(db, `jobs/${job.id}/tasks`, taskId), {
-        status: newStatus
-      });
-      toast.success("Task status updated");
-    } catch (error) {
-      toast.error("Failed to update status");
+      setEstimatedHours('');
+      setRequirements('');
+      setIsAdding(false);
+      toast.success('Team task assigned');
+    } catch {
+      toast.error('Failed to assign task');
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-xs text-muted-foreground">Manage tasks for your team members.</p>
-        <Dialog open={isAdding} onOpenChange={setIsAdding}>
-          <DialogTrigger render={
-            <Button variant="outline" size="sm" className="h-8 text-xs rounded-full gap-1 border-primary/20 text-primary">
-              <Plus size={14} /> Delegate Task
-            </Button>
-          } />
-          <DialogContent className="sm:max-w-[500px] border-border bg-white rounded-3xl p-0 overflow-hidden">
-            <div className="bg-primary/5 p-6 border-b border-border">
-              <DialogHeader>
-                <DialogTitle className="font-heading text-2xl font-bold">Delegate Task</DialogTitle>
-                <DialogDescription>Assign a task to a team member for this project.</DialogDescription>
-              </DialogHeader>
-            </div>
-            <form onSubmit={handleAddTask} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Assignee Name</label>
-                  <Input required value={assigneeName} onChange={e => setAssigneeName(e.target.value)} placeholder="e.g. Jane Doe" className="rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Role / Title</label>
-                  <Input required value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} placeholder="e.g. Draftsman" className="rounded-xl" />
-                </div>
+    <div className="space-y-4 mt-6">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+        <Users size={12} /> Team Deliverables
+      </p>
+      <div className="grid grid-cols-1 gap-3">
+        {tasks.map(task => (
+          <div key={task.id} className="p-4 rounded-2xl bg-secondary/20 border border-border flex flex-col gap-4">
+            <div className="flex justify-between items-center">
+              <div>
+                 <p className="text-sm font-bold">{task.assigneeName} <span className="text-[10px] text-muted-foreground font-normal">({task.assigneeRole})</span></p>
+                 <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1"><Clock size={12} /> Due: {new Date(task.deadline).toLocaleDateString()}</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Deadline</label>
-                <Input required type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="rounded-xl" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Task Notes</label>
-                <Textarea required value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the task..." className="rounded-xl min-h-[100px]" />
-              </div>
-              <Button type="submit" className="w-full rounded-xl h-12 font-bold">Assign Task</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {tasks.length > 0 ? (
-        <div className="space-y-3">
-          {tasks.map(task => (
-            <div key={task.id} className="p-4 rounded-2xl border border-border bg-secondary/10 flex flex-col gap-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-sm">{task.assigneeName} <span className="text-muted-foreground font-normal">({task.assigneeRole})</span></p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Clock size={12} /> Due: {new Date(task.deadline).toLocaleDateString()}</p>
-                </div>
+              <div className="flex items-center gap-2">
                 <select 
                   value={task.status}
                   onChange={(e) => handleUpdateStatus(task.id, e.target.value)}
-                  className={`text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border outline-none ${
-                    task.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                    task.status === 'in-progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                    'bg-yellow-50 text-yellow-700 border-yellow-200'
-                  }`}
+                  className="text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full border bg-white outline-none"
                 >
                   <option value="pending">Pending</option>
                   <option value="in-progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
+                {task.status === 'completed' && task.assigneeId && (
+                  <Dialog>
+                    <DialogTrigger render={<Button size="sm" variant="outline" className="h-7 px-2 rounded-lg text-[8px] uppercase font-black tracking-tighter gap-1"><Star size={10} /> Rate</Button>} />
+                    <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl border-none">
+                       <RatingSystem fromId={user.uid} toId={task.assigneeId} toName={task.assigneeName} jobId={job.id} type={task.assigneeRole === 'bep' ? 'to_bep' : 'to_freelancer'} />
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
-              <p className="text-sm bg-white p-3 rounded-xl border border-black/5">{task.notes}</p>
             </div>
-          ))}
+            <p className="text-xs text-muted-foreground line-clamp-1 italic">"{task.notes}"</p>
+          </div>
+        ))}
+        {tasks.length === 0 && <p className="text-[10px] text-muted-foreground italic">No job cards assigned yet.</p>}
+      </div>
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full gap-2"><Plus size={14} /> Add Team Task</Button>} />
+        <DialogContent className="sm:max-w-lg rounded-3xl">
+          <DialogHeader><DialogTitle>Assign Team Deliverable</DialogTitle></DialogHeader>
+          <form onSubmit={handleAddTask} className="space-y-4">
+            <Input placeholder="Assignee name" value={assigneeName} onChange={e => setAssigneeName(e.target.value)} required />
+            <Input placeholder="Role, e.g. Structural Engineer" value={assigneeRole} onChange={e => setAssigneeRole(e.target.value)} required />
+            <Input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} required />
+            <Input type="number" placeholder="Estimated hours" value={estimatedHours} onChange={e => setEstimatedHours(e.target.value)} />
+            <select value={priority} onChange={e => setPriority(e.target.value as 'low' | 'medium' | 'high')} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
+              <option value="low">Low priority</option>
+              <option value="medium">Medium priority</option>
+              <option value="high">High priority</option>
+            </select>
+            <Textarea placeholder="Notes" value={notes} onChange={e => setNotes(e.target.value)} required />
+            <Textarea placeholder="Requirements, one per line" value={requirements} onChange={e => setRequirements(e.target.value)} />
+            <Button type="submit" className="w-full">Assign task</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
+  const [pros, setPros] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), where('role', 'in', ['freelancer', 'bep']));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setPros(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+       <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-2xl font-heading font-bold">Team Assignment</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {myJobs.map(job => (
+              <Card key={job.id} className="border-border shadow-sm bg-white rounded-3xl p-6">
+                <Badge variant="secondary" className="mb-2 uppercase text-[10px] tracking-widest">{job.category}</Badge>
+                <h3 className="font-bold text-lg mb-4">{job.title}</h3>
+                <DelegatedTasksList job={job} user={user} />
+              </Card>
+            ))}
+             {myJobs.length === 0 && !loading && (
+               <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+                 <p className="text-sm text-muted-foreground italic">No active projects available for team assignment.</p>
+               </div>
+             )}
+          </div>
+       </div>
+       <div className="space-y-6">
+          <Card className="border-border shadow-sm bg-white rounded-3xl overflow-hidden">
+            <CardHeader className="bg-primary/5 p-6 border-b border-border">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest">Available Professionals</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="space-y-4">
+                {pros.map(pro => (
+                  <div key={pro.uid} className="flex items-center justify-between p-3 rounded-2xl border border-border hover:bg-secondary/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{pro.displayName[0]}</div>
+                      <div>
+                        <p className="text-xs font-bold">{pro.displayName}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-medium">{pro.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-yellow-500 font-bold text-xs">
+                      <Star size={12} fill="currentColor" /> {Number(pro.averageRating || 5.0).toFixed(1)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+       </div>
+    </div>
+  );
+}
+
+function CoordinationDashboard({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([]);
+  const [professionals, setProfessionals] = useState<UserProfile[]>([]);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), where('role', 'in', ['architect', 'freelancer', 'bep']));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setProfessionals(snapshot.docs.map((document) => ({ uid: document.id, ...document.data() } as UserProfile)));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  useEffect(() => {
+    if (!project?.id) {
+      setTeamMembers([]);
+      return;
+    }
+    return subscribeToTeam(project.id, setTeamMembers);
+  }, [project?.id]);
+
+  if (myJobs.length === 0 || !selectedJob) {
+    return (
+      <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+        <p className="text-muted-foreground italic">No active projects available for coordination.</p>
+      </div>
+    );
+  }
+
+  const coverageProject = project ? { ...project, category: selectedJob.category, teamMembers } : null;
+  const coverage = coverageProject ? getDisciplineCoverage(coverageProject) : { filled: [], missing: DISCIPLINE_REGISTRY.filter((discipline) => discipline.requiredFor.includes(selectedJob.category)).map((discipline) => discipline.key) };
+  const labelFor = (key: string) => DISCIPLINE_REGISTRY.find((discipline) => discipline.key === key)?.label || key;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><Users className="text-primary" /> Coordination</h2>
+          <p className="text-sm text-muted-foreground">Manage discipline coverage, responsibility, and project team invitations.</p>
         </div>
-      ) : (
-        <div className="p-6 text-center border border-dashed border-border rounded-2xl bg-secondary/5">
-          <p className="text-xs text-muted-foreground italic">No tasks delegated yet.</p>
-        </div>
+        <select
+          value={selectedJob.id}
+          onChange={(event) => setSelectedJobId(event.target.value)}
+          className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none"
+          aria-label="Select project for coordination"
+        >
+          {myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="rounded-3xl bg-white border-border shadow-sm">
+          <CardContent className="p-6">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Filled disciplines</p>
+            <p className="text-4xl font-heading font-black text-primary mt-2">{coverage.filled.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-3xl bg-white border-border shadow-sm">
+          <CardContent className="p-6">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Missing disciplines</p>
+            <p className="text-4xl font-heading font-black text-destructive mt-2">{coverage.missing.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-3xl bg-white border-border shadow-sm md:col-span-1">
+          <CardContent className="p-6">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-3">Outstanding</p>
+            <div className="flex flex-wrap gap-2">
+              {coverage.missing.map((discipline) => <Badge key={discipline} variant="outline" className="border-dashed">{labelFor(discipline)}</Badge>)}
+              {coverage.missing.length === 0 && <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Complete</Badge>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {!project && (
+        <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900">
+          <CardContent className="p-6">
+            <p className="font-bold">Project lifecycle record not found.</p>
+            <p className="text-sm">Coordination tools become active once this job has an associated project record.</p>
+          </CardContent>
+        </Card>
       )}
+
+      <ResponsibilityMatrix job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
+      <TeamBuilder job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />
+    </div>
+  );
+}
+
+function ConstructionDashboard({ user, myJobs }: { user: UserProfile; myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const [teamMembers, setTeamMembers] = useState<ProjectTeamMember[]>([]);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  useEffect(() => {
+    if (!project?.id) {
+      setTeamMembers([]);
+      return;
+    }
+    return subscribeToTeam(project.id, setTeamMembers);
+  }, [project?.id]);
+
+  if (myJobs.length === 0 || !selectedJob) {
+    return (
+      <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50">
+        <p className="text-muted-foreground italic">No active projects available for construction delivery.</p>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900">
+        <CardContent className="p-8">
+          <h2 className="font-heading text-2xl font-bold mb-2">Construction tools unavailable</h2>
+          <p className="text-sm">This job does not yet have a lifecycle project record. Construction delivery activates once the project record exists.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><HardHat className="text-primary" /> Construction Delivery</h2>
+          <p className="text-sm text-muted-foreground">Programme, site records, RFIs, and inspection summary for {selectedJob.title}.</p>
+        </div>
+        <select value={selectedJob.id} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none" aria-label="Select construction project">
+          {myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
+        </select>
+      </div>
+      <GanttChart projectId={project.id} teamMembers={teamMembers} />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <SiteLogManager projectId={project.id} jobId={selectedJob.id} currentUserId={user.uid} compact />
+        <RFIManager projectId={project.id} jobId={selectedJob.id} currentUser={user} teamMembers={teamMembers} compact />
+      </div>
+      <Card className="rounded-3xl border-border bg-white shadow-sm">
+        <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-2xl bg-primary/10 text-primary"><ClipboardCheck /></div>
+            <div>
+              <h3 className="font-heading text-xl font-bold">Site Inspections</h3>
+              <p className="text-sm text-muted-foreground">Inspection data model and Firestore service are available. Dedicated checklist UI is reserved for a later requested component scope.</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="rounded-full px-4 py-2">Phase 4 summary</Badge>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CloseoutDashboard({ myJobs }: { myJobs: Job[] }) {
+  const [selectedJobId, setSelectedJobId] = useState(myJobs[0]?.id || '');
+  const [project, setProject] = useState<Project | null>(null);
+  const selectedJob = myJobs.find((job) => job.id === selectedJobId) || myJobs[0];
+
+  useEffect(() => {
+    if (!selectedJobId && myJobs[0]?.id) setSelectedJobId(myJobs[0].id);
+  }, [myJobs, selectedJobId]);
+
+  useEffect(() => {
+    if (!selectedJob?.id) {
+      setProject(null);
+      return;
+    }
+    return subscribeToProjectByJobId(selectedJob.id, setProject);
+  }, [selectedJob?.id]);
+
+  if (myJobs.length === 0 || !selectedJob) {
+    return <div className="py-20 text-center border-2 border-dashed border-border rounded-3xl bg-white/50"><p className="text-muted-foreground italic">No projects available for close-out.</p></div>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-heading font-bold flex items-center gap-2"><CheckCircle2 className="text-primary" /> Project Close-out</h2>
+          <p className="text-sm text-muted-foreground">Generate completion artifacts and archive lifecycle records.</p>
+        </div>
+        <select value={selectedJob.id} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 rounded-xl border border-border bg-white px-4 text-sm font-bold outline-none" aria-label="Select close-out project">
+          {myJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
+        </select>
+      </div>
+      {project ? <CloseoutWizard projectId={project.id} /> : <Card className="rounded-3xl border-amber-200 bg-amber-50 text-amber-900"><CardContent className="p-8">Project lifecycle record not found.</CardContent></Card>}
+    </div>
+  );
+}
+
+function StatPill({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number }) {
+  return (
+    <div className="bg-secondary/50 border border-border px-4 py-2 rounded-full flex items-center gap-2">
+      {icon}
+      <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">{label}:</span>
+      <span className="text-xs font-bold">{value}</span>
+    </div>
+  );
+}
+
+function JobCardUI({ job, user }: { job: Job, user: UserProfile }) {
+  const [isApplying, setIsApplying] = useState(false);
+  const [proposal, setProposal] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleApply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be logged in to apply');
+
+      const response = await apiFetch(`/api/jobs/${job.id}/applications`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ proposal, notes }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to submit application');
+      }
+
+      setIsApplying(false);
+      setProposal('');
+      setNotes('');
+      toast.success('Application submitted');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit application');
+    }
+  };
+
+  return (
+    <Card className="beos-record-card p-8 flex flex-col group">
+       <div className="flex justify-between items-start mb-4">
+          <Badge className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest">{job.category}</Badge>
+          <span className="text-sm font-bold text-primary font-mono">R {job.budget.toLocaleString()}</span>
+       </div>
+       <h3 className="font-heading font-bold text-xl mb-3 group-hover:text-primary transition-colors">{job.title}</h3>
+       <p className="text-xs text-muted-foreground line-clamp-3 mb-6 leading-relaxed">{job.description}</p>
+       <div className="mt-auto flex items-center justify-between pt-4 border-t border-border/50">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1"><MapPin size={12} /> {job.location || 'RSA'}</span>
+           <Dialog open={isApplying} onOpenChange={setIsApplying}>
+             <DialogTrigger render={<Button size="sm" className="rounded-full px-6 font-bold uppercase text-[10px] tracking-widest">Apply</Button>} />
+             <DialogContent className="sm:max-w-lg rounded-3xl">
+               <DialogHeader><DialogTitle>Apply for {job.title}</DialogTitle></DialogHeader>
+               <form onSubmit={handleApply} className="space-y-4">
+                 <Textarea placeholder="Proposal" value={proposal} onChange={e => setProposal(e.target.value)} required />
+                 <Textarea placeholder="Private notes/comments" value={notes} onChange={e => setNotes(e.target.value)} />
+                 <Button type="submit" className="w-full">Submit application</Button>
+               </form>
+             </DialogContent>
+           </Dialog>
+        </div>
+     </Card>
+  );
+}
+
+function ApplicationCard({ application }: { application: Application }) {
+  const [localNotes, setLocalNotes] = useState(application.notes || '');
+
+  const handleWithdraw = async () => {
+    try {
+      await updateDoc(doc(db, `jobs/${application.jobId}/applications`, application.id), {
+        status: 'withdrawn',
+        withdrawnAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('Application withdrawn');
+    } catch {
+      toast.error('Failed to withdraw application');
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      await updateDoc(doc(db, `jobs/${application.jobId}/applications`, application.id), {
+        notes: localNotes,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('Application notes saved');
+    } catch {
+      toast.error('Failed to save notes');
+    }
+  };
+
+  return (
+    <Card className="beos-record-card p-6 space-y-4">
+      <div className="flex justify-between gap-4">
+        <div>
+          <h3 className="font-bold">Application</h3>
+          <p className="text-xs text-muted-foreground">Submitted {new Date(application.createdAt).toLocaleDateString()}</p>
+        </div>
+        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{application.status}</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground line-clamp-3">{application.proposal}</p>
+      <Textarea value={localNotes} onChange={e => setLocalNotes(e.target.value)} placeholder="Add notes/comments" />
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={handleSaveNotes}>Save Notes</Button>
+        {application.status === 'pending' && <Button size="sm" variant="destructive" onClick={handleWithdraw}>Withdraw</Button>}
+      </div>
+    </Card>
+  );
+}
+
+function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
+      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+      <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
+      <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
     </div>
   );
 }

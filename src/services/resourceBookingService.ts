@@ -1,0 +1,398 @@
+export type ResourceBookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+
+export interface ResourceBookingWindow {
+  id: string;
+  resourceId: string;
+  startsAt: string;
+  endsAt: string;
+  status: ResourceBookingStatus;
+}
+
+export interface ResourceBookingRequest {
+  resourceId: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface ResourceBookingConflict {
+  bookingId: string;
+  resourceId: string;
+  startsAt: string;
+  endsAt: string;
+  status: ResourceBookingStatus;
+}
+
+export interface ResourceBookingConflictAudit {
+  request: ResourceBookingRequest;
+  conflicts: ResourceBookingConflict[];
+  canConfirm: boolean;
+  checkedAt: string;
+  reason: 'no_conflict' | 'active_booking_overlap';
+}
+
+export interface ResourceUsageLogInput {
+  bookingId: string;
+  resourceId: string;
+  userId: string;
+  startedAt: string;
+  endedAt: string;
+  meteredUnits?: number;
+  notes?: string;
+}
+
+export interface ResourceUsageBillingPolicy {
+  billingMode: 'hourly' | 'metered_unit';
+  hourlyRateCents?: number;
+  meteredUnitRateCents?: number;
+  minimumBillableMinutes?: number;
+  platformFeeBps: number;
+  currency: string;
+}
+
+export interface ResourceUsageBillingResult {
+  bookingId: string;
+  resourceId: string;
+  userId: string;
+  billableMinutes: number;
+  meteredUnits: number;
+  grossAmountCents: number;
+  platformFeeCents: number;
+  ownerPayoutCents: number;
+  currency: string;
+  formula: string;
+}
+
+export interface ResourceUsageLedgerEntry extends ResourceUsageBillingResult {
+  usageLogId: string;
+  occurredAt: string;
+  notes?: string;
+}
+
+export interface ResourcePayoutRecordInput {
+  resourceId: string;
+  ownerId: string;
+  usageBillingResults: ResourceUsageBillingResult[];
+  payoutBatchId: string;
+  createdAt: string;
+}
+
+export interface ResourcePayoutRecord {
+  resourceId: string;
+  ownerId: string;
+  payoutBatchId: string;
+  usageBookingIds: string[];
+  grossAmountCents: number;
+  platformFeeCents: number;
+  ownerPayoutCents: number;
+  currency: string;
+  status: 'pending';
+  createdAt: string;
+  idempotencyKey: string;
+}
+
+export interface ResourceBookingGovernanceInput {
+  request: ResourceBookingRequest;
+  existingBookings: ResourceBookingWindow[];
+  requestedBy: string;
+  ownerId: string;
+  approvedBy?: string;
+  cancellationReason?: string;
+  checkedAt: string;
+}
+
+export interface ResourceBookingGovernanceDecision {
+  status: 'ready_for_owner_approval' | 'approved' | 'blocked_conflict' | 'cancelled';
+  blockers: string[];
+  warnings: string[];
+  humanApprovalRequired: true;
+  autoConfirmProhibited: true;
+  audit: ResourceBookingConflictAudit & { requestedBy: string; ownerId: string; approvedBy?: string; cancellationReason?: string };
+}
+
+export interface ResourcePayoutReadiness {
+  ready: boolean;
+  blockers: string[];
+  warnings: string[];
+  grossAmountCents: number;
+  ownerPayoutCents: number;
+  humanApprovalRequired: true;
+  autoPayoutProhibited: true;
+}
+
+const ACTIVE_BOOKING_STATUSES = new Set<ResourceBookingStatus>(['pending', 'confirmed']);
+
+const toMillis = (value: string, fieldName: string): number => {
+  const millis = Date.parse(value);
+  if (Number.isNaN(millis)) {
+    throw new Error(`${fieldName} must be a valid ISO date string.`);
+  }
+  return millis;
+};
+
+export const assertValidResourceBookingWindow = (window: Pick<ResourceBookingWindow, 'startsAt' | 'endsAt'>): void => {
+  const startsAt = toMillis(window.startsAt, 'startsAt');
+  const endsAt = toMillis(window.endsAt, 'endsAt');
+
+  if (endsAt <= startsAt) {
+    throw new Error('Resource booking end time must be after start time.');
+  }
+};
+
+export const resourceBookingWindowsOverlap = (
+  first: Pick<ResourceBookingWindow, 'startsAt' | 'endsAt'>,
+  second: Pick<ResourceBookingWindow, 'startsAt' | 'endsAt'>
+): boolean => {
+  assertValidResourceBookingWindow(first);
+  assertValidResourceBookingWindow(second);
+
+  return toMillis(first.startsAt, 'startsAt') < toMillis(second.endsAt, 'endsAt')
+    && toMillis(second.startsAt, 'startsAt') < toMillis(first.endsAt, 'endsAt');
+};
+
+export const findResourceBookingConflicts = (
+  request: ResourceBookingRequest,
+  existingBookings: ResourceBookingWindow[]
+): ResourceBookingConflict[] => {
+  assertValidResourceBookingWindow(request);
+
+  return existingBookings
+    .filter((booking) => booking.resourceId === request.resourceId)
+    .filter((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status))
+    .filter((booking) => resourceBookingWindowsOverlap(request, booking))
+    .map((booking) => ({
+      bookingId: booking.id,
+      resourceId: booking.resourceId,
+      startsAt: booking.startsAt,
+      endsAt: booking.endsAt,
+      status: booking.status,
+    }));
+};
+
+export const canConfirmResourceBooking = (
+  request: ResourceBookingRequest,
+  existingBookings: ResourceBookingWindow[]
+): { canConfirm: true; conflicts: [] } | { canConfirm: false; conflicts: ResourceBookingConflict[] } => {
+  const conflicts = findResourceBookingConflicts(request, existingBookings);
+
+  if (conflicts.length > 0) {
+    return { canConfirm: false, conflicts };
+  }
+
+  return { canConfirm: true, conflicts: [] };
+};
+
+export const buildResourceBookingConflictAudit = (
+  request: ResourceBookingRequest,
+  existingBookings: ResourceBookingWindow[],
+  checkedAt: string
+): ResourceBookingConflictAudit => {
+  const conflicts = findResourceBookingConflicts(request, existingBookings);
+
+  return {
+    request,
+    conflicts,
+    canConfirm: conflicts.length === 0,
+    checkedAt,
+    reason: conflicts.length === 0 ? 'no_conflict' : 'active_booking_overlap',
+  };
+};
+
+export const evaluateResourceBookingGovernance = ({
+  request,
+  existingBookings,
+  requestedBy,
+  ownerId,
+  approvedBy,
+  cancellationReason,
+  checkedAt,
+}: ResourceBookingGovernanceInput): ResourceBookingGovernanceDecision => {
+  if (!requestedBy.trim()) throw new Error('requestedBy is required.');
+  if (!ownerId.trim()) throw new Error('ownerId is required.');
+  const audit = buildResourceBookingConflictAudit(request, existingBookings, checkedAt);
+  const blockers = audit.conflicts.map((conflict) => `Booking ${conflict.bookingId} overlaps this request.`);
+  const warnings: string[] = [];
+
+  if (requestedBy === ownerId) warnings.push('Owner-created bookings still require an auditable approval decision before confirmation.');
+  if (cancellationReason?.trim()) {
+    return {
+      status: 'cancelled',
+      blockers: [],
+      warnings,
+      humanApprovalRequired: true,
+      autoConfirmProhibited: true,
+      audit: { ...audit, requestedBy, ownerId, approvedBy, cancellationReason: cancellationReason.trim() },
+    };
+  }
+
+  return {
+    status: blockers.length > 0 ? 'blocked_conflict' : approvedBy?.trim() ? 'approved' : 'ready_for_owner_approval',
+    blockers,
+    warnings,
+    humanApprovalRequired: true,
+    autoConfirmProhibited: true,
+    audit: { ...audit, requestedBy, ownerId, approvedBy },
+  };
+};
+
+export const calculateResourceUsageBilling = (
+  usage: ResourceUsageLogInput,
+  policy: ResourceUsageBillingPolicy
+): ResourceUsageBillingResult => {
+  assertValidResourceBookingWindow({ startsAt: usage.startedAt, endsAt: usage.endedAt });
+
+  if (policy.platformFeeBps < 0 || policy.platformFeeBps > 10_000) {
+    throw new Error('platformFeeBps must be between 0 and 10000.');
+  }
+
+  const elapsedMinutes = Math.ceil((toMillis(usage.endedAt, 'endedAt') - toMillis(usage.startedAt, 'startedAt')) / 60_000);
+  const billableMinutes = Math.max(elapsedMinutes, policy.minimumBillableMinutes ?? 0);
+  const meteredUnits = usage.meteredUnits ?? 0;
+
+  if (meteredUnits < 0) {
+    throw new Error('meteredUnits cannot be negative.');
+  }
+
+  let grossAmountCents: number;
+  let formula: string;
+
+  if (policy.billingMode === 'hourly') {
+    if (policy.hourlyRateCents === undefined || policy.hourlyRateCents < 0) {
+      throw new Error('hourlyRateCents must be provided and non-negative for hourly billing.');
+    }
+    grossAmountCents = Math.ceil((billableMinutes / 60) * policy.hourlyRateCents);
+    formula = `ceil((${billableMinutes} / 60) * ${policy.hourlyRateCents})`;
+  } else {
+    if (policy.meteredUnitRateCents === undefined || policy.meteredUnitRateCents < 0) {
+      throw new Error('meteredUnitRateCents must be provided and non-negative for metered billing.');
+    }
+    grossAmountCents = Math.ceil(meteredUnits * policy.meteredUnitRateCents);
+    formula = `ceil(${meteredUnits} * ${policy.meteredUnitRateCents})`;
+  }
+
+  const platformFeeCents = Math.ceil((grossAmountCents * policy.platformFeeBps) / 10_000);
+  const ownerPayoutCents = grossAmountCents - platformFeeCents;
+
+  return {
+    bookingId: usage.bookingId,
+    resourceId: usage.resourceId,
+    userId: usage.userId,
+    billableMinutes,
+    meteredUnits,
+    grossAmountCents,
+    platformFeeCents,
+    ownerPayoutCents,
+    currency: policy.currency,
+    formula: `${formula}; platformFee=ceil(${grossAmountCents} * ${policy.platformFeeBps} / 10000); ownerPayout=${grossAmountCents}-${platformFeeCents}`,
+  };
+};
+
+export const buildResourceUsageLedgerEntry = (
+  usageLogId: string,
+  usage: ResourceUsageLogInput,
+  policy: ResourceUsageBillingPolicy,
+  occurredAt: string
+): ResourceUsageLedgerEntry => {
+  if (!usageLogId.trim()) {
+    throw new Error('usageLogId is required to build a resource usage ledger entry.');
+  }
+
+  return {
+    ...calculateResourceUsageBilling(usage, policy),
+    usageLogId,
+    occurredAt,
+    notes: usage.notes,
+  };
+};
+
+export const assertResourceUsageMatchesBooking = (
+  usage: ResourceUsageLogInput,
+  booking: ResourceBookingWindow
+): void => {
+  if (usage.bookingId !== booking.id || usage.resourceId !== booking.resourceId) {
+    throw new Error('Resource usage must reference the same booking and resource.');
+  }
+
+  if (booking.status !== 'confirmed' && booking.status !== 'completed') {
+    throw new Error('Resource usage can only be logged against confirmed or completed bookings.');
+  }
+
+  assertValidResourceBookingWindow({ startsAt: usage.startedAt, endsAt: usage.endedAt });
+
+  const usageStartedAt = toMillis(usage.startedAt, 'startedAt');
+  const usageEndedAt = toMillis(usage.endedAt, 'endedAt');
+  const bookingStartsAt = toMillis(booking.startsAt, 'booking.startsAt');
+  const bookingEndsAt = toMillis(booking.endsAt, 'booking.endsAt');
+
+  if (usageStartedAt < bookingStartsAt || usageEndedAt > bookingEndsAt) {
+    throw new Error('Resource usage must fall within the booked time window.');
+  }
+};
+
+const buildPayoutIdempotencyKey = (resourceId: string, ownerId: string, payoutBatchId: string, bookingIds: string[]): string => (
+  [resourceId, ownerId, payoutBatchId, [...bookingIds].sort().join(',')].join('|')
+);
+
+export const buildResourcePayoutRecord = ({
+  resourceId,
+  ownerId,
+  usageBillingResults,
+  payoutBatchId,
+  createdAt,
+}: ResourcePayoutRecordInput): ResourcePayoutRecord => {
+  if (usageBillingResults.length === 0) {
+    throw new Error('At least one usage billing result is required to build a resource payout.');
+  }
+
+  const currencies = new Set(usageBillingResults.map((result) => result.currency));
+  if (currencies.size !== 1) {
+    throw new Error('Resource payout cannot combine multiple currencies.');
+  }
+
+  const mismatchedResource = usageBillingResults.find((result) => result.resourceId !== resourceId);
+  if (mismatchedResource) {
+    throw new Error('Resource payout cannot include usage from another resource.');
+  }
+
+  return {
+    resourceId,
+    ownerId,
+    payoutBatchId,
+    usageBookingIds: usageBillingResults.map((result) => result.bookingId),
+    grossAmountCents: usageBillingResults.reduce((sum, result) => sum + result.grossAmountCents, 0),
+    platformFeeCents: usageBillingResults.reduce((sum, result) => sum + result.platformFeeCents, 0),
+    ownerPayoutCents: usageBillingResults.reduce((sum, result) => sum + result.ownerPayoutCents, 0),
+    currency: usageBillingResults[0].currency,
+    status: 'pending',
+    createdAt,
+    idempotencyKey: buildPayoutIdempotencyKey(
+      resourceId,
+      ownerId,
+      payoutBatchId,
+      usageBillingResults.map((result) => result.bookingId)
+    ),
+  };
+};
+
+export const evaluateResourcePayoutReadiness = (
+  payout: Pick<ResourcePayoutRecord, 'usageBookingIds' | 'grossAmountCents' | 'ownerPayoutCents' | 'platformFeeCents' | 'currency'>,
+  options: { ownerBankVerified?: boolean; minimumPayoutCents?: number; heldBookingIds?: string[] } = {}
+): ResourcePayoutReadiness => {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  if (payout.usageBookingIds.length === 0) blockers.push('No usage bookings are linked to this payout.');
+  if (payout.grossAmountCents <= 0 || payout.ownerPayoutCents <= 0) blockers.push('Payout amounts must be positive.');
+  if (!options.ownerBankVerified) blockers.push('Owner bank details must be verified before payout.');
+  const heldBookingIds = options.heldBookingIds ?? [];
+  if (heldBookingIds.length > 0) blockers.push(`Bookings on hold: ${heldBookingIds.join(', ')}.`);
+  const minimum = options.minimumPayoutCents ?? 0;
+  if (minimum > 0 && payout.ownerPayoutCents < minimum) warnings.push(`Owner payout is below the preferred minimum of ${minimum} ${payout.currency} cents.`);
+  return {
+    ready: blockers.length === 0,
+    blockers,
+    warnings,
+    grossAmountCents: payout.grossAmountCents,
+    ownerPayoutCents: payout.ownerPayoutCents,
+    humanApprovalRequired: true,
+    autoPayoutProhibited: true,
+  };
+};

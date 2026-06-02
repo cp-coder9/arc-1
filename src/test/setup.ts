@@ -1,54 +1,60 @@
 import '@testing-library/jest-dom';
+import { jest } from '@jest/globals';
+
+Object.defineProperty(globalThis, 'jest', {
+  configurable: true,
+  value: jest,
+});
 
 // Mock Firebase with full implementation
 const mockDb = {
-  collection: jest.fn(() => ({
-    doc: jest.fn(() => mockDb),
-    add: jest.fn(),
-    where: jest.fn(() => mockDb),
-    orderBy: jest.fn(() => mockDb),
-    get: jest.fn(),
-    onSnapshot: jest.fn(),
+  collection: jest.fn<any>(() => ({
+    doc: jest.fn<any>(() => mockDb),
+    add: jest.fn<any>(),
+    where: jest.fn<any>(() => mockDb),
+    orderBy: jest.fn<any>(() => mockDb),
+    get: jest.fn<any>(),
+    onSnapshot: jest.fn<any>(),
   })),
-  doc: jest.fn(() => ({
-    get: jest.fn(),
-    set: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+  doc: jest.fn<any>(() => ({
+    get: jest.fn<any>(),
+    set: jest.fn<any>(),
+    update: jest.fn<any>(),
+    delete: jest.fn<any>(),
   })),
-  getDoc: jest.fn(),
-  setDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  addDoc: jest.fn(),
-  deleteDoc: jest.fn(),
-  query: jest.fn(),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  onSnapshot: jest.fn(),
-  writeBatch: jest.fn(() => ({
-    set: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    commit: jest.fn(),
+  getDoc: jest.fn<any>(),
+  setDoc: jest.fn<any>(),
+  updateDoc: jest.fn<any>(),
+  addDoc: jest.fn<any>(),
+  deleteDoc: jest.fn<any>(),
+  query: jest.fn<any>(),
+  where: jest.fn<any>(),
+  orderBy: jest.fn<any>(),
+  onSnapshot: jest.fn<any>(),
+  writeBatch: jest.fn<any>(() => ({
+    set: jest.fn<any>(),
+    update: jest.fn<any>(),
+    delete: jest.fn<any>(),
+    commit: jest.fn<any>(),
   })),
 };
 
 const mockAuth = {
   currentUser: { uid: 'test-user-id', email: 'test@example.com' },
-  onAuthStateChanged: jest.fn((callback) => {
+  onAuthStateChanged: jest.fn<any>((callback: any) => {
     callback(mockAuth.currentUser);
     return jest.fn();
   }),
-  signInWithEmailAndPassword: jest.fn(),
-  createUserWithEmailAndPassword: jest.fn(),
-  signOut: jest.fn(),
-  GoogleAuthProvider: jest.fn(),
+  signInWithEmailAndPassword: jest.fn<any>(),
+  createUserWithEmailAndPassword: jest.fn<any>(),
+  signOut: jest.fn<any>(),
+  GoogleAuthProvider: jest.fn<any>(),
 };
 
-jest.mock('../lib/firebase', () => ({
+jest.mock('@/lib/firebase', () => ({
   db: mockDb,
   auth: mockAuth,
-  handleFirestoreError: jest.fn(),
+  handleFirestoreError: jest.fn<any>(),
   OperationType: {
     CREATE: 'CREATE',
     READ: 'READ',
@@ -61,11 +67,11 @@ jest.mock('../lib/firebase', () => ({
 
 // Mock Vercel Blob
 jest.mock('@vercel/blob', () => ({
-  put: jest.fn().mockResolvedValue({
+  put: jest.fn<any>().mockResolvedValue({
     url: 'https://mock.blob.url/test.pdf',
     downloadUrl: 'https://mock.blob.url/test.pdf?download=1',
   }),
-  del: jest.fn().mockResolvedValue(undefined),
+  del: jest.fn<any>().mockResolvedValue(undefined),
 }));
 
 // Mock environment variables
@@ -78,45 +84,52 @@ globalThis.process = {
     VITE_FIREBASE_PROJECT_ID: 'test-project',
     VITE_BLOB_READ_WRITE_TOKEN: 'test-token',
     GEMINI_API_KEY: 'test-gemini-key',
+    VITE_PAYFAST_MERCHANT_ID: '10000100',
+    VITE_PAYFAST_MERCHANT_KEY: '46f0cd694581a',
   },
 };
 
 // Mock window.crypto for MD5 hashing
-(globalThis as any).crypto = {
-  ...(globalThis as any).crypto,
-  subtle: {
-    digest: jest.fn().mockResolvedValue(new ArrayBuffer(16)),
+Object.defineProperty(globalThis, 'crypto', {
+  configurable: true,
+  value: {
+    ...(globalThis as any).crypto,
+    subtle: {
+      digest: jest.fn<any>().mockResolvedValue(new ArrayBuffer(16)),
+    },
   },
-};
+});
 
 // Mock ResizeObserver
-global.ResizeObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
+(global as any).ResizeObserver = jest.fn<any>().mockImplementation(() => ({
+  observe: jest.fn<any>(),
+  unobserve: jest.fn<any>(),
+  disconnect: jest.fn<any>(),
 }));
 
 // Mock IntersectionObserver
-global.IntersectionObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
+(global as any).IntersectionObserver = jest.fn<any>().mockImplementation(() => ({
+  observe: jest.fn<any>(),
+  unobserve: jest.fn<any>(),
+  disconnect: jest.fn<any>(),
 }));
 
-// Mock matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-});
+// Mock matchMedia when a browser-like environment is available.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn<any>().mockImplementation(query => ({
+      matches: false,
+      media: query as any,
+      onchange: null,
+      addListener: jest.fn<any>(),
+      removeListener: jest.fn<any>(),
+      addEventListener: jest.fn<any>(),
+      removeEventListener: jest.fn<any>(),
+      dispatchEvent: jest.fn<any>(),
+    })),
+  });
+}
 
 // Suppress console errors during tests
 const originalConsoleError = console.error;

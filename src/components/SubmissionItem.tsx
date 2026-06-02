@@ -1,17 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Submission } from '../types';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
-import { FileUp, CheckCircle2, AlertCircle, Loader2, Shield, Clock, Sparkles, ShieldCheck, ExternalLink, ArrowRight, History, User, Cpu } from 'lucide-react';
-import { format } from 'date-fns';
+import { FileUp, CheckCircle2, AlertCircle, Loader2, Shield, Clock, Sparkles, ShieldCheck, ExternalLink, ArrowRight, History, User, Cpu, TrendingUp } from 'lucide-react';
+import { safeFormat } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { KnowledgeFeedback } from './KnowledgeFeedback';
+import { pdfGenerationService } from '@/services/pdfGenerationService';
+import { toast } from 'sonner';
+import { Button } from './ui/button';
+import { Download } from 'lucide-react';
+
+import { UserRole } from '../types';
 
 interface SubmissionItemProps {
   sub: Submission;
-  userRole?: 'admin' | 'architect' | 'client';
+  userRole?: 'admin' | 'architect' | 'client' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
   [key: string]: any;
 }
+
+// Plain language mappings for technical terms
+const plainLanguageMap: Record<string, string> = {
+  'wall': 'Wall Thickness & Materials',
+  'fenestration': 'Windows & Natural Light',
+  'door': 'Doors & Fire Safety',
+  'area': 'Room Sizes & Space Requirements',
+  'general': 'General Compliance',
+  'sans': 'SANS 10400 Standards',
+  'dpc': 'moisture barrier',
+  'cavity': 'wall insulation',
+  'thickness': 'thickness',
+  'ventilation': 'air flow',
+  'glazing': 'window glass',
+};
+
+const getPlainLanguageCategory = (categoryName: string): string => {
+  const lower = categoryName.toLowerCase();
+  for (const [key, value] of Object.entries(plainLanguageMap)) {
+    if (lower.includes(key)) return value;
+  }
+  return categoryName;
+};
 
 const getAgentRoleForCategory = (categoryName: string) => {
   const lower = categoryName.toLowerCase();
@@ -24,8 +53,65 @@ const getAgentRoleForCategory = (categoryName: string) => {
   return 'orchestrator';
 };
 
+// Helper to calculate compliance summary
+const calculateComplianceSummary = (feedback?: string, categories?: any[]) => {
+  if (!categories || categories.length === 0) {
+    return { totalIssues: 0, criticalCount: 0, warningCount: 0, infoCount: 0, compliancePercentage: 0 };
+  }
+
+  let criticalCount = 0;
+  let warningCount = 0;
+  let infoCount = 0;
+  let totalIssues = 0;
+
+  categories.forEach(cat => {
+    if (cat.issues && Array.isArray(cat.issues)) {
+      cat.issues.forEach(issue => {
+        totalIssues++;
+        if (issue.severity === 'high') criticalCount++;
+        else if (issue.severity === 'medium') warningCount++;
+        else infoCount++;
+      });
+    }
+  });
+
+  const compliancePercentage = totalIssues > 0 ? Math.round(((totalIssues - criticalCount) / totalIssues) * 100) : 100;
+
+  return { totalIssues, criticalCount, warningCount, infoCount, compliancePercentage };
+};
+
 export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const handleDownloadCertificate = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // In case we want to use it outside the dialog trigger
+    
+    setIsGenerating(true);
+    try {
+      const { url, fileName } = await pdfGenerationService.generateComplianceCertificate(sub.id, sub.architectId);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Certificate downloaded successfully");
+    } catch (err) {
+      console.error("Certificate download error:", err);
+      toast.error("Failed to generate certificate");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  // Calculate compliance summary
+  const complianceSummary = useMemo(
+    () => calculateComplianceSummary(sub.aiFeedback, sub.aiStructuredFeedback),
+    [sub.aiFeedback, sub.aiStructuredFeedback]
+  );
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -51,7 +137,7 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-bold truncate max-w-[150px]">{sub.drawingName}</span>
-              <span className="text-[10px] text-muted-foreground">{format(new Date(sub.createdAt), 'MMM d, HH:mm')}</span>
+              <span className="text-[10px] text-muted-foreground">{safeFormat(sub.createdAt, 'MMM d, HH:mm')}</span>
             </div>
           </div>
           <Badge variant="outline" className={`px-3 py-0.5 rounded-full font-bold uppercase tracking-widest text-[10px] flex items-center gap-1 ${config.color}`}>
@@ -67,60 +153,188 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
               <div>
                 <DialogTitle className="font-heading font-bold text-3xl tracking-tighter">{sub.drawingName}</DialogTitle>
                 <DialogDescription className="text-muted-foreground mt-1 flex items-center gap-2">
-                  Submitted on {format(new Date(sub.createdAt), 'MMMM d, yyyy HH:mm')}
+                  Submitted on {safeFormat(sub.createdAt, 'MMMM d, yyyy HH:mm')}
                 </DialogDescription>
               </div>
-              <Badge className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs ${config.color}`}>
-                {config.label}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {sub.status === 'approved' && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleDownloadCertificate}
+                    disabled={isGenerating}
+                    className="h-8 rounded-full gap-1.5 border-primary/20 hover:bg-primary/5 text-primary text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    {isGenerating ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    Certificate
+                  </Button>
+                )}
+                <Badge className={`px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs ${config.color}`}>
+                  {config.label}
+                </Badge>
+              </div>
             </div>
           </DialogHeader>
         </div>
 
         <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 max-h-[70vh] overflow-y-auto">
           <div className="md:col-span-2 space-y-8">
+              {/* Compliance Summary Card */}
+              {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 && (
+                <section className="p-6 rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/2">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-xl bg-primary/10">
+                        <TrendingUp size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Compliance Summary</h4>
+                        <p className="text-2xl font-bold text-foreground mt-1">{complianceSummary.compliancePercentage}% Compliant</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-2 mb-4 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-500"
+                      style={{ width: `${complianceSummary.compliancePercentage}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-3 bg-white rounded-lg">
+                      <p className="text-lg font-bold text-red-600">{complianceSummary.criticalCount}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Critical</p>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg">
+                      <p className="text-lg font-bold text-yellow-600">{complianceSummary.warningCount}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Warnings</p>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg">
+                      <p className="text-lg font-bold text-blue-600">{complianceSummary.infoCount}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Info</p>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* AI Compliance Feedback Section */}
               <section className="space-y-4">
                 <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-2">
-                  <Sparkles size={14} className="text-primary" /> AI Compliance Feedback
+                  <Sparkles size={14} className="text-primary" /> Detailed Compliance Review
                 </h4>
                 {sub.aiStructuredFeedback && sub.aiStructuredFeedback.length > 0 ? (
                   <div className="space-y-6">
-                    {sub.aiStructuredFeedback.map((cat, i) => (
-                      <div key={i} className="space-y-3">
-                        <h5 className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-primary" /> {cat.name}
+                    {/* Critical Issues Section */}
+                    {complianceSummary.criticalCount > 0 && (
+                      <div className="space-y-3">
+                        <h5 className="text-[11px] font-bold text-red-700 uppercase tracking-widest flex items-center gap-2 px-4 py-2 bg-red-50 rounded-lg border border-red-100">
+                          <AlertCircle size={14} /> Critical Issues ({complianceSummary.criticalCount})
                         </h5>
-                        <div className="grid gap-3">
-                          {cat.issues.map((issue, j) => (
-                            <div key={j} className={`p-4 rounded-2xl border ${
-                              issue.severity === 'high' ? 'bg-red-50/50 border-red-100' :
-                              issue.severity === 'medium' ? 'bg-yellow-50/50 border-yellow-100' :
-                              'bg-blue-50/50 border-blue-100'
-                            }`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <p className="text-sm font-bold leading-tight">{issue.description}</p>
-                                <Badge variant="outline" className={`text-[8px] font-bold uppercase px-2 py-0 h-4 ${
-                                  issue.severity === 'high' ? 'border-red-200 text-red-700 bg-red-50' :
-                                  issue.severity === 'medium' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
-                                  'border-blue-200 text-blue-700 bg-blue-50'
-                                }`}>
-                                  {issue.severity}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-black/5">
-                                <div className="p-1 rounded-full bg-white shadow-sm">
-                                  <CheckCircle2 size={10} className="text-primary" />
+                        <div className="grid gap-4">
+                          {sub.aiStructuredFeedback.flatMap((cat, catIdx) => 
+                            cat.issues
+                              .filter(issue => issue.severity === 'high')
+                              .map((issue, issueIdx) => (
+                                <div key={`${catIdx}-${issueIdx}`} className="p-5 rounded-2xl border-2 border-red-200 bg-red-50/60 hover:bg-red-50 transition-colors">
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-bold text-foreground leading-snug">{issue.description}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-1">{getPlainLanguageCategory(cat.name)}</p>
+                                    </div>
+                                    <Badge className="bg-red-600 text-white text-[8px] font-bold uppercase px-2 py-1 flex-shrink-0">Critical</Badge>
+                                  </div>
+                                  <div className="pt-3 border-t border-red-100 space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <CheckCircle2 size={14} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">What to do:</p>
+                                        <p className="text-sm text-foreground mt-1">{issue.actionItem}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex items-center justify-between">
+                                    <p className="text-[9px] text-muted-foreground italic">Requires immediate attention</p>
+                                    <KnowledgeFeedback agentRole={getAgentRoleForCategory(cat.name)} categoryName={cat.name} issue={issue} userRole={userRole} />
+                                  </div>
                                 </div>
-                                <div className="flex-1 flex justify-between items-start gap-4">
-                                  <p className="text-[10px] font-bold text-muted-foreground"><span className="text-primary">ACTION:</span> {issue.actionItem}</p>
-                                  <KnowledgeFeedback agentRole={getAgentRoleForCategory(cat.name)} categoryName={cat.name} issue={issue} userRole={userRole} />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                              ))
+                          )}
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Warning Issues Section */}
+                    {complianceSummary.warningCount > 0 && (
+                      <div className="space-y-3">
+                        <h5 className="text-[11px] font-bold text-yellow-700 uppercase tracking-widest flex items-center gap-2 px-4 py-2 bg-yellow-50 rounded-lg border border-yellow-100">
+                          <AlertCircle size={14} /> Warnings ({complianceSummary.warningCount})
+                        </h5>
+                        <div className="grid gap-4">
+                          {sub.aiStructuredFeedback.flatMap((cat, catIdx) => 
+                            cat.issues
+                              .filter(issue => issue.severity === 'medium')
+                              .map((issue, issueIdx) => (
+                                <div key={`${catIdx}-${issueIdx}`} className="p-5 rounded-2xl border-2 border-yellow-200 bg-yellow-50/60 hover:bg-yellow-50 transition-colors">
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-bold text-foreground leading-snug">{issue.description}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-1">{getPlainLanguageCategory(cat.name)}</p>
+                                    </div>
+                                    <Badge className="bg-yellow-600 text-white text-[8px] font-bold uppercase px-2 py-1 flex-shrink-0">Warning</Badge>
+                                  </div>
+                                  <div className="pt-3 border-t border-yellow-100 space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <CheckCircle2 size={14} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">What to do:</p>
+                                        <p className="text-sm text-foreground mt-1">{issue.actionItem}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex items-center justify-between">
+                                    <p className="text-[9px] text-muted-foreground italic">Should be reviewed and addressed</p>
+                                    <KnowledgeFeedback agentRole={getAgentRoleForCategory(cat.name)} categoryName={cat.name} issue={issue} userRole={userRole} />
+                                  </div>
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Info Notes Section */}
+                    {complianceSummary.infoCount > 0 && (
+                      <div className="space-y-3">
+                        <h5 className="text-[11px] font-bold text-blue-700 uppercase tracking-widest flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">
+                          <Clock size={14} /> Notes & Observations ({complianceSummary.infoCount})
+                        </h5>
+                        <div className="grid gap-4">
+                          {sub.aiStructuredFeedback.flatMap((cat, catIdx) => 
+                            cat.issues
+                              .filter(issue => issue.severity === 'low')
+                              .map((issue, issueIdx) => (
+                                <div key={`${catIdx}-${issueIdx}`} className="p-5 rounded-2xl border-2 border-blue-200 bg-blue-50/60 hover:bg-blue-50 transition-colors">
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-bold text-foreground leading-snug">{issue.description}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-1">{getPlainLanguageCategory(cat.name)}</p>
+                                    </div>
+                                    <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 text-[8px] font-bold uppercase px-2 py-1 flex-shrink-0">Info</Badge>
+                                  </div>
+                                  <div className="pt-3 border-t border-blue-100 space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <CheckCircle2 size={14} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                                      <div className="flex-1">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Note:</p>
+                                        <p className="text-sm text-foreground mt-1">{issue.actionItem}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : sub.aiFeedback ? (
                   <div className="p-6 bg-secondary/30 rounded-2xl border border-border markdown-body text-sm leading-relaxed">
@@ -183,7 +397,7 @@ export function SubmissionItem({ sub, userRole, ...props }: SubmissionItemProps)
                   <div className="space-y-1">
                     <div className="flex justify-between items-center">
                       <p className="text-[10px] font-bold uppercase tracking-widest">{log.actor}</p>
-                      <p className="text-[9px] text-muted-foreground">{format(new Date(log.timestamp), 'HH:mm')}</p>
+                      <p className="text-[9px] text-muted-foreground">{safeFormat(log.timestamp, 'HH:mm')}</p>
                     </div>
                     <p className="text-xs font-bold text-foreground">{log.action}</p>
                     <p className="text-[10px] text-muted-foreground leading-tight">{log.details}</p>

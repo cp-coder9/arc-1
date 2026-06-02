@@ -1,4 +1,69 @@
-export type UserRole = 'client' | 'architect' | 'admin';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
+
+export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
+export type FirmMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';
+export type FirmSubscriptionStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'none';
+export type FirmInviteStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+
+export interface Firm {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  ownerId: string;
+  primaryContactEmail?: string;
+  billingEmail?: string;
+  subscriptionStatus: FirmSubscriptionStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FirmMember {
+  id: string;
+  firmId: string;
+  userId: string;
+  email: string;
+  displayName?: string;
+  role: FirmRole;
+  status: FirmMemberStatus;
+  invitedBy?: string;
+  invitedAt?: string;
+  acceptedAt?: string;
+  removedBy?: string;
+  removedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FirmInvite {
+  id: string;
+  firmId: string;
+  email: string;
+  invitedUid?: string;
+  role: FirmRole;
+  status: FirmInviteStatus;
+  invitedBy: string;
+  invitedAt: string;
+  acceptedBy?: string;
+  acceptedAt?: string;
+  revokedBy?: string;
+  revokedAt?: string;
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FirmAuditEvent {
+  id: string;
+  firmId: string;
+  actorId: string;
+  type: 'firm_created' | 'member_invited' | 'invite_accepted' | 'role_changed' | 'member_removed';
+  targetUserId?: string;
+  targetInviteId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
 
 export interface UserProfile {
   uid: string;
@@ -6,8 +71,25 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   bio?: string;
+  nhbrcNumber?: string;
+  cidbGrading?: string;
+  hasPIInsurance?: boolean;
+  tradeLicense?: string;
+  professionalLabels?: string[]; // e.g. ['Engineer', 'Builder', 'Construction Worker']
+  professionalLabel?: string;
+  region?: string;
+  averageRating?: number;
+  totalReviews?: number;
+  completedJobs?: number;
   createdAt: string;
   updatedAt?: string;
+  notificationPreferences?: NotificationPreferences;
+  primaryFirmId?: string;
+  firmMembershipIds?: string[];
+  firmRole?: FirmRole;
+  firmStatus?: FirmMemberStatus;
+  subscriptionStatus?: FirmSubscriptionStatus;
+  billingRole?: FirmRole | 'none';
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -23,20 +105,40 @@ export interface Job {
   category: JobCategory;
   location?: string;
   status: 'open' | 'in-progress' | 'completed' | 'cancelled';
+  selectedProfessionalId?: string;
+  selectedBepId?: string;
+  /** @deprecated Use selectedProfessionalId/selectedBepId for new writes. */
   selectedArchitectId?: string;
   createdAt: string;
+  updatedAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  statusHistory?: JobStatusHistory[];
+}
+
+export interface JobStatusHistory {
+  status: Job['status'];
+  timestamp: string;
+  actorId: string;
+  note?: string;
 }
 
 export interface Application {
   id: string;
   jobId: string;
+  professionalId?: string;
+  bepId?: string;
+  /** @deprecated Use professionalId/bepId for new writes. */
   architectId: string;
   architectName: string;
   proposal: string;
   portfolioUrl?: string;
   documents?: string[];
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   createdAt: string;
+  updatedAt?: string;
+  withdrawnAt?: string;
+  notes?: string;
   
   // Denormalized profile fields
   sacapNumber?: string;
@@ -53,7 +155,8 @@ export interface Review {
   toId: string;
   rating: number;
   comment: string;
-  type: 'client_to_architect' | 'architect_to_client';
+  status: 'pending_admin' | 'approved';
+  type: 'client_to_architect' | 'architect_to_client' | 'to_bep' | 'from_bep' | 'to_freelancer';
   createdAt: string;
 }
 
@@ -74,10 +177,146 @@ export interface TraceLog {
   details: string;
 }
 
+export type Discipline =
+  | 'architecture'
+  | 'structure'
+  | 'fire'
+  | 'accessibility'
+  | 'energy'
+  | 'drainage'
+  | 'electrical'
+  | 'mechanical'
+  | 'planning'
+  | 'documentation'
+  | 'environmental'
+  | 'nhbrc'
+  | 'coordination';
+
+export interface DisciplineInfo {
+  key: Discipline;
+  label: string;
+  sacapCategory: string;
+  requiredFor: JobCategory[];
+  icon: string;
+}
+
+export const DISCIPLINE_REGISTRY: DisciplineInfo[] = [
+  { key: 'architecture', label: 'Architecture', sacapCategory: 'Professional Architect', requiredFor: ['Residential', 'Commercial', 'Industrial'], icon: 'Building2' },
+  { key: 'structure', label: 'Structural Engineering', sacapCategory: 'Pr Eng (Structural)', requiredFor: ['Residential', 'Commercial', 'Industrial'], icon: 'Hammer' },
+  { key: 'fire', label: 'Fire Engineering', sacapCategory: 'Fire Consultant', requiredFor: ['Commercial', 'Industrial'], icon: 'Flame' },
+  { key: 'electrical', label: 'Electrical Engineering', sacapCategory: 'Pr Eng (Electrical)', requiredFor: ['Commercial', 'Industrial'], icon: 'Zap' },
+  { key: 'mechanical', label: 'Mechanical Engineering', sacapCategory: 'Pr Eng (Mechanical)', requiredFor: ['Commercial', 'Industrial'], icon: 'Cog' },
+  { key: 'energy', label: 'Energy Compliance', sacapCategory: 'Energy Consultant', requiredFor: ['Residential', 'Commercial'], icon: 'Sun' },
+  { key: 'drainage', label: 'Civil / Drainage', sacapCategory: 'Pr Eng (Civil)', requiredFor: ['Residential', 'Commercial'], icon: 'Droplets' },
+  { key: 'accessibility', label: 'Accessibility', sacapCategory: 'Accessibility Consultant', requiredFor: ['Commercial'], icon: 'Accessibility' },
+  { key: 'environmental', label: 'Environmental', sacapCategory: 'Environmental Consultant', requiredFor: ['Industrial'], icon: 'TreePine' },
+  { key: 'planning', label: 'Town Planning', sacapCategory: 'Town Planner', requiredFor: ['Residential', 'Commercial'], icon: 'Map' },
+  { key: 'nhbrc', label: 'NHBRC Enrolment', sacapCategory: 'NHBRC Registered Builder', requiredFor: ['Residential'], icon: 'ShieldCheck' },
+  { key: 'documentation', label: 'Documentation', sacapCategory: 'Draughtsperson', requiredFor: ['Residential', 'Commercial', 'Industrial'], icon: 'FileText' },
+  { key: 'coordination', label: 'Professional Coordination', sacapCategory: 'Lead Consultant', requiredFor: ['Commercial', 'Industrial'], icon: 'Users' },
+];
+
+export type StandardFamily =
+  | 'NBR'
+  | 'SANS10400'
+  | 'SANS10160'
+  | 'SANS10100'
+  | 'SANS10162'
+  | 'SANS10142'
+  | 'SANS10252'
+  | 'MunicipalBylaw'
+  | 'NHBRC'
+  | 'ProfessionalCoordination'
+  | 'Other';
+
+export type AutonomyLabel =
+  | 'autonomous_check'
+  | 'professional_review_required'
+  | 'competent_person_required'
+  | 'municipal_confirmation_required'
+  | 'insufficient_information';
+
+export type ResponsibleParty =
+  | 'architect'
+  | 'structural_engineer'
+  | 'civil_engineer'
+  | 'fire_engineer'
+  | 'electrical_engineer'
+  | 'mechanical_engineer'
+  | 'energy_professional'
+  | 'client'
+  | 'contractor'
+  | 'municipality'
+  | 'admin';
+
+export type RiskStatus =
+  | 'ready_for_admin_review'
+  | 'ready_for_professional_review'
+  | 'requires_minor_corrections'
+  | 'requires_major_corrections'
+  | 'requires_specialist_design'
+  | 'not_assessable_insufficient_information'
+  | 'ai_review_failed';
+
+export type ExecutionMode =
+  | 'basic_ai_screen'
+  | 'council_readiness'
+  | 'fire_plan_review'
+  | 'engineering_coordination'
+  | 'full_professional_review'
+  | 'resubmission_delta_review'
+  | 'specialist_pack_review';
+
+export interface DrawingReference {
+  url: string;
+  name: string;
+  type?: string;
+}
+
+export interface SubmissionIndexItem extends DrawingReference {
+  detectedType: string;
+}
+
+export interface SignOffRequirement {
+  discipline: Discipline;
+  responsibleParty: ResponsibleParty;
+  requirement: string;
+  reason: string;
+  standardFamily?: StandardFamily;
+  reference?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface Finding {
+  title: string;
+  description: string;
+  discipline: Discipline;
+  standardFamily: StandardFamily;
+  reference: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'low' | 'medium' | 'high';
+  autonomyLabel: AutonomyLabel;
+  responsibleParty: ResponsibleParty;
+  actionItem: string;
+  evidence: string;
+  sourceCitations: KnowledgeCitation[];
+  drawingReferences: DrawingReference[];
+  requiresProfessionalSignoff: boolean;
+}
+
 export interface AIIssue {
   description: string;
-  severity: 'low' | 'medium' | 'high';
+  regulationStipulation: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
   actionItem: string;
+  discipline?: Discipline;
+  standardFamily?: StandardFamily;
+  reference?: string;
+  confidence?: 'low' | 'medium' | 'high';
+  autonomyLabel?: AutonomyLabel;
+  responsibleParty?: ResponsibleParty;
+  evidence?: string;
+  requiresProfessionalSignoff?: boolean;
   boundingBox?: { x: number; y: number; width: number; height: number };
   annotatedImageUrl?: string;
 }
@@ -88,10 +327,30 @@ export interface AICategory {
 }
 
 export interface AIReviewResult {
-  status: 'passed' | 'failed';
-  feedback: string;
-  categories: AICategory[];
-  traceLog: string;
+ status: 'passed' | 'failed';
+ feedback: string;
+ categories: AICategory[];
+ visualReportUrl?: string;
+ traceLog: string;
+ citations?: KnowledgeCitation[];
+ knowledgeSources?: string[];
+ riskStatus?: RiskStatus;
+ findings?: Finding[];
+ signOffChecklist?: SignOffRequirement[];
+ submissionIndex?: SubmissionIndexItem[];
+ mode?: ExecutionMode;
+ disclaimers?: string[];
+}
+
+export interface AIProgress {
+ percentage: number;
+ agentName: string;
+ activity: string;
+ completedAgents: string[];
+ thought?: string;
+ mode?: ExecutionMode;
+ discipline?: Discipline;
+ plannedAgents?: string[];
 }
 
 export interface Submission {
@@ -103,8 +362,15 @@ export interface Submission {
   status: SubmissionStatus;
   aiFeedback?: string;
   aiStructuredFeedback?: AICategory[];
+  findings?: Finding[];
+  signOffChecklist?: SignOffRequirement[];
+  riskStatus?: RiskStatus;
+  executionMode?: ExecutionMode;
+  architectComment?: string;
   annotatedScreenshots?: { issueIndex: number; imageUrl: string }[];
+
   adminFeedback?: string;
+  visualReportUrl?: string;
   traceability: TraceLog[];
   createdAt: string;
 }
@@ -117,12 +383,38 @@ export interface Agent {
   systemPrompt: string;
   temperature: number;
   status: 'online' | 'offline' | 'maintenance';
+  discipline?: Discipline;
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+  standardsCoverage?: string[];
+  executionModes?: ExecutionMode[];
+  requiresHumanReview?: boolean;
+  version?: string;
+  approvedBy?: string;
   currentActivity?: string;
   lastActive: string;
   llmProvider?: LLMProvider | 'global';
   llmModel?: string;
   llmApiKey?: string;
   llmBaseUrl?: string;
+  authorizationType?: 'bearer' | 'api_key' | 'custom';
+  authorizationValue?: string;
+  authorizationHeader?: string;
+}
+
+export type WorkflowAgentRole =
+  | 'briefing_agent'
+  | 'matching_agent'
+  | 'tender_agent'
+  | 'construction_agent';
+
+export interface WorkflowAgentConfig {
+  role: WorkflowAgentRole;
+  name: string;
+  description: string;
+  systemPrompt: string;
+  activeInStages: ProjectStage[];
+  triggerEvents: string[];
+  temperature: number;
 }
 
 export interface SystemLog {
@@ -137,16 +429,33 @@ export interface SystemLog {
 export interface DelegatedTask {
   id: string;
   jobId: string;
+  jobTaskId?: string;
   architectId: string;
+  assigneeId?: string; // UID of the assigned freelancer/user
   assigneeName: string;
   assigneeRole: string;
   deadline: string;
   notes: string;
   status: 'pending' | 'in-progress' | 'completed';
+  submissionStatus?: 'not_submitted' | 'submitted' | 'changes_requested' | 'approved';
+  submittedAt?: string | null;
+  completedAt?: string | null;
+  reviewFeedback?: string;
+  reviewedAt?: string;
+  paymentStatus?: 'not_ready' | 'review_pending' | 'ready_for_invoice' | 'invoice_created' | 'paid';
   createdAt: string;
+  updatedAt?: string;
 }
 
-export type LLMProvider = 'gemini' | 'nvidia' | 'openrouter';
+export interface JobCard extends DelegatedTask {
+  assigneeId?: string;
+  priority: 'low' | 'medium' | 'high';
+  estimatedHours?: number;
+  attachments?: { name: string; url: string }[];
+  requirements?: string[];
+}
+
+export type LLMProvider = 'gemini' | 'openai' | 'openrouter' | 'nvidia';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -168,7 +477,21 @@ export type NotificationType =
   | 'milestone_due'
   | 'council_update'
   | 'invoice_sent'
-  | 'invoice_paid';
+  | 'invoice_paid'
+  | 'firm_invite'
+  | 'firm_invite_accepted'
+  | 'firm_role_changed'
+  | 'firm_member_removed'
+  | 'firm_subscription_updated'
+  | 'directory_invitation'
+  | 'material_request_created'
+  | 'material_quote_received'
+  | 'procurement_order_updated'
+  | 'cpd_course_published'
+  | 'cpd_certificate_issued'
+  | 'subscription_status_changed'
+  | 'refund_processed'
+  | 'contractor_delivery_update';
 
 export interface Notification {
   id: string;
@@ -178,9 +501,23 @@ export interface Notification {
   body: string;
   data?: {
     jobId?: string;
+    projectId?: string;
     submissionId?: string;
     senderId?: string;
     applicationId?: string;
+    firmId?: string;
+    firmInviteId?: string;
+    invitationId?: string;
+    workPackageId?: string;
+    discipline?: string;
+    materialRequestId?: string;
+    quoteId?: string;
+    procurementOrderId?: string;
+    courseId?: string;
+    certificateId?: string;
+    subscriptionId?: string;
+    refundId?: string;
+    deliveryId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -189,10 +526,68 @@ export interface Notification {
   deliveryStatus?: 'pending' | 'processing' | 'delivered' | 'failed';
 }
 
+export interface Dispute {
+  id: string;
+  jobId: string;
+  filedBy: string;
+  filedAgainst?: string;
+  reason: string;
+  requestedResolution: string;
+  status: 'open' | 'in_mediation' | 'resolved' | 'rejected';
+  adminNotes?: string;
+  resolution?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface NotificationPreferences {
+  in_app: boolean;
+  email: boolean;
+  push: boolean;
+}
+
 // Message types
+export type ProjectCommunicationCaptureType =
+  | 'chat'
+  | 'voice_note'
+  | 'document_upload'
+  | 'drawing_comment'
+  | 'approval_request'
+  | 'site_photo'
+  | 'site_voice_note'
+  | 'rfi'
+  | 'site_instruction'
+  | 'payment_note'
+  | 'closeout_evidence';
+
+export type ProjectCommunicationStructuredStatus = 'raw' | 'converted' | 'linked' | 'archived';
+export type ProjectCommunicationVisibility = 'job_participants' | 'project_team' | 'client_professional' | 'admin_only';
+
+export interface ProjectRecordLink {
+  recordType: string;
+  recordId: string;
+}
+
+export interface ProjectCommunicationLocation {
+  latitude: number;
+  longitude: number;
+  label?: string;
+}
+
 export interface Message {
   id: string;
   jobId: string;
+  /** New project communication engine metadata; optional for legacy job-scoped messages. */
+  projectId?: string;
+  phase?: ProjectStage;
+  captureType?: ProjectCommunicationCaptureType;
+  structuredStatus?: ProjectCommunicationStructuredStatus;
+  actionIds?: string[];
+  recordLinks?: ProjectRecordLink[];
+  aiTags?: string[];
+  transcribedText?: string;
+  visibility?: ProjectCommunicationVisibility;
+  location?: ProjectCommunicationLocation;
   senderId: string;
   senderRole: UserRole;
   content: string;
@@ -249,8 +644,66 @@ export interface Escrow {
   updatedAt?: string;
 }
 
+export interface EscrowMilestone {
+  id: string;
+  name: string;
+  stage: ProjectStage;
+  percentage: number;
+  amount: number;
+  status: 'pending' | 'funded' | 'release_requested' | 'released' | 'disputed';
+  releaseConditions?: string[];
+  requestedAt?: string;
+  releasedAt?: string;
+  approvedBy?: string;
+}
+
+export interface EscrowV2 extends Omit<Escrow, 'milestones'> {
+  milestones: EscrowMilestone[];
+  linkedProjectId?: string;
+}
+
+export interface LedgerEntry {
+  id: string;
+  projectId: string;
+  jobId: string;
+  type: PaymentType | 'invoice_payment';
+  amount: number;
+  direction: 'credit' | 'debit';
+  description: string;
+  payerId: string;
+  payeeId: string;
+  paymentId?: string;
+  escrowMilestoneId?: string;
+  createdAt: string;
+}
+
 // Architect verification types
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired';
+
+export type VerificationSubjectType = 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'freelancer' | 'admin';
+export type VerificationSource = 'professional_body_api' | 'public_register' | 'automated_browser_agent' | 'manual_admin_review' | 'document_upload' | 'privyseal' | 'other';
+
+export interface UserVerification {
+  id: string;
+  userId: string;
+  subjectType: VerificationSubjectType;
+  status: VerificationStatus;
+  source: VerificationSource;
+  registrationNumber?: string;
+  statutoryBody?: string;
+  evidenceDocumentIds?: string[];
+  evidenceUrls?: string[];
+  submittedAt: string;
+  submittedBy: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+  expiresAt?: string;
+  lastVerifiedAt?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface ArchitectVerification {
   userId: string;
@@ -266,9 +719,14 @@ export interface ArchitectVerification {
 }
 
 // Architect profile
+export type SACAPStatus = 'unverified' | 'verified' | 'pending' | 'failed';
+
 export interface ArchitectProfile {
   userId: string;
   sacapNumber: string;
+  sacapStatus?: SACAPStatus;
+  sacapLastVerifiedAt?: string;
+  sacapRegistrationType?: string;
   yearsExperience?: number;
   specializations: string[];
   portfolioImages: { url: string; title: string; description?: string }[];
@@ -281,22 +739,67 @@ export interface ArchitectProfile {
 }
 
 // Council submission types
+export type MunicipalityType = 'COJ' | 'COCT' | 'ETH' | 'NMB' | 'Tshwane' | 'Ekurhuleni' | 'Mangaung' | 'Other';
+
+export interface TrackingEvent {
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  timestamp: string;
+  notes?: string;
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow' | string;
+  actorId?: string;
+}
+
 export interface CouncilSubmission {
   id: string;
   jobId: string;
-  municipality: string;
+  municipality: MunicipalityType | string;
+  municipalityName?: string;
+  userId: string;
   referenceNumber?: string;
-  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised';
+  status: 'preparing' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'queries_raised' | string;
+  rawStatus?: string;
+  lastCheckedAt?: string;
   submittedAt?: string;
   documents: { name: string; url: string }[];
-  trackingHistory: { status: string; timestamp: string; notes?: string }[];
-  queries?: {
-    raisedAt: string;
-    description: string;
-    response?: string;
-    respondedAt?: string;
-    attachments?: { name: string; url: string }[];
-  }[];
+  source: 'manual' | 'scraper' | 'ocr' | 'shadow_tracker';
+  trackingHistory: TrackingEvent[];
+  queries?: CouncilQuery[];
+  erfNumber?: string;
+  projectDescription?: string;
+}
+
+export interface CouncilQuery {
+  raisedAt: string;
+  description: string;
+  response?: string;
+  respondedAt?: string;
+  attachments?: { name: string; url: string }[];
+}
+
+export interface MunicipalCredential {
+  id: string;
+  userId: string;
+  municipality: MunicipalityType | string;
+  username: string;
+  encryptedPassword?: string;
+  password?: string; // Obfuscated base64 for demo
+  iv?: string;
+  authTag?: string; // For GCM
+  lastUsed?: string;
+  status: 'valid' | 'invalid' | 'unchecked';
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CrowdsourceUpdate {
+  id: string;
+  municipality: MunicipalityType;
+  officeLocation?: string;
+  department?: string;
+  statusUpdate: string;
+  backlogLevel: 'low' | 'medium' | 'high';
+  reportedBy: string; // userId
+  timestamp: string;
 }
 
 // Invoicing types
@@ -336,7 +839,7 @@ export type UploadedFile = {
   fileSize: number;
   uploadedBy: string;
   uploadedAt: string;
-  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test';
+  context: 'submission' | 'chat' | 'certificate' | 'invoice' | 'test' | 'knowledge_base' | 'site_log' | 'brief';
   jobId?: string;
   submissionId?: string;
 };
@@ -353,14 +856,311 @@ export interface AgentKnowledge {
   source: KnowledgeSource;
   status: KnowledgeStatus;
   submittedBy: string; // userId
-  submittedByRole: 'admin' | 'architect' | 'client' | 'system';
+  submittedByRole: UserRole | 'system';
   reviewedBy?: string; // admin userId
   reviewedAt?: string;
   relatedSubmissionId?: string;
   relatedJobId?: string;
   searchQuery?: string; // if source is web_search
   sourceUrl?: string; // if from documentation or web
+  pdfUrl?: string; // if uploaded from PDF
+  pdfPageNumber?: number; // page number in PDF
   tags: string[]; // e.g. ['SANS 10400-K', 'wall thickness', 'DPC']
+  standardFamily?: StandardFamily;
+  standardPart?: string;
+  municipality?: string;
+  province?: string;
+  discipline?: Discipline;
+  effectiveDate?: string;
+  reviewDate?: string;
+  version?: string;
+  disclaimer?: string;
+  confidence?: 'low' | 'medium' | 'high';
   createdAt: string;
   updatedAt?: string;
+  usageCount?: number; // Track how often this knowledge is used
+  lastUsedAt?: string;
+}
+
+export interface KnowledgeCitation {
+  knowledgeId: string;
+  title: string;
+  content: string;
+  source: KnowledgeSource;
+  sourceUrl?: string;
+  pdfUrl?: string;
+  pdfPageNumber?: number;
+  tags: string[];
+}
+
+// --- Project Lifecycle Types ------------------------------------------------
+
+/**
+ * The PRD canonical 8-stage project lifecycle from Brief through Close-Out.
+ * `scoping` remains a legacy value for existing project documents and maps to the Brief stage.
+ */
+export type ProjectStage =
+  | 'intake'
+  | 'scoping'
+  | 'appointment'
+  | 'coordination'
+  | 'compliance'
+  | 'tender'
+  | 'delivery'
+  | 'payments'
+  | 'closeout';
+
+/** Canonical ordering of project stages (forward-only transitions). */
+export const PROJECT_STAGE_ORDER: ProjectStage[] = [
+  'intake',
+  'appointment',
+  'coordination',
+  'compliance',
+  'tender',
+  'delivery',
+  'payments',
+  'closeout',
+];
+
+/** Human-readable labels for each project stage. */
+export const PROJECT_STAGE_LABELS: Record<ProjectStage, string> = {
+  intake: 'Brief & Diagnostic',
+  scoping: 'Brief & Diagnostic (Legacy Scoping)',
+  appointment: 'Team Appointment',
+  coordination: 'Design & Coordination',
+  compliance: 'Compliance & Municipal',
+  tender: 'Tender & Procurement',
+  delivery: 'Construction Delivery',
+  payments: 'Payments & Governance',
+  closeout: 'Close-Out & Handover',
+};
+
+/** Icon names (lucide-react) for each project stage. */
+export const PROJECT_STAGE_ICONS: Record<ProjectStage, string> = {
+  intake: 'ClipboardList',
+  scoping: 'Search',
+  appointment: 'UserCheck',
+  coordination: 'Users',
+  compliance: 'ShieldCheck',
+  tender: 'FileText',
+  delivery: 'HardHat',
+  payments: 'CreditCard',
+  closeout: 'CheckCircle2',
+};
+
+/** A record of a stage transition in the project's history. */
+export interface StageHistoryEntry {
+  stage: ProjectStage;
+  enteredAt: string;
+  exitedAt?: string;
+  actorId: string;
+  note?: string;
+}
+
+/**
+ * A Project wraps a Job with lifecycle tracking, stage metadata, and a team roster.
+ * Created when a client accepts an architect's application.
+ */
+export interface Project {
+  id: string;
+  jobId: string;
+  clientId: string;
+  leadProfessionalId?: string;
+  leadBepId?: string;
+  /** @deprecated Use leadProfessionalId/leadBepId for new writes. */
+  leadArchitectId?: string;
+  currentStage: ProjectStage;
+  /** PRD stage-gate evidence flags used to block premature legal, financial, or professional progression. */
+  stageGateEvidence?: Partial<Record<string, boolean>>;
+  stageHistory: StageHistoryEntry[];
+  teamMembers: ProjectTeamMember[];
+  firmId?: string;
+  firmAccessEnabled?: boolean;
+  firmSharedBy?: string;
+  firmSharedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/** A member of the project team, tracked by discipline and status. */
+export interface ProjectTeamMember {
+  userId: string;
+  role: UserRole | string;
+  discipline?: Discipline;
+  joinedAt: string;
+  status: 'invited' | 'active' | 'removed';
+}
+
+// --- Tender & Procurement Types ---------------------------------------------
+
+export type TenderStatus = 'draft' | 'published' | 'closed' | 'evaluating' | 'awarded' | 'cancelled';
+
+export interface TenderPackage {
+  id: string;
+  projectId: string;
+  jobId: string;
+  title: string;
+  description: string;
+  scope: string[];
+  documents: { name: string; url: string }[];
+  deadline: string;
+  estimatedBudget?: number;
+  requiredDisciplines: Discipline[];
+  requiredCertifications?: string[];
+  status: TenderStatus;
+  createdBy: string;
+  awardedBidId?: string;
+  awardedContractorId?: string;
+  aiComparisonReport?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type BidStatus = 'submitted' | 'shortlisted' | 'rejected' | 'awarded' | 'withdrawn';
+
+export interface BidLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Bid {
+  id: string;
+  tenderPackageId: string;
+  contractorId: string;
+  contractorName: string;
+  totalAmount: number;
+  lineItems: BidLineItem[];
+  proposedTimeline: string;
+  proposedStartDate: string;
+  methodology: string;
+  qualifications: string;
+  attachments: { name: string; url: string }[];
+  verificationId: string;
+  status: BidStatus;
+  aiScore?: number;
+  aiNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// --- Construction Delivery Types --------------------------------------------
+
+export interface GanttTask {
+  id: string;
+  projectId: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  baselineStartDate?: string;
+  baselineEndDate?: string;
+  forecastEndDate?: string;
+  progress: number;
+  dependsOn?: string[];
+  assignedTo?: string;
+  phase: string;
+  status: 'not_started' | 'in_progress' | 'completed' | 'delayed';
+  isCritical?: boolean;
+  recoveryPlan?: string;
+  baselineChangeReason?: string;
+  baselineChangeStatus?: 'pending_review' | 'approved' | 'rejected';
+  humanApprovalRequired?: boolean;
+  color?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SiteLog {
+  id: string;
+  projectId: string;
+  date: string;
+  weather: 'sunny' | 'cloudy' | 'rainy' | 'stormy';
+  temperature?: number;
+  workDescription: string;
+  labourCount?: number;
+  materialsUsed?: string[];
+  issues?: string[];
+  photos: { url: string; caption: string }[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export type RFIStatus = 'open' | 'responded' | 'closed' | 'overdue';
+export type RFIPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface RFI {
+  id: string;
+  projectId: string;
+  number: number;
+  subject: string;
+  question: string;
+  attachments: { name: string; url: string }[];
+  requestedBy: string;
+  assignedTo: string;
+  priority: RFIPriority;
+  status: RFIStatus;
+  response?: string;
+  responseAttachments?: { name: string; url: string }[];
+  respondedBy?: string;
+  respondedAt?: string;
+  dueDate: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SiteInspection {
+  id: string;
+  projectId: string;
+  inspectionType: 'foundation' | 'dpc' | 'roof' | 'final' | 'custom';
+  date: string;
+  inspector: string;
+  checklist: InspectionItem[];
+  overallResult: 'pass' | 'fail' | 'conditional';
+  notes?: string;
+  photos: { url: string; caption: string }[];
+  createdAt: string;
+}
+
+export interface InspectionItem {
+  item: string;
+  standard?: string;
+  result: 'pass' | 'fail' | 'na';
+  comment?: string;
+}
+
+// Agent workflow types for platform-wide agent orchestration
+export type AgentOwnerType = 'user' | 'project';
+export type AgentSurface = 'dashboard' | 'chat' | 'notification' | 'document' | 'workflow' | 'admin';
+export type AgentActionStatus = 'draft' | 'suggested' | 'requires_approval' | 'approved' | 'rejected' | 'applied';
+
+export interface AgentEvent {
+  id: string;
+  type: string;
+  ownerType: AgentOwnerType;
+  ownerId: string;
+  jobId?: string;
+  userId?: string;
+  phase?: string;
+  source: AgentSurface;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentRecommendation {
+  id: string;
+  agentId: string;
+  jobId?: string;
+  userId?: string;
+  surface: AgentSurface;
+  title: string;
+  summary: string;
+  suggestedAction?: {
+    label: string;
+    actionType: string;
+    payload: Record<string, unknown>;
+  };
+  status: AgentActionStatus;
+  requiresHumanApproval: boolean;
+  createdAt: string;
 }

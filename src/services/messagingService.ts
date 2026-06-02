@@ -16,13 +16,23 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { Message, Conversation } from '../types';
+import { Message, Conversation, UserRole, ProjectCommunicationCaptureType, ProjectCommunicationStructuredStatus, ProjectCommunicationVisibility, ProjectRecordLink, ProjectStage, ProjectCommunicationLocation } from '../types';
 import DOMPurify from 'dompurify';
 
 export interface SendMessageParams {
   jobId: string;
+  projectId?: string;
+  phase?: ProjectStage;
+  captureType?: ProjectCommunicationCaptureType;
+  structuredStatus?: ProjectCommunicationStructuredStatus;
+  actionIds?: string[];
+  recordLinks?: ProjectRecordLink[];
+  aiTags?: string[];
+  transcribedText?: string;
+  visibility?: ProjectCommunicationVisibility;
+  location?: ProjectCommunicationLocation;
   senderId: string;
-  senderRole: 'client' | 'architect' | 'admin';
+  senderRole: UserRole;
   content: string;
   attachments?: { name: string; url: string; type: string }[];
 }
@@ -50,7 +60,7 @@ class MessagingService {
    * Send a message
    */
   async sendMessage(params: SendMessageParams): Promise<string> {
-    const { jobId, senderId, senderRole, content, attachments } = params;
+    const { jobId, senderId, senderRole, content, attachments, projectId, phase, captureType, structuredStatus, actionIds, recordLinks, aiTags, transcribedText, visibility, location } = params;
 
     // Sanitize content before storing
     const sanitizedContent = this.sanitizeContent(content);
@@ -65,6 +75,16 @@ class MessagingService {
       senderRole,
       content: sanitizedContent,
       attachments: attachments || [],
+      projectId,
+      phase,
+      captureType,
+      structuredStatus: structuredStatus || (phase || captureType ? 'raw' : undefined),
+      actionIds: actionIds || [],
+      recordLinks: recordLinks || [],
+      aiTags: aiTags || [],
+      transcribedText,
+      visibility,
+      location,
       isRead: false,
       createdAt: new Date().toISOString(),
     };
@@ -106,26 +126,28 @@ class MessagingService {
   /**
    * Mark messages as read
    */
-  async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
-    const q = query(
-      collection(db, 'messages'),
-      where('jobId', '==', jobId),
-      where('senderId', '!=', userId),
-      where('isRead', '==', false)
-    );
+async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
+ const q = query(
+ collection(db, 'messages'),
+ where('jobId', '==', jobId),
+ where('isRead', '==', false)
+ );
 
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
+ const snapshot = await getDocs(q);
+ const batch = writeBatch(db);
 
-    snapshot.docs.forEach(doc => {
-      batch.update(doc.ref, {
-        isRead: true,
-        readAt: new Date().toISOString(),
-      });
-    });
+ snapshot.docs.forEach(doc => {
+ const message = doc.data() as Message;
+ if (message.senderId !== userId) {
+ batch.update(doc.ref, {
+ isRead: true,
+ readAt: new Date().toISOString(),
+ });
+ }
+ });
 
-    await batch.commit();
-  }
+ await batch.commit();
+}
 
   /**
    * Get or create conversation

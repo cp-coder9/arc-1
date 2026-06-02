@@ -6,6 +6,13 @@
 import { describe, test, expect, jest } from '@jest/globals';
 import { messagingService } from '../messagingService';
 
+jest.mock('dompurify', () => ({
+  __esModule: true,
+  default: {
+    sanitize: jest.fn((content: string) => content.replace(/<script[^>]*>.*?<\/script>/gi, '')),
+  },
+}));
+
 describe('messagingService', () => {
   test('should sanitize HTML content', () => {
     const maliciousContent = '<script>alert("xss")</script><b>Bold text</b>';
@@ -40,5 +47,16 @@ describe('messagingService', () => {
         content: '   '
       })
     ).rejects.toThrow('Message content cannot be empty');
+  });
+
+  test("should accept BEP/design-team roles for backend.html project threads", async () => {
+    await expect(
+      messagingService.sendMessage({
+        jobId: "test-job",
+        senderId: "bep-1",
+        senderRole: "bep",
+        content: "<b>Design coordination update</b>"
+      })
+    ).resolves.toBeDefined();
   });
 });

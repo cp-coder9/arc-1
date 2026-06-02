@@ -23,6 +23,9 @@ dist-ssr
 *.local
 out/
 build/
+*.tgz
+.tmp/
+tmp.*/
 
 # IDEs and editors
 .vscode/*
@@ -39,6 +42,9 @@ build/
 .vercel
 .vercel/output
 
+# Kilo
+.kilo/
+
 # Environment variables
 .env
 .env.local
@@ -51,6 +57,19 @@ build/
 
 # Firebase
 .firebase/
+*-firebase-adminsdk-*.json
+firebase-debug.log
+.firebaserc
 
 .vercel
 .env*.local
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Generated verification and release artifacts
+release/
+reports/
+public/build-info.json
+12/

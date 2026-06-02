@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest';
+import { buildAppointmentIdempotencyKey, buildAppointmentRecord, buildProjectStageHistoryEntry, assertAppointmentPreconditions } from '../appointmentWorkflowService';
+
+const verification = { status: 'verified' as const, expiresAt: '2099-01-01T00:00:00.000Z', subjectType: 'bep' as const, statutoryBody: 'SACAP' };
+const brief = { id: 'brief-1', clientId: 'client-1', status: 'published' };
+const proposal = { id: 'proposal-1', briefId: 'brief-1', clientId: 'client-1', professionalId: 'bep-1', status: 'submitted' };
+
+describe('appointmentWorkflowService', () => {
+  it('requires eligible brief, matching proposal, and active BEP verification', () => {
+    expect(() => assertAppointmentPreconditions({ brief, proposal, verification })).not.toThrow();
+    expect(() => assertAppointmentPreconditions({ brief, proposal, verification: { ...verification, status: 'pending' } })).toThrow(/Active BEP verification/);
+    expect(() => assertAppointmentPreconditions({ brief, proposal: { ...proposal, clientId: 'other' }, verification })).toThrow(/client does not match/);
+    expect(() => assertAppointmentPreconditions({ brief: { ...brief, appointmentId: 'appointment-1' }, proposal, verification })).toThrow(/already been appointed/);
+    expect(() => assertAppointmentPreconditions({ brief: { ...brief, status: 'draft' }, proposal, verification })).toThrow(/not ready/);
+    expect(() => assertAppointmentPreconditions({ brief, proposal: { ...proposal, briefId: 'other' }, verification })).toThrow(/does not belong/);
+    expect(() => assertAppointmentPreconditions({ brief, proposal: { ...proposal, status: 'withdrawn' }, verification })).toThrow(/not eligible/);
+  });
+
+  it('builds appointment records with human acceptance gates and deterministic idempotency', () => {
+    const appointment = buildAppointmentRecord({
+      briefId: 'brief-1',
+      proposalId: 'proposal-1',
+      clientId: 'client-1',
+      professionalId: 'bep-1',
+      verificationId: 'verification-1',
+      createdBy: 'client-1',
+    });
+
+    expect(appointment.status).toBe('pending_acceptance');
+    expect(appointment.legalAcceptanceRequired).toBe(true);
+    expect(appointment.humanAcceptanceRequired).toBe(true);
+    expect(appointment.idempotencyKey).toBe(buildAppointmentIdempotencyKey({ briefId: 'brief-1', clientId: 'client-1', professionalId: 'bep-1' }));
+    expect(() => buildAppointmentRecord({ ...appointment, createdBy: 'other' })).toThrow(/Only the client owner/);
+    expect(() => buildAppointmentIdempotencyKey({ briefId: ' ', clientId: 'client-1', professionalId: 'bep-1' })).toThrow(/briefId/);
+  });
+
+  it('does not mutate supplied appointment input or auto-accept legal/provider gates', () => {
+    const input = {
+      briefId: ' brief-1 ',
+      proposalId: ' proposal-1 ',
+      clientId: 'client-1',
+      professionalId: ' bep-1 ',
+      verificationId: ' verification-1 ',
+      createdBy: 'client-1',
+      contractDraftId: 'draft-1',
+    };
+
+    const appointment = buildAppointmentRecord(input);
+
+    expect(input).toEqual({
+      briefId: ' brief-1 ',
+      proposalId: ' proposal-1 ',
+      clientId: 'client-1',
+      professionalId: ' bep-1 ',
+      verificationId: ' verification-1 ',
+      createdBy: 'client-1',
+      contractDraftId: 'draft-1',
+    });
+    expect(appointment).toMatchObject({
+      briefId: 'brief-1',
+      proposalId: 'proposal-1',
+      professionalId: 'bep-1',
+      verificationId: 'verification-1',
+      status: 'pending_acceptance',
+      legalAcceptanceRequired: true,
+      humanAcceptanceRequired: true,
+    });
+    expect(appointment.status).not.toBe('accepted');
+  });
+
+  it('builds immutable project stage history entries', () => {
+    expect(buildProjectStageHistoryEntry({ projectId: 'project-1', actorId: 'client-1', stage: 'appointed', note: 'Appointment created' })).toMatchObject({
+      projectId: 'project-1',
+      immutable: true,
+      stage: 'appointed',
+    });
+  });
+});

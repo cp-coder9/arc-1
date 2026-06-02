@@ -19,6 +19,18 @@ View your app in AI Studio: https://ai.studio/apps/2ae3d9c3-70e6-4323-8a95-9d566
 3. Run the app:
    `npm run dev`
 
+## Verification
+
+Use these non-production checks before merging backend, dashboard, or documentation changes:
+
+- `npm run lint` validates the app TypeScript project.
+- `npm run lint:tests` validates tests and shared TypeScript files.
+- `npm test` runs the deterministic Vitest suite.
+- `npm run docs:api-contracts` validates backend API contract documentation by parsing every JSON example block and checking that documented non-legacy API reference routes have deterministic contract examples.
+- `npm run build` builds the production Vite bundle.
+
+The GitHub Actions workflow in `.github/workflows/verification.yml` runs the same lint, test, docs-contract, and build gates on pull requests and pushes to `main` / `phase-2-verification-workflows`.
+
 ## Production Deployment
 
 Because this application uses a custom Express setup (`server.ts`) alongside a Vite Single Page Application, it **requires a long-running Node.js environment**. 

@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AgentKnowledge, KnowledgeStatus, KnowledgeSource, UserProfile } from '../types';
-import { getAgentKnowledge, approveKnowledge, rejectKnowledge, deleteKnowledge, updateKnowledge } from '../services/knowledgeService';
+import { AgentKnowledge, KnowledgeStatus, KnowledgeSource, UserProfile, Discipline, StandardFamily } from '../types';
+import { getAllAgentKnowledge, approveKnowledge, rejectKnowledge, deleteKnowledge, updateKnowledge } from '../services/knowledgeService';
 import { SPECIALIZED_AGENTS } from '../services/geminiService';
 import { Loader2, CheckCircle2, XCircle, Search, Trash2, Edit } from 'lucide-react';
 
@@ -14,6 +14,9 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
   const [entries, setEntries] = useState<AgentKnowledge[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
+  const [selectedDiscipline, setSelectedDiscipline] = useState<string>('all');
+  const [selectedStandardFamily, setSelectedStandardFamily] = useState<string>('all');
+  const [municipalityFilter, setMunicipalityFilter] = useState('');
   const [editingEntry, setEditingEntry] = useState<AgentKnowledge | null>(null);
   const [editContent, setEditContent] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -26,25 +29,19 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
   const fetchKnowledge = async () => {
     setLoading(true);
     try {
-      // In a real implementation we would fetch by status for all agents, but since getAgentKnowledge 
-      // requires agentId, we'll fetch all agents' knowledge and filter.
-      // Firestore query would ideally be adjusted to support this.
-      const allEntries: AgentKnowledge[] = [];
-      const agents = SPECIALIZED_AGENTS; // Using default roles
+      const allEntries = await getAllAgentKnowledge(activeTab);
 
-      for (const agent of agents) {
-         // Assuming agent role serves as a fallback ID if 'id' isn't set
-         const agentId = agent.role; 
-         const knowledge = await getAgentKnowledge(agentId, activeTab);
-         allEntries.push(...knowledge);
-      }
-      
       // Sort by newest first
       allEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
+
       setEntries(allEntries);
     } catch (error) {
       console.error("Failed to fetch knowledge:", error);
+      // If permission denied, show empty list gracefully
+      if (error.message?.includes('permission-denied')) {
+        console.warn("Permission denied for agent knowledge, showing empty list");
+        setEntries([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -112,9 +109,14 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
     }
   };
 
-  const filteredEntries = selectedAgentId === 'all' 
-    ? entries 
-    : entries.filter(e => e.agentId === selectedAgentId);
+  const filteredEntries = entries
+    .filter(e => selectedAgentId === 'all' || e.agentRole === selectedAgentId || e.agentId === selectedAgentId)
+    .filter(e => selectedDiscipline === 'all' || e.discipline === selectedDiscipline)
+    .filter(e => selectedStandardFamily === 'all' || e.standardFamily === selectedStandardFamily)
+    .filter(e => !municipalityFilter.trim() || e.municipality?.toLowerCase().includes(municipalityFilter.toLowerCase()));
+
+  const disciplines: Discipline[] = ['architecture', 'structure', 'fire', 'accessibility', 'energy', 'drainage', 'electrical', 'mechanical', 'planning', 'documentation', 'environmental', 'nhbrc', 'coordination'];
+  const standardFamilies: StandardFamily[] = ['NBR', 'SANS10400', 'SANS10160', 'SANS10100', 'SANS10162', 'SANS10142', 'SANS10252', 'MunicipalBylaw', 'NHBRC', 'ProfessionalCoordination', 'Other'];
 
   return (
     <div className="space-y-6">
@@ -141,7 +143,7 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
         ))}
       </div>
 
-      <div className="flex gap-4 items-center">
+       <div className="flex flex-wrap gap-4 items-center">
          <Search className="w-4 h-4 text-muted-foreground" />
          <select 
            className="flex h-10 w-[250px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -152,8 +154,17 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
            {SPECIALIZED_AGENTS.map(agent => (
              <option key={agent.role} value={agent.role}>{agent.name}</option>
            ))}
-         </select>
-      </div>
+          </select>
+          <select className="flex h-10 w-[220px] rounded-md border border-input bg-background px-3 py-2 text-sm" value={selectedDiscipline} onChange={(e) => setSelectedDiscipline(e.target.value)}>
+            <option value="all">All Disciplines</option>
+            {disciplines.map(discipline => <option key={discipline} value={discipline}>{discipline}</option>)}
+          </select>
+          <select className="flex h-10 w-[220px] rounded-md border border-input bg-background px-3 py-2 text-sm" value={selectedStandardFamily} onChange={(e) => setSelectedStandardFamily(e.target.value)}>
+            <option value="all">All Standards</option>
+            {standardFamilies.map(standard => <option key={standard} value={standard}>{standard}</option>)}
+          </select>
+          <Input className="w-[220px]" placeholder="Municipality" value={municipalityFilter} onChange={(e) => setMunicipalityFilter(e.target.value)} />
+       </div>
 
       {loading ? (
         <div className="flex justify-center py-8">
@@ -174,14 +185,19 @@ export default function AgentKnowledgeManager({ user }: { user: UserProfile }) {
                       <Badge className={getSourceBadgeColor(entry.source)}>
                         {getSourceLabel(entry.source)}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Agent: <strong className="text-foreground">{entry.agentRole}</strong>
-                      </span>
-                    </div>
+                       <span className="text-sm text-muted-foreground">
+                         Agent: <strong className="text-foreground">{entry.agentRole}</strong>
+                       </span>
+                       {entry.discipline && <Badge variant="outline">{entry.discipline}</Badge>}
+                       {entry.standardFamily && <Badge variant="outline">{entry.standardFamily}</Badge>}
+                     </div>
                     <CardTitle className="text-lg">{entry.title}</CardTitle>
-                    <CardDescription>
-                      Submitted by {entry.submittedByRole} on {new Date(entry.createdAt).toLocaleDateString()}
-                    </CardDescription>
+                     <CardDescription>
+                       Submitted by {entry.submittedByRole} on {new Date(entry.createdAt).toLocaleDateString()}
+                       {entry.version && ` • v${entry.version}`}
+                       {entry.effectiveDate && ` • effective ${entry.effectiveDate}`}
+                       {entry.municipality && ` • ${entry.municipality}`}
+                     </CardDescription>
                   </div>
                   
                   {/* Actions */}

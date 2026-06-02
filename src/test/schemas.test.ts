@@ -1,5 +1,44 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { JobCreateSchema, ApplicationCreateSchema, ReviewCreateSchema, validateForm } from '../lib/schemas';
+import {
+  ApplicationCreateSchema,
+  ApplicationStatusEnum,
+  AutonomyLabelEnum,
+  DisciplineEnum,
+  ExecutionModeEnum,
+  JobCreateSchema,
+  JobCategoryEnum,
+  JobStatusEnum,
+  NotificationSchema,
+  NotificationTypeEnum,
+  PaymentStatusEnum,
+  PaymentTypeEnum,
+  ResponsiblePartyEnum,
+  RiskStatusEnum,
+  ReviewCreateSchema,
+  StandardFamilyEnum,
+  SubmissionStatusEnum,
+  UserRoleEnum,
+  VerificationStatusEnum,
+  validateForm,
+} from '../lib/schemas';
+import type {
+  Application,
+  AutonomyLabel,
+  Discipline,
+  ExecutionMode,
+  Job,
+  JobCategory,
+  NotificationType,
+  PaymentStatus,
+  PaymentType,
+  ResponsibleParty,
+  Review,
+  RiskStatus,
+  StandardFamily,
+  SubmissionStatus,
+  UserRole,
+  VerificationStatus,
+} from '../types';
 
 describe('Validation Schemas', () => {
   describe('JobCreateSchema', () => {
@@ -104,6 +143,10 @@ describe('Validation Schemas', () => {
       const result = validateForm(ApplicationCreateSchema, application);
       expect(result.success).toBe(false);
     });
+
+    it('should accept withdrawn application status values used by the dashboard', () => {
+      expect(ApplicationStatusEnum.safeParse('withdrawn').success).toBe(true);
+    });
   });
 
   describe('ReviewCreateSchema', () => {
@@ -144,6 +187,95 @@ describe('Validation Schemas', () => {
 
       const result = validateForm(ReviewCreateSchema, review);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('Enum Consistency', () => {
+    const expectOptionsMatch = (actual: readonly string[], expected: readonly string[]) => {
+      expect(actual).toEqual(expected);
+    };
+
+    const userRoles = ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'] as const satisfies readonly UserRole[];
+    it('should accept all UserRole values', () => {
+      expectOptionsMatch(UserRoleEnum.options, userRoles);
+      for (const role of userRoles) {
+        const result = UserRoleEnum.safeParse(role);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    const notificationTypes = [
+      'job_application',
+      'application_accepted',
+      'drawing_submitted',
+      'ai_review_complete',
+      'admin_approval',
+      'admin_rejection',
+      'payment_released',
+      'message',
+      'milestone_due',
+      'council_update',
+      'invoice_sent',
+      'invoice_paid',
+      'firm_invite',
+      'firm_role_changed',
+      'firm_member_removed',
+      'directory_invitation'
+    ] as const satisfies readonly NotificationType[];
+    it('should accept all NotificationType values', () => {
+      expectOptionsMatch(NotificationTypeEnum.options, notificationTypes);
+      for (const type of notificationTypes) {
+        const result = NotificationTypeEnum.safeParse(type);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it('should accept directory invitation notification metadata fields', () => {
+      const result = NotificationSchema.safeParse({
+        userId: 'user-1',
+        type: 'directory_invitation',
+        title: 'Directory Invitation',
+        body: 'You have been invited to a project',
+        data: {
+          invitationId: 'invite-1',
+          projectId: 'project-1',
+          workPackageId: 'package-1',
+          senderId: 'client-1',
+          discipline: 'architecture',
+        },
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should keep core runtime enums aligned with TypeScript domain unions', () => {
+      const enumCases = [
+        { name: 'JobCategoryEnum', actual: JobCategoryEnum.options, expected: ['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape'] as const satisfies readonly JobCategory[] },
+        { name: 'JobStatusEnum', actual: JobStatusEnum.options, expected: ['open', 'in-progress', 'completed', 'cancelled'] as const satisfies readonly Job['status'][] },
+        { name: 'ApplicationStatusEnum', actual: ApplicationStatusEnum.options, expected: ['pending', 'accepted', 'rejected', 'withdrawn'] as const satisfies readonly Application['status'][] },
+        { name: 'SubmissionStatusEnum', actual: SubmissionStatusEnum.options, expected: ['processing', 'pending_ai', 'ai_reviewing', 'ai_failed', 'ai_passed', 'admin_reviewing', 'admin_rejected', 'approved'] as const satisfies readonly SubmissionStatus[] },
+        { name: 'PaymentTypeEnum', actual: PaymentTypeEnum.options, expected: ['escrow_deposit', 'milestone_release', 'refund', 'platform_fee'] as const satisfies readonly PaymentType[] },
+        { name: 'PaymentStatusEnum', actual: PaymentStatusEnum.options, expected: ['pending', 'completed', 'failed', 'refunded'] as const satisfies readonly PaymentStatus[] },
+        { name: 'VerificationStatusEnum', actual: VerificationStatusEnum.options, expected: ['pending', 'verified', 'rejected', 'expired'] as const satisfies readonly VerificationStatus[] },
+        { name: 'DisciplineEnum', actual: DisciplineEnum.options, expected: ['architecture', 'structure', 'fire', 'accessibility', 'energy', 'drainage', 'electrical', 'mechanical', 'planning', 'documentation', 'environmental', 'nhbrc', 'coordination'] as const satisfies readonly Discipline[] },
+        { name: 'StandardFamilyEnum', actual: StandardFamilyEnum.options, expected: ['NBR', 'SANS10400', 'SANS10160', 'SANS10100', 'SANS10162', 'SANS10142', 'SANS10252', 'MunicipalBylaw', 'NHBRC', 'ProfessionalCoordination', 'Other'] as const satisfies readonly StandardFamily[] },
+        { name: 'AutonomyLabelEnum', actual: AutonomyLabelEnum.options, expected: ['autonomous_check', 'professional_review_required', 'competent_person_required', 'municipal_confirmation_required', 'insufficient_information'] as const satisfies readonly AutonomyLabel[] },
+        { name: 'ResponsiblePartyEnum', actual: ResponsiblePartyEnum.options, expected: ['architect', 'structural_engineer', 'civil_engineer', 'fire_engineer', 'electrical_engineer', 'mechanical_engineer', 'energy_professional', 'client', 'contractor', 'municipality', 'admin'] as const satisfies readonly ResponsibleParty[] },
+        { name: 'RiskStatusEnum', actual: RiskStatusEnum.options, expected: ['ready_for_admin_review', 'ready_for_professional_review', 'requires_minor_corrections', 'requires_major_corrections', 'requires_specialist_design', 'not_assessable_insufficient_information', 'ai_review_failed'] as const satisfies readonly RiskStatus[] },
+        { name: 'ExecutionModeEnum', actual: ExecutionModeEnum.options, expected: ['basic_ai_screen', 'council_readiness', 'fire_plan_review', 'engineering_coordination', 'full_professional_review', 'resubmission_delta_review', 'specialist_pack_review'] as const satisfies readonly ExecutionMode[] },
+      ];
+
+      for (const enumCase of enumCases) {
+        expect(enumCase.actual, enumCase.name).toEqual(enumCase.expected);
+      }
+    });
+
+    const reviewTypes = ['client_to_architect', 'architect_to_client', 'to_bep', 'from_bep', 'to_freelancer'] as const satisfies readonly Review['type'][];
+    it('should accept all Review type values', () => {
+      for (const type of reviewTypes) {
+        const result = ReviewCreateSchema.pick({ type: true }).safeParse({ type });
+        expect(result.success).toBe(true);
+      }
     });
   });
 });

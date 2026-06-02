@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Static Architex front-end routes must not swallow API calls.
+  # On static/shared hosting, API traffic is served by https://api.architex.co.za.
+  # If someone probes this static host directly, return a real 404 instead of the SPA shell.
+  RewriteRule ^api(?:/|$) - [R=404,L]
+  RewriteRule ^health$ - [R=404,L]
+
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

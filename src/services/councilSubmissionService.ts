@@ -169,15 +169,19 @@ class CouncilSubmissionService {
 
     const submission: Omit<CouncilSubmission, 'id'> = {
       jobId: job.id,
-      municipality: config.name,
+      municipality: 'Other',
+      municipalityName: config.name,
+      userId: client.uid,
       referenceNumber,
       status: 'preparing',
       documents,
+      source: 'manual',
       trackingHistory: [
         {
           status: 'Document Package Created',
           timestamp: new Date().toISOString(),
           notes: 'All required documents compiled and ready for submission',
+          source: 'manual'
         },
       ],
     };

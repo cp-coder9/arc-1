@@ -3,7 +3,9 @@
  * Handles in-app, email (SendGrid), and push (FCM) notifications
  */
 
+import { apiFetch } from '../lib/apiClient';
 import { db } from '../lib/firebase';
+import { toast } from 'sonner';
 import {
   collection,
   addDoc,
@@ -15,9 +17,10 @@ import {
   orderBy,
   limit,
   getDocs,
+  getDoc,
   writeBatch
 } from 'firebase/firestore';
-import { Notification, NotificationType } from '../types';
+import { Notification, NotificationPreferences, NotificationType } from '../types';
 
 // Notification types with their default channels
 const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: ('in_app' | 'email' | 'push')[] }> = {
@@ -69,10 +72,76 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Invoice Paid',
     channels: ['in_app', 'email', 'push'],
   },
+  firm_invite: {
+    title: 'Firm Invitation',
+    channels: ['in_app', 'email'],
+  },
+  firm_invite_accepted: {
+    title: 'Firm Invitation Accepted',
+    channels: ['in_app', 'email'],
+  },
+  firm_role_changed: {
+    title: 'Firm Role Updated',
+    channels: ['in_app', 'email'],
+  },
+  firm_member_removed: {
+    title: 'Firm Access Removed',
+    channels: ['in_app', 'email'],
+  },
+  firm_subscription_updated: {
+    title: 'Firm Subscription Updated',
+    channels: ['in_app', 'email'],
+  },
+  directory_invitation: {
+    title: 'Directory Invitation',
+    channels: ['in_app', 'email'],
+  },
+  material_request_created: {
+    title: 'Material Request Created',
+    channels: ['in_app', 'email'],
+  },
+  material_quote_received: {
+    title: 'Material Quote Received',
+    channels: ['in_app', 'email', 'push'],
+  },
+  procurement_order_updated: {
+    title: 'Procurement Order Updated',
+    channels: ['in_app', 'email'],
+  },
+  cpd_course_published: {
+    title: 'CPD Course Published',
+    channels: ['in_app', 'email'],
+  },
+  cpd_certificate_issued: {
+    title: 'CPD Certificate Issued',
+    channels: ['in_app', 'email', 'push'],
+  },
+  subscription_status_changed: {
+    title: 'Subscription Status Changed',
+    channels: ['in_app', 'email'],
+  },
+  refund_processed: {
+    title: 'Refund Processed',
+    channels: ['in_app', 'email'],
+  },
+  contractor_delivery_update: {
+    title: 'Contractor Delivery Update',
+    channels: ['in_app', 'email', 'push'],
+  },
 };
 
 class NotificationService {
   private unsubscribeFns: Map<string, () => void> = new Map();
+
+  private async getUserPreferences(userId: string): Promise<NotificationPreferences> {
+    const userSnap = await getDoc(doc(db, 'users', userId));
+    const preferences = userSnap.data()?.notificationPreferences as Partial<NotificationPreferences> | undefined;
+    return {
+      in_app: preferences?.in_app ?? true,
+      email: preferences?.email ?? true,
+      push: preferences?.push ?? true,
+    };
+  }
 
   /**
    * Send a notification to a user
@@ -81,9 +150,13 @@ class NotificationService {
     userId: string,
     type: NotificationType,
     body: string,
-    data?: { jobId?: string; submissionId?: string; senderId?: string; applicationId?: string }
+    data?: Notification['data']
   ): Promise<void> {
     const config = NOTIFICATION_CONFIG[type];
+    const preferences = await this.getUserPreferences(userId);
+    const channels = config.channels.filter(channel => preferences[channel]);
+
+    if (channels.length === 0) return;
 
     const notification: Omit<Notification, 'id'> = {
       userId,
@@ -92,16 +165,16 @@ class NotificationService {
       body,
       data: data || {},
       isRead: false,
-      channels: config.channels,
+      channels,
       createdAt: new Date().toISOString(),
-      deliveryStatus: 'pending' as any, // Tracked by the server.ts notification worker
+      deliveryStatus: 'pending', // Tracked by the server.ts notification worker
     };
 
     // Save to Firestore (triggers Cloud Function for email/push)
     await addDoc(collection(db, 'notifications'), notification);
 
     // Also send in-app immediately
-    if (config.channels.includes('in_app')) {
+    if (channels.includes('in_app')) {
       this.showToast(notification.title, body, type);
     }
   }
@@ -184,27 +257,38 @@ class NotificationService {
    * Show toast notification
    */
   private showToast(title: string, body: string, type: NotificationType): void {
-    // Import toast dynamically to avoid circular dependency
-    import('sonner').then(({ toast }) => {
-      const icons: Record<NotificationType, string> = {
-        job_application: '👤',
-        application_accepted: '✅',
-        drawing_submitted: '📄',
-        ai_review_complete: '🤖',
-        admin_approval: '✅',
-        admin_rejection: '❌',
-        payment_released: '💰',
-        message: '💬',
-        milestone_due: '⏰',
-        council_update: '🏛️',
-        invoice_sent: '📄',
-        invoice_paid: '💰',
-      };
+    const icons: Record<NotificationType, string> = {
+      job_application: '👤',
+      application_accepted: '✅',
+      drawing_submitted: '📄',
+      ai_review_complete: '🤖',
+      admin_approval: '✅',
+      admin_rejection: '❌',
+      payment_released: '💰',
+      message: '💬',
+      milestone_due: '⏰',
+      council_update: '🏛️',
+      invoice_sent: '📄',
+      invoice_paid: '💰',
+      firm_invite: '🏢',
+      firm_invite_accepted: '✅',
+      firm_role_changed: '🪪',
+      firm_member_removed: '🚪',
+      firm_subscription_updated: '🏢',
+      directory_invitation: '📨',
+      material_request_created: '📦',
+      material_quote_received: '🏷️',
+      procurement_order_updated: '🚚',
+      cpd_course_published: '🎓',
+      cpd_certificate_issued: '📜',
+      subscription_status_changed: '💳',
+      refund_processed: '↩️',
+      contractor_delivery_update: '🏗️',
+    };
 
-      toast(`${icons[type] || '🔔'} ${title}`, {
-        description: body,
-        duration: 5000,
-      });
+    toast(`${icons[type] || '🔔'} ${title}`, {
+      description: body,
+      duration: 5000,
     });
   }
 
@@ -214,6 +298,10 @@ class NotificationService {
   cleanup(): void {
     this.unsubscribeFns.forEach(unsubscribe => unsubscribe());
     this.unsubscribeFns.clear();
+  }
+
+  unsubscribe(): void {
+    this.cleanup();
   }
 
   /**
@@ -226,7 +314,7 @@ class NotificationService {
       const user = auth.currentUser;
       if (!user) return;
       const idToken = await user.getIdToken();
-      await fetch('/api/notifications/token', {
+      await apiFetch('/api/notifications/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -250,6 +338,15 @@ class NotificationService {
       'job_application',
       `${architectName} applied for "${jobTitle}"`,
       { jobId }
+    );
+  }
+
+  async notifyJobApplication(clientId: string, architectId: string, jobId: string, applicationId: string): Promise<void> {
+    await this.sendNotification(
+      clientId,
+      'job_application',
+      `${architectId} applied for your job`,
+      { jobId, applicationId }
     );
   }
 
@@ -346,6 +443,24 @@ class NotificationService {
     );
   }
 
+  async notifyMessage(recipientId: string, senderId: string, body: string, jobId: string): Promise<void> {
+    await this.sendNotification(
+      recipientId,
+      'message',
+      body,
+      { jobId, senderId }
+    );
+  }
+
+  async notifyMilestoneDue(architectId: string, milestone: string, jobId: string, daysUntilDue: number): Promise<void> {
+    await this.sendNotification(
+      architectId,
+      'milestone_due',
+      `${milestone} milestone is due in ${daysUntilDue} days`,
+      { jobId }
+    );
+  }
+
   /**
    * Notify client of council update
    */
@@ -411,7 +526,7 @@ class NotificationService {
   ): Promise<void> {
     await this.sendNotification(
       clientId,
-      'payment_released',
+      'refund_processed',
       `Refund of R${amount.toLocaleString()} processed. Reason: ${reason}`,
       { jobId }
     );
@@ -438,6 +553,114 @@ class NotificationService {
       'invoice_paid',
       `Invoice ${invoiceNumber} has been marked as paid`,
       { jobId }
+    );
+  }
+
+  async notifyFirmInvite(userId: string, firmId: string, firmInviteId: string, inviterName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_invite',
+      `${inviterName} invited you to join a firm workspace.`,
+      { firmId, firmInviteId }
+    );
+  }
+
+  async notifyFirmInviteAccepted(userId: string, firmId: string, firmInviteId: string, memberName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_invite_accepted',
+      `${memberName} accepted a firm workspace invitation.`,
+      { firmId, firmInviteId }
+    );
+  }
+
+  async notifyFirmRoleChanged(userId: string, firmId: string, role: string, senderId: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_role_changed',
+      `Your firm workspace role is now ${role.replace('_', ' ')}.`,
+      { firmId, senderId }
+    );
+  }
+
+  async notifyFirmMemberRemoved(userId: string, firmId: string, senderId: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_member_removed',
+      'Your access to a firm workspace has been removed.',
+      { firmId, senderId }
+    );
+  }
+
+  async notifyFirmSubscriptionUpdated(userId: string, firmId: string, subscriptionId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'firm_subscription_updated',
+      `Firm subscription status changed to ${status.replace('_', ' ')}.`,
+      { firmId, subscriptionId }
+    );
+  }
+
+  async notifyMaterialRequestCreated(userId: string, projectId: string, materialRequestId: string, packageName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'material_request_created',
+      `New material request created for ${packageName}.`,
+      { projectId, materialRequestId }
+    );
+  }
+
+  async notifyMaterialQuoteReceived(userId: string, projectId: string, materialRequestId: string, quoteId: string, supplierName: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'material_quote_received',
+      `${supplierName} submitted a material quote.`,
+      { projectId, materialRequestId, quoteId }
+    );
+  }
+
+  async notifyProcurementOrderUpdated(userId: string, projectId: string, procurementOrderId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'procurement_order_updated',
+      `Procurement order status changed to ${status.replace('_', ' ')}.`,
+      { projectId, procurementOrderId }
+    );
+  }
+
+  async notifyCPDCoursePublished(userId: string, courseId: string, courseTitle: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'cpd_course_published',
+      `New CPD course published: ${courseTitle}.`,
+      { courseId }
+    );
+  }
+
+  async notifyCPDCertificateIssued(userId: string, courseId: string, certificateId: string, courseTitle: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'cpd_certificate_issued',
+      `Your CPD certificate for ${courseTitle} is ready.`,
+      { courseId, certificateId }
+    );
+  }
+
+  async notifySubscriptionStatusChanged(userId: string, subscriptionId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'subscription_status_changed',
+      `Subscription status changed to ${status.replace('_', ' ')}.`,
+      { subscriptionId }
+    );
+  }
+
+  async notifyContractorDeliveryUpdate(userId: string, projectId: string, deliveryId: string, status: string): Promise<void> {
+    await this.sendNotification(
+      userId,
+      'contractor_delivery_update',
+      `Contractor delivery status changed to ${status.replace('_', ' ')}.`,
+      { projectId, deliveryId }
     );
   }
 }

@@ -1,29 +1,58 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
 import fs from 'fs';
+import { SPECIALIZED_AGENTS } from './src/services/geminiService';
 
 const config = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
 const app = initializeApp(config);
 const db = getFirestore(app, config.firestoreDatabaseId);
+const reseed = process.argv.includes('--reseed');
 
 async function run() {
   const snap = await getDocs(collection(db, 'agents'));
-  for (const docSnap of snap.docs) {
-    const data = docSnap.data();
-    if (data.name === 'Wall Compliance Agent') {
-      await updateDoc(doc(db, 'agents', docSnap.id), {
-        systemPrompt: "You are a Wall Compliance Specialist. Focus on SANS 10400-K. Check for correct wall thicknesses (e.g., 230mm external, 110mm internal). You MUST specifically check for damp-proof courses (DPC) and the structural integrity of masonry. Ensure all findings comply with SANS 10400-K standards."
-      });
-      console.log('Updated Wall Compliance Agent');
+  const byRole = new Map(snap.docs.map(docSnap => [docSnap.data().role, docSnap]));
+
+  for (const agent of SPECIALIZED_AGENTS) {
+    if (!agent.role) continue;
+    const existing = byRole.get(agent.role);
+    const payload = {
+      ...agent,
+      temperature: agent.temperature ?? 0.1,
+      status: agent.status ?? 'online',
+      lastActive: new Date().toISOString()
+    };
+
+    if (!existing) {
+      await addDoc(collection(db, 'agents'), payload);
+      console.log(`Seeded ${agent.role}`);
+      continue;
     }
-    if (data.name === 'Fenestration & Window Agent') {
-      await updateDoc(doc(db, 'agents', docSnap.id), {
-        systemPrompt: "You are a Fenestration Specialist. Focus on SANS 10400-N. Emphasize natural ventilation requirements (minimum 5% of floor area) and natural lighting requirements (minimum 10% of floor area). You must also specifically check for safety glazing where needed. Ensure all findings comply with SANS 10400-N standards."
-      });
-      console.log('Updated Fenestration & Window Agent');
+
+    if (reseed) {
+      await updateDoc(doc(db, 'agents', existing.id), payload);
+      console.log(`Reseeded ${agent.role}`);
+      continue;
+    }
+
+    const current = existing.data();
+    const patch: Record<string, unknown> = {};
+    for (const field of ['discipline', 'riskLevel', 'standardsCoverage', 'executionModes', 'requiresHumanReview', 'version']) {
+      if (current[field] === undefined && (payload as Record<string, unknown>)[field] !== undefined) {
+        patch[field] = (payload as Record<string, unknown>)[field];
+      }
+    }
+
+    if (Object.keys(patch).length) {
+      await updateDoc(doc(db, 'agents', existing.id), patch);
+      console.log(`Patched ${agent.role}: ${Object.keys(patch).join(', ')}`);
     }
   }
+
   console.log('Done');
   process.exit(0);
 }
-run();
+
+run().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
