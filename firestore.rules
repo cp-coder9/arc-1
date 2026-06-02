@@ -1308,6 +1308,53 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.uploadedBy == request.auth.uid || isAdmin());
     }
 
+    // Agent Workflow collections
+    match /userAgents/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
+    match /projectAgents/{jobId} {
+      allow read: if isAuthenticated() && (canReadProject(jobId) || isAdmin());
+      allow create: if isAuthenticated() && hasRole('client');
+      allow update: if isAuthenticated() && (canReadProject(jobId) || isAdmin());
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
+    match /agentContexts/{agentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
+    match /agentEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Append-only audit trail
+    }
+
+    match /agentRecommendations/{recommendationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
+    match /agentToolInvocations/{invocationId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Append-only audit trail
+    }
+
+    match /agentDecisions/{decisionId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Append-only audit trail
+    }
+
     // Agent Knowledge collection
     match /agent_knowledge/{entryId} {
       allow read: if isAuthenticated();

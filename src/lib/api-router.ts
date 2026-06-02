@@ -25,6 +25,10 @@ import {
   queueVerificationRecheck,
   type ProviderVerificationResult,
 } from "../services/userVerificationService";
+import { AgentService } from "../services/agentWorkflow/agentService";
+import { AgentEventNormalizer } from "../services/agentWorkflow/agentEventNormalizer";
+import { AgentRecommendationService } from "../services/agentWorkflow/agentRecommendationService";
+import type { AgentEvent, AgentOwnerType, AgentSurface, AgentActionStatus } from "../types";
 import { runVerificationBrowserAgent, type VerificationAgentInput } from "../services/verificationAgentService";
 import { analyzeBrief } from "../services/agents/briefingAgent";
 import { DEFAULT_FEE_ESTIMATOR_SETTINGS, estimateArchitecturalFee, type FeeEstimatorInput } from "../services/feeEstimatorService";
@@ -6235,6 +6239,181 @@ router.get("/payment/receipts", async (req, res) => {
     res.json({ receipts, total: paymentMap.size });
   } catch (err: any) {
     console.error("Get receipts error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Agent workflow endpoints
+router.post("/api/agents", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { ownerType, ownerId, context } = req.body;
+
+    if (!ownerType || !ownerId) {
+      return res.status(400).json({ error: "ownerType and ownerId are required" });
+    }
+
+    let agentId;
+    if (ownerType === 'user') {
+      agentId = await AgentService.getOrCreateUserAgent(ownerId);
+    } else if (ownerType === 'project') {
+      agentId = await AgentService.getOrCreateProjectAgent(ownerId);
+    } else {
+      return res.status(400).json({ error: "ownerType must be 'user' or 'project'" });
+    }
+
+    if (context) {
+      await AgentService.updateAgentContext(agentId, context);
+    }
+
+    res.json({ agentId, ownerType, ownerId });
+  } catch (err: any) {
+    console.error("Create agent error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.get("/api/agents/me", apiLimiter, async (req, res) => {
+  try {
+    const { uid } = await verifyAuth(req.headers);
+    const agentId = await AgentService.getOrCreateUserAgent(uid);
+    const context = await AgentService.getAgentContext(agentId);
+    res.json({ agentId, context });
+  } catch (err: any) {
+    console.error("Get agent error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.get("/api/jobs/:jobId/agent", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { jobId } = req.params;
+    const agentId = await AgentService.getOrCreateProjectAgent(jobId);
+    const context = await AgentService.getAgentContext(agentId);
+    res.json({ agentId, context });
+  } catch (err: any) {
+    console.error("Get project agent error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.post("/api/agents/event", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { type, ownerType, ownerId, jobId, userId, phase, source, payload } = req.body;
+
+    if (!type || !ownerType || !ownerId || !source) {
+      return res.status(400).json({ error: "type, ownerType, ownerId, and source are required" });
+    }
+
+    const event = AgentEventNormalizer.normalizeEvent(
+      type,
+      ownerType as AgentOwnerType,
+      ownerId,
+      source as AgentSurface,
+      payload,
+      userId,
+      jobId,
+      phase
+    );
+
+    const recommendation = await AgentRecommendationService.generateRecommendation(event);
+
+    if (recommendation) {
+      res.json({ recommendation });
+    } else {
+      res.status(500).json({ error: "Failed to generate recommendation" });
+    }
+  } catch (err: any) {
+    console.error("Process agent event error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.post("/api/agents/:agentId/recommend", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { agentId } = req.params;
+    const { context, surface } = req.body;
+
+    if (!agentId) {
+      return res.status(400).json({ error: "agentId is required" });
+    }
+
+    // Create a generic event for on-demand recommendation
+    const event = AgentEventNormalizer.normalizeEvent(
+      'on_demand_recommendation',
+      'user' as AgentOwnerType, // Default to user, could be enhanced
+      agentId,
+      surface as AgentSurface || 'dashboard',
+      { context },
+      undefined, // userId would come from auth in real implementation
+      undefined, // jobId
+      undefined  // phase
+    );
+
+    const recommendation = await AgentRecommendationService.generateRecommendation(event);
+
+    if (recommendation) {
+      res.json({ recommendation });
+    } else {
+      res.status(500).json({ error: "Failed to generate recommendation" });
+    }
+  } catch (err: any) {
+    console.error("Generate recommendation error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.post("/api/agents/:agentId/apply", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { agentId } = req.params;
+    const { recommendationId, appliedBy } = req.body;
+
+    if (!agentId || !recommendationId) {
+      return res.status(400).json({ error: "agentId and recommendationId are required" });
+    }
+
+    await AgentRecommendationService.updateRecommendationStatus(
+      recommendationId,
+      'applied' as AgentActionStatus,
+      appliedBy
+    );
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Apply recommendation error:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+});
+
+router.post("/api/jobs/:jobId/chat/agent-message", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { jobId } = req.params;
+    const { message, context } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "message is required" });
+    }
+
+    const event = AgentEventNormalizer.normalizeChatEvent(
+      'agent', // userId would come from auth
+      jobId,
+      message,
+      context
+    );
+
+    // Log the event for audit trail
+    await AgentRecommendationService.logEvent(event);
+
+    // In a full implementation, this would also add the message to the chat
+    // For now, we'll just acknowledge receipt
+    res.json({ success: true, eventId: event.id });
+  } catch (err: any) {
+    console.error("Agent chat message error:", err);
     res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });

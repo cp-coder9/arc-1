@@ -1128,3 +1128,39 @@ export interface InspectionItem {
   result: 'pass' | 'fail' | 'na';
   comment?: string;
 }
+
+// Agent workflow types for platform-wide agent orchestration
+export type AgentOwnerType = 'user' | 'project';
+export type AgentSurface = 'dashboard' | 'chat' | 'notification' | 'document' | 'workflow' | 'admin';
+export type AgentActionStatus = 'draft' | 'suggested' | 'requires_approval' | 'approved' | 'rejected' | 'applied';
+
+export interface AgentEvent {
+  id: string;
+  type: string;
+  ownerType: AgentOwnerType;
+  ownerId: string;
+  jobId?: string;
+  userId?: string;
+  phase?: string;
+  source: AgentSurface;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentRecommendation {
+  id: string;
+  agentId: string;
+  jobId?: string;
+  userId?: string;
+  surface: AgentSurface;
+  title: string;
+  summary: string;
+  suggestedAction?: {
+    label: string;
+    actionType: string;
+    payload: Record<string, unknown>;
+  };
+  status: AgentActionStatus;
+  requiresHumanApproval: boolean;
+  createdAt: string;
+}
