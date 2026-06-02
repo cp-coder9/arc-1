@@ -45,4 +45,4 @@ Because this application uses a custom Express setup (`server.ts`) alongside a V
    - Run `npm run build` during your build step.
    - Start the app via `NODE_ENV=production node server.js` (or use `tsx server.ts` depending on your build target pipeline).
 
-> **Note**: Vercel is primarily designed for stateless serverless functions. While you *could* split your endpoints into Vercel Serverless Functions (`/api/*`), this project is bundled to run as a monolithic Express app. If you plan to deploy the frontend-only on Vercel, ensure the `vercel.json` config routes `/api/*` outward to your Node server.
+> **Deployment policy**: Do not deploy this repository to Vercel. All repository-driven test deployments target `https://test.architex.co.za` from `main` via `.github/workflows/deploy-test-architex.yml`. Feature branches and PRs run verification only; merge reviewed work to `main` for deployment.
