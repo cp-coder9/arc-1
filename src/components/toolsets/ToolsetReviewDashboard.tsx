@@ -49,7 +49,7 @@ export default function ToolsetReviewDashboard({ user }: ToolsetReviewDashboardP
 
   const recommendedTools = recommendTools(toolContext, 'drawing compliance tender boq site log invoice resource marketplace workflow');
   const calculators = listCalculatorsForContext(calculatorContext);
-  const exampleConcreteRun = runCalculator('concreteOrderCalculator', calculatorContext, {
+  const exampleConcreteRun = runCalculator('concrete_order', calculatorContext, {
     elements: [{ label: 'Strip foundation allowance', lengthM: 10, widthM: 0.6, depthM: 0.25, count: 1 }],
     wastePercent: 7,
     truckCapacityM3: 6,
