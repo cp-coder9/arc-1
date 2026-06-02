@@ -11,7 +11,6 @@
     "start": "NODE_ENV=production tsx server.ts",
     "start:api:host": "NODE_ENV=production DISABLE_NOTIFICATION_WORKER=true tsx api-server.ts",
     "build": "node scripts/write-build-info.mjs && vite build",
-    "vercel-build": "node scripts/write-build-info.mjs && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit -p tsconfig.app.json",
@@ -30,7 +29,9 @@
     "deploy:api:bundle": "npm run predeploy:check && node scripts/build-cpanel-api-bundle.mjs",
     "deploy:bundle": "npm run deploy:static:bundle && npm run predeploy:check",
     "install:deps": "npm install",
-    "deploy:static:bundle": "npm run build && node scripts/build-static-upload-bundle.mjs"
+    "deploy:static:bundle": "npm run build && node scripts/build-static-upload-bundle.mjs",
+    "deploy:test:bundle": "VITE_API_BASE_URL=https://api.architex.co.za npm run deploy:static:bundle",
+    "deploy:test:smoke": "SMOKE_INCLUDE_API=1 SMOKE_API_BASE_URL=https://api.architex.co.za npm run smoke:deploy -- https://test.architex.co.za"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

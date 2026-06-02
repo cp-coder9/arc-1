@@ -109,7 +109,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(98);
+    expect(inventory).toHaveLength(105);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -209,6 +209,13 @@ describe('api-router route inventory', () => {
         "GET /payment/:paymentId/receipt",
         "POST /payment/:paymentId/receipt/pdf",
         "GET /payment/receipts",
+        "POST /api/agents",
+        "GET /api/agents/me",
+        "GET /api/jobs/:jobId/agent",
+        "POST /api/agents/event",
+        "POST /api/agents/:agentId/recommend",
+        "POST /api/agents/:agentId/apply",
+        "POST /api/jobs/:jobId/chat/agent-message",
         "GET /firebase/test",
       ]
     `);

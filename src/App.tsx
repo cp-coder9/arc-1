@@ -58,6 +58,7 @@ import {
   Landmark,
   UserCircle,
   HardDrive,
+  Wrench,
   Sparkles,
   Send,
   Building2,
@@ -80,6 +81,7 @@ import {
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
 
+// Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 import { ArchitexThreeExperience } from './components/ArchitexThreeExperience';
 
@@ -149,6 +151,7 @@ const ContractorStaffPlantPage = lazyWithChunkRetry(() => import('./components/C
 const BEPFreelancerJobsPage = lazyWithChunkRetry(() => import('./components/BEPFreelancerJobsPage'));
 const SANSComplianceFormsPage = lazyWithChunkRetry(() => import('./components/SANSComplianceFormsPage'));
 const CPDAssessmentPage = lazyWithChunkRetry(() => import('./components/CPDAssessmentPage'));
+const ToolsetReviewDashboard = lazyWithChunkRetry(() => import('./components/toolsets/ToolsetReviewDashboard'));
 const DrawingRegisterPage = lazyWithChunkRetry(() => import('./components/DrawingRegisterPage'));
 const AdminGovernanceConsolePage = lazyWithChunkRetry(() => import('./components/AdminGovernanceConsolePage'));
 
@@ -199,6 +202,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'command', label: 'Command Centre', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <LayoutDashboard size={18} />, summary: 'Role-aware dashboard landing page for priorities, project state, and next decisions.', backedBy: ['role dashboards', 'active project data'] },
   { id: 'profile', label: 'Profile Editor', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <UserCircle size={18} />, summary: 'Canonical profile surface reused for verification, contracts, invoices, procurement, matching, and governance.', backedBy: ['UserSettings', 'ProfileEditor'] },
   { id: 'toolbox', label: 'Project Toolbox', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Files size={18} />, summary: 'Guided, role-aware project tools and checklists from the backend.html reference.', backedBy: ['FileManager', 'current project metadata'] },
+  { id: 'toolset-review', label: 'Toolset Review', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Wrench size={18} />, summary: 'Amy/Greg role-aware toolset registry, calculator toolbox, guarded recommendations, and implementation coverage.', backedBy: ['toolset registry', 'calculator service', 'implementation manifests'] },
   { id: 'journey', label: 'Project Journey', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Workflow size={18} />, summary: 'Lifecycle navigation shell for stage progress, decisions, and next actions.', backedBy: ['StageProgressTracker', 'AdvanceStageButton'] },
   { id: 'tasks', label: 'Tasks & Approvals', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <ClipboardCheck size={18} />, summary: 'Role-filtered task and approval command surface.', backedBy: ['delegatedTasks', 'job status workflows'] },
   { id: 'messages', label: 'Project Messenger', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Mail size={18} />, summary: 'Native project chat applet and desktop message centre for phase-aware capture, AI draft suggestions, conversions, approvals, and audit links.', backedBy: ['ProjectChatApplet', 'ProjectMessageCentre', 'projectCommunicationCentreService'] },
@@ -255,6 +259,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'admin-console',
   'design',
   'toolbox',
+  'toolset-review',
   'freelancer-work',
   'freelancer-submissions',
   'resource-sharing',
@@ -1165,6 +1170,7 @@ export default function App() {
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
+              {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}
               {activeTab === 'freelancer-work' && <FreelancerDashboard user={user} />}
               {activeTab === 'freelancer-submissions' && <FreelancerSubmissionsPage user={user} />}
               {activeTab === 'resource-sharing' && <ResourceSharingPage user={user} />}

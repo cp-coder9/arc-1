@@ -1,0 +1,358 @@
+{
+  "packName": "Architex Comprehensive Built Environment User Toolset",
+  "version": "0.1-draft",
+  "repoContext": {
+    "repo": "https://github.com/cp-coder9/arc-1",
+    "branch": "main",
+    "headInspected": "8541ede",
+    "currentEmbeddedTools": [
+      "role dashboards",
+      "fee estimator",
+      "tender wizard",
+      "bid submission/evaluation",
+      "Gantt chart",
+      "site logs",
+      "RFIs",
+      "invoice management",
+      "payments/ledger",
+      "file manager",
+      "team/permission services",
+      "workflow agents",
+      "knowledge/compliance services"
+    ],
+    "missingOrThinAreas": [
+      "plant/equipment management",
+      "workforce attendance/payroll export",
+      "procurement/PO/GRN/invoice matching",
+      "document control registers/transmittals",
+      "subcontractor package commercial controls",
+      "supplier portal/catalogue/order tracking",
+      "resource planning and profitability",
+      "AI drawing/model reader for PDF, DWG/DXF, IFC/BIM/Revit-derived exports, scans and schedules",
+      "SANS/NBR, land-use and municipality-specific compliance pre-checks from drawing intelligence",
+      "pre-populated BoM/BoQ linked to editable quotes, project programmes and drawdown schedules",
+      "architect/lead-consultant snag walk, allocation and re-inspection tools",
+      "resource sharing centre / freelancer and candidate-professional marketplace workflow"
+    ]
+  },
+  "benchmarks": [
+    {
+      "id": "gobuild360",
+      "url": "https://www.gobuild360.io/",
+      "inspiration": [
+        "supplier/customer portal",
+        "quotes/orders/delivery tracking",
+        "ERP integration",
+        "BoM/material ordering"
+      ]
+    },
+    {
+      "id": "fencalc",
+      "url": "https://fencalc.co.za/",
+      "inspiration": [
+        "SANS 10400-XA project calculators",
+        "live validation",
+        "council-ready PDF reports"
+      ]
+    },
+    {
+      "id": "buildsmart",
+      "url": "https://www.rib-software.com/en/products/rib-buildsmart",
+      "inspiration": [
+        "construction ERP",
+        "procurement",
+        "subcontractor management",
+        "plant",
+        "payroll/costing",
+        "actuals vs allowable"
+      ]
+    },
+    {
+      "id": "allwage",
+      "url": "https://www.allwage.com/",
+      "inspiration": [
+        "SA time and attendance",
+        "activity monitoring",
+        "payroll export/compliance",
+        "WhatsApp workforce access"
+      ]
+    },
+    {
+      "id": "clickup",
+      "url": "https://clickup.com/",
+      "inspiration": [
+        "convenient task views",
+        "forms",
+        "dashboards",
+        "automations",
+        "docs",
+        "guest collaboration"
+      ]
+    },
+    {
+      "id": "fresh_projects",
+      "url": "https://www.gofreshprojects.com/",
+      "inspiration": [
+        "A&E fee proposals",
+        "resource planning",
+        "timesheets",
+        "profitability",
+        "forecasting",
+        "accounting integrations"
+      ]
+    },
+    {
+      "id": "procore_acc_fieldwire",
+      "url": "benchmark-set",
+      "inspiration": [
+        "construction document control",
+        "RFIs/submittals",
+        "field capture",
+        "quality/safety",
+        "cost controls"
+      ]
+    },
+    {
+      "id": "rib_candy_sage_hilti",
+      "url": "benchmark-set",
+      "inspiration": [
+        "estimating/BOQ",
+        "accounting/job cost",
+        "plant/tool asset management"
+      ]
+    }
+  ],
+  "toolFamilies": [
+    {
+      "id": "client_developer",
+      "tools": [
+        "brief_builder",
+        "budget_soft_cost_estimator",
+        "team_selection_comparator",
+        "proposal_approval",
+        "escrow_schedule_viewer",
+        "variation_approval",
+        "handover_checklist"
+      ]
+    },
+    {
+      "id": "architect_lead_consultant",
+      "tools": [
+        "scope_proposal_terms",
+        "consultant_team_builder",
+        "phase_plan",
+        "document_register",
+        "submission_readiness",
+        "tender_package_builder",
+        "bid_adjudication",
+        "site_instruction",
+        "payment_certificate_review",
+        "closeout_pack",
+        "ai_drawing_compliance_reader",
+        "land_use_municipal_precheck",
+        "lead_consultant_snag_walk",
+        "snag_allocation_reinspection"
+      ]
+    },
+    {
+      "id": "bep_consultant",
+      "tools": [
+        "discipline_calculators",
+        "deliverables_checklist",
+        "rfi_response",
+        "compliance_evidence_register",
+        "report_builder",
+        "time_expense",
+        "resource_capacity",
+        "signoff_register",
+        "discipline_drawing_takeoff_check",
+        "candidate_professional_review_gate"
+      ]
+    },
+    {
+      "id": "contractor",
+      "tools": [
+        "tender_review",
+        "boq_takeoff",
+        "rate_buildup",
+        "supplier_subcontractor_rfq",
+        "bid_methodology",
+        "construction_programme",
+        "lookahead",
+        "site_diary",
+        "labour_productivity",
+        "plant_allocation",
+        "procurement_po_grn",
+        "variation_claims",
+        "payment_valuation",
+        "snag_closeout",
+        "ai_drawing_takeoff_bom_boq",
+        "editable_quote_programme_drawdown",
+        "programme_boq_cashflow_link"
+      ]
+    },
+    {
+      "id": "subcontractor",
+      "tools": [
+        "package_review",
+        "quote_buildup",
+        "crew_planner",
+        "safety_file",
+        "progress_photos",
+        "daywork_sheet",
+        "variation_claim",
+        "payment_application",
+        "retention_release",
+        "package_bom_boq_review",
+        "subcontract_quote_programme_drawdown"
+      ]
+    },
+    {
+      "id": "supplier",
+      "tools": [
+        "catalogue_pricelist",
+        "bom_rfq_response",
+        "quote_normaliser",
+        "order_delivery_tracking",
+        "proof_of_delivery",
+        "materials_on_site",
+        "invoice_matching",
+        "product_substitution_approval"
+      ]
+    },
+    {
+      "id": "site_manager",
+      "tools": [
+        "daily_diary",
+        "photo_tagging",
+        "activity_progress",
+        "inspection_checklist",
+        "ncr_snag",
+        "toolbox_talk_safety",
+        "delivery_ticket",
+        "plant_fuel_log",
+        "delay_event",
+        "weekly_report",
+        "architect_snag_walk_support"
+      ]
+    },
+    {
+      "id": "freelancer_candidate_professional",
+      "tools": [
+        "profile_portfolio_registration",
+        "availability_capacity_calendar",
+        "rate_card_quote_builder",
+        "task_package_acceptance",
+        "deliverables_review_gate",
+        "timesheet_expense_progress_claim",
+        "supervision_signoff_routing",
+        "resource_sharing_listing_booking"
+      ]
+    },
+    {
+      "id": "firm_admin_platform",
+      "tools": [
+        "verification_dashboard",
+        "document_expiry_tracker",
+        "template_admin",
+        "calculator_version_admin",
+        "agent_governance",
+        "audit_log",
+        "platform_fee_reconciliation",
+        "marketplace_quality",
+        "knowledge_manager"
+      ]
+    }
+  ],
+  "workflowPhases": [
+    "lead",
+    "brief_feasibility",
+    "proposal_appointment",
+    "design_coordination",
+    "municipal_submission",
+    "tender_procurement",
+    "construction_execution",
+    "payments_commercial_control",
+    "closeout",
+    "operations_post_occupancy"
+  ],
+  "agenticPrinciples": [
+    "role filtered",
+    "phase aware",
+    "object action based",
+    "project record saving",
+    "human signoff gated",
+    "South Africa localized",
+    "export driven",
+    "audit snapshotted",
+    "drawing intelligence uses source revision and confidence scoring",
+    "quantities are pre-populated but editable and review-gated",
+    "candidate-professional outputs require registered professional signoff where applicable",
+    "resource sharing centre can be a platform income stream"
+  ],
+  "coreAgents": [
+    "tool_router_agent",
+    "workflow_orchestrator_agent",
+    "briefing_agent",
+    "proposal_agent",
+    "compliance_agent",
+    "document_control_agent",
+    "tender_agent",
+    "procurement_agent",
+    "cost_agent",
+    "site_agent",
+    "resource_agent",
+    "plant_agent",
+    "claims_agent",
+    "finance_escrow_agent",
+    "closeout_agent",
+    "governance_agent",
+    "drawing_intelligence_agent",
+    "land_use_municipal_compliance_agent",
+    "bom_boq_agent",
+    "programme_drawdown_agent",
+    "snag_agent",
+    "resource_marketplace_agent",
+    "candidate_professional_supervision_agent"
+  ],
+  "storageCollections": [
+    "projects/{projectId}/tool_runs",
+    "projects/{projectId}/workflow_recommendations",
+    "projects/{projectId}/procurement_packages",
+    "projects/{projectId}/plant_equipment",
+    "projects/{projectId}/attendance_logs",
+    "tender_packages/{tenderPackageId}/tool_runs",
+    "projects/{projectId}/drawing_extractions",
+    "projects/{projectId}/compliance_checks",
+    "projects/{projectId}/bom_boq_sets",
+    "projects/{projectId}/drawdown_schedules",
+    "projects/{projectId}/snag_items",
+    "resource_marketplace/listings",
+    "resource_marketplace/bookings"
+  ],
+  "exportTargets": [
+    "task",
+    "tender_line",
+    "bid_line",
+    "boq_item",
+    "rfq",
+    "purchase_order",
+    "goods_received_note",
+    "site_log",
+    "rfi",
+    "variation",
+    "payment_valuation",
+    "invoice",
+    "escrow_release",
+    "compliance_report",
+    "closeout_pack",
+    "bom_item",
+    "editable_quote",
+    "programme_activity",
+    "cashflow_item",
+    "drawdown_schedule",
+    "snag_item",
+    "resource_listing",
+    "resource_booking"
+  ]
+}

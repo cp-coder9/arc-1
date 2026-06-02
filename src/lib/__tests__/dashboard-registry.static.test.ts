@@ -136,7 +136,7 @@ describe('canonical dashboard page registry', () => {
 
 
   it('pins the full role navigation matrix for every canonical role and page', () => {
-    const sharedPageIds = ['command', 'profile', 'toolbox', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai'];
+    const sharedPageIds = ['command', 'profile', 'toolbox', 'toolset-review', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai'];
     const expectedPagesByRole: Record<string, string[]> = {
       client: [...sharedPageIds, 'client-intake', 'client-proposals', 'directory-search', 'municipal-tracker', 'client-progress', 'drawing-register'],
       bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment'],
@@ -149,7 +149,7 @@ describe('canonical dashboard page registry', () => {
     };
 
     const allPageIds = extractPageIds();
-    expect(allPageIds).toHaveLength(38);
+    expect(allPageIds).toHaveLength(39);
 
     for (const role of canonicalRoles) {
       const actualPagesForRole = allPageIds.filter((pageId) => entryIncludesRole(findPageEntry(pageId), role));
