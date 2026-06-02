@@ -1,261 +1,127 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { Router } from 'express';
-import apiRouter from '../api-router';
+// @vitest-environment node
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AgentEventNormalizer } from '../../services/agentWorkflow/agentEventNormalizer';
+import { AgentRecommendationService } from '../../services/agentWorkflow/agentRecommendationService';
 
-// Mock the agent services
-vi.mock('../services/agentWorkflow/agentService', () => ({
-  AgentService: {
-    getOrCreateUserAgent: vi.fn(),
-    getOrCreateProjectAgent: vi.fn(),
-    getAgentContext: vi.fn(),
-    updateAgentContext: vi.fn(),
-  },
-}));
-vi.mock('../services/agentWorkflow/agentEventNormalizer', () => ({
-  default: {
-    normalizeEvent: vi.fn(),
-  },
-}));
-vi.mock('../services/agentWorkflow/agentRecommendationService', () => ({
-  AgentRecommendationService: {
-    generateRecommendation: vi.fn(),
-    saveRecommendation: vi.fn(),
-    getRecommendationsForOwner: vi.fn(),
-    updateRecommendationStatus: vi.fn(),
-    logEvent: vi.fn(),
-    logToolInvocation: vi.fn(),
-    logDecision: vi.fn(),
-  },
+const firestoreMocks = vi.hoisted(() => ({
+  setDocMock: vi.fn(),
+  updateDocMock: vi.fn(),
+  getDocsMock: vi.fn(),
+  docMock: vi.fn((_dbOrCollection, collectionName?: string, id?: string) => ({
+    collectionName,
+    id: id ?? 'generated-doc-id',
+  })),
+  collectionMock: vi.fn((_db, collectionName: string) => ({ collectionName })),
 }));
 
-// Mock the verifyAuth function
-vi.mock('../middleware/verifyAuth', () => ({
-  verifyAuth: vi.fn().mockResolvedValue({ uid: 'test-user-id' }),
+const { setDocMock, updateDocMock, getDocsMock, docMock, collectionMock } = firestoreMocks;
+
+vi.mock('@/lib/firebase', () => ({
+  db: { mocked: true },
 }));
 
-// Mock the rate limiter
-vi.mock('express-rate-limit', () => {
-  return vi.fn().mockImplementation((options) => {
-    return (req, res, next) => next();
-  });
-});
+vi.mock('firebase/firestore', () => ({
+  collection: firestoreMocks.collectionMock,
+  doc: firestoreMocks.docMock,
+  getDoc: vi.fn(),
+  getDocs: firestoreMocks.getDocsMock,
+  limit: vi.fn((count: number) => ({ type: 'limit', count })),
+  orderBy: vi.fn((field: string, direction: string) => ({ type: 'orderBy', field, direction })),
+  query: vi.fn((...parts: unknown[]) => ({ parts })),
+  setDoc: firestoreMocks.setDocMock,
+  updateDoc: firestoreMocks.updateDocMock,
+  where: vi.fn((field: string, op: string, value: unknown) => ({ type: 'where', field, op, value })),
+}));
 
-describe('Agent Workflow API Endpoints', () => {
-  let router: Router;
+vi.mock('../../services/agents/briefingAgent', () => ({
+  analyzeBrief: vi.fn(),
+}));
 
+describe('agent workflow services', () => {
   beforeEach(() => {
-    // Reset all mocks before each test
     vi.clearAllMocks();
-    router = Router();
-    router.use('/api', apiRouter);
+    setDocMock.mockResolvedValue(undefined);
+    updateDocMock.mockResolvedValue(undefined);
+    getDocsMock.mockResolvedValue({ docs: [] });
   });
 
-  describe('POST /api/agents', () => {
-    it('should create a user agent', async () => {
-      const mockAgentId = 'user-agent-123';
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentService').AgentService.getOrCreateUserAgent.mockResolvedValue(mockAgentId);
+  it('normalizes a job-created event as a project-owned workflow event', () => {
+    const event = AgentEventNormalizer.normalizeJobCreationEvent(
+      'user-123',
+      'job-123',
+      { description: 'Design a clinic reception extension' },
+    );
 
-      const res = await router.handle(
-        {
-          method: 'POST',
-          url: '/api/agents',
-          headers: { authorization: 'Bearer fake-token' },
-          body: { ownerType: 'user', ownerId: 'user-123', context: { test: true } },
-        },
-        { status: 200 }
-      );
-
-      expect(res.statusCode).toBe(200);
-      expect(res._getJSON()).toEqual({
-        agentId: mockAgentId,
-        ownerType: 'user',
-        ownerId: 'user-123',
-      });
+    expect(event).toMatchObject({
+      type: 'job_created',
+      ownerType: 'project',
+      ownerId: 'job-123',
+      jobId: 'job-123',
+      userId: 'user-123',
+      source: 'workflow',
     });
-
-    it('should create a project agent', async () => {
-      const mockAgentId = 'project-agent-456';
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentService').AgentService.getOrCreateProjectAgent.mockResolvedValue(mockAgentId);
-
-      const res = await router.handle(
-        {
-          method: 'POST',
-          url: '/api/agents',
-          headers: { authorization: 'Bearer fake-token' },
-          body: { ownerType: 'project', ownerId: 'job-123', context: { stage: 'intake' } },
-        },
-        { status: 200 }
-      );
-
-      expect(res.statusCode).toBe(200);
-      expect(res._getJSON()).toEqual({
-        agentId: mockAgentId,
-        ownerType: 'project',
-        ownerId: 'job-123',
-      });
+    expect(event.payload).toMatchObject({
+      createdBy: 'user-123',
+      jobData: { description: 'Design a clinic reception extension' },
     });
-
-    it('should return 400 for invalid ownerType', async () => {
-      const res = await router.handle(
-        {
-          method: 'POST',
-          url: '/api/agents',
-          headers: { authorization: 'Bearer fake-token' },
-          body: { ownerType: 'invalid', ownerId: '123' },
-        },
-        { status: 400 }
-      );
-
-      expect(res.statusCode).toBe(400);
-      expect(res._getJSON().error).toContain('ownerType must be');
-    });
+    expect(event.id).toContain('job_created_job-123_');
   });
 
-  describe('GET /api/agents/me', () => {
-    it('should return the current user agent and context', async () => {
-      const mockAgentId = 'user-agent-789';
-      const mockContext = { id: mockAgentId, ownerType: 'user', ownerId: 'user-123', context: { test: true }, updatedAt: new Date().toISOString() };
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentService').AgentService.getOrCreateUserAgent.mockResolvedValue(mockAgentId);
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentService').AgentService.getAgentContext.mockResolvedValue(mockContext);
+  it('normalizes a generic stage event with phase and timestamp payload', () => {
+    const event = AgentEventNormalizer.normalizeEvent(
+      'stage_transitioned',
+      'project',
+      'job-456',
+      'workflow',
+      { fromStage: 'brief', toStage: 'verification' },
+      'user-456',
+      'job-456',
+      'verification',
+    );
 
-      const res = await router.handle(
-        {
-          method: 'GET',
-          url: '/api/agents/me',
-          headers: { authorization: 'Bearer fake-token' },
-        },
-        { status: 200 }
-      );
-
-      expect(res.statusCode).toBe(200);
-      expect(res._getJSON()).toEqual({
-        agentId: mockAgentId,
-        context: mockContext,
-      });
+    expect(event).toMatchObject({
+      type: 'stage_transitioned',
+      ownerType: 'project',
+      ownerId: 'job-456',
+      userId: 'user-456',
+      jobId: 'job-456',
+      phase: 'verification',
+      source: 'workflow',
     });
+    expect(event.payload).toMatchObject({ fromStage: 'brief', toStage: 'verification' });
+    expect(event.payload.timestamp).toEqual(expect.any(String));
   });
 
-  describe('GET /api/jobs/:jobId/agent', () => {
-    it('should return the project agent and context', async () => {
-      const jobId = 'job-456';
-      const mockAgentId = jobId; // as per implementation
-      const mockContext = { id: mockAgentId, ownerType: 'project', ownerId: jobId, context: { stage: 'intake' }, updatedAt: new Date().toISOString() };
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentService').AgentService.getOrCreateProjectAgent.mockResolvedValue(mockAgentId);
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentService').AgentService.getAgentContext.mockResolvedValue(mockContext);
+  it('creates and persists a generic notification recommendation for non-brief events', async () => {
+    const event = AgentEventNormalizer.normalizeEvent(
+      'stage_transitioned',
+      'project',
+      'job-789',
+      'workflow',
+      { toStage: 'construction' },
+      'user-789',
+      'job-789',
+      'construction',
+    );
 
-      const res = await router.handle(
-        {
-          method: 'GET',
-          url: `/api/jobs/${jobId}/agent`,
-          headers: { authorization: 'Bearer fake-token' },
-        },
-        { status: 200 }
-      );
+    const recommendation = await AgentRecommendationService.generateRecommendation(event);
 
-      expect(res.statusCode).toBe(200);
-      expect(res._getJSON()).toEqual({
-        agentId: mockAgentId,
-        context: mockContext,
-      });
+    expect(recommendation).toMatchObject({
+      id: `rec_${event.id}`,
+      agentId: 'platform_agent',
+      jobId: 'job-789',
+      userId: 'user-789',
+      surface: 'notification',
+      title: 'Platform Event Processed',
+      requiresHumanApproval: false,
+      status: 'suggested',
     });
-  });
-
-  describe('POST /api/agents/event', () => {
-    it('should process an event and generate a recommendation', async () => {
-      const mockEvent = {
-        id: 'event-123',
-        type: 'job_created',
-        ownerType: 'project',
-        ownerId: 'job-123',
-        jobId: 'job-123',
-        userId: 'user-123',
-        source: 'workflow',
-        payload: { jobData: { description: 'Test job' } },
-        createdAt: new Date().toISOString(),
-      };
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentEventNormalizer').default.normalizeEvent.mockReturnValue(mockEvent);
-      const mockRecommendation = {
-        id: 'rec-123',
-        agentId: 'briefing_agent',
-        jobId: 'job-123',
-        userId: 'user-123',
-        surface: 'dashboard',
-        title: 'Test Recommendation',
-        summary: 'Test summary',
-        suggestedAction: { label: 'Test', actionType: 'test', payload: {} },
-        status: 'suggested',
-        requiresHumanApproval: true,
-        createdAt: new Date().toISOString(),
-      };
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentRecommendationService').AgentRecommendationService.generateRecommendation.mockResolvedValue(mockRecommendation);
-
-      const res = await router.handle(
-        {
-          method: 'POST',
-          url: '/api/agents/event',
-          headers: { authorization: 'Bearer fake-token' },
-          body: {
-            type: 'job_created',
-            ownerType: 'project',
-            ownerId: 'job-123',
-            source: 'workflow',
-            payload: { jobData: { description: 'Test job' } },
-            userId: 'user-123',
-            jobId: 'job-123',
-          },
-        },
-        { status: 200 }
-      );
-
-      expect(res.statusCode).toBe(200);
-      expect(res._getJSON()).toEqual({ recommendation: mockRecommendation });
+    expect(recommendation?.suggestedAction).toMatchObject({
+      label: 'View Details',
+      actionType: 'view_event_details',
+      payload: { eventId: event.id },
     });
-
-    it('should return 500 if recommendation generation fails', async () => {
-      const mockEvent = {
-        id: 'event-123',
-        type: 'job_created',
-        ownerType: 'project',
-        ownerId: 'job-123',
-        jobId: 'job-123',
-        userId: 'user-123',
-        source: 'workflow',
-        payload: { jobData: { description: 'Test job' } },
-        createdAt: new Date().toISOString(),
-      };
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentEventNormalizer').default.normalizeEvent.mockReturnValue(mockEvent);
-      // @ts-expect-error - mocking
-      require('../services/agentWorkflow/agentRecommendationService').AgentRecommendationService.generateRecommendation.mockResolvedValue(null);
-
-      const res = await router.handle(
-        {
-          method: 'POST',
-          url: '/api/agents/event',
-          headers: { authorization: 'Bearer fake-token' },
-          body: {
-            type: 'job_created',
-            ownerType: 'project',
-            ownerId: 'job-123',
-            source: 'workflow',
-            payload: { jobData: { description: 'Test job' } },
-            userId: 'user-123',
-            jobId: 'job-123',
-          },
-        },
-        { status: 500 }
-      );
-
-      expect(res.statusCode).toBe(500);
-      expect(res._getJSON().error).toBe('Failed to generate recommendation');
-    });
+    expect(collectionMock).toHaveBeenCalledWith({ mocked: true }, 'agentRecommendations');
+    expect(setDocMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: `rec_${event.id}` }));
   });
 });
