@@ -47,7 +47,8 @@ import {
   Settings2,
   CreditCard,
   UserCircle,
-  HardDrive
+  HardDrive,
+  Wrench
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -60,6 +61,7 @@ import AdminDashboard from './components/AdminDashboard';
 import UserSettings from './components/UserSettings';
 import InvoiceManagement from './components/InvoiceManagement';
 import FileManager from './components/FileManager';
+import ToolsetReviewDashboard from './components/toolsets/ToolsetReviewDashboard';
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 
 export default function App() {
@@ -547,6 +549,12 @@ const handleLogin = async () => {
             active={activeTab === 'projects'} 
             onClick={() => { setActiveTab('projects'); setIsSidebarOpen(false); }} 
           />
+          <NavItem 
+            icon={<Wrench size={18} />} 
+            label="Toolsets" 
+            active={activeTab === 'toolsets'} 
+            onClick={() => { setActiveTab('toolsets'); setIsSidebarOpen(false); }} 
+          />
           {user!.role === 'admin' && (
             <>
               <NavItem 
@@ -649,8 +657,9 @@ const handleLogin = async () => {
             {activeTab === 'invoices' && <InvoiceManagement user={user!} />}
             {activeTab === 'files' && <FileManager user={user!} />}
             {activeTab === 'profile-settings' && <UserSettings user={user!} />}
+            {activeTab === 'toolsets' && <ToolsetReviewDashboard user={user!} />}
             
-            {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings') && (
+            {(activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'toolsets') && (
               <>
                 {user!.role === 'client' && <ClientDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}
                 {user!.role === 'architect' && <ArchitectDashboard user={user!} activeTab={activeTab} onTabChange={setActiveTab} />}

@@ -1,0 +1,237 @@
+{
+  "packName": "Architex BEP Contractor Subcontractor Calculator Toolbox",
+  "version": "0.1-draft",
+  "jurisdiction": "South Africa",
+  "repoContext": {
+    "repo": "https://github.com/cp-coder9/arc-1",
+    "branch": "main",
+    "headInspected": "8541ede",
+    "integrationPoints": [
+      "src/components/BEPDashboard.tsx",
+      "src/components/ContractorDashboard.tsx",
+      "src/services/tenderService.ts",
+      "src/services/constructionService.ts",
+      "src/types.ts"
+    ]
+  },
+  "calculatorFamilies": [
+    {
+      "id": "xa_energy",
+      "label": "SANS 10400-XA / Energy",
+      "roles": [
+        "architect",
+        "bep",
+        "energy_professional",
+        "contractor"
+      ],
+      "calculators": [
+        "xa_fenestration_quick_check",
+        "xa_roof_rvalue_check",
+        "xa_wall_rvalue_check",
+        "hot_water_energy_checklist",
+        "edge_early_sustainability_estimator"
+      ]
+    },
+    {
+      "id": "structural",
+      "label": "Structural",
+      "roles": [
+        "engineer",
+        "bep",
+        "contractor"
+      ],
+      "calculators": [
+        "beam_quick_check",
+        "section_properties",
+        "preliminary_steel_member",
+        "pad_footing_bearing",
+        "retaining_wall_precheck",
+        "concrete_volume_rebar_allowance"
+      ]
+    },
+    {
+      "id": "civil_stormwater",
+      "label": "Civil / Drainage / Stormwater",
+      "roles": [
+        "engineer",
+        "bep",
+        "contractor"
+      ],
+      "calculators": [
+        "rational_method_runoff",
+        "manning_pipe_flow",
+        "stormwater_attenuation",
+        "pipe_gradient_invert",
+        "earthworks_cut_fill",
+        "rainwater_tank_sizing"
+      ]
+    },
+    {
+      "id": "electrical",
+      "label": "Electrical",
+      "roles": [
+        "engineer",
+        "bep",
+        "subcontractor"
+      ],
+      "calculators": [
+        "voltage_drop",
+        "cable_sizing_derating",
+        "db_load_estimate",
+        "lighting_lumen_method",
+        "pv_preliminary_sizing",
+        "battery_inverter_sizing"
+      ]
+    },
+    {
+      "id": "mechanical_hvac",
+      "label": "Mechanical / HVAC",
+      "roles": [
+        "engineer",
+        "bep",
+        "subcontractor"
+      ],
+      "calculators": [
+        "cooling_load_preliminary",
+        "ventilation_air_change",
+        "duct_sizing",
+        "fan_airflow_pressure",
+        "plant_room_allowance",
+        "louver_free_area"
+      ]
+    },
+    {
+      "id": "wet_services",
+      "label": "Wet Services / Plumbing",
+      "roles": [
+        "engineer",
+        "bep",
+        "subcontractor"
+      ],
+      "calculators": [
+        "fixture_unit_water_demand",
+        "soil_waste_pipe_sizing",
+        "hot_water_sizing",
+        "pump_preliminary",
+        "rainwater_greywater",
+        "fire_water_preliminary"
+      ]
+    },
+    {
+      "id": "fire_life_safety",
+      "label": "Fire / Life Safety",
+      "roles": [
+        "fire_engineer",
+        "architect",
+        "bep"
+      ],
+      "calculators": [
+        "occupant_load",
+        "escape_width_exits",
+        "travel_distance_check",
+        "fire_water_storage",
+        "smoke_vent_preliminary",
+        "fire_door_compartment_checklist"
+      ]
+    },
+    {
+      "id": "contractor_trade",
+      "label": "Contractor / Subcontractor / Supplier",
+      "roles": [
+        "contractor",
+        "subcontractor",
+        "supplier",
+        "bep"
+      ],
+      "calculators": [
+        "quantity_takeoff",
+        "concrete_order",
+        "brick_blockwork",
+        "plaster_screed",
+        "paint",
+        "tile_adhesive_grout",
+        "roofing_materials",
+        "drywall_partition",
+        "excavation_trench",
+        "waste_pack_order_optimiser",
+        "labour_productivity",
+        "tender_rate_buildup",
+        "programme_crew_productivity",
+        "variation_daywork_claim",
+        "payment_valuation"
+      ]
+    }
+  ],
+  "standardOutputFields": [
+    "calculatorId",
+    "calculatorVersion",
+    "projectId",
+    "jobId",
+    "tenderPackageId",
+    "bidId",
+    "userId",
+    "role",
+    "discipline",
+    "phase",
+    "locationZone",
+    "inputs",
+    "formulaVersion",
+    "assumptions",
+    "results",
+    "riskStatus",
+    "referenceNotes",
+    "professionalSignoffRequired",
+    "sourceReferences",
+    "nextRecommendedActions",
+    "exportTargets"
+  ],
+  "agenticWorkflow": {
+    "agents": [
+      "toolbox_router_agent",
+      "input_completion_agent",
+      "compliance_caution_agent",
+      "quantity_agent",
+      "tender_agent",
+      "site_agent",
+      "claims_agent",
+      "coordination_agent",
+      "learning_agent"
+    ],
+    "states": [
+      "context_detected",
+      "calculator_suggested",
+      "inputs_prefilled",
+      "inputs_completed",
+      "calculation_run",
+      "risk_checked",
+      "saved_versioned_run",
+      "export_target_selected",
+      "human_signoff_if_required",
+      "downstream_monitoring"
+    ],
+    "exportTargets": [
+      "compliance_report",
+      "tender_boq",
+      "bid_line_item",
+      "supplier_rfq",
+      "site_log",
+      "rfi",
+      "variation_claim",
+      "payment_valuation",
+      "bim_coordination_comment"
+    ]
+  },
+  "sourceExamples": [
+    "https://magnusfjeldolsen.github.io/structural_tools/",
+    "https://sanscalc.co.za/",
+    "https://fencalc.co.za/",
+    "https://architects.blindsolutions.co.za/tools/sans-checker",
+    "https://www.pgsmartglass.co.za/technical-tools/",
+    "https://claybricksa.co.za/calculate-r-value-sabs-sans10400xa",
+    "https://edgebuildings.com/edge-app/",
+    "https://skyciv.com/free-beam-calculator/",
+    "https://calcresource.com/",
+    "https://www.engineeringtoolbox.com/",
+    "https://www.dialux.com/"
+  ]
+}
