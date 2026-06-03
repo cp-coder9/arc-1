@@ -18,7 +18,7 @@ import { getIdToken } from 'firebase/auth';
 import { LedgerEntry, Payment, Escrow, EscrowMilestone, EscrowV2, Job, Project, ProjectStage, PROJECT_STAGE_ORDER, UserProfile } from '../types';
 import { notificationService } from './notificationService';
 import { recordTransaction } from './financialLedgerService';
-import { PRD_PLATFORM_FEE_PERCENTAGE, calculateSplitPlatformFee } from './platformFeePolicy';
+import { calculateSplitPlatformFee } from './platformFeePolicy';
 import { toast } from 'sonner';
 import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
@@ -77,7 +77,6 @@ const PAYFAST_CONFIG = {
     : 'https://www.payfast.co.za/eng/process',
 };
 
-const PLATFORM_FEE_PERCENTAGE = PRD_PLATFORM_FEE_PERCENTAGE;
 const VAT_PERCENTAGE = 0.15;
 
 const STAGE_ESCROW_MILESTONES: Array<{ id: string; name: string; stage: ProjectStage; percentage: number; releaseConditions: string[] }> = [
@@ -217,7 +216,7 @@ class PaymentService {
 
   async initializeStageEscrow(project: Project, totalAmount: number): Promise<void> {
     const feeBreakdown = calculateSplitPlatformFee(totalAmount);
-    const platformFeeAmount = Math.round(totalAmount * PLATFORM_FEE_PERCENTAGE);
+    const platformFeeAmount = feeBreakdown.totalPlatformFee;  // unified
     const milestones = STAGE_ESCROW_MILESTONES.map((milestone, index) => {
       const amount = index === STAGE_ESCROW_MILESTONES.length - 1
         ? totalAmount - STAGE_ESCROW_MILESTONES.slice(0, -1).reduce((sum, item) => sum + Math.round(totalAmount * (item.percentage / 100)), 0)
