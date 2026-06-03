@@ -18,7 +18,7 @@ import { getIdToken } from 'firebase/auth';
 import { LedgerEntry, Payment, Escrow, EscrowMilestone, EscrowV2, Job, Project, ProjectStage, PROJECT_STAGE_ORDER, UserProfile } from '../types';
 import { notificationService } from './notificationService';
 import { recordTransaction } from './financialLedgerService';
-import { PRD_PLATFORM_FEE_PERCENTAGE } from './platformFeePolicy';
+import { PRD_PLATFORM_FEE_PERCENTAGE, calculateSplitPlatformFee } from './platformFeePolicy';
 import { toast } from 'sonner';
 import * as jsMd5 from 'js-md5';
 // Handle both ESM and CJS import styles safely
@@ -147,15 +147,19 @@ function buildMilestoneInvoice(project: Project, milestone: EscrowMilestone, arc
 
 class PaymentService {
   /**
-   * Calculate escrow amounts including platform fees
+   * Calculate escrow amounts including split platform fees.
+   * Returns the breakdown of payer surcharge and payee deduction.
    */
-  calculateEscrowAmounts(baseAmount: number, feePercentage: number = PLATFORM_FEE_PERCENTAGE) {
-    const platformFee = Math.round(baseAmount * feePercentage);
-    const total = baseAmount + platformFee;
+  calculateEscrowAmounts(baseAmount: number, _feePercentage?: number) {
+    const breakdown = calculateSplitPlatformFee(baseAmount);
     return {
       architectAmount: baseAmount,
-      platformFee,
-      total,
+      platformFee: breakdown.totalPlatformFee,
+      payerSurcharge: breakdown.payerPlatformFee,
+      payeeDeduction: breakdown.payeePlatformFee,
+      total: breakdown.payerTotalIntoEscrow,
+      payerTotalIntoEscrow: breakdown.payerTotalIntoEscrow,
+      payeeNetRelease: breakdown.payeeNetRelease,
     };
   }
 
@@ -212,6 +216,7 @@ class PaymentService {
   }
 
   async initializeStageEscrow(project: Project, totalAmount: number): Promise<void> {
+    const feeBreakdown = calculateSplitPlatformFee(totalAmount);
     const platformFeeAmount = Math.round(totalAmount * PLATFORM_FEE_PERCENTAGE);
     const milestones = STAGE_ESCROW_MILESTONES.map((milestone, index) => {
       const amount = index === STAGE_ESCROW_MILESTONES.length - 1
@@ -226,6 +231,8 @@ class PaymentService {
       heldAmount: totalAmount,
       releasedAmount: 0,
       platformFeeAmount,
+      payerSurchargeAmount: feeBreakdown.payerPlatformFee,
+      payeeDeductionAmount: feeBreakdown.payeePlatformFee,
       refundedAmount: 0,
       status: 'funded',
       milestones,
