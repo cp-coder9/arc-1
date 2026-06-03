@@ -4,8 +4,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'command_centre',
     label: 'Command Centre',
-    iconHint: 'home/dashboard',
-    defaultVisible: true,
     description: 'Personal daily cockpit curated by the user agent.',
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
@@ -18,8 +16,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'inbox',
     label: 'Inbox / Action Centre',
-    iconHint: 'inbox/checklist',
-    defaultVisible: true,
     description: 'Protected action centre for required work and agent-pushed tasks.',
     sections: [
       { key: 'required_actions', label: 'Required Actions', description: 'Tasks requiring user action.', supportsContextualMessaging: true },
@@ -31,8 +27,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'projects',
     label: 'Projects',
-    iconHint: 'folder/building',
-    defaultVisible: true,
     description: 'Phase-aware project workspace.',
     sections: [
       { key: 'dashboard', label: 'Project Dashboard', description: 'Project overview.', projectScoped: true, phaseAware: true },
@@ -48,8 +42,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'toolboxes',
     label: 'Toolboxes',
-    iconHint: 'tools',
-    defaultVisible: true,
     description: 'Role-specific professional tools, not a flat list.',
     sections: [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
@@ -63,8 +55,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'cpd_learning',
     label: 'CPD & Learning',
-    iconHint: 'graduation-cap/certificate',
-    defaultVisible: true,
     description: 'Separate CPD platform for learning, assessments and professional records.',
     sections: [
       { key: 'cpd_dashboard', label: 'CPD Dashboard', description: 'Role/body-aware CPD status.' },
@@ -78,8 +68,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'documents',
     label: 'Documents / Knowledge Hub',
-    iconHint: 'file/search',
-    defaultVisible: true,
     description: 'Global document, template and knowledge hub.',
     sections: [
       { key: 'my_documents', label: 'My Documents', description: 'User documents.' },
@@ -92,8 +80,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'marketplace',
     label: 'Marketplace / Resource Centre',
-    iconHint: 'users/store',
-    defaultVisible: true,
     description: 'Industry network, resources, suppliers and opportunities.',
     sections: [
       { key: 'professionals', label: 'Professionals', description: 'Find consultants and professionals.' },
@@ -107,8 +93,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'finance',
     label: 'Finance & Commercial',
-    iconHint: 'wallet/ledger',
-    defaultVisible: true,
     description: 'Commercial controls, payments, escrow and financial records.',
     sections: [
       { key: 'quotes', label: 'Quotes', description: 'Quotes and comparisons.', supportsContextualMessaging: true },
@@ -121,8 +105,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'messages',
     label: 'Messages',
-    iconHint: 'message-circle',
-    defaultVisible: true,
     description: 'Full persistent messaging centre linked to project context.',
     sections: [
       { key: 'direct', label: 'Direct Messages', description: 'One-to-one messages.' },
@@ -136,8 +118,6 @@ export const architexNavigation: NavigationItem[] = [
   {
     key: 'settings',
     label: 'Settings',
-    iconHint: 'settings/gear',
-    defaultVisible: true,
     description: 'User, company, permissions, billing and admin configuration.',
     sections: [
       { key: 'profile', label: 'Profile', description: 'Personal profile and preferences.' },

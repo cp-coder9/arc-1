@@ -26,8 +26,6 @@ export type NavigationItem = {
   key: ArchitexNavKey;
   label: string;
   description: string;
-  iconHint: string;
-  defaultVisible: boolean;
   roles?: UserRole[];
   sections: WorkspaceSection[];
 };

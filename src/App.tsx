@@ -935,14 +935,6 @@ export default function App() {
                 onClick={() => navigateDashboard(getDefaultPageForNavKey(item.key), 'sidebar')}
               />
             ))}
-            {user?.role === 'client' && (
-              <NavItem
-                icon={<Plus size={18} />}
-                label="Post a Job (legacy)"
-                active={activeTab === 'post-job'}
-                onClick={() => navigateDashboard('post-job', 'sidebar')}
-              />
-            )}
           </nav>
 
             <div className="mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground" data-testid="dashboard-keyboard-shortcuts">

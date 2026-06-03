@@ -1,4 +1,14 @@
-import type { MessagingContext, ContextualMessageDraft } from './navTypes';
+import type { MessagingContext, ContextualMessageDraft, MessagingContextSourceType } from './navTypes';
+
+/**
+ * Source object types that always require user approval before sending.
+ * Kept as a configurable set so it can be extended from config/database
+ * without modifying service code.
+ */
+const ALWAYS_REQUIRE_APPROVAL: ReadonlySet<MessagingContextSourceType> = new Set([
+  'site_instruction',
+  'variation',
+]);
 
 /**
  * Contextual Messaging Service
@@ -33,8 +43,7 @@ export class ContextualMessagingService {
     return (
       context.auditPolicy === 'approval_required' ||
       context.persistencePolicy === 'audit_required' ||
-      context.sourceObjectType === 'site_instruction' ||
-      context.sourceObjectType === 'variation'
+      ALWAYS_REQUIRE_APPROVAL.has(context.sourceObjectType)
     );
   }
 }
