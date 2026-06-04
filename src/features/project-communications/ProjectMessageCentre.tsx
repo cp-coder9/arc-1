@@ -11,8 +11,7 @@
 
 import React, { useMemo, useState } from 'react';
 import type { Job, Message, ProjectStage, UserProfile } from '@/types';
-import { PROJECT_STAGE_ORDER, PROJECT_STAGE_LABELS } from '@/types';
-import { getPhaseCommunicationUIConfig } from './phaseConfig';
+import { getPhaseCommunicationUIConfig, PHASE_COMMUNICATION_UI_CONFIG } from './phaseConfig';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -149,9 +148,9 @@ export function ProjectMessageCentre({
           }
         >
           <option value="all">All phases</option>
-          {PROJECT_STAGE_ORDER.map((stage) => (
+          {(Object.entries(PHASE_COMMUNICATION_UI_CONFIG) as [ProjectStage, typeof PHASE_COMMUNICATION_UI_CONFIG[ProjectStage]][]).map(([stage, cfg]) => (
             <option key={stage} value={stage}>
-              {PROJECT_STAGE_LABELS[stage]}
+              {cfg.label}
             </option>
           ))}
         </select>

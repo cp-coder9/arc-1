@@ -915,7 +915,6 @@ export type ProjectStage =
 /** Canonical ordering of project stages (forward-only transitions). */
 export const PROJECT_STAGE_ORDER: ProjectStage[] = [
   'intake',
-  'scoping',
   'appointment',
   'coordination',
   'compliance',

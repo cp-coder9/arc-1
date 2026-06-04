@@ -12,8 +12,7 @@
 
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { Job, Message, ProjectStage, UserProfile } from '@/types';
-import { PROJECT_STAGE_ORDER, PROJECT_STAGE_LABELS } from '@/types';
-import { getPhaseCommunicationUIConfig } from './phaseConfig';
+import { getPhaseCommunicationUIConfig, PHASE_COMMUNICATION_UI_CONFIG } from './phaseConfig';
 import { sendProjectCommunication } from './projectCommunicationService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -153,9 +152,9 @@ export function ProjectChatApplet({
             value={phase}
             onChange={(e) => setPhase(e.target.value as ProjectStage)}
           >
-            {PROJECT_STAGE_ORDER.map((stage) => (
+            {(Object.entries(PHASE_COMMUNICATION_UI_CONFIG) as [ProjectStage, typeof PHASE_COMMUNICATION_UI_CONFIG[ProjectStage]][]).map(([stage, cfg]) => (
               <option key={stage} value={stage}>
-                {PROJECT_STAGE_LABELS[stage]}
+                {cfg.label}
               </option>
             ))}
           </select>
