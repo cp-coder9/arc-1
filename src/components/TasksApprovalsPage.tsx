@@ -3,12 +3,15 @@ import { addDoc, collection, collectionGroup, limit, onSnapshot, query, type Doc
 import { CheckCircle2, ClipboardCheck, Clock, Loader2, Plus, UserCheck } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { Job, JobCard, Project, UserProfile } from '@/types';
+import type { ContextualMessageDraft } from '@/types/navigation';
 import ProjectCoordinationRegister from './ProjectCoordinationRegister';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { ContextualMessageButton, ContextualMessageDrawer } from '@/components/messaging';
+import { buildMessagingContext, createContextualMessageDraft } from '@/services/contextualMessagingService';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -74,6 +77,23 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
   const [deadline, setDeadline] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [messageDraft, setMessageDraft] = useState<ContextualMessageDraft | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openContextualMessage = (sourceType: 'agent_inbox_action_card', sourceObjectId: string, title: string, status?: string) => {
+    const context = buildMessagingContext({
+      projectId: selectedProject?.id,
+      projectName: selectedJob?.title,
+      moduleKey: 'inbox.tasks',
+      sourceObjectType,
+      sourceObjectId,
+      title,
+      status,
+      summary: `Inbox action item "${title}"${status ? ` (${status})` : ''} requires communication.`,
+    });
+    setMessageDraft(createContextualMessageDraft(context));
+    setDrawerOpen(true);
+  };
 
   useEffect(() => {
     setState('loading');
@@ -185,9 +205,12 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
               <div key={task.id} className="rounded-xl border border-border p-4 text-sm">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                   <div><p className="font-semibold">{task.assigneeName} <span className="text-muted-foreground">({task.assigneeRole})</span></p><p className="mt-1 text-xs text-muted-foreground">Due: {task.deadline || 'No deadline'} · {task.notes || 'No notes'}</p></div>
-                  <select value={task.status} onChange={(event) => updateTaskStatus(task, event.target.value as JobCard['status'])} className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-bold uppercase tracking-widest">
-                    <option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="completed">Completed</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select value={task.status} onChange={(event) => updateTaskStatus(task, event.target.value as JobCard['status'])} className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-bold uppercase tracking-widest">
+                      <option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="completed">Completed</option>
+                    </select>
+                    <ContextualMessageButton compact label="Task" onClick={() => openContextualMessage('agent_inbox_action_card', task.id, task.assigneeName, task.status)} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -198,12 +221,21 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
           <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
             <CardHeader><CardTitle className="font-heading text-xl">Open approvals</CardTitle><CardDescription>Project approval records visible to this role.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
-              {approvals.length === 0 ? <p className="text-sm text-muted-foreground">No approval records visible.</p> : approvals.slice(0, 8).map((approval) => <div key={approval.id} className="rounded-xl border border-border p-3 text-sm"><div className="flex items-start justify-between gap-2"><p className="font-semibold">{approval.title || approval.category || 'Approval request'}</p><Badge variant={statusVariant(approval.status)}>{approval.status || 'pending'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{approval.description || approval.dueDate || approval.createdAt || 'No detail recorded'}</p></div>)}
+              {approvals.length === 0 ? <p className="text-sm text-muted-foreground">No approval records visible.</p> : approvals.slice(0, 8).map((approval) => <div key={approval.id} className="rounded-xl border border-border p-3 text-sm"><div className="flex items-start justify-between gap-2"><p className="font-semibold">{approval.title || approval.category || 'Approval request'}</p><Badge variant={statusVariant(approval.status)}>{approval.status || 'pending'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{approval.description || approval.dueDate || approval.createdAt || 'No detail recorded'}</p><div className="mt-2 flex justify-end"><ContextualMessageButton compact label="Message" onClick={() => openContextualMessage('agent_inbox_action_card', approval.id, approval.title || approval.category || 'Approval', approval.status)} /></div></div>)}
             </CardContent>
           </Card>
           {canCreateTasks(user) && selectedJob && <Card className="rounded-2xl border-border bg-card/90 shadow-sm"><CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Assign task</CardTitle><CardDescription>Create a real job task card for the selected project.</CardDescription></CardHeader><CardContent><form onSubmit={createTask} className="space-y-3"><Input value={assigneeName} onChange={(e) => setAssigneeName(e.target.value)} placeholder="Assignee name" required /><Input value={assigneeRole} onChange={(e) => setAssigneeRole(e.target.value)} placeholder="Role / discipline" required /><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required /><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Task notes / deliverable" /><Button type="submit" disabled={saving} className="w-full rounded-xl gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create task</Button></form></CardContent></Card>}
         </div>
       </div>
+
+      <ContextualMessageDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        draft={messageDraft}
+        user={user}
+        jobId={selectedJob?.id}
+        onSent={() => setDrawerOpen(false)}
+      />
     </div>
   );
 }

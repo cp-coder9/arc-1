@@ -125,6 +125,9 @@ describe('projectCommandCentreService', () => {
       'freelancer-work',
       'admin-console',
       'disputes',
+      'command',
+      'programme',
+      'construction',
     ]);
 
     expect(targets).not.toHaveLength(0);
