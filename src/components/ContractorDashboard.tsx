@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Briefcase, Building2, CheckCircle2, Clock, FileText, HardHat, Search, ShieldCheck, TrendingUp } from 'lucide-react';
 import BidSubmission from './BidSubmission';
+import ContractorBidCalculatorPanel from './ContractorBidCalculatorPanel';
 
 export default function ContractorDashboard({ user }: { user: UserProfile }) {
   const [publishedTenders, setPublishedTenders] = useState<TenderPackage[]>([]);
   const [myBids, setMyBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBidSubmission, setShowBidSubmission] = useState(false);
+  const [showBidCalculator, setShowBidCalculator] = useState(false);
 
   useEffect(() => {
     const unsubscribeTenders = onSnapshot(
@@ -108,7 +110,7 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
                   {tender.requiredDisciplines?.slice(0, 4).map((discipline) => <Badge key={discipline} variant="outline" className="text-[10px] uppercase tracking-widest">{discipline}</Badge>)}
-                  <Button size="sm" className="ml-auto rounded-full font-bold" onClick={() => setShowBidSubmission(true)}>Prepare Bid</Button>
+                  <Button size="sm" className="ml-auto rounded-full font-bold" onClick={() => setShowBidCalculator(true)}>Prepare Bid</Button>
                 </div>
               </div>
             ))}
@@ -120,6 +122,28 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
             )}
           </CardContent>
         </Card>
+
+        {showBidCalculator && (
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Bid Calculator</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setShowBidCalculator(false)}>Close</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ContractorBidCalculatorPanel
+                  user={user}
+                  onBidLinesReady={(lines) => {
+                    setShowBidCalculator(false);
+                    setShowBidSubmission(true);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {showBidSubmission && (
           <div className="lg:col-span-2">
