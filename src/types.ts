@@ -608,7 +608,7 @@ export interface Conversation {
 }
 
 // Payment types
-export type PaymentType = 'escrow_deposit' | 'milestone_release' | 'refund' | 'platform_fee';
+export type PaymentType = 'escrow_deposit' | 'milestone_release' | 'refund' | 'platform_fee' | 'platform_fee_client_share' | 'platform_fee_payee_share';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
 export interface Payment {
