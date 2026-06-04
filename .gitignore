@@ -73,3 +73,4 @@ release/
 reports/
 public/build-info.json
 12/
+.claude/

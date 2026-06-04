@@ -122,6 +122,7 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
     domain: 'agent',
     label: API_ROUTE_DOMAIN_LABELS.agent,
     description: 'Service/agent automation endpoints guarded separately from normal user workflow routes.',
+    exactPaths: ['/agents'],
     prefixes: ['/agent/', '/agents/', '/api/agents'],
   },
   {

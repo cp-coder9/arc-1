@@ -660,6 +660,8 @@ export interface EscrowMilestone {
 export interface EscrowV2 extends Omit<Escrow, 'milestones'> {
   milestones: EscrowMilestone[];
   linkedProjectId?: string;
+  payerSurchargeAmount?: number;
+  payeeDeductionAmount?: number;
 }
 
 export interface LedgerEntry {

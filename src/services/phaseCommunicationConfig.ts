@@ -39,7 +39,7 @@ export interface PhaseCommunicationConfig {
   conversionRoutes: ProjectCommunicationConversionRoute[];
 }
 
-export const PHASE_COMMUNICATION_CONFIG: Record<Exclude<ProjectStage, 'scoping'>, PhaseCommunicationConfig> = {
+export const PHASE_COMMUNICATION_CONFIG: Record<ProjectStage, PhaseCommunicationConfig> = {
   intake: {
     stage: 'intake',
     captureTools: ['chat', 'voice_note', 'document_upload', 'approval_request'],
@@ -47,6 +47,14 @@ export const PHASE_COMMUNICATION_CONFIG: Record<Exclude<ProjectStage, 'scoping'>
     fileFocus: ['title deeds', 'photos', 'site information', 'client brief attachments'],
     nextActions: ['complete brief', 'assign BEP review', 'prepare appointment route'],
     conversionRoutes: ['brief_item', 'appointment_query'],
+  },
+  scoping: {
+    stage: 'scoping',
+    captureTools: ['chat', 'voice_note', 'document_upload', 'drawing_comment', 'approval_request'],
+    suggestedPrompts: ['List feasibility risks before we proceed', 'What brief decisions are unresolved?', 'Draft a client brief summary for approval'],
+    fileFocus: ['brief documents', 'precedents', 'zoning notes', 'site information'],
+    nextActions: ['lock brief assumptions', 'check zoning constraints', 'prepare feasibility note'],
+    conversionRoutes: ['brief_item', 'design_coordination_issue'],
   },
   appointment: {
     stage: 'appointment',
@@ -107,5 +115,5 @@ export const PHASE_COMMUNICATION_CONFIG: Record<Exclude<ProjectStage, 'scoping'>
 };
 
 export function getPhaseCommunicationConfig(stage: ProjectStage): PhaseCommunicationConfig {
-  return PHASE_COMMUNICATION_CONFIG[stage === 'scoping' ? 'intake' : stage];
+  return PHASE_COMMUNICATION_CONFIG[stage] ?? PHASE_COMMUNICATION_CONFIG.intake;
 }
