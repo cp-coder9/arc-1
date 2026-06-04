@@ -166,6 +166,72 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
+  developer: {
+    title: 'Developer Toolbox',
+    subtitle: 'Portfolio management, project oversight, funding tools, and reporting.',
+    scope: 'Developer tools focus on investment decisions, project health, and commercial returns.',
+    primaryResponsibilities: ['Monitor portfolio health and project progress', 'Track funding drawdowns and milestones', 'Review commercial reports and risk indicators'],
+    handoffBoundaries: ['Cannot override professional design decisions', 'Cannot approve statutory submissions without professional sign-off'],
+    toolGroups: [
+      { id: 'portfolio', label: 'Portfolio management', description: 'Project portfolio tracking and investment decision support.', tools: [
+        { label: 'Project Command Centre', description: 'Portfolio-wide command centre for active projects.', pageId: 'command' },
+        { label: 'Financial Dashboard', description: 'Project and portfolio financial reporting.', pageId: 'payments' },
+      ] },
+    ],
+  },
+  engineer: {
+    title: 'Engineer Toolbox',
+    subtitle: 'Structural, civil, and specialist engineering design and compliance tools.',
+    scope: 'Engineering tools support professional design, analysis, compliance, and coordination.',
+    primaryResponsibilities: ['Deliver specialist engineering designs and calculations', 'Sign off structural and civil compliance', 'Coordinate with design team disciplines'],
+    handoffBoundaries: ['Cannot unilaterally change project scope', 'Cannot override architectural lead decisions without coordination'],
+    toolGroups: [
+      { id: 'engineering-design', label: 'Engineering design', description: 'Structural and civil design tools with compliance checks.', tools: [
+        { label: 'Design & Compliance', description: 'Engineering compliance and standards checks.', pageId: 'design' },
+        { label: 'SANS / Compliance Forms', description: 'Engineering compliance form packs.', pageId: 'sans-forms' },
+      ] },
+    ],
+  },
+  quantity_surveyor: {
+    title: 'Quantity Surveyor Toolbox',
+    subtitle: 'Cost planning, BoQ/BoM preparation, tender analysis, and commercial control.',
+    scope: 'QS tools cover cost estimation, quantity take-off, procurement pricing, and valuation.',
+    primaryResponsibilities: ['Prepare cost plans and elemental estimates', 'Produce BoQ/BoM for tender and procurement', 'Manage valuations, variations, and commercial control'],
+    handoffBoundaries: ['Cannot approve payments without client authorisation', 'Cannot change scope without project team coordination'],
+    toolGroups: [
+      { id: 'costing', label: 'Costing & procurement', description: 'Cost estimation, BoQ/BoM, and procurement support.', tools: [
+        { label: 'Fee Estimator', description: 'Professional fee and project cost estimation.', pageId: 'fees' },
+        { label: 'BoQ / BoM Procurement', description: 'Bill of quantities and materials procurement.', pageId: 'procurement' },
+      ] },
+    ],
+  },
+  planner: {
+    title: 'Town Planner Toolbox',
+    subtitle: 'Statutory planning, municipal submissions, and land-use applications.',
+    scope: 'Planning tools support development applications, zoning checks, and municipal engagement.',
+    primaryResponsibilities: ['Prepare and lodge municipal development applications', 'Advise on zoning, land-use rights, and statutory processes', 'Coordinate statutory approvals with design team'],
+    handoffBoundaries: ['Cannot override environmental or heritage statutory requirements', 'Cannot guarantee municipal approval timelines'],
+    toolGroups: [
+      { id: 'planning', label: 'Planning submissions', description: 'Municipal and statutory planning tools.', tools: [
+        { label: 'Municipal Tracker', description: 'Track council submissions and approvals.', pageId: 'municipal-tracker' },
+        { label: 'SANS / Compliance Forms', description: 'Statutory compliance form packs.', pageId: 'sans-forms' },
+      ] },
+    ],
+  },
+  project_manager: {
+    title: 'Project Manager Toolbox',
+    subtitle: 'Programme management, team coordination, and delivery oversight.',
+    scope: 'PM tools cover programme planning, risk management, team coordination, and reporting.',
+    primaryResponsibilities: ['Manage project programme and critical path', 'Coordinate multi-disciplinary teams and handoffs', 'Track risks, issues, and mitigation actions'],
+    handoffBoundaries: ['Cannot sign professional compliance certificates', 'Cannot approve payments without client and QS review'],
+    toolGroups: [
+      { id: 'pm-tools', label: 'Project management', description: 'Programme, risk, team, and delivery coordination.', tools: [
+        { label: 'Project Command Centre', description: 'Cross-project command and control.', pageId: 'command' },
+        { label: 'Programme / Gantt', description: 'Programme planning and critical path tracking.', pageId: 'programme' },
+        { label: 'Team Builder', description: 'Build and coordinate project teams.', pageId: 'design' },
+      ] },
+    ],
+  },
 };
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {

@@ -326,6 +326,26 @@ const ROLE_STAGE_ACTIONS: Record<UserRole, Partial<Record<CanonicalProjectStage,
       detail: 'Review unresolved disputes, missing documents, payment holds, and governance exceptions before closure.',
     },
   },
+  developer: {
+    intake: { label: 'Review portfolio intake', target: 'command', detail: 'Review new project intakes across your development portfolio.' },
+    payments: { label: 'Review drawdown schedule', target: 'payments', detail: 'Review scheduled drawdowns and payment milestones.', priority: 'high' },
+  },
+  engineer: {
+    compliance: { label: 'Review compliance sign-offs', target: 'design', detail: 'Check pending engineering compliance and sign-off items.', priority: 'high' },
+    coordination: { label: 'Review coordination items', target: 'journey', detail: 'Review multi-discipline coordination requirements and pending handoffs.' },
+  },
+  quantity_surveyor: {
+    tender: { label: 'Review tender returns', target: 'procurement', detail: 'Review tender pricing, BoQ compliance, and bid comparisons.' },
+    payments: { label: 'Review payment valuations', target: 'payments', detail: 'Review contractor valuations and payment certificate recommendations.', priority: 'high' },
+  },
+  planner: {
+    compliance: { label: 'Review statutory submissions', target: 'municipal-tracker', detail: 'Track municipal application progress and statutory queries.', priority: 'high' },
+    coordination: { label: 'Review planning conditions', target: 'journey', detail: 'Ensure planning conditions are being addressed during design and delivery.' },
+  },
+  project_manager: {
+    coordination: { label: 'Review programme status', target: 'programme', detail: 'Review critical path, team coordination, and milestone status.', priority: 'high' },
+    delivery: { label: 'Review delivery blockers', target: 'construction', detail: 'Identify and escalate delivery blockers, RFIs, and variations.' },
+  },
 };
 
 function canonicalStage(input: ProjectCommandCentreInput): CanonicalProjectStage {

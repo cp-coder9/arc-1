@@ -85,6 +85,11 @@ const ROLE_PROFILE_FIELDS: Record<UserProfile['role'], RoleProfileField[]> = {
     { key: 'twoFactorEnabled', label: '2FA enabled', helper: 'Confirm whether 2FA is enabled.', kind: 'boolean' },
     { key: 'auditIdentity', label: 'Audit identity', helper: 'Audit identity or staff reference.', kind: 'object' },
   ],
+  developer: [{ key: 'portfolio', label: 'Portfolio', helper: 'Development portfolio and project interests.' }],
+  engineer: [{ key: 'engineeringDiscipline', label: 'Engineering discipline', helper: 'Primary engineering discipline.' }, { key: 'prEngNumber', label: 'Pr Eng number', helper: 'Professional engineer registration number.' }],
+  quantity_surveyor: [{ key: 'professionalBody', label: 'Professional body', helper: 'QS professional body and registration.' }],
+  planner: [{ key: 'planningBody', label: 'Planning body', helper: 'Town planning professional body registration.' }],
+  project_manager: [{ key: 'pmCertification', label: 'PM certification', helper: 'Project management certification or registration.' }],
 };
 
 const ARRAY_FIELDS = new Set(['disciplines', 'healthSafetyFiles', 'plantCapacity', 'tradeCategories', 'packageTypes', 'serviceAreas', 'productCategories', 'deliveryRegions', 'catalogueUrls', 'skills', 'software', 'portfolioUrls']);

@@ -80,6 +80,7 @@ import {
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
+import { NavItem, NavSectionLabel } from './components/ui/nav-item';
 
 // Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
@@ -345,6 +346,11 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   supplier: { label: 'Supplier', viewLabel: 'Supplier View', accent: '#1d8d6f', accentSoft: 'rgba(29, 141, 111, 0.13)', description: 'Track procurement, deliveries, warranties, and product evidence.' },
   freelancer: { label: 'Freelancer', viewLabel: 'Freelancer View', accent: '#165a4c', accentSoft: 'rgba(22, 90, 76, 0.12)', description: 'Complete assigned deliverables, submissions, and resource bookings.' },
   admin: { label: 'Platform Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Oversee governance, system health, disputes, and platform controls.' },
+  developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#5b3a9e', accentSoft: 'rgba(91, 58, 158, 0.12)', description: 'Property development portfolio, funding, and project coordination.' },
+  engineer: { label: 'Engineer', viewLabel: 'Engineer View', accent: '#0066a1', accentSoft: 'rgba(0, 102, 161, 0.12)', description: 'Structural, civil, and specialist engineering design and compliance.' },
+  quantity_surveyor: { label: 'Quantity Surveyor', viewLabel: 'QS View', accent: '#8b5e00', accentSoft: 'rgba(139, 94, 0, 0.12)', description: 'Cost planning, BoQ/BoM, tender analysis, and commercial control.' },
+  planner: { label: 'Town Planner', viewLabel: 'Planner View', accent: '#3a7d5a', accentSoft: 'rgba(58, 125, 90, 0.12)', description: 'Statutory planning, municipal submissions, and land-use applications.' },
+  project_manager: { label: 'Project Manager', viewLabel: 'PM View', accent: '#4a6fa1', accentSoft: 'rgba(74, 111, 161, 0.12)', description: 'Programme management, team coordination, and project delivery oversight.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -1622,25 +1628,6 @@ function AuthRoleCard({ icon, title, description, active, onClick, ...props }: {
           {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
         </span>
       </div>
-    </button>
-  );
-}
-
-function NavSectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-3 pt-4 pb-1 beos-label-caps text-muted-foreground/80">{children}</div>;
-}
-
-function NavItem({ icon, label, active, onClick, ...props }: any) {
-  return (
-    <button
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={`group w-full flex items-center gap-3 rounded-[1.05rem] px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-[#dff1fa] text-primary shadow-[0_12px_30px_rgba(20,71,63,0.10)]' : 'text-muted-foreground hover:bg-muted hover:text-primary'}`}
-      {...props}
-    >
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[0.7rem] border transition-all ${active ? 'border-primary/15 bg-white text-primary' : 'border-transparent bg-white/70 text-muted-foreground group-hover:border-primary/15 group-hover:text-primary'}`}>{icon}</span>
-      <span className="min-w-0 flex-1 truncate font-bold tracking-[0.01em]">{label}</span>
-      {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary" />}
     </button>
   );
 }

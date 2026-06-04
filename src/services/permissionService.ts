@@ -94,6 +94,11 @@ const ROLE_PERMISSIONS: Record<NormalizedUserRole, PermissionAction[]> = {
     'municipal:manage',
     'municipal:view_insight',
   ],
+  developer: ['project:read', 'profile:read', 'profile:update', 'payment:read', 'municipal:view_insight'],
+  engineer: ['project:read', 'project:update', 'profile:read', 'profile:update', 'compliance:sign', 'municipal:manage'],
+  quantity_surveyor: ['project:read', 'project:update', 'profile:read', 'profile:update', 'payment:read', 'municipal:manage'],
+  planner: ['project:read', 'project:update', 'profile:read', 'profile:update', 'municipal:manage', 'municipal:view_insight'],
+  project_manager: ['project:read', 'project:update', 'project:manage_members', 'profile:read', 'profile:update', 'payment:read', 'compliance:sign', 'municipal:manage', 'municipal:view_insight'],
 };
 
 const PROJECT_ACCESS_PERMISSIONS: Record<ProjectAccessRole, PermissionAction[]> = {

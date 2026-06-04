@@ -17,6 +17,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { Message, Conversation, UserRole, ProjectCommunicationCaptureType, ProjectCommunicationStructuredStatus, ProjectCommunicationVisibility, ProjectRecordLink, ProjectStage, ProjectCommunicationLocation } from '../types';
+import type { ContextualMessageDraft, MessagingContext } from '../types/navigation';
 import DOMPurify from 'dompurify';
 
 export interface SendMessageParams {
@@ -34,6 +35,15 @@ export interface SendMessageParams {
   senderId: string;
   senderRole: UserRole;
   content: string;
+  attachments?: { name: string; url: string; type: string }[];
+}
+
+/** Parameters for sending a contextual (workflow-linked) message. */
+export interface SendContextualMessageParams {
+  jobId: string;
+  senderId: string;
+  senderRole: UserRole;
+  draft: ContextualMessageDraft;
   attachments?: { name: string; url: string; type: string }[];
 }
 
@@ -96,6 +106,48 @@ class MessagingService {
     await this.updateConversationLastMessage(jobId, sanitizedContent, senderId);
 
     return docRef.id;
+  }
+
+  /**
+   * Send a contextual (workflow-linked) message.
+   *
+   * Automatically sets recordLinks, captureType, and transcribedText
+   * from the MessagingContext so the message is linked to its source
+   * workflow object (RFI, snag, CPD assessment, etc.).
+   */
+  async sendContextualMessage(params: SendContextualMessageParams): Promise<string> {
+    const { jobId, senderId, senderRole, draft, attachments } = params;
+    const ctx: MessagingContext = draft.context;
+
+    // Build record links from the context
+    const recordLinks: ProjectRecordLink[] = [];
+
+    if (ctx.projectId) {
+      recordLinks.push({ recordType: 'project', recordId: ctx.projectId });
+    }
+    recordLinks.push({
+      recordType: ctx.sourceObjectType,
+      recordId: ctx.sourceObjectId,
+    });
+
+    // Map the source object type to a communication capture type
+    const captureType = mapSourceTypeToCaptureType(ctx.sourceObjectType);
+
+    return this.sendMessage({
+      jobId,
+      projectId: ctx.projectId,
+      phase: ctx.phaseId as ProjectStage | undefined,
+      captureType,
+      structuredStatus: 'raw',
+      recordLinks,
+      aiTags: ['contextual', ctx.sourceObjectType],
+      transcribedText: ctx.summary,
+      visibility: 'project_team',
+      senderId,
+      senderRole,
+      content: draft.body,
+      attachments,
+    });
   }
 
   /**
@@ -302,3 +354,35 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
 }
 
 export const messagingService = new MessagingService();
+
+// ── Internal Helpers -------------------------------------------------------
+
+/** Map a MessagingContextSourceType to the nearest ProjectCommunicationCaptureType. */
+function mapSourceTypeToCaptureType(
+  sourceType: import('../types/navigation').MessagingContextSourceType,
+): ProjectCommunicationCaptureType {
+  switch (sourceType) {
+    case 'snag_item':
+      return 'closeout_evidence';
+    case 'rfi':
+      return 'rfi';
+    case 'site_instruction':
+      return 'site_instruction';
+    case 'payment_certificate':
+    case 'drawdown_request':
+      return 'payment_note';
+    case 'variation':
+      return 'site_instruction';
+    case 'cpd_assessment':
+    case 'cpd_certificate':
+    case 'cpd_manual_submission':
+    case 'cpd_course':
+      return 'chat';
+    case 'document_review_item':
+      return 'drawing_comment';
+    case 'agent_inbox_action_card':
+      return 'approval_request';
+    default:
+      return 'chat';
+  }
+}

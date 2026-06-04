@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, MessageSquarePlus, Send, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProjectTeamMember, RFI, RFIPriority, UserProfile } from '@/types';
+import type { ContextualMessageDraft } from '@/types/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ContextualMessageButton, ContextualMessageDrawer } from '@/components/messaging';
 import { closeRFI, createRFI, respondToRFI, subscribeToRFIs } from '@/services/constructionService';
 import { notificationService } from '@/services/notificationService';
+import { buildMessagingContext, createContextualMessageDraft } from '@/services/contextualMessagingService';
 import { safeFormat } from '@/lib/utils';
 
 type Props = {
@@ -44,6 +47,23 @@ export default function RFIManager({ projectId, jobId, currentUser, teamMembers 
   const [priority, setPriority] = useState<RFIPriority>('medium');
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [responseById, setResponseById] = useState<Record<string, string>>({});
+  const [messageDraft, setMessageDraft] = useState<ContextualMessageDraft | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openContextualMessage = (rfi: RFI) => {
+    const context = buildMessagingContext({
+      projectId,
+      moduleKey: 'projects.rfis',
+      sourceObjectType: 'rfi',
+      sourceObjectId: rfi.id,
+      title: rfi.subject,
+      status: rfi.status,
+      suggestedRecipients: [rfi.assignedTo, rfi.requestedBy].filter(Boolean),
+      summary: `RFI #${rfi.number}: ${rfi.subject} — ${rfi.question.slice(0, 120)}`,
+    });
+    setMessageDraft(createContextualMessageDraft(context));
+    setDrawerOpen(true);
+  };
 
   useEffect(() => subscribeToRFIs(projectId, setRfis), [projectId]);
 
@@ -145,7 +165,7 @@ export default function RFIManager({ projectId, jobId, currentUser, teamMembers 
               {visibleRFIs.map((rfi) => {
                 const canRespond = rfi.assignedTo === currentUser.uid || canManageRFIs;
                 const canClose = rfi.requestedBy === currentUser.uid || canManageRFIs;
-                return <RFIRow key={rfi.id} rfi={rfi} response={responseById[rfi.id] || ''} canRespond={canRespond} canClose={canClose} onResponseChange={(value) => setResponseById({ ...responseById, [rfi.id]: value })} onSubmitResponse={() => submitResponse(rfi)} onClose={() => close(rfi)} />;
+                return <RFIRow key={rfi.id} rfi={rfi} response={responseById[rfi.id] || ''} canRespond={canRespond} canClose={canClose} onResponseChange={(value) => setResponseById({ ...responseById, [rfi.id]: value })} onSubmitResponse={() => submitResponse(rfi)} onClose={() => close(rfi)} onMessageClick={() => openContextualMessage(rfi)} />;
               })}
             </TableBody>
           </Table>
@@ -154,16 +174,25 @@ export default function RFIManager({ projectId, jobId, currentUser, teamMembers 
           {visibleRFIs.map((rfi) => {
             const canRespond = rfi.assignedTo === currentUser.uid || canManageRFIs;
             const canClose = rfi.requestedBy === currentUser.uid || canManageRFIs;
-            return <RFICard key={rfi.id} rfi={rfi} response={responseById[rfi.id] || ''} canRespond={canRespond} canClose={canClose} onResponseChange={(value) => setResponseById({ ...responseById, [rfi.id]: value })} onSubmitResponse={() => submitResponse(rfi)} onClose={() => close(rfi)} />;
+            return <RFICard key={rfi.id} rfi={rfi} response={responseById[rfi.id] || ''} canRespond={canRespond} canClose={canClose} onResponseChange={(value) => setResponseById({ ...responseById, [rfi.id]: value })} onSubmitResponse={() => submitResponse(rfi)} onClose={() => close(rfi)} onMessageClick={() => openContextualMessage(rfi)} />;
           })}
         </div>
         {visibleRFIs.length === 0 && <div className="py-14 text-center rounded-3xl border-2 border-dashed border-border text-sm text-muted-foreground">No RFIs recorded for this project.</div>}
       </CardContent>
+
+      <ContextualMessageDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        draft={messageDraft}
+        user={currentUser}
+        jobId={jobId}
+        onSent={() => setDrawerOpen(false)}
+      />
     </Card>
   );
 }
 
-function RFIRow({ rfi, response, canRespond, canClose, onResponseChange, onSubmitResponse, onClose }: { key?: React.Key; rfi: RFI; response: string; canRespond: boolean; canClose: boolean; onResponseChange: (value: string) => void; onSubmitResponse: () => void | Promise<void>; onClose: () => void | Promise<void> }) {
+function RFIRow({ rfi, response, canRespond, canClose, onResponseChange, onSubmitResponse, onClose, onMessageClick }: { key?: React.Key; rfi: RFI; response: string; canRespond: boolean; canClose: boolean; onResponseChange: (value: string) => void; onSubmitResponse: () => void | Promise<void>; onClose: () => void | Promise<void>; onMessageClick: () => void }) {
   return (
     <TableRow className={rfi.status === 'overdue' ? 'bg-destructive/5' : undefined}>
       <TableCell className="font-mono font-bold">{rfi.number}</TableCell>
@@ -171,16 +200,24 @@ function RFIRow({ rfi, response, canRespond, canClose, onResponseChange, onSubmi
       <TableCell><StatusBadge rfi={rfi} /></TableCell>
       <TableCell><Badge className={priorityClass[rfi.priority]}>{rfi.priority}</Badge></TableCell>
       <TableCell>{safeFormat(rfi.dueDate, 'MMM d')}</TableCell>
-      <TableCell><RFIActions rfi={rfi} response={response} canRespond={canRespond} canClose={canClose} onResponseChange={onResponseChange} onSubmitResponse={onSubmitResponse} onClose={onClose} /></TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <RFIActions rfi={rfi} response={response} canRespond={canRespond} canClose={canClose} onResponseChange={onResponseChange} onSubmitResponse={onSubmitResponse} onClose={onClose} />
+          <ContextualMessageButton label="Message" onClick={onMessageClick} compact />
+        </div>
+      </TableCell>
     </TableRow>
   );
 }
 
-function RFICard(props: { key?: React.Key; rfi: RFI; response: string; canRespond: boolean; canClose: boolean; onResponseChange: (value: string) => void; onSubmitResponse: () => void | Promise<void>; onClose: () => void | Promise<void> }) {
+function RFICard(props: { key?: React.Key; rfi: RFI; response: string; canRespond: boolean; canClose: boolean; onResponseChange: (value: string) => void; onSubmitResponse: () => void | Promise<void>; onClose: () => void | Promise<void>; onMessageClick: () => void }) {
   return (
     <div className="rounded-2xl border border-border p-4 space-y-3">
       <div className="flex justify-between gap-3"><RFIContent rfi={props.rfi} /><StatusBadge rfi={props.rfi} /></div>
-      <RFIActions {...props} />
+      <div className="flex items-center gap-2">
+        <RFIActions {...props} />
+        <ContextualMessageButton label="Message" onClick={props.onMessageClick} compact />
+      </div>
     </div>
   );
 }

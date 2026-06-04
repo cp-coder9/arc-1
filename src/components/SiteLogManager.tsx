@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Camera, CloudRain, Plus, Sun } from 'lucide-react';
 import { toast } from 'sonner';
-import type { SiteLog } from '@/types';
+import type { SiteLog, UserProfile } from '@/types';
+import type { ContextualMessageDraft } from '@/types/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { ContextualMessageButton, ContextualMessageDrawer } from '@/components/messaging';
 import { createSiteLog, subscribeToSiteLogs } from '@/services/constructionService';
+import { buildMessagingContext, createContextualMessageDraft } from '@/services/contextualMessagingService';
 import { uploadAndTrackFile } from '@/lib/uploadService';
 import { paginateItems, safeFormat, totalPages } from '@/lib/utils';
 import { OptimizedImage } from '@/components/ui/optimized-image';
@@ -19,12 +22,31 @@ type Props = {
   projectId: string;
   jobId?: string;
   currentUserId: string;
+  currentUser?: UserProfile;
   compact?: boolean;
 };
 
-export default function SiteLogManager({ projectId, jobId, currentUserId, compact = false }: Props) {
+export default function SiteLogManager({ projectId, jobId, currentUserId, currentUser, compact = false }: Props) {
   const [logs, setLogs] = useState<SiteLog[]>([]);
   const [page, setPage] = useState(1);
+  const [messageDraft, setMessageDraft] = useState<ContextualMessageDraft | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openContextualMessage = (log: SiteLog) => {
+    if (!currentUser) return;
+    const context = buildMessagingContext({
+      projectId,
+      moduleKey: 'projects.site_logs',
+      sourceObjectType: 'site_instruction',
+      sourceObjectId: log.id,
+      title: `Site log — ${safeFormat(log.date, 'PPP')}`,
+      status: log.issues?.length ? 'Issues reported' : 'Completed',
+      summary: `Site log: ${log.workDescription.slice(0, 120)}${log.issues?.length ? ` — ${log.issues.length} issue(s) noted.` : ''}`,
+      linkedFileIds: log.photos.map((p) => p.url),
+    });
+    setMessageDraft(createContextualMessageDraft(context));
+    setDrawerOpen(true);
+  };
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -135,6 +157,9 @@ export default function SiteLogManager({ projectId, jobId, currentUserId, compac
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="capitalize gap-1">{log.weather === 'sunny' ? <Sun size={12} /> : <CloudRain size={12} />}{log.weather}</Badge>
                 {typeof log.temperature === 'number' && <Badge variant="secondary">{log.temperature}°C</Badge>}
+                {currentUser && (
+                  <ContextualMessageButton label="Message" onClick={() => openContextualMessage(log)} compact />
+                )}
               </div>
             </div>
             <p className="text-sm leading-relaxed text-foreground">{log.workDescription}</p>
@@ -159,6 +184,17 @@ export default function SiteLogManager({ projectId, jobId, currentUserId, compac
           </div>
         )}
       </CardContent>
+
+      {currentUser && (
+        <ContextualMessageDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          draft={messageDraft}
+          user={currentUser}
+          jobId={jobId}
+          onSent={() => setDrawerOpen(false)}
+        />
+      )}
     </Card>
   );
 }

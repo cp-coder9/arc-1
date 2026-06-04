@@ -32,6 +32,11 @@ const ROLE_COMMAND_VISUALS: Record<UserProfile['role'], { viewLabel: string; hea
   supplier: { viewLabel: 'Supplier View', headline: 'Make procurement traceable.', description: 'Track orders, deliveries, product records, warranties, and project commitments.', accent: '#1d8d6f', accentSoft: 'rgba(29, 141, 111, 0.13)' },
   freelancer: { viewLabel: 'Freelancer View', headline: 'Deliver assigned work clearly.', description: 'Stay aligned to delegated tasks, submissions, comments, and resource bookings.', accent: '#165a4c', accentSoft: 'rgba(22, 90, 76, 0.12)' },
   admin: { viewLabel: 'Admin View', headline: 'Whole-system platform oversight.', description: 'Monitor system health, governance queues, disputes, and operational controls.', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)' },
+  developer: { viewLabel: 'Developer View', headline: 'Drive your development portfolio.', description: 'Monitor project progress, funding, approvals, and key decisions.', accent: '#5b3a9e', accentSoft: 'rgba(91, 58, 158, 0.12)' },
+  engineer: { viewLabel: 'Engineer View', headline: 'Deliver specialist engineering outcomes.', description: 'Track design, compliance, and coordination across structural and civil disciplines.', accent: '#0066a1', accentSoft: 'rgba(0, 102, 161, 0.12)' },
+  quantity_surveyor: { viewLabel: 'QS View', headline: 'Control project costs and commercial risk.', description: 'Monitor cost plans, BoQs, valuations, and commercial governance.', accent: '#8b5e00', accentSoft: 'rgba(139, 94, 0, 0.12)' },
+  planner: { viewLabel: 'Planner View', headline: 'Advance statutory approvals with confidence.', description: 'Track municipal submissions, land-use applications, and planning conditions.', accent: '#3a7d5a', accentSoft: 'rgba(58, 125, 90, 0.12)' },
+  project_manager: { viewLabel: 'PM View', headline: 'Orchestrate programme and delivery.', description: 'Coordinate teams, phases, risks, and critical decisions across projects.', accent: '#4a6fa1', accentSoft: 'rgba(74, 111, 161, 0.12)' },
 };
 
 const canListProjectsByRole = (user: UserProfile) => ['client', 'architect', 'bep', 'admin'].includes(user.role);
