@@ -1,124 +1,178 @@
 /**
- * Inbox Event Adapter
+ * Inbox Event Adapter — Trust, Verification & Compliance
  *
- * Converts readiness check findings into Platform-Spine-compatible
- * workflow events for the user inbox / action center.
+ * Creates inbox events for compliance actions requiring attention.
+ * Routes events to appropriate recipient roles based on compliance state.
  *
- * @module documents_drawing_intelligence
+ * @module trust_verification_compliance
  */
 
-import type {
-  ReadinessFinding,
-  ReadinessReport,
-  WorkflowEvent,
-  WorkflowEventType,
-} from '@/types/documentTypes';
+export type InboxPriority = 'low' | 'medium' | 'high' | 'critical';
 
-/** Generate workflow events from readiness reports. */
-export function workflowEventsFromReadiness(
-  projectId: string,
-  reports: ReadinessReport[],
-): WorkflowEvent[] {
-  const findings = reports.flatMap((r) => r.findings);
-  return findings.map((finding, index) => eventFromFinding(projectId, finding, index));
+export interface InboxEvent {
+  eventId: string; recipientRole: string; title: string; description?: string;
+  sourceObjectId: string; priority: InboxPriority; projectId?: string;
+  createdAt: string; acknowledged: boolean; acknowledgedBy?: string;
+  acknowledgedAt?: string; eventType: InboxEventType; moduleKey: string;
 }
 
-/** Generate events from a single report. */
-export function workflowEventsFromReport(
-  projectId: string,
-  report: ReadinessReport,
-): WorkflowEvent[] {
-  return report.findings.map((finding, index) =>
-    eventFromFinding(projectId, finding, index),
-  );
-}
+export type InboxEventType =
+  | 'verification_required' | 'document_expiring' | 'document_expired'
+  | 'registration_renewal' | 'insurance_renewal' | 'compliance_check'
+  | 'consent_required' | 'data_subject_request' | 'breach_notification'
+  | 'risk_alert' | 'badge_expired';
 
-/** Classify a finding into a WorkflowEventType. */
-export function classifyEventType(finding: ReadinessFinding): WorkflowEventType {
-  const code = finding.code;
+let eventSeq = 1;
+const inboxEvents: InboxEvent[] = [];
+const MODULE_KEY = 'trust_verification_compliance';
 
-  // Approval letter checks
-  if (code.includes('APPROVAL_LETTER')) return 'approval_letter_missing';
-
-  // Municipal checks
-  if (code.includes('MUNICIPAL')) return 'municipal_submission_pack_incomplete';
-
-  // Tender checks
-  if (code.includes('TENDER')) return 'tender_pack_incomplete';
-
-  // Superseded drawing checks
-  if (code.includes('SUPERSEDED')) return 'superseded_construction_drawing';
-
-  // Closeout / as-built checks
-  if (code.includes('CLOSEOUT') || code.includes('AS_BUILT')) return 'closeout_pack_incomplete';
-
-  // Review checks
-  if (code.includes('REVIEW')) return 'document_review_required';
-
-  // Drawing / revision checks
-  if (code.includes('REVISION') || code.includes('DRAWING')) return 'drawing_revision_uploaded';
-
-  // Warranty checks
-  if (code.includes('WARRANTY')) return 'closeout_pack_incomplete';
-
-  // Discipline drawing checks — fall through to appropriate type
-  if (code.includes('DISCIPLINE')) return 'municipal_submission_pack_incomplete';
-
-  return 'document_review_required';
-}
-
-/** Build a workflow event from a single finding. */
-function eventFromFinding(
-  projectId: string,
-  finding: ReadinessFinding,
-  index: number,
-): WorkflowEvent {
-  return {
-    id: `doc-event-${projectId}-${index + 1}`,
-    type: classifyEventType(finding),
-    projectId,
-    title: formatEventTitle(finding.code),
-    detail: finding.message,
-    priority: finding.priority,
-    sourceModule: 'documents',
-    assignedRoles: finding.assignedRoles,
-    createdAt: new Date().toISOString(),
+export function buildComplianceInboxEvent(input: {
+  recipientRole: string; title: string; sourceObjectId: string;
+  priority: InboxPriority; eventType: InboxEventType;
+  description?: string; projectId?: string;
+}): InboxEvent {
+  const event: InboxEvent = {
+    eventId: `inbox-trust-${String(eventSeq++).padStart(6, '0')}`,
+    recipientRole: input.recipientRole, title: input.title,
+    description: input.description, sourceObjectId: input.sourceObjectId,
+    priority: input.priority, projectId: input.projectId,
+    createdAt: new Date().toISOString(), acknowledged: false,
+    eventType: input.eventType, moduleKey: MODULE_KEY,
   };
+  inboxEvents.push(event);
+  return event;
 }
 
-/** Format a finding code into a human-readable event title. */
-export function formatEventTitle(code: string): string {
-  return code
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/^./, (c) => c.toUpperCase());
+export function buildVerificationRequiredEvent(
+  recipientRole: string, entityId: string, entityType: string,
+  priority: InboxPriority = 'medium',
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `Verification Required: ${entityType}`,
+    description: `${entityType} ${entityId} requires verification.`,
+    sourceObjectId: entityId, priority, eventType: 'verification_required',
+  });
 }
 
-/** Filter events by priority threshold. */
-export function eventsAbovePriority(
-  events: WorkflowEvent[],
-  minimumPriority: WorkflowEvent['priority'],
-): WorkflowEvent[] {
-  const rank = { low: 0, medium: 1, high: 2, critical: 3 };
-  const threshold = rank[minimumPriority];
-  return events.filter((e) => rank[e.priority] >= threshold);
+export function buildDocumentExpiringEvent(
+  recipientRole: string, documentTitle: string, documentId: string,
+  daysUntilExpiry: number, projectId?: string,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `Document Expiring: ${documentTitle}`,
+    description: `"${documentTitle}" expires in ${daysUntilExpiry} days.`,
+    sourceObjectId: documentId,
+    priority: daysUntilExpiry <= 7 ? 'critical' : daysUntilExpiry <= 30 ? 'high' : 'medium',
+    eventType: 'document_expiring', projectId,
+  });
 }
 
-/** Group events by their type. */
-export function groupEventsByType(events: WorkflowEvent[]): Record<string, WorkflowEvent[]> {
-  const groups: Record<string, WorkflowEvent[]> = {};
-  for (const event of events) {
-    if (!groups[event.type]) groups[event.type] = [];
-    groups[event.type].push(event);
-  }
-  return groups;
+export function buildDocumentExpiredEvent(
+  recipientRole: string, documentTitle: string, documentId: string, projectId?: string,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `Document Expired: ${documentTitle}`,
+    description: `"${documentTitle}" has expired. Renew immediately.`,
+    sourceObjectId: documentId, priority: 'critical', eventType: 'document_expired', projectId,
+  });
 }
 
-/** Get the count of events by priority level. */
-export function eventCountByPriority(events: WorkflowEvent[]): Record<string, number> {
-  const counts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
-  for (const event of events) {
-    counts[event.priority] = (counts[event.priority] || 0) + 1;
-  }
-  return counts;
+export function buildRegistrationRenewalEvent(
+  recipientRole: string, body: string, registrationNumber: string, daysUntilExpiry: number,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `Registration Renewal: ${body}`,
+    description: `${body} registration ${registrationNumber} expires in ${daysUntilExpiry} days.`,
+    sourceObjectId: registrationNumber,
+    priority: daysUntilExpiry <= 14 ? 'critical' : daysUntilExpiry <= 30 ? 'high' : 'medium',
+    eventType: 'registration_renewal',
+  });
 }
+
+export function buildInsuranceExpiringEvent(
+  recipientRole: string, provider: string, policyNumber: string, daysUntilExpiry: number,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `PI Insurance Expiring: ${provider}`,
+    description: `PI insurance ${policyNumber} expires in ${daysUntilExpiry} days.`,
+    sourceObjectId: policyNumber,
+    priority: daysUntilExpiry <= 14 ? 'critical' : 'high',
+    eventType: 'insurance_renewal',
+  });
+}
+
+export function buildComplianceCheckFailedEvent(
+  recipientRole: string, entityId: string, checkType: string, projectId?: string,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `Compliance Check Failed: ${checkType}`,
+    description: `${checkType} check failed for ${entityId}.`,
+    sourceObjectId: entityId, priority: 'high', eventType: 'compliance_check', projectId,
+  });
+}
+
+export function buildRiskAlertEvent(
+  recipientRole: string, entityId: string, riskLevel: string, triggerCount: number,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `${riskLevel.toUpperCase()} Risk Alert (${triggerCount} triggers)`,
+    description: `${entityId} has ${triggerCount} active risk triggers.`,
+    sourceObjectId: entityId,
+    priority: riskLevel === 'critical' ? 'critical' : riskLevel === 'high' ? 'high' : 'medium',
+    eventType: 'risk_alert',
+  });
+}
+
+export function buildConsentRequiredEvent(
+  recipientRole: string, userId: string, purpose: string,
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title: `POPIA Consent Required: ${purpose}`,
+    description: `Consent for "${purpose}" is required.`,
+    sourceObjectId: userId, priority: 'high', eventType: 'consent_required',
+  });
+}
+
+// ── Backwards-compatible exports ───────────────────────────────────────────────
+
+export function inbox(
+  recipientRole: string, title: string, sourceObjectId: string,
+  priority: InboxPriority,
+  options?: { description?: string; projectId?: string },
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole, title, sourceObjectId, priority,
+    description: options?.description, projectId: options?.projectId,
+    eventType: 'verification_required',
+  });
+}
+
+// ── Queries ────────────────────────────────────────────────────────────────────
+
+export function getInboxEvents(options?: {
+  recipientRole?: string; projectId?: string; unacknowledgedOnly?: boolean;
+  priority?: InboxPriority; eventType?: InboxEventType; limit?: number;
+}): InboxEvent[] {
+  let filtered = [...inboxEvents];
+  if (options?.recipientRole) filtered = filtered.filter((e) => e.recipientRole === options.recipientRole);
+  if (options?.projectId) filtered = filtered.filter((e) => e.projectId === options.projectId);
+  if (options?.unacknowledgedOnly) filtered = filtered.filter((e) => !e.acknowledged);
+  if (options?.priority) filtered = filtered.filter((e) => e.priority === options.priority);
+  if (options?.eventType) filtered = filtered.filter((e) => e.eventType === options.eventType);
+  if (options?.limit) filtered = filtered.slice(0, options.limit);
+  return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function acknowledgeInboxEvent(eventId: string, acknowledgedBy: string): InboxEvent | undefined {
+  const event = inboxEvents.find((e) => e.eventId === eventId);
+  if (!event) return undefined;
+  event.acknowledged = true; event.acknowledgedBy = acknowledgedBy;
+  event.acknowledgedAt = new Date().toISOString();
+  return event;
+}
+
+export function getInboxEventCount(options?: { recipientRole?: string; unacknowledgedOnly?: boolean }): number {
+  return getInboxEvents(options).length;
+}
+
+export function resetInboxState(): void { inboxEvents.length = 0; eventSeq = 1; }

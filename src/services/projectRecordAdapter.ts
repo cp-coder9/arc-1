@@ -21,7 +21,8 @@ export type ProjectRecordType =
   | 'professional_registration' | 'company_document' | 'insurance_compliance'
   | 'contractor_supplier_compliance' | 'data_processing_register' | 'consent_record'
   | 'data_subject_request' | 'breach_notification' | 'verification_badge'
-  | 'compliance_risk' | 'governance_decision' | 'audit_entry';
+  | 'compliance_risk' | 'governance_decision' | 'audit_entry'
+  | 'documents' | 'drawing_revision';
 
 export interface BaseProjectContext {
   tenantId: string; projectId: string; userId: string; actorRole?: string;
@@ -133,6 +134,45 @@ export function getProjectRecord(recordId: string): ProjectRecord | undefined {
 
 export function getProjectRecords(projectId: string): ProjectRecord[] {
   return projectRecords.filter((r) => r.projectId === projectId);
+}
+
+export function projectRecordsFromDocuments(
+  docs: Array<{ id: string; name: string; type: string }>,
+  drawings?: Array<{ id: string; name: string; type: string }>,
+): ProjectRecord[] {
+  const records: ProjectRecord[] = [];
+  for (const doc of docs) {
+    records.push({
+      recordId: nextRecordId(),
+      recordType: 'documents' as ProjectRecordType,
+      projectId: doc.id,
+      tenantId: 'default',
+      moduleKey: 'documents',
+      title: doc.name,
+      status: 'active',
+      payload: { name: doc.name, type: doc.type },
+      linkedRecordIds: [],
+      audit: { createdBy: 'system', createdAt: new Date().toISOString() },
+    });
+  }
+  if (drawings) {
+    for (const dwg of drawings) {
+      records.push({
+        recordId: nextRecordId(),
+        recordType: 'drawing_revision' as ProjectRecordType,
+        projectId: dwg.id,
+        tenantId: 'default',
+        moduleKey: 'documents',
+        title: dwg.name,
+        status: 'active',
+        payload: { name: dwg.name, type: dwg.type },
+        linkedRecordIds: [],
+        audit: { createdBy: 'system', createdAt: new Date().toISOString() },
+      });
+    }
+  }
+  projectRecords.push(...records);
+  return records;
 }
 
 export function resetProjectRecordState(): void {

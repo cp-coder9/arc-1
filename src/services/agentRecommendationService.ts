@@ -1,142 +1,219 @@
 /**
- * Agent Recommendation Service
+ * Agent Recommendation Service — Trust, Verification & Compliance
  *
- * Generates agent-ready recommendations from document state,
- * readiness reports, and workflow events. Includes human-approval
- * guardrails for municipal, construction, and closeout operations.
+ * Generates compliance-focused agent recommendations for expired documents,
+ * missing insurance, lapsed registrations, and other compliance issues.
  *
- * @module documents_drawing_intelligence
+ * @module trust_verification_compliance
  */
 
-import type {
-  AgentRecommendation,
-  Priority,
-  ReadinessReport,
-  WorkflowEvent,
-} from '@/types/documentTypes';
+import type { ProfessionalRegistrationRecord, RegistrationLifecycleState } from './professionalRegistrationService';
+import { getRegistrationLifecycle } from './professionalRegistrationService';
+import type { CompanyDocumentRecord } from './companyDocumentService';
+import { getDocumentLifecycle } from './companyDocumentService';
+import type { InsuranceComplianceRecord } from './insuranceComplianceService';
+import { getInsuranceLifecycle } from './insuranceComplianceService';
+import type { ContractorComplianceRecord } from './contractorSupplierComplianceService';
+import { getMissingComplianceChecks } from './contractorSupplierComplianceService';
+import type { ComplianceRiskScore } from './complianceRiskService';
 
-/** Generate agent recommendations from readiness reports and events. */
-export function recommendationsFromDocumentState(
-  projectId: string,
-  reports: ReadinessReport[],
-  events: WorkflowEvent[],
+export type AgentRecommendationSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type AgentRecommendationUrgency = 'advisory' | 'this_week' | 'immediate';
+
+export interface AgentRecommendation {
+  recommendationId: string; agentKey: string; title: string; rationale: string;
+  sourceObjectId: string; severity: AgentRecommendationSeverity;
+  recommendedAction: string; urgency: AgentRecommendationUrgency;
+  category: RecommendationCategory; createdAt: string; moduleKey: string;
+}
+
+export type RecommendationCategory =
+  | 'registration_renewal' | 'document_renewal' | 'insurance_renewal'
+  | 'coverage_gap' | 'compliance_fix' | 'risk_mitigation'
+  | 'consent_required' | 'badge_renewal' | 'general_advisory';
+
+let recSeq = 1;
+const recommendations: AgentRecommendation[] = [];
+const MODULE_KEY = 'trust_verification_compliance';
+
+// ── Builder ────────────────────────────────────────────────────────────────────
+
+export function buildAgentRecommendation(input: {
+  agentKey: string; title: string; rationale: string; sourceObjectId: string;
+  severity: AgentRecommendationSeverity; recommendedAction: string;
+  urgency: AgentRecommendationUrgency; category: RecommendationCategory;
+}): AgentRecommendation {
+  const rec: AgentRecommendation = {
+    recommendationId: `agent-rec-trust-${String(recSeq++).padStart(6, '0')}`,
+    ...input, createdAt: new Date().toISOString(), moduleKey: MODULE_KEY,
+  };
+  recommendations.push(rec);
+  return rec;
+}
+
+// ── Recommendation factories ──────────────────────────────────────────────────
+
+export function recommendRegistrationRenewal(
+  registration: ProfessionalRegistrationRecord, lifecycle: RegistrationLifecycleState,
+): AgentRecommendation {
+  const daysText = lifecycle.daysUntilExpiry !== undefined
+    ? ` (${lifecycle.daysUntilExpiry} days remaining)` : '';
+  return buildAgentRecommendation({
+    agentKey: 'trust_verification_compliance_agent',
+    title: `Renew ${registration.professionalBody} Registration${daysText}`,
+    rationale: `${registration.professionalBody} registration ${registration.registrationNumber} is ${lifecycle.status}.`,
+    sourceObjectId: registration.registrationNumber,
+    severity: lifecycle.status === 'expired' || lifecycle.status === 'suspended' ? 'critical' : 'high',
+    recommendedAction: lifecycle.actionLabel || `Renew ${registration.professionalBody} registration`,
+    urgency: lifecycle.status === 'expired' || lifecycle.status === 'suspended' ? 'immediate' : 'this_week',
+    category: 'registration_renewal',
+  });
+}
+
+export function recommendDocumentRenewal(
+  document: CompanyDocumentRecord, daysUntilExpiry?: number,
+): AgentRecommendation {
+  const isExpired = daysUntilExpiry !== undefined && daysUntilExpiry < 0;
+  return buildAgentRecommendation({
+    agentKey: 'trust_verification_compliance_agent',
+    title: isExpired ? `Expired Document: ${document.title}` : `Renew Document: ${document.title}`,
+    rationale: isExpired
+      ? `"${document.title}" has expired.` : `"${document.title}" expires soon.`,
+    sourceObjectId: document.referenceNumber || document.entityId,
+    severity: isExpired ? 'critical' : 'medium',
+    recommendedAction: `Upload renewed ${document.title}`,
+    urgency: isExpired ? 'immediate' : 'this_week',
+    category: 'document_renewal',
+  });
+}
+
+export function recommendInsuranceAction(insurance: InsuranceComplianceRecord): AgentRecommendation {
+  const isGap = insurance.coverageGapCents > 0;
+  const isExpired = insurance.status === 'expired' || insurance.status === 'lapsed';
+  return buildAgentRecommendation({
+    agentKey: 'trust_verification_compliance_agent',
+    title: isExpired
+      ? `PI Insurance ${insurance.status === 'lapsed' ? 'Lapsed' : 'Expired'}: ${insurance.provider}`
+      : isGap ? `PI Insurance Coverage Gap: ${insurance.provider}`
+      : `PI Insurance Renewal: ${insurance.provider}`,
+    rationale: `PI policy ${insurance.policyNumber} (cover: R${(insurance.coverageAmountCents / 100).toLocaleString()})`,
+    sourceObjectId: insurance.policyNumber,
+    severity: isExpired ? 'critical' : isGap ? 'high' : 'medium',
+    recommendedAction: isExpired ? 'Reinstate PI insurance immediately'
+      : isGap ? `Increase cover by R${(insurance.coverageGapCents / 100).toLocaleString()}`
+      : 'Renew before expiry',
+    urgency: isExpired ? 'immediate' : 'this_week',
+    category: isGap ? 'coverage_gap' : 'insurance_renewal',
+  });
+}
+
+export function recommendComplianceFix(
+  compliance: ContractorComplianceRecord, checkType: string, reason: string,
+): AgentRecommendation {
+  return buildAgentRecommendation({
+    agentKey: 'trust_verification_compliance_agent',
+    title: `Compliance Fix Required: ${checkType}`,
+    rationale: `${checkType}: ${reason}`,
+    sourceObjectId: compliance.entityId, severity: 'high',
+    recommendedAction: `Resolve ${checkType}: ${reason}`,
+    urgency: 'immediate', category: 'compliance_fix',
+  });
+}
+
+export function recommendRiskMitigation(risk: ComplianceRiskScore): AgentRecommendation[] {
+  return risk.triggers.map((trigger) =>
+    buildAgentRecommendation({
+      agentKey: 'trust_verification_compliance_agent',
+      title: `Risk Mitigation: ${trigger.description}`,
+      rationale: `${trigger.type} at ${trigger.severity} severity`,
+      sourceObjectId: risk.entityId,
+      severity: trigger.severity === 'critical' ? 'critical' : trigger.severity === 'high' ? 'high' : 'medium',
+      recommendedAction: trigger.recommendedAction || `Address ${trigger.type}`,
+      urgency: trigger.severity === 'critical' ? 'immediate' : 'this_week',
+      category: 'risk_mitigation',
+    })
+  );
+}
+
+export function recommendConsentAction(userId: string, purpose: string, missing = true): AgentRecommendation {
+  return buildAgentRecommendation({
+    agentKey: 'trust_verification_compliance_agent',
+    title: missing ? `POPIA Consent Required: ${purpose}` : `POPIA Consent Renewal: ${purpose}`,
+    rationale: missing ? `No consent for ${purpose}` : `Consent for ${purpose} needs renewal`,
+    sourceObjectId: userId, severity: 'high',
+    recommendedAction: missing ? `Obtain consent for ${purpose}` : `Renew consent for ${purpose}`,
+    urgency: 'immediate', category: 'consent_required',
+  });
+}
+
+// ── Batch generator ───────────────────────────────────────────────────────────
+
+export function generateComplianceRecommendations(input: {
+  registrations?: ProfessionalRegistrationRecord[];
+  documents?: CompanyDocumentRecord[];
+  insurance?: InsuranceComplianceRecord[];
+  compliance?: ContractorComplianceRecord[];
+  risks?: ComplianceRiskScore[];
+}): AgentRecommendation[] {
+  const all: AgentRecommendation[] = [];
+  if (input.registrations) for (const reg of input.registrations) {
+    const lc = getRegistrationLifecycle(reg);
+    if (lc.requiresAction) all.push(recommendRegistrationRenewal(reg, lc));
+  }
+  if (input.documents) for (const doc of input.documents) {
+    const lc = getDocumentLifecycle(doc);
+    if (lc.requiresAction) all.push(recommendDocumentRenewal(doc, lc.daysUntilExpiry));
+  }
+  if (input.insurance) for (const ins of input.insurance) {
+    const lc = getInsuranceLifecycle(ins);
+    if (lc.requiresAction) all.push(recommendInsuranceAction(ins));
+  }
+  if (input.compliance) for (const comp of input.compliance) {
+    for (const m of getMissingComplianceChecks(comp)) all.push(recommendComplianceFix(comp, m.label, m.reason));
+  }
+  if (input.risks) for (const risk of input.risks) all.push(...recommendRiskMitigation(risk));
+  return all;
+}
+
+// ── Backwards-compatible exports ───────────────────────────────────────────────
+
+export function recommend(
+  agentKey: string, title: string,
+  records: Array<{ id: string; title?: string; status?: string; blockers?: string[] }>,
 ): AgentRecommendation[] {
-  const recommendations: AgentRecommendation[] = [];
-
-  // Generate per-report recommendations
-  for (const report of reports) {
-    if (!report.ready) {
-      const highest = report.findings.sort(
-        (a, b) => rankPriority(b.priority) - rankPriority(a.priority),
-      )[0];
-      recommendations.push({
-        id: `rec-${report.checkName}`,
-        scope: 'project',
-        title: `Resolve ${report.checkName.replace(/_/g, ' ')} blockers`,
-        rationale: highest?.message ?? `${report.checkName} is not ready.`,
-        priority: highest?.priority ?? 'medium',
-        recommendedActionLabel: labelForReport(report.checkName),
-        relatedRoute: `/projects/${projectId}/documents`,
-        requiresHumanApproval: requiresApproval(report.checkName),
-      });
+  const outputs: AgentRecommendation[] = [];
+  for (const r of records) {
+    if (r.blockers && r.blockers.length > 0) {
+      outputs.push(buildAgentRecommendation({
+        agentKey, title: `Resolve blocker on ${r.title || r.id}`,
+        rationale: `Blockers: ${r.blockers.join('; ')}`, sourceObjectId: r.id || 'unknown',
+        severity: 'high', recommendedAction: `Resolve: ${r.blockers.join(', ')}`,
+        urgency: 'this_week', category: 'compliance_fix',
+      }));
     }
   }
-
-  // Top event recommendation
-  const topEvent = events.sort(
-    (a, b) => rankPriority(b.priority) - rankPriority(a.priority),
-  )[0];
-  if (topEvent) {
-    recommendations.push({
-      id: `rec-event-${topEvent.id}`,
-      scope: 'user',
-      title: 'Open highest-priority document issue',
-      rationale: topEvent.detail,
-      priority: topEvent.priority,
-      recommendedActionLabel: 'Open document inbox item',
-      relatedRoute: `/inbox/${topEvent.id}`,
-      requiresHumanApproval: topEvent.priority === 'critical',
-    });
+  if (outputs.length === 0) {
+    outputs.push(buildAgentRecommendation({
+      agentKey, title, rationale: 'All compliance records within expected ranges.',
+      sourceObjectId: records[0]?.id || 'none', severity: 'low',
+      recommendedAction: 'Continue monitoring.', urgency: 'advisory', category: 'general_advisory',
+    }));
   }
-
-  return recommendations.sort(
-    (a, b) => rankPriority(b.priority) - rankPriority(a.priority),
-  );
+  return outputs;
 }
 
-/** Generate a recommendation for a specific finding. */
-export function recommendationForFinding(
-  projectId: string,
-  finding: { code: string; priority: Priority; message: string },
-  index: number,
-): AgentRecommendation {
-  return {
-    id: `rec-finding-${projectId}-${index}`,
-    scope: 'project',
-    title: formatRecommendationTitle(finding.code),
-    rationale: finding.message,
-    priority: finding.priority,
-    recommendedActionLabel: 'Review and resolve',
-    relatedRoute: `/projects/${projectId}/documents`,
-    requiresHumanApproval: ['critical', 'high'].includes(finding.priority),
-  };
+// ── Queries ────────────────────────────────────────────────────────────────────
+
+export function getRecommendations(options?: {
+  severity?: AgentRecommendationSeverity; urgency?: AgentRecommendationUrgency;
+  category?: RecommendationCategory; limit?: number;
+}): AgentRecommendation[] {
+  let filtered = [...recommendations];
+  if (options?.severity) filtered = filtered.filter((r) => r.severity === options.severity);
+  if (options?.urgency) filtered = filtered.filter((r) => r.urgency === options.urgency);
+  if (options?.category) filtered = filtered.filter((r) => r.category === options.category);
+  if (options?.limit) filtered = filtered.slice(0, options.limit);
+  return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-/** Generate a recommendation for superseded drawing alerts. */
-export function supersededDrawingRecommendation(
-  projectId: string,
-  drawingCount: number,
-): AgentRecommendation {
-  return {
-    id: `rec-superseded-${projectId}`,
-    scope: 'project',
-    title: `${drawingCount} construction drawing(s) have been superseded`,
-    rationale:
-      'Construction teams may be working from outdated drawings. Ensure the latest revisions are distributed.',
-    priority: 'high',
-    recommendedActionLabel: 'Review superseded drawings',
-    relatedRoute: `/projects/${projectId}/documents/drawings`,
-    requiresHumanApproval: true,
-  };
-}
-
-/** Determine if a report check requires human approval. */
-export function requiresApproval(
-  checkName: ReadinessReport['checkName'],
-): boolean {
-  // Municipal submission, construction issue, and closeout always require human sign-off
-  return ['municipal_submission', 'construction_issue', 'closeout_pack'].includes(
-    checkName,
-  );
-}
-
-/** Map report check-name to a user-facing action label. */
-export function labelForReport(checkName: ReadinessReport['checkName']): string {
-  switch (checkName) {
-    case 'municipal_submission':
-      return 'Complete municipal submission pack';
-    case 'tender_pack':
-      return 'Complete tender pack';
-    case 'construction_issue':
-      return 'Review current construction drawings';
-    case 'closeout_pack':
-      return 'Complete closeout documents';
-    case 'approval_letter':
-      return 'Obtain approval letter';
-    case 'warranty':
-      return 'Collect warranty documents';
-  }
-}
-
-/** Format a finding code into a recommendation title. */
-export function formatRecommendationTitle(code: string): string {
-  return code
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/^./, (c) => c.toUpperCase());
-}
-
-/** Rank priorities numerically. */
-export function rankPriority(priority: Priority): number {
-  return { low: 1, medium: 2, high: 3, critical: 4 }[priority];
-}
+export function resetRecommendationState(): void { recommendations.length = 0; recSeq = 1; }
