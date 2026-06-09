@@ -1,363 +1,439 @@
 /**
- * Proposal State Machine
+ * Proposal State Machine — Pack 4: Professional Toolboxes & Proposal Builder
  *
- * Manages all 10 proposal states with:
- *   - Valid transition definitions
- *   - Transition validation (throw on invalid transition)
- *   - Audit trail on every state change
- *   - Issued-proposal locking (only allow revision, not mutation)
+ * Manages the full proposal lifecycle across 10 states with validated
+ * transitions and immutable audit trails.
  *
- * State Flow:
+ * States:
  *   draft → calculator_completed → terms_attached → professional_approved
- *     → issued → revision_requested
- *     → issued → accepted → converted_to_appointment
- *     → issued → rejected
- *   Any pre-issue state → withdrawn
+ *   → issued → revision_requested → accepted/rejected → withdrawn
+ *   → converted_to_appointment
  */
-
 import type { ProposalStatus } from '../types/proposalBuilder';
 
-export interface StateTransition {
-  from: ProposalStatus;
-  to: ProposalStatus;
-  /** Human-readable description of the transition */
+// ─── State Definitions ─────────────────────────────────────────────────────
+
+export const ALL_PROPOSAL_STATES: ReadonlyArray<ProposalStatus> = [
+  'draft',
+  'calculator_completed',
+  'terms_attached',
+  'professional_approved',
+  'issued',
+  'revision_requested',
+  'accepted',
+  'rejected',
+  'withdrawn',
+  'converted_to_appointment',
+] as const;
+
+export interface ProposalStateInfo {
+  state: ProposalStatus;
+  label: string;
   description: string;
-  /** Which actor roles can perform this transition */
-  allowedBy: string[];
-  /** Whether the proposal becomes locked after this transition */
-  locksProposal?: boolean;
+  isTerminal: boolean;
+  isMutable: boolean;
+  requiresAction: boolean;
+  responsibleRole: 'professional' | 'client' | 'system' | 'admin';
 }
 
-export interface AuditTrailEntry {
+export const PROPOSAL_STATE_INFO: Record<ProposalStatus, ProposalStateInfo> = {
+  draft: {
+    state: 'draft',
+    label: 'Draft',
+    description: 'Proposal is being prepared. Calculator, terms and scope are being assembled.',
+    isTerminal: false,
+    isMutable: true,
+    requiresAction: true,
+    responsibleRole: 'professional',
+  },
+  calculator_completed: {
+    state: 'calculator_completed',
+    label: 'Calculator Completed',
+    description: 'Fee calculator has been run and professional fee determined. Terms must be attached.',
+    isTerminal: false,
+    isMutable: true,
+    requiresAction: true,
+    responsibleRole: 'professional',
+  },
+  terms_attached: {
+    state: 'terms_attached',
+    label: 'Terms Attached',
+    description: 'Terms and conditions have been attached. Ready for professional approval.',
+    isTerminal: false,
+    isMutable: true,
+    requiresAction: true,
+    responsibleRole: 'professional',
+  },
+  professional_approved: {
+    state: 'professional_approved',
+    label: 'Professionally Approved',
+    description: 'Proposal has been approved by the professional and is ready to issue.',
+    isTerminal: false,
+    isMutable: false,
+    requiresAction: true,
+    responsibleRole: 'professional',
+  },
+  issued: {
+    state: 'issued',
+    label: 'Issued',
+    description: 'Proposal has been issued to the client for review and acceptance.',
+    isTerminal: false,
+    isMutable: false,
+    requiresAction: true,
+    responsibleRole: 'client',
+  },
+  revision_requested: {
+    state: 'revision_requested',
+    label: 'Revision Requested',
+    description: 'Client has requested changes. A revised proposal will supersede this one.',
+    isTerminal: false,
+    isMutable: false,
+    requiresAction: true,
+    responsibleRole: 'professional',
+  },
+  accepted: {
+    state: 'accepted',
+    label: 'Accepted',
+    description: 'Client has accepted the proposal. Ready for conversion to appointment.',
+    isTerminal: true,
+    isMutable: false,
+    requiresAction: true,
+    responsibleRole: 'system',
+  },
+  rejected: {
+    state: 'rejected',
+    label: 'Rejected',
+    description: 'Client has rejected the proposal.',
+    isTerminal: true,
+    isMutable: false,
+    requiresAction: false,
+    responsibleRole: 'client',
+  },
+  withdrawn: {
+    state: 'withdrawn',
+    label: 'Withdrawn',
+    description: 'Proposal has been withdrawn by the professional.',
+    isTerminal: true,
+    isMutable: false,
+    requiresAction: false,
+    responsibleRole: 'professional',
+  },
+  converted_to_appointment: {
+    state: 'converted_to_appointment',
+    label: 'Converted to Appointment',
+    description: 'Accepted proposal has been converted into a formal professional appointment.',
+    isTerminal: true,
+    isMutable: false,
+    requiresAction: false,
+    responsibleRole: 'system',
+  },
+};
+
+// ─── Transition Map ─────────────────────────────────────────────────────────
+
+/**
+ * Defines ALL valid transitions for each state.
+ * Any transition not listed here is illegal and will throw.
+ */
+export const VALID_TRANSITIONS: Record<ProposalStatus, ProposalStatus[]> = {
+  draft: ['calculator_completed', 'withdrawn'],
+  calculator_completed: ['terms_attached', 'draft', 'withdrawn'],
+  terms_attached: ['professional_approved', 'calculator_completed', 'withdrawn'],
+  professional_approved: ['issued', 'terms_attached', 'withdrawn'],
+  issued: ['accepted', 'rejected', 'revision_requested', 'withdrawn'],
+  revision_requested: ['draft'], // forces creation of new revision
+  accepted: ['converted_to_appointment'],
+  rejected: [], // terminal
+  withdrawn: [], // terminal
+  converted_to_appointment: [], // terminal
+};
+
+// ─── Audit Trail ────────────────────────────────────────────────────────────
+
+export interface StateChangeEntry {
+  id: string;
   from: ProposalStatus;
   to: ProposalStatus;
   timestamp: string;
-  actorUserId: string;
+  actorId: string;
   actorRole: string;
   reason?: string;
   metadata?: Record<string, unknown>;
 }
 
-export interface ProposalState {
-  currentStatus: ProposalStatus;
-  auditTrail: AuditTrailEntry[];
-  isLocked: boolean;
-  lockedAt?: string;
-  issuedAt?: string;
-  acceptedAt?: string;
-  rejectedAt?: string;
-  withdrawnAt?: string;
-  convertedAt?: string;
+export interface ProposalAuditTrail {
+  proposalId: string;
+  entries: StateChangeEntry[];
+  createdAt: string;
+  updatedAt: string;
+  currentState: ProposalStatus;
+  version: number;
 }
 
-// ─── Valid Transitions ────────────────────────────────────────────────────────
+// ─── State Machine Engine ───────────────────────────────────────────────────
 
-export const VALID_TRANSITIONS: StateTransition[] = [
-  {
-    from: 'draft',
-    to: 'calculator_completed',
-    description: 'Fee calculator has been run and attached.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'calculator_completed',
-    to: 'terms_attached',
-    description: 'Terms and conditions have been selected and attached.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'terms_attached',
-    to: 'professional_approved',
-    description: 'Issuing professional has reviewed and approved the proposal.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'professional_approved',
-    to: 'issued',
-    description: 'Proposal has been formally issued to the client.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-    locksProposal: true,
-  },
-  {
-    from: 'issued',
-    to: 'revision_requested',
-    description: 'Client or professional has requested a revision.',
-    allowedBy: ['client', 'architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'issued',
-    to: 'accepted',
-    description: 'Client has formally accepted the proposal.',
-    allowedBy: ['client', 'admin'],
-  },
-  {
-    from: 'issued',
-    to: 'rejected',
-    description: 'Client has rejected the proposal.',
-    allowedBy: ['client', 'admin'],
-  },
-  {
-    from: 'accepted',
-    to: 'converted_to_appointment',
-    description: 'Accepted proposal has been converted to a formal appointment.',
-    allowedBy: ['architect', 'admin'],
-  },
-  // Any pre-issue state can be withdrawn
-  {
-    from: 'draft',
-    to: 'withdrawn',
-    description: 'Proposal has been withdrawn before issue.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'calculator_completed',
-    to: 'withdrawn',
-    description: 'Proposal has been withdrawn before issue.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'terms_attached',
-    to: 'withdrawn',
-    description: 'Proposal has been withdrawn before issue.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  {
-    from: 'professional_approved',
-    to: 'withdrawn',
-    description: 'Proposal has been withdrawn before issue.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-  // Allow re-drafting from revision_requested
-  {
-    from: 'revision_requested',
-    to: 'draft',
-    description: 'Revision request accepted — returning to draft for rework.',
-    allowedBy: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'admin'],
-  },
-];
-
-/** Transitions that are allowed from each state (derived from VALID_TRANSITIONS) */
-const TRANSITION_MAP = new Map<ProposalStatus, StateTransition[]>();
-for (const t of VALID_TRANSITIONS) {
-  const existing = TRANSITION_MAP.get(t.from) ?? [];
-  existing.push(t);
-  TRANSITION_MAP.set(t.from, existing);
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Create a new proposal state starting at 'draft'.
- */
-export function createProposalState(): ProposalState {
-  return {
-    currentStatus: 'draft',
-    auditTrail: [
-      {
-        from: 'draft' as ProposalStatus,
-        to: 'draft',
-        timestamp: new Date().toISOString(),
-        actorUserId: 'system',
-        actorRole: 'system',
-        reason: 'Proposal created',
-      },
-    ],
-    isLocked: false,
-  };
-}
-
-/**
- * Get all valid transitions from a given state.
- */
-export function availableTransitions(from: ProposalStatus): StateTransition[] {
-  return TRANSITION_MAP.get(from) ?? [];
-}
-
-/**
- * Check if a transition from one state to another is valid.
- */
-export function isValidTransition(from: ProposalStatus, to: ProposalStatus): boolean {
-  return availableTransitions(from).some((t) => t.to === to);
-}
-
-/**
- * Attempt to transition a proposal to a new state.
- * Returns the updated ProposalState.
- * Throws if the transition is invalid.
- */
-export function transitionProposal(
-  state: ProposalState,
-  to: ProposalStatus,
-  actor: { userId: string; role: string },
-  reason?: string,
-  metadata?: Record<string, unknown>,
-): ProposalState {
-  // Check if locked
-  if (state.isLocked) {
-    throw new Error(
-      `Cannot transition a locked proposal. The proposal was issued and is locked against mutation. ` +
-      `Create a revision instead.`,
-    );
-  }
-
-  // Find the matching transition
-  const transition = availableTransitions(state.currentStatus).find((t) => t.to === to);
-  if (!transition) {
-    throw new Error(
-      `Invalid state transition: ${state.currentStatus} → ${to}. ` +
-      `Allowed transitions from ${state.currentStatus}: ${availableTransitions(state.currentStatus).map(t => t.to).join(', ') || 'none'}`,
-    );
-  }
-
-  // Create audit entry
-  const entry: AuditTrailEntry = {
-    from: state.currentStatus,
-    to,
-    timestamp: new Date().toISOString(),
-    actorUserId: actor.userId,
-    actorRole: actor.role,
-    reason,
-    metadata,
-  };
-
-  const updated: ProposalState = {
-    ...state,
-    currentStatus: to,
-    auditTrail: [...state.auditTrail, entry],
-    isLocked: transition.locksProposal ?? false,
-  };
-
-  // Record timestamped milestones
-  if (to === 'issued') {
-    updated.issuedAt = entry.timestamp;
-    updated.lockedAt = entry.timestamp;
-  }
-  if (to === 'accepted') {
-    updated.acceptedAt = entry.timestamp;
-  }
-  if (to === 'rejected') {
-    updated.rejectedAt = entry.timestamp;
-  }
-  if (to === 'withdrawn') {
-    updated.withdrawnAt = entry.timestamp;
-  }
-  if (to === 'converted_to_appointment') {
-    updated.convertedAt = entry.timestamp;
-  }
-
-  return updated;
-}
-
-/**
- * Create a revision of an issued proposal.
- * Only works for proposals in 'issued', 'accepted', or 'revision_requested' status.
- * The revision starts a new proposal in 'draft' state.
- */
-export function createRevision(
-  state: ProposalState,
-  actor: { userId: string; role: string },
-  reason?: string,
-): ProposalState {
-  if (!['issued', 'accepted', 'revision_requested'].includes(state.currentStatus)) {
-    throw new Error(
-      `Revisions can only be created from issued, accepted, or revision_requested proposals. ` +
-      `Current status: ${state.currentStatus}`,
-    );
-  }
-
-  return {
-    currentStatus: 'draft',
-    auditTrail: [
-      {
-        from: state.currentStatus,
-        to: 'draft',
-        timestamp: new Date().toISOString(),
-        actorUserId: actor.userId,
-        actorRole: actor.role,
-        reason: reason ?? 'Revision created from issued proposal',
-        metadata: { revisedFromStatus: state.currentStatus },
-      },
-    ],
-    isLocked: false,
-  };
-}
-
-/**
- * Generate a summary of the proposal state for display.
- */
-export function stateSummary(state: ProposalState): string {
-  const latest = state.auditTrail[state.auditTrail.length - 1];
-  const statusLabel = state.currentStatus.replace(/_/g, ' ');
-  const lockedNote = state.isLocked ? ' (locked)' : '';
-  const actionNote = latest
-    ? `\nLast action: ${latest.from} → ${latest.to} by ${latest.actorRole} at ${latest.timestamp}`
-    : '';
-  return `Status: ${statusLabel}${lockedNote}${actionNote}`;
-}
-
-// ─── Class-based wrapper for the frontend component ──────────────────────────
-
-export interface StateChangeEntry {
-  id: string;
-  from: string;
-  to: string;
-  timestamp: string;
-  actorRole: string;
-  actorId: string;
-  reason?: string;
-}
-
-/**
- * Class-based state machine wrapper used by the ProposalBuilderPanel.
- * Wraps the functional ProposalState API.
- */
 export class ProposalStateMachine {
-  private state: ProposalState;
-  private historyEntries: StateChangeEntry[] = [];
+  public readonly proposalId: string;
+  private auditTrail: ProposalAuditTrail;
 
-  constructor(proposalId: string) {
-    this.state = createProposalState();
+  constructor(proposalId: string, initialState: ProposalStatus = 'draft') {
+    this.proposalId = proposalId;
+    const now = new Date().toISOString();
+    this.auditTrail = {
+      proposalId,
+      entries: [
+        {
+          id: `${proposalId}-state-init`,
+          from: 'draft' as ProposalStatus,
+          to: initialState,
+          timestamp: now,
+          actorId: 'system',
+          actorRole: 'system',
+          reason: 'Proposal created',
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+      currentState: initialState,
+      version: 1,
+    };
   }
 
-  get currentState(): string {
-    return this.state.currentStatus;
+  /**
+   * Get the current state of the proposal.
+   */
+  get currentState(): ProposalStatus {
+    return this.auditTrail.currentState;
   }
 
-  get isLocked(): boolean {
-    return this.state.isLocked;
+  /**
+   * Get full audit trail.
+   */
+  get trail(): Readonly<ProposalAuditTrail> {
+    return this.auditTrail;
   }
 
+  /**
+   * Get the state info for the current state.
+   */
+  get stateInfo(): ProposalStateInfo {
+    return PROPOSAL_STATE_INFO[this.auditTrail.currentState];
+  }
+
+  /**
+   * Get valid next states from the current state.
+   */
+  get validNextStates(): ReadonlyArray<ProposalStatus> {
+    return VALID_TRANSITIONS[this.auditTrail.currentState];
+  }
+
+  /**
+   * Check if a transition is valid.
+   */
+  canTransitionTo(target: ProposalStatus): boolean {
+    return this.validNextStates.includes(target);
+  }
+
+  /**
+   * Execute a state transition. Throws if invalid.
+   */
   transition(
-    to: string,
+    to: ProposalStatus,
     actor: { id: string; role: string },
     reason?: string,
-  ): void {
-    this.state = transitionProposal(
-      this.state,
-      to as any,
-      { userId: actor.id, role: actor.role },
+    metadata?: Record<string, unknown>,
+  ): StateChangeEntry {
+    const from = this.auditTrail.currentState;
+
+    if (!this.canTransitionTo(to)) {
+      throw new Error(
+        `Invalid state transition: "${from}" → "${to}". ` +
+        `Valid transitions from "${from}" are: ${this.validNextStates.join(', ') || 'none (terminal state)'}.`,
+      );
+    }
+
+    const entry: StateChangeEntry = {
+      id: `${this.proposalId}-state-${this.auditTrail.entries.length}`,
+      from,
+      to,
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorRole: actor.role,
       reason,
-    );
-    const lastAudit = this.state.auditTrail[this.state.auditTrail.length - 1];
-    this.historyEntries.push({
-      id: `entry-${this.historyEntries.length + 1}`,
-      from: lastAudit.from,
-      to: lastAudit.to,
-      timestamp: lastAudit.timestamp,
-      actorRole: lastAudit.actorRole,
-      actorId: lastAudit.actorUserId,
-      reason: lastAudit.reason,
-    });
+      metadata,
+    };
+
+    this.auditTrail = {
+      ...this.auditTrail,
+      entries: [...this.auditTrail.entries, entry],
+      currentState: to,
+      updatedAt: entry.timestamp,
+      version: this.auditTrail.version + 1,
+    };
+
+    return entry;
   }
 
-  getHistory(): StateChangeEntry[] {
-    return [...this.historyEntries];
+  /**
+   * Get all entries in the audit trail.
+   */
+  getHistory(): ReadonlyArray<StateChangeEntry> {
+    return this.auditTrail.entries;
+  }
+
+  /**
+   * Get the last N entries.
+   */
+  getRecentHistory(count: number = 5): ReadonlyArray<StateChangeEntry> {
+    return this.auditTrail.entries.slice(-count);
+  }
+
+  /**
+   * Get time spent in the current state.
+   */
+  timeInCurrentState(): number {
+    const lastEntry = this.auditTrail.entries[this.auditTrail.entries.length - 1];
+    return Date.now() - new Date(lastEntry.timestamp).getTime();
+  }
+
+  /**
+   * Serialize the full audit trail for storage.
+   */
+  serialize(): ProposalAuditTrail {
+    return { ...this.auditTrail, entries: [...this.auditTrail.entries] };
+  }
+
+  /**
+   * Restore a state machine from a serialized audit trail.
+   */
+  static fromAuditTrail(trail: ProposalAuditTrail): ProposalStateMachine {
+    const machine = new ProposalStateMachine(trail.proposalId, trail.currentState);
+    machine.auditTrail = { ...trail, entries: [...trail.entries] };
+    return machine;
+  }
+
+  /**
+   * Check if the proposal is in a terminal state.
+   */
+  get isTerminal(): boolean {
+    return PROPOSAL_STATE_INFO[this.auditTrail.currentState].isTerminal;
+  }
+
+  /**
+   * Check if the proposal is currently mutable (can have its contents changed).
+   */
+  get isMutable(): boolean {
+    return PROPOSAL_STATE_INFO[this.auditTrail.currentState].isMutable;
   }
 }
 
+// ─── State Machine Factory ──────────────────────────────────────────────────
+
 /**
- * Create a state machine instance for a proposal.
+ * Create a new proposal state machine, starting at "draft".
  */
 export function createProposalStateMachine(proposalId: string): ProposalStateMachine {
-  return new ProposalStateMachine(proposalId);
+  return new ProposalStateMachine(proposalId, 'draft');
+}
+
+/**
+ * Create a proposal state machine at "calculator_completed" — used when
+ * a fee calculation has been completed and terms are ready to attach.
+ */
+export function createProposalFromCalculator(proposalId: string): ProposalStateMachine {
+  return new ProposalStateMachine(proposalId, 'calculator_completed');
+}
+
+// ─── Convenience Transitions ────────────────────────────────────────────────
+
+export interface TransitionActor {
+  id: string;
+  role: string;
+}
+
+/**
+ * Professional approves the proposal after attaching terms.
+ */
+export function approveProposal(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+): StateChangeEntry {
+  if (machine.currentState === 'terms_attached') {
+    return machine.transition('professional_approved', actor, 'Professional review completed.');
+  }
+  if (machine.currentState === 'professional_approved') {
+    return machine.transition('issued', actor, 'Proposal issued to client.');
+  }
+  throw new Error(`Cannot approve from state "${machine.currentState}".`);
+}
+
+/**
+ * Client accepts an issued proposal.
+ */
+export function acceptProposal(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+): StateChangeEntry {
+  return machine.transition('accepted', actor, 'Client accepted the proposal.');
+}
+
+/**
+ * Client rejects an issued proposal.
+ */
+export function rejectProposal(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+  reason?: string,
+): StateChangeEntry {
+  return machine.transition('rejected', actor, reason || 'Client rejected the proposal.');
+}
+
+/**
+ * Client requests a revision to an issued proposal.
+ */
+export function requestRevision(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+  reason?: string,
+): StateChangeEntry {
+  return machine.transition(
+    'revision_requested',
+    actor,
+    reason || 'Client requested revisions.',
+  );
+}
+
+/**
+ * Professional withdraws a proposal.
+ */
+export function withdrawProposal(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+  reason?: string,
+): StateChangeEntry {
+  return machine.transition('withdrawn', actor, reason || 'Proposal withdrawn by professional.');
+}
+
+/**
+ * Convert an accepted proposal to an appointment.
+ */
+export function convertToAppointment(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+): StateChangeEntry {
+  return machine.transition(
+    'converted_to_appointment',
+    actor,
+    'Proposal converted to professional appointment.',
+  );
+}
+
+/**
+ * Attach terms to a calculator-completed proposal.
+ */
+export function attachTerms(
+  machine: ProposalStateMachine,
+  actor: TransitionActor,
+): StateChangeEntry {
+  return machine.transition('terms_attached', actor, 'Terms and conditions attached.');
 }

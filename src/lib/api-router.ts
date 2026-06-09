@@ -11,6 +11,7 @@ import { processReceiptOCR } from "../services/ocrService";
 import { detectMunicipalInvoices, getMunicipalityHeatMap } from "../services/shadowTrackerService";
 import { runMunicipalBrowserAutomation, trackMunicipalityStatus } from "./municipalAutomation";
 import { notificationService } from "../services/notificationService";
+import { assessMunicipalSubmissionReadiness, buildScopeFactsFromProject } from "../services/municipalSubmissionReadinessService";
 import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../services/auditService";
 import { normalizeUserRole } from "../services/permissionService";
 import {
@@ -3192,6 +3193,87 @@ router.get("/proposals/:proposalId/appointment-readiness", async (req, res) => {
     }
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ── Submission Readiness (Pack 6) ──────────────────────────────────────────
+router.get("/projects/:projectId/submission-readiness", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) return res.status(404).json({ error: 'Project not found' });
+    const project = { id: projectId, ...projectSnap.data() } as Record<string, any>;
+
+    const isOwner = project.clientId === authContext.uid;
+    const isLeadProfessional =
+      project.leadProfessionalId === authContext.uid ||
+      project.leadBepId === authContext.uid ||
+      project.leadArchitectId === authContext.uid;
+    if (!authContext.isAdmin && !isOwner && !isLeadProfessional) {
+      const memberSnap = await adminDb
+        .collection('project_team_members')
+        .where('projectId', '==', projectId)
+        .where('userId', '==', authContext.uid)
+        .limit(1)
+        .get();
+      if (memberSnap.empty) {
+        return res.status(403).json({
+          error: 'Only project owner, lead professional, or team members can view submission readiness',
+        });
+      }
+    }
+
+    const scopeFacts = buildScopeFactsFromProject({
+      projectId,
+      projectName: project.name || project.projectName || 'Untitled',
+      municipality: project.municipality,
+      province: project.province,
+      propertyDescription: project.propertyDescription,
+      erfNumber: project.erfNumber,
+      zoningKnown: project.zoningKnown ?? false,
+      occupancyType: project.occupancyType ?? 'single_residential',
+      alterationToExisting: project.alterationToExisting ?? false,
+      additions: project.additions ?? false,
+      newBuild: project.newBuild ?? project.projectType === 'new_build',
+      changesLoadBearing: project.changesLoadBearing ?? false,
+      changesDrainageOrStormwater: project.changesDrainageOrStormwater ?? false,
+      publicAccessOrAssembly: project.publicAccessOrAssembly ?? false,
+      envelopeEnergyImpact: project.envelopeEnergyImpact ?? false,
+      coverageOrParkingRisk: project.coverageOrParkingRisk ?? false,
+      boundaryOrServitudeUnclear: project.boundaryOrServitudeUnclear ?? false,
+      heritagePotential: project.heritagePotential ?? false,
+      environmentalSensitivity: project.environmentalSensitivity ?? false,
+      trafficImpact: project.trafficImpact ?? false,
+      estimatedConstructionValueZar: project.estimatedConstructionValueZar ?? 0,
+      drawingRegister: Array.isArray(project.drawingRegister) ? project.drawingRegister : [],
+      supportingDocuments: Array.isArray(project.supportingDocuments) ? project.supportingDocuments : [],
+    });
+
+    const result = assessMunicipalSubmissionReadiness(scopeFacts);
+
+    await recordAuditEvent(req as any, {
+      category: 'compliance',
+      action: 'municipal_readiness_accessed',
+      actor: {
+        uid: authContext.uid,
+        role: authContext.role,
+        email: authContext.decoded.email,
+      },
+      target: { type: 'project', id: projectId },
+      metadata: {
+        score: result.readiness.score,
+        ready: result.readiness.readyForProfessionalSubmissionReview,
+      },
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Submission readiness error:', err);
+    res.status(err.status || 500).json({
+      error: err.message || 'Failed to assess submission readiness',
+    });
   }
 });
 

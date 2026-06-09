@@ -159,7 +159,7 @@ describe('complianceRiskService', () => {
       triggers: [buildRiskTrigger('expired_registration', 'R1', 'Expired')],
     });
     expect(() =>
-      assertEntityRiskBelowThreshold(score, { maxRiskLevel: 'critical', blockExpiredRegistration: true }),
+      assertEntityRiskBelowThreshold(score, { maxRiskLevel: 'critical', blockCritical: false, blockExpiredRegistration: true }),
     ).toThrow(/expired or suspended/);
   });
 
@@ -169,7 +169,7 @@ describe('complianceRiskService', () => {
       triggers: [buildRiskTrigger('expired_insurance', 'I1', 'Expired')],
     });
     expect(() =>
-      assertEntityRiskBelowThreshold(score, { maxRiskLevel: 'critical', blockExpiredInsurance: true }),
+      assertEntityRiskBelowThreshold(score, { maxRiskLevel: 'critical', blockCritical: false, blockExpiredInsurance: true }),
     ).toThrow(/expired or missing/);
   });
 
