@@ -30,7 +30,8 @@ export interface AgentRecommendation {
 export type RecommendationCategory =
   | 'registration_renewal' | 'document_renewal' | 'insurance_renewal'
   | 'coverage_gap' | 'compliance_fix' | 'risk_mitigation'
-  | 'consent_required' | 'badge_renewal' | 'general_advisory';
+  | 'consent_required' | 'badge_renewal' | 'general_advisory'
+  | 'compliance_checklist';
 
 let recSeq = 1;
 const recommendations: AgentRecommendation[] = [];
@@ -214,6 +215,50 @@ export function getRecommendations(options?: {
   if (options?.category) filtered = filtered.filter((r) => r.category === options.category);
   if (options?.limit) filtered = filtered.slice(0, options.limit);
   return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function recommendationsFromDocumentState(
+  projectId: string,
+  readinessReports: Array<{ checkName: string; ready: boolean; findings: Array<{ code: string; message: string; priority: string }> }>,
+  inboxEvents: Array<{ eventId: string; priority: string; type?: string; assignedRoles?: string[] }>,
+): AgentRecommendation[] {
+  const recs: AgentRecommendation[] = [];
+  for (const report of readinessReports) {
+    if (!report.ready) {
+      const severity: AgentRecommendationSeverity = report.findings.some((f) => f.priority === 'critical') ? 'critical' :
+        report.findings.some((f) => f.priority === 'high') ? 'high' : 'medium';
+      recs.push({
+        recommendationId: `rec-${recSeq++}`,
+        agentKey: 'document_agent',
+        title: `Review ${report.checkName}`,
+        rationale: `Readiness check "${report.checkName}" is not ready with ${report.findings.length} findings.`,
+        sourceObjectId: projectId,
+        severity,
+        recommendedAction: `Review and resolve ${report.findings.length} findings in ${report.checkName}`,
+        urgency: 'this_week',
+        category: 'compliance_checklist',
+        createdAt: new Date().toISOString(),
+        moduleKey: MODULE_KEY,
+      });
+    }
+  }
+  if (inboxEvents.length > 0) {
+    recs.push({
+      recommendationId: `rec-${recSeq++}`,
+      agentKey: 'inbox_agent',
+      title: 'Address pending inbox events',
+      rationale: `${inboxEvents.length} inbox events require attention.`,
+      sourceObjectId: projectId,
+      severity: 'high',
+      recommendedAction: `Review ${inboxEvents.length} pending inbox events`,
+      urgency: 'immediate',
+      category: 'compliance_checklist',
+      createdAt: new Date().toISOString(),
+      moduleKey: MODULE_KEY,
+    });
+  }
+  recommendations.push(...recs);
+  return recs;
 }
 
 export function resetRecommendationState(): void { recommendations.length = 0; recSeq = 1; }

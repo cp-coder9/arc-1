@@ -137,20 +137,20 @@ export function getProjectRecords(projectId: string): ProjectRecord[] {
 }
 
 export function projectRecordsFromDocuments(
-  docs: Array<{ id: string; name: string; type: string }>,
-  drawings?: Array<{ id: string; name: string; type: string }>,
+  docs: Array<{ documentId: string; title: string; documentType: string }>,
+  drawings?: Array<{ drawingId: string; title: string; sheetType?: string }>,
 ): ProjectRecord[] {
   const records: ProjectRecord[] = [];
   for (const doc of docs) {
     records.push({
       recordId: nextRecordId(),
       recordType: 'documents' as ProjectRecordType,
-      projectId: doc.id,
+      projectId: doc.documentId,
       tenantId: 'default',
       moduleKey: 'documents',
-      title: doc.name,
+      title: doc.title,
       status: 'active',
-      payload: { name: doc.name, type: doc.type },
+      payload: { name: doc.title, type: doc.documentType },
       linkedRecordIds: [],
       audit: { createdBy: 'system', createdAt: new Date().toISOString() },
     });
@@ -160,12 +160,12 @@ export function projectRecordsFromDocuments(
       records.push({
         recordId: nextRecordId(),
         recordType: 'drawing_revision' as ProjectRecordType,
-        projectId: dwg.id,
+        projectId: dwg.drawingId,
         tenantId: 'default',
         moduleKey: 'documents',
-        title: dwg.name,
+        title: dwg.title,
         status: 'active',
-        payload: { name: dwg.name, type: dwg.type },
+        payload: { name: dwg.title, type: dwg.sheetType ?? 'unknown' },
         linkedRecordIds: [],
         audit: { createdBy: 'system', createdAt: new Date().toISOString() },
       });

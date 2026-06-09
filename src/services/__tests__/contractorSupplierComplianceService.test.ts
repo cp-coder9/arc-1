@@ -85,7 +85,7 @@ describe('contractorSupplierComplianceService', () => {
         entityType: 'contractor',
         checks: [],
       }),
-    ).toThrow(/at least one compliance check/);
+    ).toThrow(/compliance check is required/);
   });
 
   it('rejects invalid check types', () => {

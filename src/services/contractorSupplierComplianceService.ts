@@ -193,7 +193,7 @@ export function buildContractorCompliance(
   const expiredChecks = validatedChecks
     .filter((check) => {
       if (check.status === 'expired') return true;
-      if (check.status === 'non_compliant' && check.expiresAt) {
+      if (check.expiresAt) {
         return new Date(check.expiresAt).getTime() < now.getTime();
       }
       return false;

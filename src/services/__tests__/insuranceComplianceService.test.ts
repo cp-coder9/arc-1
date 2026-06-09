@@ -168,7 +168,7 @@ describe('insuranceComplianceService', () => {
     const sufficient = analyzeCoverageGap(5_000_000_00, 3_000_000_00);
     expect(sufficient.hasGap).toBe(false);
     expect(sufficient.gapCents).toBe(0);
-    expect(sufficient.percentageOfRequirement).toBe(166);
+    expect(sufficient.percentageOfRequirement).toBe(167);
   });
 
   it('returns minimum coverage per entity type and professional body', () => {

@@ -1,126 +1,128 @@
-/**
- * Tests: Inbox Event Adapter
- *
- * Event type classification, priority derivation, event grouping,
- * and proper WorkflowEvent envelope construction.
- */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import {
-  classifyEventType,
-  eventCountByPriority,
-  eventsAbovePriority,
-  formatEventTitle,
-  groupEventsByType,
-  workflowEventsFromReadiness,
-  workflowEventsFromReport,
+  buildComplianceInboxEvent,
+  buildVerificationRequiredEvent,
+  buildDocumentExpiringEvent,
+  buildDocumentExpiredEvent,
+  buildRegistrationRenewalEvent,
+  buildInsuranceExpiringEvent,
+  buildComplianceCheckFailedEvent,
+  buildRiskAlertEvent,
+  buildConsentRequiredEvent,
+  inbox,
+  getInboxEvents,
+  acknowledgeInboxEvent,
+  getInboxEventCount,
+  resetInboxState,
 } from '../inboxEventAdapter';
-import { allReadinessReports } from '../readinessCheckService';
-import { sampleDocuments, sampleDrawings } from '../sampleDocumentData';
-import type { ReadinessFinding } from '@/types/documentTypes';
 
-describe('inboxEventAdapter', () => {
-  const reports = allReadinessReports(sampleDocuments, sampleDrawings);
-  const events = workflowEventsFromReadiness('project-test', reports);
+describe('inboxEventAdapter — trust_verification_compliance', () => {
+  beforeEach(() => resetInboxState());
 
-  // ── Event Classification ──
-  it.each([
-    ['MUNICIPAL_SHEET_MISSING', 'municipal_submission_pack_incomplete'],
-    ['MUNICIPAL_FORM_NOT_READY', 'municipal_submission_pack_incomplete'],
-    ['APPROVAL_LETTER_MISSING', 'approval_letter_missing'],
-    ['TENDER_SPECIFICATION_NOT_ISSUED', 'tender_pack_incomplete'],
-    ['TENDER_SHEET_MISSING', 'tender_pack_incomplete'],
-    ['SUPERSEDED_CONSTRUCTION_DRAWING', 'superseded_construction_drawing'],
-    ['CLOSEOUT_PACK_NOT_ISSUED', 'closeout_pack_incomplete'],
-    ['CLOSEOUT_CERTIFICATE_MISSING', 'closeout_pack_incomplete'],
-    ['AS_BUILT_DRAWINGS_MISSING', 'closeout_pack_incomplete'],
-    ['DOCUMENT_REVIEW_REQUIRED', 'document_review_required'],
-    ['DRAWING_REVISION_UPLOADED', 'drawing_revision_uploaded'],
-  ] as const)('classifies %s as %s', (code, expectedType) => {
-    const finding: ReadinessFinding = {
-      code,
-      priority: 'medium',
-      message: 'Test finding',
-      assignedRoles: ['architect'],
-    };
-    expect(classifyEventType(finding)).toBe(expectedType);
+  it('builds a compliance inbox event with correct envelope', () => {
+    const event = buildComplianceInboxEvent({
+      recipientRole: 'admin',
+      title: 'Test Event',
+      sourceObjectId: 'obj-1',
+      priority: 'high',
+      eventType: 'verification_required',
+      description: 'Test description',
+      projectId: 'proj-1',
+    });
+
+    expect(event.recipientRole).toBe('admin');
+    expect(event.priority).toBe('high');
+    expect(event.eventType).toBe('verification_required');
+    expect(event.moduleKey).toBe('trust_verification_compliance');
+    expect(event.acknowledged).toBe(false);
+    expect(event.eventId).toMatch(/inbox-trust-/);
   });
 
-  // ── Event Generation ──
-  it('generates events from all readiness reports', () => {
-    expect(events.length).toBeGreaterThan(0);
-    expect(events.every((e) => e.projectId === 'project-test')).toBe(true);
-    expect(events.every((e) => e.sourceModule === 'documents')).toBe(true);
+  it('builds verification required event', () => {
+    const event = buildVerificationRequiredEvent('admin', 'prof-1', 'professional');
+    expect(event.eventType).toBe('verification_required');
+    expect(event.title).toContain('professional');
   });
 
-  it('generates events from a single report', () => {
-    const report = reports[0]; // municipal submission
-    const reportEvents = workflowEventsFromReport('project-test', report);
-    expect(reportEvents.length).toBe(report.findings.length);
-    expect(reportEvents[0].projectId).toBe('project-test');
+  it('builds document expiring event with critical priority when <7 days', () => {
+    const event = buildDocumentExpiringEvent('admin', 'PI Certificate', 'doc-1', 5);
+    expect(event.priority).toBe('critical');
+    expect(event.eventType).toBe('document_expiring');
   });
 
-  it('each event has required fields', () => {
-    for (const event of events) {
-      expect(event.id).toMatch(/^doc-event-project-test-/);
-      expect(event.type).toBeDefined();
-      expect(event.title).toBeTruthy();
-      expect(event.detail).toBeTruthy();
-      expect(['low', 'medium', 'high', 'critical']).toContain(event.priority);
-      expect(event.assignedRoles.length).toBeGreaterThan(0);
-      expect(event.createdAt).toBeDefined();
-    }
+  it('builds document expiring event with high priority when <30 days', () => {
+    const event = buildDocumentExpiringEvent('admin', 'PI Certificate', 'doc-1', 20);
+    expect(event.priority).toBe('high');
   });
 
-  // ── Event Title Formatting ──
-  it('formats finding codes into human-readable titles', () => {
-    expect(formatEventTitle('MUNICIPAL_FORM_NOT_READY')).toBe('Municipal form not ready');
-    expect(formatEventTitle('SUPERSEDED_CONSTRUCTION_DRAWING')).toBe('Superseded construction drawing');
-    expect(formatEventTitle('TENDER_SPECIFICATION_NOT_ISSUED')).toBe('Tender specification not issued');
+  it('builds document expired event', () => {
+    const event = buildDocumentExpiredEvent('admin', 'Tax Clearance', 'doc-2');
+    expect(event.priority).toBe('critical');
+    expect(event.eventType).toBe('document_expired');
   });
 
-  // ── Priority Filtering ──
-  it('filters events above a priority threshold', () => {
-    const highOrAbove = eventsAbovePriority(events, 'high');
-    expect(highOrAbove.every((e) => ['high', 'critical'].includes(e.priority))).toBe(true);
-
-    const criticalOnly = eventsAbovePriority(events, 'critical');
-    expect(criticalOnly.every((e) => e.priority === 'critical')).toBe(true);
+  it('builds registration renewal event', () => {
+    const event = buildRegistrationRenewalEvent('professional', 'SACAP', 'SACAP-001', 10);
+    expect(event.priority).toBe('critical'); // <=14 days
+    expect(event.eventType).toBe('registration_renewal');
   });
 
-  // ── Event Grouping ──
-  it('groups events by type', () => {
-    const groups = groupEventsByType(events);
-    expect(Object.keys(groups).length).toBeGreaterThan(1);
-    // Municipal submission pack incomplete events should be grouped
-    if (groups.municipal_submission_pack_incomplete) {
-      expect(groups.municipal_submission_pack_incomplete.length).toBeGreaterThan(0);
-    }
+  it('builds insurance expiring event', () => {
+    const event = buildInsuranceExpiringEvent('professional', 'ABC Insurers', 'POL-001', 10);
+    expect(event.priority).toBe('critical'); // <=14 days
+    expect(event.eventType).toBe('insurance_renewal');
   });
 
-  // ── Event Counts by Priority ──
-  it('counts events by priority', () => {
-    const counts = eventCountByPriority(events);
-    expect(counts.critical + counts.high + counts.medium + counts.low).toBe(events.length);
-    expect(Object.values(counts).every((c) => typeof c === 'number')).toBe(true);
+  it('builds compliance check failed event', () => {
+    const event = buildComplianceCheckFailedEvent('admin', 'contractor-1', 'Health & Safety', 'proj-1');
+    expect(event.priority).toBe('high');
+    expect(event.eventType).toBe('compliance_check');
   });
 
-  // ── Coverage of All 7 Event Types ──
-  it('covers all 7 required event types', () => {
-    const eventTypes = new Set(events.map((e) => e.type));
-    const requiredTypes = [
-      'document_review_required',
-      'drawing_revision_uploaded',
-      'superseded_construction_drawing',
-      'municipal_submission_pack_incomplete',
-      'tender_pack_incomplete',
-      'closeout_pack_incomplete',
-      'approval_letter_missing',
-    ];
+  it('builds risk alert event', () => {
+    const event = buildRiskAlertEvent('admin', 'prof-1', 'critical', 3);
+    expect(event.priority).toBe('critical');
+    expect(event.eventType).toBe('risk_alert');
+  });
 
-    // Note: Not all types may be present in the demo data,
-    // but the classification function should handle all of them
-    for (const type of eventTypes) {
-      expect(requiredTypes).toContain(type);
-    }
+  it('builds consent required event', () => {
+    const event = buildConsentRequiredEvent('admin', 'user-1', 'professional_verification');
+    expect(event.priority).toBe('high');
+    expect(event.eventType).toBe('consent_required');
+  });
+
+  it('legacy inbox() function works correctly', () => {
+    const event = inbox('admin', 'Legacy Event', 'obj-legacy', 'medium');
+    expect(event.recipientRole).toBe('admin');
+    expect(event.eventType).toBe('verification_required');
+  });
+
+  it('queries inbox events with filters', () => {
+    buildComplianceInboxEvent({ recipientRole: 'admin', title: 'E1', sourceObjectId: 'o1', priority: 'high', eventType: 'risk_alert' });
+    buildComplianceInboxEvent({ recipientRole: 'bep', title: 'E2', sourceObjectId: 'o2', priority: 'medium', eventType: 'document_expiring' });
+    buildComplianceInboxEvent({ recipientRole: 'admin', title: 'E3', sourceObjectId: 'o3', priority: 'low', eventType: 'verification_required' });
+
+    expect(getInboxEvents({ recipientRole: 'admin' })).toHaveLength(2);
+    expect(getInboxEvents({ priority: 'high' })).toHaveLength(1);
+    expect(getInboxEvents({ unacknowledgedOnly: true })).toHaveLength(3);
+  });
+
+  it('acknowledges an inbox event', () => {
+    const event = buildComplianceInboxEvent({ recipientRole: 'admin', title: 'Test', sourceObjectId: 'o1', priority: 'medium', eventType: 'verification_required' });
+    const acked = acknowledgeInboxEvent(event.eventId, 'admin-1');
+    expect(acked?.acknowledged).toBe(true);
+    expect(acked?.acknowledgedBy).toBe('admin-1');
+  });
+
+  it('returns undefined for non-existent event acknowledgment', () => {
+    expect(acknowledgeInboxEvent('nonexistent', 'admin-1')).toBeUndefined();
+  });
+
+  it('counts inbox events', () => {
+    buildComplianceInboxEvent({ recipientRole: 'admin', title: 'E1', sourceObjectId: 'o1', priority: 'high', eventType: 'risk_alert' });
+    buildComplianceInboxEvent({ recipientRole: 'admin', title: 'E2', sourceObjectId: 'o2', priority: 'medium', eventType: 'document_expiring' });
+    expect(getInboxEventCount()).toBe(2);
+    expect(getInboxEventCount({ recipientRole: 'admin' })).toBe(2);
+    expect(getInboxEventCount({ recipientRole: 'bep' })).toBe(0);
   });
 });

@@ -20,7 +20,8 @@ export type InboxEventType =
   | 'verification_required' | 'document_expiring' | 'document_expired'
   | 'registration_renewal' | 'insurance_renewal' | 'compliance_check'
   | 'consent_required' | 'data_subject_request' | 'breach_notification'
-  | 'risk_alert' | 'badge_expired';
+  | 'risk_alert' | 'badge_expired'
+  | 'document_readiness' | 'drawing_revision_required';
 
 let eventSeq = 1;
 const inboxEvents: InboxEvent[] = [];
@@ -173,6 +174,32 @@ export function acknowledgeInboxEvent(eventId: string, acknowledgedBy: string): 
 
 export function getInboxEventCount(options?: { recipientRole?: string; unacknowledgedOnly?: boolean }): number {
   return getInboxEvents(options).length;
+}
+
+export function workflowEventsFromReadiness(
+  projectId: string,
+  readinessReports: Array<{ checkName: string; ready: boolean; findings: Array<{ code: string; message: string; priority: InboxPriority }> }>,
+): InboxEvent[] {
+  const events: InboxEvent[] = [];
+  for (const report of readinessReports) {
+    for (const finding of report.findings) {
+      events.push({
+        eventId: `inbox-${eventSeq++}`,
+        eventType: 'document_readiness',
+        recipientRole: 'architect',
+        title: `${report.checkName}: ${finding.code}`,
+        description: finding.message,
+        sourceObjectId: report.checkName,
+        priority: finding.priority,
+        projectId,
+        createdAt: new Date().toISOString(),
+        acknowledged: false,
+        moduleKey: MODULE_KEY,
+      });
+    }
+  }
+  inboxEvents.push(...events);
+  return events;
 }
 
 export function resetInboxState(): void { inboxEvents.length = 0; eventSeq = 1; }
