@@ -128,6 +128,26 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Contractor Delivery Update',
     channels: ['in_app', 'email', 'push'],
   },
+  timesheet_due: {
+    title: 'Timesheet Entry Logged',
+    channels: ['in_app', 'email'],
+  },
+  supervision_log_required: {
+    title: 'Supervision Log Required',
+    channels: ['in_app', 'email'],
+  },
+  registration_expiring: {
+    title: 'Registration Expiring',
+    channels: ['in_app', 'email', 'push'],
+  },
+  cpd_shortfall: {
+    title: 'CPD Points Shortfall',
+    channels: ['in_app', 'email', 'push'],
+  },
+  invoice_ready_for_review: {
+    title: 'Invoice Ready for Review',
+    channels: ['in_app', 'email'],
+  },
 };
 
 class NotificationService {
