@@ -92,7 +92,6 @@ export function parseProviderWebhook(
 
   return {
     valid: true,
-    errors: [],
     event: {
       providerReference: payload.providerReference as string,
       status: payload.status as ProviderStatusEvent['status'],
