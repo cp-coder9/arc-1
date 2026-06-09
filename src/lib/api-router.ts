@@ -6529,6 +6529,370 @@ router.post("/api/jobs/:jobId/chat/agent-message", apiLimiter, async (req, res) 
   }
 });
 
+// ─── Procurement Marketplace Routes (Pack 7) ────────────────────────────────
+
+import {
+  classifyProcurementScope,
+} from "../services/procurementScopeClassifier";
+import {
+  buildRfqPackage,
+  getDefaultReturnables,
+  getDefaultEvaluationCriteria,
+  validateRfqPackageCompleteness,
+} from "../services/rfqPackageBuilder";
+import {
+  matchMarketplaceListings,
+} from "../services/marketplaceMatcherService";
+import {
+  createBidderInvitation,
+  createBatchInvitations,
+  getInvitationStatusSummary,
+} from "../services/bidderInvitationService";
+import {
+  submitClarificationQuestion,
+  respondToClarification,
+  createAddendum,
+  issueAddendum,
+  verifyEqualDistribution,
+} from "../services/clarificationAddendumService";
+import {
+  createQuoteSubmission,
+  validateQuoteSubmission,
+} from "../services/quoteReturnableValidator";
+import {
+  createAwardRecommendation,
+  recordClientApproval,
+  recordProfessionalApproval,
+  checkConflictOfInterest,
+  checkCandidateProfessionalSupervision,
+} from "../services/awardRecommendationService";
+import {
+  runAllGuardrails,
+} from "../services/procurementGuardrails";
+
+// POST /api/procurement/scope/classify — classify procurement scope
+router.post("/procurement/scope/classify", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const result = classifyProcurementScope(req.body);
+    await recordAuditEvent(req, {
+      category: "project",
+      action: "procurement.scope_classified",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "procurement_scope", id: req.body.projectId },
+      metadata: { classification: result.classification, confidence: result.confidence, canonicalRoute: true },
+    });
+    res.json({ ...result, advisoryOnly: true, governanceNote: result.governanceNote });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/rfq/defaults — get default returnables & evaluation criteria
+router.get("/procurement/rfq/defaults", async (_req, res) => {
+  try {
+    res.json({
+      returnables: getDefaultReturnables(),
+      evaluationCriteria: getDefaultEvaluationCriteria(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/rfq — build RFQ package
+router.post("/procurement/rfq", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const pkg = buildRfqPackage({ ...req.body, createdBy: authContext.uid });
+    await recordAuditEvent(req, {
+      category: "project",
+      action: "procurement.rfq_package_created",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "rfq_package", id: pkg.rfqId, projectId: pkg.projectId },
+      metadata: { rfqId: pkg.rfqId, classification: pkg.procurementClassification, isComplete: pkg.isComplete, canonicalRoute: true },
+    });
+    res.status(201).json({ rfqPackage: pkg });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/rfq/validate — validate RFQ package completeness
+router.post("/procurement/rfq/validate", async (req, res) => {
+  try {
+    const result = validateRfqPackageCompleteness(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/marketplace/search — search marketplace
+router.post("/procurement/marketplace/search", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const { trades, location, category, limit } = req.body;
+    const listingsSnap = await adminDb.collection("marketplace_listings")
+      .where("availability", "in", ["available", "limited"])
+      .limit(limit ? Math.min(Number(limit), 50) : 50)
+      .get();
+    const listings = listingsSnap.docs.map(doc => ({ listingId: doc.id, ...doc.data() })) as any[];
+    if (listings.length === 0) {
+      return res.json({ matches: [], totalListingsSearched: 0, advisoryNote: "Marketplace matches are advisory only." });
+    }
+    const result = matchMarketplaceListings(listings, {
+      projectId: String(req.body.projectId || "adhoc"),
+      location: String(location || ""),
+      requiredTrades: Array.isArray(trades) ? trades : [],
+      requiredDisciplines: [],
+      estimatedValueZar: Number(req.body.budget) || 0,
+      categoryPreferences: category ? [category as any] : [],
+      verificationRequirements: [],
+      excludeListingIds: [],
+    });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.marketplace_searched",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "marketplace_search", id: authContext.uid },
+      metadata: { matchCount: result.matches.length, canonicalRoute: true },
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/invitations — create bidder invitations
+router.post("/procurement/:rfqId/invitations", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const { bidders } = req.body;
+    if (!bidders || !Array.isArray(bidders) || bidders.length === 0) {
+      return res.status(400).json({ error: "At least one bidder is required" });
+    }
+    const inputs = bidders.map((b: any) => ({
+      rfqId: req.params.rfqId, rfqTitle: b.rfqTitle || req.params.rfqId,
+      bidderId: String(b.bidderId || ""), bidderName: String(b.bidderName || ""),
+      bidderEmail: String(b.bidderEmail || ""), bidderCategory: String(b.bidderCategory || "contractor"),
+      invitedBy: authContext.uid, message: b.message, expiryDays: b.expiryDays,
+    }));
+    const batchResult = createBatchInvitations(inputs);
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.invitations_created",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "bidder_invitation", id: req.params.rfqId },
+      metadata: { rfqId: req.params.rfqId, totalInvited: batchResult.totalInvited, canonicalRoute: true },
+    });
+    res.status(201).json(batchResult);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/:rfqId/invitations
+router.get("/procurement/:rfqId/invitations", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const invSnap = await adminDb.collection("procurement_invitations").where("rfqId", "==", req.params.rfqId).get();
+    const invitations = invSnap.docs.map(doc => ({ invitationId: doc.id, ...doc.data() })) as any[];
+    const summary = getInvitationStatusSummary(invitations);
+    res.json({ rfqId: req.params.rfqId, invitations, summary });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/clarifications
+router.post("/procurement/:rfqId/clarifications", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const clarification = submitClarificationQuestion({ ...req.body, rfqId: req.params.rfqId });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.clarification_submitted",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "clarification_question", id: clarification.questionId },
+      metadata: { rfqId: req.params.rfqId, isMaterial: clarification.isMaterial, canonicalRoute: true },
+    });
+    res.status(201).json(clarification);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/clarifications/:questionId/respond
+router.post("/procurement/:rfqId/clarifications/:questionId/respond", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const { response } = req.body;
+    if (!response) return res.status(400).json({ error: "response is required" });
+    const questionSnap = await adminDb.collection("procurement_clarifications").doc(req.params.questionId).get();
+    if (!questionSnap.exists) return res.status(404).json({ error: "Clarification question not found" });
+    const question = { questionId: questionSnap.id, ...questionSnap.data() } as any;
+    const updated = respondToClarification(question, authContext.uid, response);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/addenda
+router.post("/procurement/:rfqId/addenda", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const addendum = createAddendum({ ...req.body, rfqId: req.params.rfqId, issuedBy: authContext.uid });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.addendum_created",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "addendum", id: addendum.addendumId },
+      metadata: { rfqId: req.params.rfqId, distributionCount: addendum.distributedToBidderIds.length, equalInformationCompliant: true, canonicalRoute: true },
+    });
+    res.status(201).json(addendum);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/addenda/:addendumId/issue
+router.post("/procurement/:rfqId/addenda/:addendumId/issue", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const addendumSnap = await adminDb.collection("procurement_addenda").doc(req.params.addendumId).get();
+    if (!addendumSnap.exists) return res.status(404).json({ error: "Addendum not found" });
+    const addendum = { addendumId: addendumSnap.id, ...addendumSnap.data() } as any;
+    const { addendum: issued, distributions } = issueAddendum(addendum, authContext.uid);
+    res.json({ addendum: issued, distributions });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/quotes
+router.post("/procurement/:rfqId/quotes", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const quote = createQuoteSubmission({ ...req.body, rfqId: req.params.rfqId });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.quote_submitted",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "quote_submission", id: quote.quoteId },
+      metadata: { rfqId: req.params.rfqId, bidderId: quote.bidderId, priceZar: quote.priceZar, canonicalRoute: true },
+    });
+    res.status(201).json(quote);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/:rfqId/quotes
+router.get("/procurement/:rfqId/quotes", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const quotesSnap = await adminDb.collection("procurement_quotes").where("rfqId", "==", req.params.rfqId).get();
+    const quotes = quotesSnap.docs.map(doc => ({ quoteId: doc.id, ...doc.data() }));
+    res.json({ rfqId: req.params.rfqId, quotes });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/quotes/:quoteId/validate
+router.post("/procurement/:rfqId/quotes/:quoteId/validate", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const returnables = req.body.returnables || getDefaultReturnables();
+    const validation = validateQuoteSubmission(req.body, returnables, req.body.budgetEstimateZar);
+    res.json(validation);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/:rfqId/comparison
+router.get("/procurement/:rfqId/comparison", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const quotesSnap = await adminDb.collection("procurement_quotes").where("rfqId", "==", req.params.rfqId).get();
+    const quotes = quotesSnap.docs.map(doc => ({ quoteId: doc.id, ...doc.data() })) as any[];
+    const returnables = getDefaultReturnables();
+    const validations = quotes.map(q => validateQuoteSubmission(q, returnables, q.budgetEstimateZar));
+    res.json({ rfqId: req.params.rfqId, quoteCount: quotes.length, validations, advisoryNote: "Quote comparison is advisory only. Human review required." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/award
+router.post("/procurement/:rfqId/award", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const conflictChecks = checkConflictOfInterest(req.body.recommendedBidderId, req.body.recommendedBidderName, req.body.declarations || [], authContext.uid);
+    const supervisionCheck = checkCandidateProfessionalSupervision(req.body.bidderCategory || "contractor", req.body.bidderRegistrations || []);
+    const recommendation = createAwardRecommendation(
+      { ...req.body, rfqId: req.params.rfqId, createdBy: authContext.uid, createdByRole: authContext.normalizedRole || "unknown" },
+      conflictChecks, supervisionCheck,
+    );
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.award_recommended",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "award_recommendation", id: recommendation.recommendationId, projectId: req.body.projectId },
+      metadata: { rfqId: req.params.rfqId, humanApprovalGate: true, canonicalRoute: true },
+    });
+    res.status(201).json({ recommendation, advisoryNote: "Client AND professional approval required before appointment." });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/award/:recommendationId/approve
+router.post("/procurement/:rfqId/award/:recommendationId/approve", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const recSnap = await adminDb.collection("procurement_award_recommendations").doc(req.params.recommendationId).get();
+    if (!recSnap.exists) return res.status(404).json({ error: "Award recommendation not found" });
+    let recommendation = { recommendationId: recSnap.id, ...recSnap.data() } as any;
+    const { approvalType } = req.body;
+    if (approvalType === "client") recommendation = recordClientApproval(recommendation, authContext.uid);
+    else if (approvalType === "professional") recommendation = recordProfessionalApproval(recommendation, authContext.uid);
+    else return res.status(400).json({ error: "approvalType must be 'client' or 'professional'" });
+    res.json({ recommendation, note: recommendation.status === "approved" ? "Appointment may proceed." : "Awaiting remaining approval." });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/guardrails
+router.post("/procurement/:rfqId/guardrails", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const report = runAllGuardrails(req.body);
+    res.json(report);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
 // Firebase test endpoint
 router.get("/firebase/test", async (_req, res) => {
   try {
