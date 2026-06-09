@@ -1129,6 +1129,245 @@ export interface InspectionItem {
   comment?: string;
 }
 
+// --- Site Execution & Field Control Types (Pack 10) ----------------------------
+
+export type Severity = 'low' | 'medium' | 'high' | 'critical';
+
+export type EvidenceType =
+  | 'photo'
+  | 'drawing'
+  | 'specification'
+  | 'delivery_note'
+  | 'weather_report'
+  | 'file';
+
+export interface FieldEvidence {
+  id: string;
+  projectId: string;
+  type: EvidenceType;
+  title: string;
+  uri: string;
+  location?: string;
+  gps?: { lat: number; lng: number };
+  capturedBy: string;
+  capturedAt: string;
+  linkedObjectId?: string;
+}
+
+export type NCRStatus = 'open' | 'corrective_action_submitted' | 'verified_closed' | 'rejected';
+
+export interface NonConformanceReport {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  severity: Severity;
+  responsiblePartyId: string;
+  correctiveAction?: string;
+  evidenceIds: string[];
+  status: NCRStatus;
+  blocksPayment: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectedReason?: string;
+}
+
+export type SiteInstructionStatus = 'draft' | 'issued' | 'acknowledged' | 'superseded';
+
+export interface SiteInstruction {
+  id: string;
+  projectId: string;
+  title: string;
+  instruction: string;
+  issuedBy: string;
+  issuedByRole: UserRole;
+  authorised: boolean;
+  authorisedBy?: string;
+  authorisedAt?: string;
+  costImpact: 'none' | 'possible' | 'confirmed';
+  timeImpact: 'none' | 'possible' | 'confirmed';
+  linkedRfiId?: string;
+  linkedDocumentIds?: string[];
+  status: SiteInstructionStatus;
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  supersededById?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type SnagStatus = 'open' | 'allocated' | 'ready_for_reinspection' | 'closed' | 'rejected';
+
+export interface SnagItem {
+  id: string;
+  projectId: string;
+  location: string;
+  description: string;
+  priority: Severity;
+  responsiblePartyId: string;
+  dueDate: string;
+  evidenceIds: string[];
+  status: SnagStatus;
+  blocksPayment: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  closedBy?: string;
+  closedAt?: string;
+  rejectedReason?: string;
+}
+
+export type InspectionStatus = 'draft' | 'issued' | 'requires_follow_up' | 'closed';
+
+export type InspectionType =
+  | 'architectural'
+  | 'structural'
+  | 'quality'
+  | 'safety'
+  | 'municipal'
+  | 'progress'
+  | 'foundation'
+  | 'dpc'
+  | 'roof'
+  | 'final'
+  | 'custom';
+
+export interface InspectionRecord {
+  id: string;
+  projectId: string;
+  inspectorId: string;
+  inspectorRole: UserRole;
+  inspectionType: InspectionType;
+  date: string;
+  findings: string[];
+  followUps: string[];
+  photos: { url: string; caption: string }[];
+  status: InspectionStatus;
+  signOffRequired: boolean;
+  signedOffBy?: string;
+  signedOffAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type DelayWarningCause =
+  | 'weather'
+  | 'materials'
+  | 'labour'
+  | 'client'
+  | 'professional'
+  | 'contractor'
+  | 'unknown';
+
+export type DelayWarningStatus = 'recorded' | 'notice_required' | 'under_review' | 'closed';
+
+export interface DelayEarlyWarning {
+  id: string;
+  projectId: string;
+  cause: DelayWarningCause;
+  description: string;
+  noticeDeadline: string;
+  likelyProgrammeImpactDays: number;
+  status: DelayWarningStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+}
+
+export type ProgrammeImpactSourceType = 'delay_warning' | 'site_instruction' | 'ncr' | 'snag';
+
+export interface ProgrammeImpact {
+  id: string;
+  projectId: string;
+  sourceObjectId: string;
+  sourceType: ProgrammeImpactSourceType;
+  estimatedDays: number;
+  requiresPlannerReview: boolean;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type BlockerSourceType = 'ncr' | 'snag' | 'inspection';
+
+export interface PaymentBlocker {
+  id: string;
+  projectId: string;
+  sourceObjectId: string;
+  sourceType: BlockerSourceType;
+  reason: string;
+  severity: Severity;
+  status: 'active' | 'cleared';
+  clearedBy?: string;
+  clearedAt?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+// Site Execution Integration Record types
+export type SiteExecutionPhase = 'construction_execution' | 'closeout';
+
+export interface SiteProjectRecord {
+  id: string;
+  projectId: string;
+  tenantId: string;
+  phase: SiteExecutionPhase;
+  moduleKey: string;
+  recordType: string;
+  title: string;
+  status: string;
+  payload: unknown;
+  linkedRecordIds: string[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface SiteInboxEvent {
+  id: string;
+  projectId: string;
+  recipientRole: UserRole;
+  title: string;
+  description?: string;
+  sourceObjectId: string;
+  sourceObjectType: string;
+  priority: Severity;
+  dueDate?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface SiteAuditRecord {
+  id: string;
+  projectId: string;
+  actorId: string;
+  actorRole: UserRole;
+  action: string;
+  sourceObjectId: string;
+  sourceObjectType: string;
+  createdAt: string;
+}
+
+export interface SiteAgentRecommendation {
+  id: string;
+  projectId: string;
+  agentKey: string;
+  title: string;
+  rationale: string;
+  sourceObjectId: string;
+  severity: Severity;
+  status: 'suggested' | 'applied' | 'dismissed';
+  createdAt: string;
+}
+
 // Agent workflow types for platform-wide agent orchestration
 export type AgentOwnerType = 'user' | 'project';
 export type AgentSurface = 'dashboard' | 'chat' | 'notification' | 'document' | 'workflow' | 'admin';
