@@ -17,6 +17,17 @@ export type {
   ProjectLifecycleState,
   ProjectPassportSummary,
   ProductModuleDefinition,
+  // Pack 2 enhanced types
+  Priority,
+  RecordStatus,
+  MissingRecord,
+  LifecycleEvaluation,
+  TeamAppointmentSummary,
+  RiskFinding,
+  WorkflowEvent,
+  AgentRecommendation,
+  ProjectMetadata,
+  PhaseDefinition,
 } from '@/types/architexMasterTypes';
 
 // Module Registry
@@ -40,8 +51,27 @@ export {
 } from './navigationConfig';
 
 // Services
-export { buildLifecycleState, recommendLifecycleActions } from './projectLifecycleEngine';
-export { buildProjectPassportSummary } from './projectPassportService';
+export {
+  buildLifecycleState,
+  recommendLifecycleActions,
+  evaluateLifecycle,
+  evaluatePhaseReadiness,
+  identifyBlockers,
+  canAdvance,
+  produceNextBestActions,
+  hasUsableRecord,
+  definitionForPhase,
+  PHASE_DEFINITIONS,
+} from './projectLifecycleEngine';
+export {
+  buildProjectPassport,
+  buildProjectPassportSummary,
+  extractTeamAppointments,
+  calculateApprovalStatus,
+  calculateDocumentStatus,
+  calculateFinancialStatus,
+  calculateReadinessScore,
+} from './projectPassportService';
 export { createDrawingRevisionRecord } from './documentIntelligenceService';
 export type { DrawingIntelligencePayload } from './documentIntelligenceService';
 export { createKnowledgeSourceRecord } from './knowledgeHubService';
@@ -55,4 +85,5 @@ export type { QuoteComparisonPayload } from './procurementService';
 export { createSiteDiaryRecord } from './siteExecutionService';
 export type { SiteDiaryPayload } from './siteExecutionService';
 export { detectProjectRisks } from './riskEngineService';
-export type { RiskFinding } from './riskEngineService';
+export { workflowEventsFromProjectState, generateMissingApprovalEvent } from './inboxEventService';
+export { recommendationsFromPassport, createRecommendation } from './agentRecommendationService';
