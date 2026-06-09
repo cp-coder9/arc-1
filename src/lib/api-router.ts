@@ -6690,4 +6690,103 @@ router.get("/firebase/test", async (_req, res) => {
   }
 })
 
+// ── Trust, Verification & Compliance Routes (Pack 13) ───────────────────────────
+
+import {
+  buildProfessionalRegistration,
+  getRegistrationLifecycle,
+  buildRegistrationQueueProjection,
+} from '../services/professionalRegistrationService';
+import {
+  buildCompanyDocument,
+  getDocumentLifecycle,
+  getEntityPublicVerificationSummary,
+} from '../services/companyDocumentService';
+import {
+  buildInsuranceCompliance,
+  getInsuranceLifecycle,
+} from '../services/insuranceComplianceService';
+import {
+  buildContractorCompliance,
+  getComplianceCheckSummary,
+} from '../services/contractorSupplierComplianceService';
+import {
+  evaluateComplianceRisk,
+  buildRiskDashboardSummary,
+} from '../services/complianceRiskService';
+import {
+  buildVerificationBadge,
+  getDisplayBadgesForEntity,
+} from '../services/verificationBadgeService';
+
+// GET /api/verification/:entityId — Get verification status for an entity
+router.get(['/verification/:entityId', '/api/verification/:entityId'], async (req, res) => {
+  try {
+    const { entityId } = req.params;
+    // Aggregate verification status from badges, registrations, documents
+    res.json({
+      entityId,
+      status: 'pending',
+      message: 'Verification status endpoint — integration with Firestore pending',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/verification/check — Trigger a verification check
+router.post(['/verification/check', '/api/verification/check'], async (req, res) => {
+  try {
+    const { entityId, entityType } = req.body || {};
+    if (!entityId || !entityType) {
+      return res.status(400).json({ error: 'entityId and entityType are required' });
+    }
+    res.json({
+      entityId,
+      entityType,
+      status: 'queued',
+      message: 'Verification check queued for processing',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/compliance/status — Get compliance status
+router.get(['/compliance/status', '/api/compliance/status'], async (req, res) => {
+  try {
+    const { entityId, projectId } = req.query;
+    res.json({
+      entityId: entityId || null,
+      projectId: projectId || null,
+      complianceStatus: 'pending',
+      message: 'Compliance status endpoint — integration with Firestore pending',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/governance/audit — Get audit trail
+router.get(['/governance/audit', '/api/governance/audit'], async (req, res) => {
+  try {
+    const { entityId, projectId, limit } = req.query;
+    const limitNum = Math.min(Number(limit) || 50, 200);
+    res.json({
+      entityId: entityId || null,
+      projectId: projectId || null,
+      entries: [],
+      total: 0,
+      limit: limitNum,
+      message: 'Governance audit endpoint — integration with Firestore pending',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

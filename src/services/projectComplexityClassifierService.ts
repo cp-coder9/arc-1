@@ -4,7 +4,7 @@
  *
  * Part of Pack 6: Municipal Submission Readiness
  */
-import type { ComplexityAssessment, ProjectScopeFacts } from '@/types/municipalSubmissionReadiness';
+import type { ComplexityAssessment, ProjectComplexity, ProjectScopeFacts } from '@/types/municipalSubmissionReadiness';
 
 /**
  * Classify a project's complexity based on scope facts.
