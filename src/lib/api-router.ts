@@ -72,7 +72,7 @@ import { recordLatency, recordError, recordRequest, recordMemoryViolation, compu
 import { audit } from "../services/auditTrailService";
 import { toAnalyticsProjectRecord, storeAllAnalyticsKPIMetrics, getAnalyticsKPIMetrics } from "../services/analyticsProjectRecordAdapter";
 import { createInboxEvent, getAnalyticsInboxEvents } from "../services/analyticsInboxEventAdapter";
-import { recommend } from "../services/agentRecommendationService";
+// agentRecommendationService integration via AgentWorkflow services
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
