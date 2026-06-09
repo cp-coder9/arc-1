@@ -7,6 +7,7 @@ import { evaluateContractSignatureReadiness, type ContractSignatureRecord } from
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import KickoffChecklistDashboard from './KickoffChecklistDashboard';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -229,6 +230,14 @@ export default function ContractSigningPage({ user }: { user: UserProfile }) {
                 ))}
               </CardContent>
             </Card>
+
+            {/* Pack 5: Kickoff readiness for the selected contract's project */}
+            {selectedContract.projectId && (
+              <KickoffChecklistDashboard
+                projectId={selectedContract.projectId}
+                isProfessional={user.role === 'bep' || user.role === 'architect'}
+              />
+            )}
           </div>
         </div>
       )}
