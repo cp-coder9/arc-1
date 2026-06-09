@@ -491,7 +491,12 @@ export type NotificationType =
   | 'cpd_certificate_issued'
   | 'subscription_status_changed'
   | 'refund_processed'
-  | 'contractor_delivery_update';
+  | 'contractor_delivery_update'
+  | 'timesheet_due'
+  | 'supervision_log_required'
+  | 'registration_expiring'
+  | 'cpd_shortfall'
+  | 'invoice_ready_for_review';
 
 export interface Notification {
   id: string;
@@ -518,6 +523,10 @@ export interface Notification {
     subscriptionId?: string;
     refundId?: string;
     deliveryId?: string;
+    timesheetId?: string;
+    supervisionLogId?: string;
+    registrationId?: string;
+    invoiceReadinessId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -1162,5 +1171,213 @@ export interface AgentRecommendation {
   };
   status: AgentActionStatus;
   requiresHumanApproval: boolean;
+  createdAt: string;
+}
+
+// ── Pack 12: Practice Management & Professional Office Ops ─────────────────
+
+// Pipeline types
+export type PipelineStatus = 'active' | 'won' | 'lost' | 'abandoned' | 'on_hold';
+
+export interface PipelineProject {
+  id: string;
+  firmId: string;
+  projectId: string;
+  jobId?: string;
+  title: string;
+  stage: ProjectStage;
+  status: PipelineStatus;
+  estimatedValueCents: number;
+  probability: number; // 0-100
+  expectedCloseDate?: string;
+  closedAt?: string;
+  closedReason?: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PipelineForecast {
+  totalValueCents: number;
+  weightedValueCents: number;
+  byStage: Record<ProjectStage, { count: number; value: number; weighted: number }>;
+}
+
+// Practice Task types
+export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type PracticeTaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'cancelled';
+
+export interface PracticeTask {
+  id: string;
+  firmId: string;
+  projectId?: string;
+  title: string;
+  description?: string;
+  assigneeId?: string;
+  assignedBy?: string;
+  priority: PracticeTaskPriority;
+  status: PracticeTaskStatus;
+  dueDate?: string;
+  slaDeadline?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  tags?: string[];
+  completedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface WorkloadSummary {
+  userId: string;
+  displayName?: string;
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  totalEstimatedHours: number;
+  totalActualHours: number;
+}
+
+// Timesheet types
+export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
+
+export interface TimesheetEntry {
+  id: string;
+  userId: string;
+  firmId: string;
+  projectId?: string;
+  workstage?: ProjectStage;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  durationMinutes: number;
+  description: string;
+  billable: TimesheetBillableStatus;
+  hourlyRateCents?: number;
+  totalValueCents?: number;
+  tags?: string[];
+  invoiced?: boolean;
+  invoiceId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TimesheetSummary {
+  periodStart: string;
+  periodEnd: string;
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  internalHours: number;
+  totalValueCents: number;
+  byProject: Record<string, { hours: number; valueCents: number }>;
+  byUser: Record<string, { hours: number; valueCents: number }>;
+}
+
+export interface FeeReconciliation {
+  timesheetEntryId: string;
+  projectId: string;
+  userId: string;
+  hoursLogged: number;
+  timesheetValueCents: number;
+  feeChargedCents: number;
+  varianceCents: number;
+  variancePercent: number;
+  reconciled: boolean;
+}
+
+// Candidate Supervision types
+export type SupervisionLogStatus = 'draft' | 'submitted' | 'reviewed' | 'signed_off' | 'rejected';
+
+export interface CandidateSupervisionLog {
+  id: string;
+  candidateId: string;
+  mentorId: string;
+  firmId: string;
+  projectId?: string;
+  periodStart: string;
+  periodEnd: string;
+  hoursLogged: number;
+  activities: string;
+  category?: string;
+  sacapCategory?: string;
+  status: SupervisionLogStatus;
+  mentorNotes?: string;
+  signedOffBy?: string;
+  signedOffAt?: string;
+  rejectedReason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Registration Renewal types
+export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACLAP' | 'SACPCMP';
+export type RegistrationStatus = 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'suspended';
+
+export interface ProfessionalRegistration {
+  id: string;
+  userId: string;
+  firmId: string;
+  body: RegistrationBody;
+  registrationNumber: string;
+  expiryDate: string;
+  status: RegistrationStatus;
+  cpdPointsRequired: number;
+  cpdPointsEarned: number;
+  renewalReminderSent?: boolean;
+  lastRenewedAt?: string;
+  renewalSubmittedAt?: string;
+  documents?: { name: string; url: string }[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Invoice Readiness types
+export interface InvoiceReadinessCheck {
+  id: string;
+  firmId: string;
+  projectId: string;
+  timesheetIds: string[];
+  expenseIds: string[];
+  readyForInvoice: boolean;
+  blockers: string[];
+  warnings: string[];
+  totalAmountCents: number;
+  currency: string;
+  invoiced: boolean;
+  invoiceId?: string;
+  checkedAt: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Template Library types
+export type TemplateCategory = 'appointment' | 'certificate' | 'report' | 'submission' | 'contract' | 'invoice' | 'general';
+
+export interface PracticeTemplate {
+  id: string;
+  firmId: string;
+  name: string;
+  description?: string;
+  category: TemplateCategory;
+  version: number;
+  fileUrl?: string;
+  fileName?: string;
+  roles: UserRole[];
+  tags?: string[];
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TemplateVersion {
+  id: string;
+  templateId: string;
+  version: number;
+  fileUrl?: string;
+  fileName?: string;
+  changes?: string;
+  createdBy: string;
   createdAt: string;
 }
