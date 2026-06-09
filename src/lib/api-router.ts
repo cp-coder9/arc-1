@@ -1,4 +1,5 @@
 import express from "express";
+import financeApiRouter from "./finance-api-router";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
 // import csrf from "csurf"; // TODO: Install csurf package when enabling CSRF protection
@@ -6437,5 +6438,8 @@ router.get("/firebase/test", async (_req, res) => {
     });
   }
 })
+
+// Mount Pack 8: Finance / Payment / Escrow + Commercial Control routes
+router.use(financeApiRouter);
 
 export default router;
