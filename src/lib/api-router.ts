@@ -61,6 +61,18 @@ import { getApplicationProfessionalId, withProfessionalJobAliases, withProfessio
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
+// Analytics & Reporting Pack 15 services
+import { computeAllKPIs, computeScheduleVariance, computeCostToComplete, computeDefectLiabilityRemaining, computeRetentionReleaseReadiness, computeComplianceGapCount } from "../services/kpiCalculatorService";
+import type { KPIInputData } from "../services/kpiCalculatorService";
+import { buildDashboard, getAvailableWidgets, getDashboardConfig } from "../services/dashboardService";
+import type { DashboardRole, KPIResult } from "../types/analyticsReporting";
+import { registerAlertRule, evaluateAllAlerts, getAlertEvents, getAlertEventCount, acknowledgeAlertEvent, getAlertRulesForProject, disableAlertRule } from "../services/alertSchedulerService";
+import { exportRecords, exportAlerts, exportAuditTrail, createExportJob, generateExportFilename } from "../services/exportApiService";
+import { recordLatency, recordError, recordRequest, recordMemoryViolation, computeHealthSnapshot } from "../services/observabilityService";
+import { audit } from "../services/auditTrailService";
+import { toProjectRecord, storeAllKPIMetrics, getKPIMetrics } from "../services/projectRecordAdapter";
+import { inbox, getInboxEvents } from "../services/inboxEventAdapter";
+import { recommend } from "../services/agentRecommendationService";
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -6419,6 +6431,160 @@ router.post("/api/jobs/:jobId/chat/agent-message", apiLimiter, async (req, res) 
 });
 
 // Firebase test endpoint
+// ── Pack 15: Analytics & Reporting API Routes ───────────────────────────────────
+
+router.get(["/analytics/dashboard/:role", "/api/analytics/dashboard/:role"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const role = (req.params.role as any) || 'principal_agent';
+    const kpiData: Record<string, KPIResult> = {};
+    const dashboard = buildDashboard(role, { kpiData, alertCount: getAlertEventCount({ unacknowledgedOnly: true }) });
+    res.json({ ...dashboard, requestedBy: decoded.uid, requestedRole: role });
+  } catch (err: any) {
+    console.error("Analytics dashboard error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to build dashboard" });
+  }
+});
+
+router.get(["/analytics/kpis/:projectId", "/api/analytics/kpis/:projectId"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { projectId } = req.params;
+    const storedMetrics = getKPIMetrics({ projectId, limit: 50 });
+    const input: KPIInputData = { projectId, milestones: [], costLineItems: [], complianceItems: [] };
+    const freshKpis = computeAllKPIs(input);
+    res.json({ projectId, storedMetricCount: storedMetrics.length, storedMetrics: storedMetrics.slice(0, 10), freshComputation: freshKpis, requestedBy: decoded.uid });
+  } catch (err: any) {
+    console.error("Analytics KPIs error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to get KPIs" });
+  }
+});
+
+router.post(["/analytics/kpis/compute/:projectId", "/api/analytics/kpis/compute/:projectId"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { projectId } = req.params;
+    const input: KPIInputData = {
+      projectId, milestones: req.body?.milestones || [], costLineItems: req.body?.costLineItems || [],
+      defectLiability: req.body?.defectLiability, retentionAmount: req.body?.retentionAmount,
+      retentionConditions: req.body?.retentionConditions || [], complianceItems: req.body?.complianceItems || [],
+    };
+    const result = computeAllKPIs(input);
+    const ctx = { tenantId: req.body?.tenantId || 'default', projectId, userId: decoded.uid, actorRole: decoded.role || 'platform_admin', now: new Date().toISOString() };
+    const storedMetrics = storeAllKPIMetrics(result.kpis, ctx);
+    audit(ctx, 'analytics_kpi_computed', projectId, { kpiCount: result.kpis.length });
+    res.json({ projectId, computation: result, storedMetrics: storedMetrics.map((m) => m.metricId), computedAt: result.computedAt });
+  } catch (err: any) {
+    console.error("Analytics KPI computation error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to compute KPIs" });
+  }
+});
+
+router.post(["/analytics/alerts", "/api/analytics/alerts"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { name, description, condition, severity, recipientRole, requiresAcknowledgement, cooldownMinutes, projectId, tenantId } = req.body;
+    if (!name || !condition || !severity || !recipientRole) {
+      return res.status(400).json({ error: "name, condition, severity, and recipientRole are required" });
+    }
+    const rule = registerAlertRule({ name, description: description || '', condition, severity, recipientRole, requiresAcknowledgement, cooldownMinutes, projectId, tenantId: tenantId || 'default', createdBy: decoded.uid });
+    res.status(201).json({ rule });
+  } catch (err: any) {
+    console.error("Alert registration error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to register alert" });
+  }
+});
+
+router.get(["/analytics/alerts/:projectId", "/api/analytics/alerts/:projectId"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { projectId } = req.params;
+    const unacknowledgedOnly = req.query.unacknowledged === 'true';
+    const events = getAlertEvents({ projectId, unacknowledgedOnly });
+    res.json({ projectId, alertCount: events.length, alerts: events, requestedBy: decoded.uid });
+  } catch (err: any) {
+    console.error("Alert events error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to get alerts" });
+  }
+});
+
+router.post(["/analytics/alerts/:eventId/acknowledge", "/api/analytics/alerts/:eventId/acknowledge"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { eventId } = req.params;
+    const event = acknowledgeAlertEvent(eventId, decoded.uid);
+    if (!event) return res.status(404).json({ error: "Alert event not found" });
+    res.json({ event, acknowledgedBy: decoded.uid });
+  } catch (err: any) {
+    console.error("Alert acknowledge error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to acknowledge alert" });
+  }
+});
+
+router.get(["/analytics/export/:type", "/api/analytics/export/:type"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const exportType = req.params.type as 'records' | 'alerts' | 'audit';
+    const format = (req.query.format as string) || 'json';
+    const projectId = req.query.projectId as string | undefined;
+    if (!['csv', 'json'].includes(format)) {
+      return res.status(400).json({ error: "Format must be csv or json" });
+    }
+    let result;
+    if (exportType === 'alerts') {
+      const allAlerts = getAlertEvents({ projectId });
+      const exportable = allAlerts.map((a) => ({ eventId: a.eventId, title: a.title, severity: a.severity, recipientRole: a.recipientRole, projectId: a.projectId, firedAt: a.firedAt, acknowledged: a.acknowledged }));
+      const job = createExportJob({ format: format as 'csv' | 'json', scope: projectId ? 'project' : 'tenant', projectId, tenantId: 'default', filters: {}, requestedBy: decoded.uid });
+      result = exportAlerts({ format: format as 'csv' | 'json', alerts: exportable, jobId: job.jobId });
+    } else if (exportType === 'audit') {
+      result = exportAuditTrail({ format: format as 'csv' | 'json', audits: [] });
+    } else {
+      result = exportRecords({ format: format as 'csv' | 'json', records: [] });
+    }
+    const filename = generateExportFilename(exportType, format as 'csv' | 'json', projectId);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
+    res.send(result.content);
+  } catch (err: any) {
+    console.error("Export error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Export failed" });
+  }
+});
+
+router.get(["/analytics/observability", "/api/analytics/observability"], async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const since = req.query.since as string | undefined;
+    const snapshot = computeHealthSnapshot({ since });
+    res.json({ ...snapshot, requestedBy: decoded.uid });
+  } catch (err: any) {
+    console.error("Observability error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to compute health snapshot" });
+  }
+});
+
+router.post(["/analytics/observability/record", "/api/analytics/observability/record"], async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { type, serviceName, moduleKey, value, unit, tags } = req.body;
+    if (!type || !serviceName || !moduleKey) {
+      return res.status(400).json({ error: "type, serviceName, and moduleKey are required" });
+    }
+    let metric;
+    switch (type) {
+      case 'latency': metric = recordLatency(serviceName, moduleKey, value || 0, tags); break;
+      case 'error_count': metric = recordError(serviceName, moduleKey, tags); break;
+      case 'request_count': metric = recordRequest(serviceName, moduleKey, tags); break;
+      case 'memory_boundary_violation': metric = recordMemoryViolation(serviceName, moduleKey, value || 0, tags?.limit || 0, tags); break;
+      default: return res.status(400).json({ error: `Unknown metric type: ${type}` });
+    }
+    res.status(201).json({ metric });
+  } catch (err: any) {
+    console.error("Observability record error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Failed to record metric" });
+  }
+});
+
 router.get("/firebase/test", async (_req, res) => {
   try {
     const collections = await adminDb.listCollections();
