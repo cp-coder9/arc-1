@@ -1,3 +1,5 @@
+import type { CPDProfessionalBody, ArchitexBuiltEnvironmentRole } from './services/cpdTypes';
+
 export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
 
 export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
@@ -90,6 +92,10 @@ export interface UserProfile {
   firmStatus?: FirmMemberStatus;
   subscriptionStatus?: FirmSubscriptionStatus;
   billingRole?: FirmRole | 'none';
+  professionalBody?: CPDProfessionalBody;
+  builtEnvironmentRole?: ArchitexBuiltEnvironmentRole;
+  cpdCycleStart?: string;
+  cpdCycleEnd?: string;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';

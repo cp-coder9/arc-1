@@ -257,6 +257,30 @@ export function getInboxEventCount(options?: {
   return getInboxEvents(options).length;
 }
 
+// ── Backwards-compatible exports ───────────────────────────────────────────────
+
+/**
+ * Legacy compatibility: simple inbox event creation.
+ * Prefer buildComplianceInboxEvent for new code.
+ */
+export function inbox(
+  recipientRole: string,
+  title: string,
+  sourceObjectId: string,
+  priority: InboxPriority,
+  options?: { description?: string; projectId?: string },
+): InboxEvent {
+  return buildComplianceInboxEvent({
+    recipientRole,
+    title,
+    sourceObjectId,
+    priority,
+    description: options?.description,
+    projectId: options?.projectId,
+    eventType: 'verification_required',
+  });
+}
+
 // ── Reset (for testing) ────────────────────────────────────────────────────────
 
 export function resetInboxState(): void {

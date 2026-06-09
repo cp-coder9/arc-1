@@ -328,6 +328,50 @@ export function getRecommendations(options?: {
   );
 }
 
+// ── Backwards-compatible exports ───────────────────────────────────────────────
+
+/**
+ * Legacy compatibility: generate recommendations based on records.
+ * Prefer buildAgentRecommendation or generateComplianceRecommendations for new code.
+ */
+export function recommend(
+  agentKey: string,
+  title: string,
+  records: Array<{ id: string; title?: string; status?: string; blockers?: string[] }>,
+): AgentRecommendation[] {
+  const outputs: AgentRecommendation[] = [];
+
+  for (const record of records) {
+    if (record.blockers && record.blockers.length > 0) {
+      outputs.push(buildAgentRecommendation({
+        agentKey,
+        title: `Resolve blocker on ${record.title || record.id}`,
+        rationale: `Blockers: ${record.blockers.join('; ')}. Action needed to unblock this record.`,
+        sourceObjectId: record.id || 'unknown',
+        severity: 'high',
+        recommendedAction: `Review and resolve blockers: ${record.blockers.join(', ')}`,
+        urgency: 'this_week',
+        category: 'compliance_fix',
+      }));
+    }
+  }
+
+  if (outputs.length === 0) {
+    outputs.push(buildAgentRecommendation({
+      agentKey,
+      title,
+      rationale: 'All trust, verification and compliance records are within expected ranges.',
+      sourceObjectId: records[0]?.id || 'none',
+      severity: 'low',
+      recommendedAction: 'Continue monitoring compliance status.',
+      urgency: 'advisory',
+      category: 'general_advisory',
+    }));
+  }
+
+  return outputs;
+}
+
 // ── Reset (for testing) ────────────────────────────────────────────────────────
 
 export function resetRecommendationState(): void {

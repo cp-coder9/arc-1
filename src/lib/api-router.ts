@@ -71,7 +71,7 @@ import { exportRecords, exportAlerts, exportAuditTrail, createExportJob, generat
 import { recordLatency, recordError, recordRequest, recordMemoryViolation, computeHealthSnapshot } from "../services/observabilityService";
 import { audit } from "../services/auditTrailService";
 import { toAnalyticsProjectRecord, storeAllAnalyticsKPIMetrics, getAnalyticsKPIMetrics } from "../services/analyticsProjectRecordAdapter";
-import { inbox, getInboxEvents } from "../services/inboxEventAdapter";
+import { createInboxEvent, getAnalyticsInboxEvents } from "../services/analyticsInboxEventAdapter";
 import { recommend } from "../services/agentRecommendationService";
 
 // ── Environment variables ─────────────────────────────────────────────────────
@@ -6470,7 +6470,9 @@ router.post(["/analytics/kpis/compute/:projectId", "/api/analytics/kpis/compute/
       retentionConditions: req.body?.retentionConditions || [], complianceItems: req.body?.complianceItems || [],
     };
     const result = computeAllKPIs(input);
-    const ctx = { tenantId: req.body?.tenantId || 'default', projectId, userId: decoded.uid, actorRole: decoded.role || 'platform_admin', now: new Date().toISOString() };
+    const tenantId = req.body?.tenantId;
+    if (!tenantId) { return res.status(400).json({ error: "tenantId is required" }); }
+    const ctx = { tenantId, projectId, userId: decoded.uid, actorRole: decoded.role || 'platform_admin', now: new Date().toISOString() };
     const storedMetrics = storeAllAnalyticsKPIMetrics(result.kpis, ctx);
     audit(ctx, 'analytics_kpi_computed', projectId, { kpiCount: result.kpis.length });
     res.json({ projectId, computation: result, storedMetrics: storedMetrics.map((m) => m.metricId), computedAt: result.computedAt });
@@ -6487,7 +6489,8 @@ router.post(["/analytics/alerts", "/api/analytics/alerts"], async (req, res) => 
     if (!name || !condition || !severity || !recipientRole) {
       return res.status(400).json({ error: "name, condition, severity, and recipientRole are required" });
     }
-    const rule = registerAlertRule({ name, description: description || '', condition, severity, recipientRole, requiresAcknowledgement, cooldownMinutes, projectId, tenantId: tenantId || 'default', createdBy: decoded.uid });
+    if (!tenantId) { return res.status(400).json({ error: "tenantId is required" }); }
+    const rule = registerAlertRule({ name, description: description || '', condition, severity, recipientRole, requiresAcknowledgement, cooldownMinutes, projectId, tenantId, createdBy: decoded.uid });
     res.status(201).json({ rule });
   } catch (err: any) {
     console.error("Alert registration error:", err);
@@ -6534,7 +6537,8 @@ router.get(["/analytics/export/:type", "/api/analytics/export/:type"], async (re
     if (exportType === 'alerts') {
       const allAlerts = getAlertEvents({ projectId });
       const exportable = allAlerts.map((a) => ({ eventId: a.eventId, title: a.title, severity: a.severity, recipientRole: a.recipientRole, projectId: a.projectId, firedAt: a.firedAt, acknowledged: a.acknowledged }));
-      const job = createExportJob({ format: format as 'csv' | 'json', scope: projectId ? 'project' : 'tenant', projectId, tenantId: 'default', filters: {}, requestedBy: decoded.uid });
+      const tenantId = (req.query.tenantId as string) || (decoded as any).tenantId || 'unknown';
+      const job = createExportJob({ format: format as 'csv' | 'json', scope: projectId ? 'project' : 'tenant', projectId, tenantId, filters: {}, requestedBy: decoded.uid });
       result = exportAlerts({ format: format as 'csv' | 'json', alerts: exportable, jobId: job.jobId });
     } else if (exportType === 'audit') {
       result = exportAuditTrail({ format: format as 'csv' | 'json', audits: [] });

@@ -45,7 +45,7 @@ export function recordMetric(params: {
     unit: params.unit,
     tags: params.tags || {},
     recordedAt: new Date().toISOString(),
-    ttlDays: params.ttlDays || DEFAULT_TTL_DAYS,
+    ttlDays: params.ttlDays !== undefined ? params.ttlDays : DEFAULT_TTL_DAYS,
   };
 
   metrics.push(metric);
