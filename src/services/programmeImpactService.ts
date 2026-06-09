@@ -3,18 +3,18 @@ import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { ProgrammeImpact, ProgrammeImpactSourceType } from '@/types';
 
 const PROJECTS_COL = 'projects';
-const IMPACTS_COL = 'programme_impacts';
+const PROGRAMME_IMPACTS_COL = 'programme_impacts';
 
 type FirestoreUnsubscribe = () => void;
 
 function impactsCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, IMPACTS_COL);
+  return collection(db, PROJECTS_COL, projectId, PROGRAMME_IMPACTS_COL);
 }
 
 function impactDocument(projectId: string, impactId: string) {
   if (!impactId) throw new Error('impactId is required');
-  return doc(db, PROJECTS_COL, projectId, IMPACTS_COL, impactId);
+  return doc(db, PROJECTS_COL, projectId, PROGRAMME_IMPACTS_COL, impactId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {
@@ -42,7 +42,7 @@ export async function assessProgrammeImpact(input: {
     const ref = await addDoc(impactsCollection(input.projectId), impact);
     return ref.id;
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${input.projectId}/${IMPACTS_COL}`);
+    handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${input.projectId}/${PROGRAMME_IMPACTS_COL}`);
   }
 }
 
@@ -50,19 +50,17 @@ export async function reviewProgrammeImpact(
   projectId: string,
   impactId: string,
   reviewedBy: string,
-  reviewNotes: string,
-  requiresPlannerReview: boolean,
+  reviewNotes?: string,
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
     await updateDoc(impactDocument(projectId, impactId), {
-      requiresPlannerReview,
       reviewedBy,
       reviewedAt: now,
-      reviewNotes,
+      reviewNotes: reviewNotes ?? '',
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${IMPACTS_COL}/${impactId}`);
+    handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${PROGRAMME_IMPACTS_COL}/${impactId}`);
   }
 }
 
@@ -71,7 +69,7 @@ export async function getProgrammeImpacts(projectId: string): Promise<ProgrammeI
     const snap = await getDocs(query(impactsCollection(projectId), orderBy('createdAt', 'desc')));
     return snap.docs.map((d) => withId<ProgrammeImpact>(d));
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `${PROJECTS_COL}/${projectId}/${IMPACTS_COL}`);
+    handleFirestoreError(error, OperationType.GET, `${PROJECTS_COL}/${projectId}/${PROGRAMME_IMPACTS_COL}`);
   }
 }
 
@@ -86,12 +84,9 @@ export function subscribeToProgrammeImpacts(
   });
 }
 
-export async function getImpactsForSource(
-  projectId: string,
-  sourceObjectId: string,
-): Promise<ProgrammeImpact[]> {
+export async function getImpactsRequiringReview(projectId: string): Promise<ProgrammeImpact[]> {
   const impacts = await getProgrammeImpacts(projectId);
-  return impacts.filter((i) => i.sourceObjectId === sourceObjectId);
+  return impacts.filter((i) => i.requiresPlannerReview && !i.reviewedBy);
 }
 
 export const programmeImpactService = {
@@ -99,7 +94,7 @@ export const programmeImpactService = {
   reviewProgrammeImpact,
   getProgrammeImpacts,
   subscribeToProgrammeImpacts,
-  getImpactsForSource,
+  getImpactsRequiringReview,
 };
 
 export default programmeImpactService;
