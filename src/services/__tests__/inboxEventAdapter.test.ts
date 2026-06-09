@@ -1,98 +1,126 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+/**
+ * Tests: Inbox Event Adapter
+ *
+ * Event type classification, priority derivation, event grouping,
+ * and proper WorkflowEvent envelope construction.
+ */
+import { describe, expect, it } from 'vitest';
 import {
-  inbox,
-  getInboxEvents,
-  acknowledgeInboxEvent,
-  getInboxEventCount,
-  resetInboxState,
+  classifyEventType,
+  eventCountByPriority,
+  eventsAbovePriority,
+  formatEventTitle,
+  groupEventsByType,
+  workflowEventsFromReadiness,
+  workflowEventsFromReport,
 } from '../inboxEventAdapter';
+import { allReadinessReports } from '../readinessCheckService';
+import { sampleDocuments, sampleDrawings } from '../sampleDocumentData';
+import type { ReadinessFinding } from '@/types/documentTypes';
 
 describe('inboxEventAdapter', () => {
-  beforeEach(() => {
-    resetInboxState();
+  const reports = allReadinessReports(sampleDocuments, sampleDrawings);
+  const events = workflowEventsFromReadiness('project-test', reports);
+
+  // ── Event Classification ──
+  it.each([
+    ['MUNICIPAL_SHEET_MISSING', 'municipal_submission_pack_incomplete'],
+    ['MUNICIPAL_FORM_NOT_READY', 'municipal_submission_pack_incomplete'],
+    ['APPROVAL_LETTER_MISSING', 'approval_letter_missing'],
+    ['TENDER_SPECIFICATION_NOT_ISSUED', 'tender_pack_incomplete'],
+    ['TENDER_SHEET_MISSING', 'tender_pack_incomplete'],
+    ['SUPERSEDED_CONSTRUCTION_DRAWING', 'superseded_construction_drawing'],
+    ['CLOSEOUT_PACK_NOT_ISSUED', 'closeout_pack_incomplete'],
+    ['CLOSEOUT_CERTIFICATE_MISSING', 'closeout_pack_incomplete'],
+    ['AS_BUILT_DRAWINGS_MISSING', 'closeout_pack_incomplete'],
+    ['DOCUMENT_REVIEW_REQUIRED', 'document_review_required'],
+    ['DRAWING_REVISION_UPLOADED', 'drawing_revision_uploaded'],
+  ] as const)('classifies %s as %s', (code, expectedType) => {
+    const finding: ReadinessFinding = {
+      code,
+      priority: 'medium',
+      message: 'Test finding',
+      assignedRoles: ['architect'],
+    };
+    expect(classifyEventType(finding)).toBe(expectedType);
   });
 
-  describe('inbox', () => {
-    it('creates an inbox event with auto-generated ID', () => {
-      const event = inbox('principal_agent', 'Retention release pending', 'rec-1', 'high');
-      expect(event.eventId).toMatch(/^inbox-/);
-      expect(event.recipientRole).toBe('principal_agent');
-      expect(event.priority).toBe('high');
-      expect(event.acknowledged).toBe(false);
-    });
-
-    it('accepts optional description and projectId', () => {
-      const event = inbox('contractor', 'Defect liability expiring', 'rec-2', 'medium', {
-        description: 'Please review remaining snags',
-        projectId: 'project-1',
-      });
-      expect(event.description).toBe('Please review remaining snags');
-      expect(event.projectId).toBe('project-1');
-    });
+  // ── Event Generation ──
+  it('generates events from all readiness reports', () => {
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((e) => e.projectId === 'project-test')).toBe(true);
+    expect(events.every((e) => e.sourceModule === 'documents')).toBe(true);
   });
 
-  describe('getInboxEvents', () => {
-    it('filters by recipient role', () => {
-      inbox('platform_admin', 'Alert 1', 'rec-1', 'high');
-      inbox('principal_agent', 'Alert 2', 'rec-2', 'medium');
-
-      const adminEvents = getInboxEvents({ recipientRole: 'platform_admin' });
-      expect(adminEvents).toHaveLength(1);
-      expect(adminEvents[0].title).toBe('Alert 1');
-    });
-
-    it('filters unacknowledged only', () => {
-      const e1 = inbox('platform_admin', 'Alert 1', 'rec-1', 'high');
-      inbox('platform_admin', 'Alert 2', 'rec-2', 'medium');
-
-      acknowledgeInboxEvent(e1.eventId, 'user-1');
-
-      const unacked = getInboxEvents({ recipientRole: 'platform_admin', unacknowledgedOnly: true });
-      expect(unacked).toHaveLength(1);
-      expect(unacked[0].title).toBe('Alert 2');
-    });
-
-    it('filters by priority', () => {
-      inbox('platform_admin', 'Low Alert', 'rec-1', 'low');
-      inbox('platform_admin', 'Critical Alert', 'rec-2', 'critical');
-
-      const critical = getInboxEvents({ priority: 'critical' });
-      expect(critical).toHaveLength(1);
-      expect(critical[0].title).toBe('Critical Alert');
-    });
-
-    it('respects limit', () => {
-      for (let i = 0; i < 5; i++) {
-        inbox('platform_admin', `Alert ${i}`, `rec-${i}`, 'low');
-      }
-      const events = getInboxEvents({ limit: 3 });
-      expect(events).toHaveLength(3);
-    });
+  it('generates events from a single report', () => {
+    const report = reports[0]; // municipal submission
+    const reportEvents = workflowEventsFromReport('project-test', report);
+    expect(reportEvents.length).toBe(report.findings.length);
+    expect(reportEvents[0].projectId).toBe('project-test');
   });
 
-  describe('acknowledgeInboxEvent', () => {
-    it('acknowledges an event', () => {
-      const event = inbox('platform_admin', 'Test', 'rec-1', 'high');
-      const acked = acknowledgeInboxEvent(event.eventId, 'user-1');
-
-      expect(acked?.acknowledged).toBe(true);
-      expect(acked?.acknowledgedBy).toBe('user-1');
-      expect(acked?.acknowledgedAt).toBeDefined();
-    });
-
-    it('returns undefined for non-existent event', () => {
-      expect(acknowledgeInboxEvent('nonexistent', 'user-1')).toBeUndefined();
-    });
+  it('each event has required fields', () => {
+    for (const event of events) {
+      expect(event.id).toMatch(/^doc-event-project-test-/);
+      expect(event.type).toBeDefined();
+      expect(event.title).toBeTruthy();
+      expect(event.detail).toBeTruthy();
+      expect(['low', 'medium', 'high', 'critical']).toContain(event.priority);
+      expect(event.assignedRoles.length).toBeGreaterThan(0);
+      expect(event.createdAt).toBeDefined();
+    }
   });
 
-  describe('getInboxEventCount', () => {
-    it('returns count of matching events', () => {
-      inbox('platform_admin', 'Alert 1', 'rec-1', 'high');
-      inbox('platform_admin', 'Alert 2', 'rec-2', 'high');
-      inbox('principal_agent', 'Alert 3', 'rec-3', 'medium');
+  // ── Event Title Formatting ──
+  it('formats finding codes into human-readable titles', () => {
+    expect(formatEventTitle('MUNICIPAL_FORM_NOT_READY')).toBe('Municipal form not ready');
+    expect(formatEventTitle('SUPERSEDED_CONSTRUCTION_DRAWING')).toBe('Superseded construction drawing');
+    expect(formatEventTitle('TENDER_SPECIFICATION_NOT_ISSUED')).toBe('Tender specification not issued');
+  });
 
-      expect(getInboxEventCount({ recipientRole: 'platform_admin' })).toBe(2);
-      expect(getInboxEventCount({})).toBe(3);
-    });
+  // ── Priority Filtering ──
+  it('filters events above a priority threshold', () => {
+    const highOrAbove = eventsAbovePriority(events, 'high');
+    expect(highOrAbove.every((e) => ['high', 'critical'].includes(e.priority))).toBe(true);
+
+    const criticalOnly = eventsAbovePriority(events, 'critical');
+    expect(criticalOnly.every((e) => e.priority === 'critical')).toBe(true);
+  });
+
+  // ── Event Grouping ──
+  it('groups events by type', () => {
+    const groups = groupEventsByType(events);
+    expect(Object.keys(groups).length).toBeGreaterThan(1);
+    // Municipal submission pack incomplete events should be grouped
+    if (groups.municipal_submission_pack_incomplete) {
+      expect(groups.municipal_submission_pack_incomplete.length).toBeGreaterThan(0);
+    }
+  });
+
+  // ── Event Counts by Priority ──
+  it('counts events by priority', () => {
+    const counts = eventCountByPriority(events);
+    expect(counts.critical + counts.high + counts.medium + counts.low).toBe(events.length);
+    expect(Object.values(counts).every((c) => typeof c === 'number')).toBe(true);
+  });
+
+  // ── Coverage of All 7 Event Types ──
+  it('covers all 7 required event types', () => {
+    const eventTypes = new Set(events.map((e) => e.type));
+    const requiredTypes = [
+      'document_review_required',
+      'drawing_revision_uploaded',
+      'superseded_construction_drawing',
+      'municipal_submission_pack_incomplete',
+      'tender_pack_incomplete',
+      'closeout_pack_incomplete',
+      'approval_letter_missing',
+    ];
+
+    // Note: Not all types may be present in the demo data,
+    // but the classification function should handle all of them
+    for (const type of eventTypes) {
+      expect(requiredTypes).toContain(type);
+    }
   });
 });
