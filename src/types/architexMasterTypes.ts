@@ -1,4 +1,4 @@
-﻿export type ArchitexRole =
+export type ArchitexRole =
   | 'client'
   | 'developer'
   | 'architect'
@@ -115,6 +115,7 @@ export interface ProjectPassportSummary {
   outstandingPayments: number;
   missingRequiredRecords: ProjectRecordType[];
   nextBestActions: string[];
+  // Enhanced fields from Pack 2 implementation
   projectName?: string;
   clientName?: string;
   municipality?: string;
@@ -138,6 +139,8 @@ export interface ProductModuleDefinition {
   phases: ProjectPhase[];
   produces: ProjectRecordType[];
 }
+
+// ─── Pack 2: Project Passport + Lifecycle Enhanced Types ───────────────────
 
 export type Priority = 'low' | 'medium' | 'high' | 'critical';
 

@@ -4,9 +4,11 @@ import { PROJECT_STAGE_ORDER } from '../../types';
 
 describe('phaseCommunicationConfig', () => {
   it('covers every canonical project stage with behaviour-changing capture guidance', () => {
-    expect(Object.keys(PHASE_COMMUNICATION_CONFIG).sort()).toEqual([...PROJECT_STAGE_ORDER].sort());
+    // Every PRD canonical stage must have a config entry, and legacy scoping is also covered.
+    const expectedStages = [...new Set([...PROJECT_STAGE_ORDER, 'scoping' as const])].sort();
+    expect(Object.keys(PHASE_COMMUNICATION_CONFIG).sort()).toEqual(expectedStages);
 
-    for (const stage of PROJECT_STAGE_ORDER) {
+    for (const stage of expectedStages) {
       const config = getPhaseCommunicationConfig(stage);
       expect(config.stage).toBe(stage);
       expect(config.captureTools.length).toBeGreaterThan(0);

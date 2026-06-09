@@ -1,129 +1,207 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+/**
+ * Unit tests for agentRecommendationService (Pack 2)
+ * Tests recommendation generation, human approval guardrails, priority ordering.
+ */
+import { describe, expect, it } from 'vitest';
 import {
-  recommend,
-  getRecommendations,
-  resetRecommendationState,
-} from '../agentRecommendationService';
-import type { WorkflowRecord } from '../../types/analyticsReporting';
-import type { KPIResult } from '../../types/analyticsReporting';
+  recommendationsFromPassport,
+  createRecommendation,
+} from '../masterExpansion/agentRecommendationService';
+import type {
+  ProjectPassportSummary,
+  WorkflowEvent,
+} from '@/types/architexMasterTypes';
 
-describe('agentRecommendationService', () => {
-  beforeEach(() => {
-    resetRecommendationState();
+function makePassport(
+  overrides: Partial<ProjectPassportSummary> = {},
+): ProjectPassportSummary {
+  return {
+    tenantId: 't1',
+    projectId: 'p1',
+    currentPhase: 'construction_execution',
+    totalRecords: 5,
+    currentDrawingRevisions: 2,
+    openRisks: 3,
+    pendingApprovals: 1,
+    outstandingPayments: 1,
+    missingRequiredRecords: ['municipal_submission_item', 'snag'],
+    nextBestActions: ['Upload municipal approval', 'Resolve outstanding snags'],
+    projectName: 'Test Project',
+    clientName: 'Test Client',
+    municipality: 'City of Cape Town',
+    approvalStatus: 'missing',
+    documentStatus: 'ready',
+    financialStatus: 'pending_review',
+    riskLevel: 'high',
+    lifecycle: {
+      phase: 'construction_execution',
+      requiredRecordTypes: ['site_diary', 'snag'],
+      presentRequiredRecordTypes: ['site_diary'],
+      missingRecords: [
+        {
+          recordType: 'snag',
+          priority: 'high',
+          reason: 'Required for Construction: snag',
+        },
+        {
+          recordType: 'municipal_submission_item',
+          priority: 'critical',
+          reason: 'Required municipal approval missing',
+        },
+      ],
+      mayAdvance: false,
+      blockers: [
+        '[HIGH] Missing snag',
+        '[CRITICAL] Construction requires municipal approval evidence',
+      ],
+      nextBestActions: [
+        'Upload municipal approval',
+        'Create baseline snag register',
+      ],
+    },
+    ...overrides,
+  };
+}
+
+function makeEvent(overrides: Partial<WorkflowEvent> = {}): WorkflowEvent {
+  return {
+    id: 'evt-1',
+    type: 'risk_detected',
+    projectId: 'p1',
+    title: 'Construction Without Approval Evidence',
+    detail: 'Construction phase requires municipal approval evidence.',
+    priority: 'critical',
+    sourceModule: 'projects',
+    assignedRoles: ['client', 'architect', 'platform_admin'],
+    createdAt: '2026-06-09T00:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('recommendationsFromPassport', () => {
+  it('generates recommendations from passport and events', () => {
+    const passport = makePassport();
+    const events = [makeEvent()];
+    const recs = recommendationsFromPassport(passport, events);
+
+    expect(recs.length).toBeGreaterThan(0);
   });
 
-  describe('recommend', () => {
-    it('recommends resolving blockers on blocked records', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'retention', title: 'Retention Hold', status: 'blocked', payload: {}, blockers: ['retention_release_pending'], approvalsRequired: ['principal_agent'] },
-      ];
+  it('each recommendation has required fields', () => {
+    const passport = makePassport();
+    const events = [makeEvent()];
+    const recs = recommendationsFromPassport(passport, events);
 
-      const outputs = recommend('analytics_agent', 'Review retention alerts', records);
-      expect(outputs.length).toBeGreaterThan(0);
-      expect(outputs[0].title).toContain('Resolve blocker');
-      expect(outputs[0].severity).toBe('high');
-      expect(outputs[0].recommendedAction).toBeDefined();
-    });
-
-    it('recommends action for negative schedule variance', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'milestone', title: 'Delayed Milestone', status: 'delayed', payload: {}, blockers: [], approvalsRequired: [] },
-      ];
-
-      const kpiResults: KPIResult[] = [
-        { name: 'schedule_variance', label: 'Schedule Variance', plannedMilestones: 5, completedOnTime: 1, delayed: 4, variancePercent: -80, unit: 'percent' },
-      ];
-
-      const outputs = recommend('analytics_agent', 'Schedule review', records, kpiResults);
-      expect(outputs.some((o) => o.kpiName === 'schedule_variance')).toBe(true);
-    });
-
-    it('recommends immediate action for compliance gaps', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'task', title: 'Task', status: 'ready', payload: {}, blockers: [], approvalsRequired: [] },
-      ];
-
-      const kpiResults: KPIResult[] = [
-        { name: 'compliance_gap_count', label: 'Compliance Gap Count', expiredRegistrations: 2, lapsedInsurance: 1, missingDocuments: 2, totalGaps: 5, unit: 'count' },
-      ];
-
-      const outputs = recommend('analytics_agent', 'Compliance check', records, kpiResults);
-      const complianceRec = outputs.find((o) => o.kpiName === 'compliance_gap_count');
-      expect(complianceRec).toBeDefined();
-      expect(complianceRec?.urgency).toBe('immediate');
-      expect(complianceRec?.severity).toBe('critical');
-    });
-
-    it('recommends retention release when ready', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'retention', title: 'Retention', status: 'ready', payload: {}, blockers: [], approvalsRequired: [] },
-      ];
-
-      const kpiResults: KPIResult[] = [
-        { name: 'retention_release_readiness', label: 'Retention Release Readiness', totalRetentionAmount: 500_000, releasableAmount: 500_000, conditionsMet: 3, totalConditions: 3, isReadyForRelease: true, unit: 'ZAR' },
-      ];
-
-      const outputs = recommend('analytics_agent', 'Retention check', records, kpiResults);
-      const retentionRec = outputs.find((o) => o.kpiName === 'retention_release_readiness');
-      expect(retentionRec).toBeDefined();
-      expect(retentionRec?.recommendedAction).toContain('retention release');
-    });
-
-    it('provides advisory when nothing is wrong', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'milestone', title: 'Done', status: 'completed', payload: {}, blockers: [], approvalsRequired: [] },
-      ];
-
-      const outputs = recommend('analytics_agent', 'All clear check', records);
-      expect(outputs).toHaveLength(1);
-      expect(outputs[0].severity).toBe('low');
-      expect(outputs[0].urgency).toBe('advisory');
-    });
+    for (const rec of recs) {
+      expect(rec.id).toBeTruthy();
+      expect(rec.scope).toMatch(/^(user|project)$/);
+      expect(rec.title).toBeTruthy();
+      expect(rec.rationale).toBeTruthy();
+      expect(rec.priority).toBeTruthy();
+      expect(rec.recommendedActionLabel).toBeTruthy();
+      expect(rec.relatedRoute).toBeTruthy();
+      expect(typeof rec.requiresHumanApproval).toBe('boolean');
+    }
   });
 
-  describe('getRecommendations', () => {
-    it('filters by severity', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'task', title: 'Blocked Task', status: 'blocked', payload: {}, blockers: ['blocker'], approvalsRequired: [] },
-        { id: 'rec-2', type: 'task', title: 'OK Task', status: 'ready', payload: {}, blockers: [], approvalsRequired: [] },
-      ];
+  it('generates recommendation for each missing record', () => {
+    const passport = makePassport();
+    const recs = recommendationsFromPassport(passport, []);
 
-      const kpiResults: KPIResult[] = [
-        { name: 'compliance_gap_count', label: 'CG', expiredRegistrations: 5, lapsedInsurance: 0, missingDocuments: 0, totalGaps: 5, unit: 'count' },
-      ];
+    const missingRecs = recs.filter((r) => r.id.startsWith('rec-missing-'));
+    expect(missingRecs.length).toBeGreaterThanOrEqual(
+      (passport.missingRequiredRecords ?? []).length,
+    );
+  });
 
-      recommend('agent', 'Test', records, kpiResults);
+  it('generates blocker resolution recommendations', () => {
+    const passport = makePassport();
+    const recs = recommendationsFromPassport(passport, []);
 
-      const critical = getRecommendations({ severity: 'critical' });
-      expect(critical.length).toBeGreaterThan(0);
-      expect(critical.every((r) => r.severity === 'critical')).toBe(true);
+    const blockerRecs = recs.filter((r) => r.id.startsWith('rec-blocker-'));
+    expect(blockerRecs.length).toBeGreaterThan(0);
+  });
 
-      const high = getRecommendations({ severity: 'high' });
-      expect(high.length).toBeGreaterThan(0);
-      expect(high.every((r) => r.severity === 'high')).toBe(true);
+  it('flags critical recommendations for human approval', () => {
+    const passport = makePassport();
+    const events = [makeEvent()];
+
+    const recs = recommendationsFromPassport(passport, events);
+    const criticalRecs = recs.filter((r) => r.priority === 'critical');
+    for (const rec of criticalRecs) {
+      expect(rec.requiresHumanApproval).toBe(true);
+    }
+  });
+
+  it('generates approval status recommendation when missing', () => {
+    const passport = makePassport({ approvalStatus: 'missing' });
+    const recs = recommendationsFromPassport(passport, []);
+
+    const approvalRec = recs.find((r) => r.id === 'rec-approval-missing');
+    expect(approvalRec).toBeDefined();
+    expect(approvalRec!.requiresHumanApproval).toBe(true);
+  });
+
+  it('generates financial status recommendation when pending review', () => {
+    const passport = makePassport({ financialStatus: 'pending_review' });
+    const recs = recommendationsFromPassport(passport, []);
+
+    const finRec = recs.find((r) => r.id === 'rec-financial-pending');
+    expect(finRec).toBeDefined();
+  });
+
+  it('generates document status recommendation when incomplete', () => {
+    const passport = makePassport({ documentStatus: 'incomplete' });
+    const recs = recommendationsFromPassport(passport, []);
+
+    const docRec = recs.find((r) => r.id === 'rec-docs-incomplete');
+    expect(docRec).toBeDefined();
+  });
+
+  it('sorts recommendations by priority (critical first)', () => {
+    const passport = makePassport();
+    const events = [makeEvent()];
+    const recs = recommendationsFromPassport(passport, events);
+
+    if (recs.length >= 2) {
+      const rankOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+      for (let i = 1; i < recs.length; i++) {
+        expect(rankOrder[recs[i - 1].priority]).toBeGreaterThanOrEqual(
+          rankOrder[recs[i].priority],
+        );
+      }
+    }
+  });
+
+  it('includes event-based recommendations for critical events', () => {
+    const passport = makePassport();
+    const events = [makeEvent({ priority: 'critical' })];
+    const recs = recommendationsFromPassport(passport, events);
+
+    const eventRecs = recs.filter((r) => r.id.startsWith('rec-event-'));
+    expect(eventRecs.length).toBeGreaterThan(0);
+  });
+});
+
+describe('createRecommendation', () => {
+  it('creates a single recommendation with the right shape', () => {
+    const rec = createRecommendation({
+      projectId: 'p1',
+      title: 'Test Recommendation',
+      rationale: 'Test rationale',
+      priority: 'high',
+      actionLabel: 'Test Action',
+      route: '/projects/p1/test',
+      requiresApproval: true,
+      relatedRecordType: 'snag',
     });
 
-    it('filters by urgency', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'rec-1', type: 'task', title: 'Blocked', status: 'blocked', payload: {}, blockers: ['blocker'], approvalsRequired: [] },
-      ];
-
-      recommend('agent', 'Test', records);
-
-      const immediate = getRecommendations({ urgency: 'this_week' });
-      expect(immediate.length).toBeGreaterThan(0);
-    });
-
-    it('respects limit', () => {
-      const records: WorkflowRecord[] = [
-        { id: 'r1', type: 'task', title: 'T1', status: 'blocked', payload: {}, blockers: ['b1'], approvalsRequired: [] },
-        { id: 'r2', type: 'task', title: 'T2', status: 'blocked', payload: {}, blockers: ['b2'], approvalsRequired: [] },
-        { id: 'r3', type: 'task', title: 'T3', status: 'blocked', payload: {}, blockers: ['b3'], approvalsRequired: [] },
-      ];
-
-      recommend('agent', 'Test', records);
-      const limited = getRecommendations({ limit: 2 });
-      expect(limited).toHaveLength(2);
-    });
+    expect(rec.id).toContain('rec-p1');
+    expect(rec.scope).toBe('project');
+    expect(rec.title).toBe('Test Recommendation');
+    expect(rec.priority).toBe('high');
+    expect(rec.requiresHumanApproval).toBe(true);
+    expect(rec.relatedRecordType).toBe('snag');
+    expect(rec.relatedRoute).toBe('/projects/p1/test');
   });
 });

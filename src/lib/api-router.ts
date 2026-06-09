@@ -70,7 +70,7 @@ import { registerAlertRule, evaluateAllAlerts, getAlertEvents, getAlertEventCoun
 import { exportRecords, exportAlerts, exportAuditTrail, createExportJob, generateExportFilename } from "../services/exportApiService";
 import { recordLatency, recordError, recordRequest, recordMemoryViolation, computeHealthSnapshot } from "../services/observabilityService";
 import { audit } from "../services/auditTrailService";
-import { toProjectRecord, storeAllKPIMetrics, getKPIMetrics } from "../services/projectRecordAdapter";
+import { toAnalyticsProjectRecord, storeAllAnalyticsKPIMetrics, getAnalyticsKPIMetrics } from "../services/analyticsProjectRecordAdapter";
 import { inbox, getInboxEvents } from "../services/inboxEventAdapter";
 import { recommend } from "../services/agentRecommendationService";
 
@@ -6450,7 +6450,7 @@ router.get(["/analytics/kpis/:projectId", "/api/analytics/kpis/:projectId"], asy
   try {
     const decoded = await verifyAuth(req.headers);
     const { projectId } = req.params;
-    const storedMetrics = getKPIMetrics({ projectId, limit: 50 });
+    const storedMetrics = getAnalyticsKPIMetrics({ projectId, limit: 50 });
     const input: KPIInputData = { projectId, milestones: [], costLineItems: [], complianceItems: [] };
     const freshKpis = computeAllKPIs(input);
     res.json({ projectId, storedMetricCount: storedMetrics.length, storedMetrics: storedMetrics.slice(0, 10), freshComputation: freshKpis, requestedBy: decoded.uid });
@@ -6471,7 +6471,7 @@ router.post(["/analytics/kpis/compute/:projectId", "/api/analytics/kpis/compute/
     };
     const result = computeAllKPIs(input);
     const ctx = { tenantId: req.body?.tenantId || 'default', projectId, userId: decoded.uid, actorRole: decoded.role || 'platform_admin', now: new Date().toISOString() };
-    const storedMetrics = storeAllKPIMetrics(result.kpis, ctx);
+    const storedMetrics = storeAllAnalyticsKPIMetrics(result.kpis, ctx);
     audit(ctx, 'analytics_kpi_computed', projectId, { kpiCount: result.kpis.length });
     res.json({ projectId, computation: result, storedMetrics: storedMetrics.map((m) => m.metricId), computedAt: result.computedAt });
   } catch (err: any) {

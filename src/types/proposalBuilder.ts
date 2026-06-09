@@ -1,4 +1,4 @@
-﻿export type ProposalPartyRole =
+export type ProposalPartyRole =
   | 'client'
   | 'architect'
   | 'engineer'
@@ -46,9 +46,9 @@ export interface MoneyBreakdown {
 
 export interface PlatformTransactionFeeConfig {
   version: string;
-  totalPlatformFeePercent: number;
-  payerSharePercent: number;
-  payeeSharePercent: number;
+  totalPlatformFeePercent: number; // default 1.00
+  payerSharePercent: number; // default 0.50
+  payeeSharePercent: number; // default 0.50
   discountAppliesBeforePlatformFee: boolean;
   includeVatInChargeableBase: boolean;
   includeDisbursementsInChargeableBase: boolean;

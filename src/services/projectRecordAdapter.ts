@@ -1,22 +1,54 @@
 /**
- * ProjectRecord Adapter
+ * ProjectRecord Adapter — Trust, Verification & Compliance
  *
- * Converts WorkflowRecords into full ProjectRecords and stores KPI metrics
- * as immutable kpi_metric records (recordType='kpi_metric') attached to ProjectRecords.
+ * Maps trust/verification/compliance records to ProjectRecord format
+ * for the Project Passport lifecycle.
+ *
+ * Module Key: trust_verification_compliance
  */
 
-import type { BaseContext, WorkflowRecord } from '../types/analyticsReporting';
-import type { KPIMetric, KPIName, KPIResult } from '../types/analyticsReporting';
+import type { ProfessionalRegistrationRecord } from './professionalRegistrationService';
+import type { CompanyDocumentRecord } from './companyDocumentService';
+import type { InsuranceComplianceRecord } from './insuranceComplianceService';
+import type { ContractorComplianceRecord } from './contractorSupplierComplianceService';
+import type { ConsentRecord, DataSubjectRequest, BreachNotification } from './popiaGovernanceService';
+import type { VerificationBadge } from './verificationBadgeService';
+import type { ComplianceRiskScore } from './complianceRiskService';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+export const TRUST_VERIFICATION_COMPLIANCE_MODULE_KEY = 'trust_verification_compliance';
+
+export type ProjectRecordType =
+  | 'professional_registration'
+  | 'company_document'
+  | 'insurance_compliance'
+  | 'contractor_supplier_compliance'
+  | 'data_processing_register'
+  | 'consent_record'
+  | 'data_subject_request'
+  | 'breach_notification'
+  | 'verification_badge'
+  | 'compliance_risk'
+  | 'governance_decision'
+  | 'audit_entry';
+
+export interface BaseProjectContext {
+  tenantId: string;
+  projectId: string;
+  userId: string;
+  actorRole?: string;
+}
 
 export interface ProjectRecord {
   recordId: string;
   tenantId: string;
   projectId: string;
   moduleKey: string;
-  recordType: string;
+  recordType: ProjectRecordType;
   title: string;
   status: string;
-  payload: WorkflowRecord;
+  payload: Record<string, unknown>;
   linkedRecordIds: string[];
   audit: {
     createdBy: string;
@@ -24,148 +56,185 @@ export interface ProjectRecord {
   };
 }
 
-let seq = 1;
-const projectRecords: ProjectRecord[] = [];
-const kpiMetrics: KPIMetric[] = [];
-let kpiSeq = 1;
+// ── Sequence counter ───────────────────────────────────────────────────────────
 
-/**
- * Convert a WorkflowRecord into a ProjectRecord.
- */
+let recordSeq = 1;
+const projectRecords: ProjectRecord[] = [];
+
+function nextRecordId(): string {
+  return `pr-trust-compliance-${String(recordSeq++).padStart(6, '0')}`;
+}
+
+// ── Core adapter ───────────────────────────────────────────────────────────────
+
 export function toProjectRecord(
-  ctx: BaseContext,
-  record: WorkflowRecord,
-  linked: string[] = [],
+  ctx: BaseProjectContext,
+  recordType: ProjectRecordType,
+  title: string,
+  status: string,
+  payload: Record<string, unknown>,
+  linkedRecordIds: string[] = [],
 ): ProjectRecord {
-  const projectRecord: ProjectRecord = {
-    recordId: `project-record-${seq++}`,
+  const record: ProjectRecord = {
+    recordId: nextRecordId(),
     tenantId: ctx.tenantId,
     projectId: ctx.projectId,
-    moduleKey: 'analytics_reporting',
-    recordType: record.type,
-    title: record.title,
-    status: record.status,
-    payload: record,
-    linkedRecordIds: linked,
+    moduleKey: TRUST_VERIFICATION_COMPLIANCE_MODULE_KEY,
+    recordType,
+    title,
+    status,
+    payload,
+    linkedRecordIds,
     audit: {
       createdBy: ctx.userId,
-      createdAt: ctx.now || new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     },
   };
-
-  projectRecords.push(projectRecord);
-  return projectRecord;
+  projectRecords.push(record);
+  return record;
 }
 
-/**
- * Store a KPI result as an immutable kpi_metric record.
- */
-export function storeKPIMetric(params: {
-  name: KPIName;
-  label: string;
-  value: number;
-  unit: string;
-  calculationSource: string;
-  projectId: string;
-  tenantId: string;
-  recordedBy: string;
-  version?: number;
-  metadata?: Record<string, unknown>;
-}): KPIMetric {
-  const metric: KPIMetric = {
-    metricId: `kpi-metric-${kpiSeq++}`,
-    name: params.name,
-    label: params.label,
-    value: params.value,
-    unit: params.unit,
-    version: params.version || 1,
-    calculationSource: params.calculationSource,
-    projectId: params.projectId,
-    tenantId: params.tenantId,
-    recordedAt: new Date().toISOString(),
-    recordedBy: params.recordedBy,
-    metadata: params.metadata,
-    immutable: true,
-  };
+// ── Record-type-specific adapters ──────────────────────────────────────────────
 
-  kpiMetrics.push(metric);
-  return metric;
-}
-
-/**
- * Store all KPIs from a computation result as immutable records.
- */
-export function storeAllKPIMetrics(
-  kpiResults: KPIResult[],
-  ctx: BaseContext,
-): KPIMetric[] {
-  return kpiResults.map((kpi) =>
-    storeKPIMetric({
-      name: kpi.name,
-      label: kpi.label,
-      value: typeof kpi === 'object' ? (kpi as unknown as Record<string, unknown>).value as number || 0 : 0,
-      unit: kpi.unit,
-      calculationSource: `kpiCalculatorService.computeAllKPIs`,
-      projectId: ctx.projectId,
-      tenantId: ctx.tenantId,
-      recordedBy: ctx.userId,
-    }),
+export function professionalRegistrationToProjectRecord(
+  ctx: BaseProjectContext,
+  registration: ProfessionalRegistrationRecord,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'professional_registration',
+    `Professional Registration: ${registration.professionalBody} ${registration.registrationNumber}`,
+    registration.status,
+    registration as unknown as Record<string, unknown>,
+    linkedRecordIds,
   );
 }
 
-/**
- * Get KPI metrics for a project.
- */
-export function getKPIMetrics(options: {
-  projectId?: string;
-  tenantId?: string;
-  name?: KPIName;
-  since?: string;
-  limit?: number;
-}): KPIMetric[] {
-  let filtered = [...kpiMetrics];
-
-  if (options.projectId) {
-    filtered = filtered.filter((m) => m.projectId === options.projectId);
-  }
-  if (options.tenantId) {
-    filtered = filtered.filter((m) => m.tenantId === options.tenantId);
-  }
-  if (options.name) {
-    filtered = filtered.filter((m) => m.name === options.name);
-  }
-  if (options.since) {
-    const sinceDate = new Date(options.since).getTime();
-    filtered = filtered.filter((m) => new Date(m.recordedAt).getTime() >= sinceDate);
-  }
-  if (options.limit) {
-    filtered = filtered.slice(0, options.limit);
-  }
-
-  return filtered.sort(
-    (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
+export function companyDocumentToProjectRecord(
+  ctx: BaseProjectContext,
+  document: CompanyDocumentRecord,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'company_document',
+    `Company Document: ${document.title}`,
+    document.status,
+    document as unknown as Record<string, unknown>,
+    linkedRecordIds,
   );
 }
 
-/**
- * Get a ProjectRecord by ID.
- */
+export function insuranceComplianceToProjectRecord(
+  ctx: BaseProjectContext,
+  insurance: InsuranceComplianceRecord,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'insurance_compliance',
+    `PI Insurance: ${insurance.provider} — ${insurance.policyNumber}`,
+    insurance.status,
+    insurance as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+export function contractorComplianceToProjectRecord(
+  ctx: BaseProjectContext,
+  compliance: ContractorComplianceRecord,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'contractor_supplier_compliance',
+    `Contractor Compliance: ${compliance.entityId} (${compliance.entityType})`,
+    compliance.overallStatus,
+    compliance as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+export function complianceRiskToProjectRecord(
+  ctx: BaseProjectContext,
+  risk: ComplianceRiskScore,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'compliance_risk',
+    `Compliance Risk: ${risk.entityType} ${risk.entityId} (${risk.riskLevel})`,
+    risk.riskLevel,
+    risk as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+export function verificationBadgeToProjectRecord(
+  ctx: BaseProjectContext,
+  badge: VerificationBadge,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'verification_badge',
+    `Verification Badge: ${badge.badgeType} (${badge.provenance})`,
+    'issued',
+    badge as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+export function consentRecordToProjectRecord(
+  ctx: BaseProjectContext,
+  consent: ConsentRecord,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'consent_record',
+    `POPIA Consent: ${consent.purpose} (${consent.status})`,
+    consent.status,
+    consent as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+export function dataSubjectRequestToProjectRecord(
+  ctx: BaseProjectContext,
+  request: DataSubjectRequest,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'data_subject_request',
+    `Data Subject Request: ${request.requestType} (${request.status})`,
+    request.status,
+    request as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+export function breachNotificationToProjectRecord(
+  ctx: BaseProjectContext,
+  breach: BreachNotification,
+  linkedRecordIds?: string[],
+): ProjectRecord {
+  return toProjectRecord(
+    ctx, 'breach_notification',
+    `Breach Notification: ${breach.breachType} (${breach.severity})`,
+    breach.ibaNotified ? 'iba_notified' : 'pending_notification',
+    breach as unknown as Record<string, unknown>,
+    linkedRecordIds,
+  );
+}
+
+// ── Queries ────────────────────────────────────────────────────────────────────
+
 export function getProjectRecord(recordId: string): ProjectRecord | undefined {
   return projectRecords.find((r) => r.recordId === recordId);
 }
 
-/**
- * Get all ProjectRecords for a given project.
- */
 export function getProjectRecords(projectId: string): ProjectRecord[] {
   return projectRecords.filter((r) => r.projectId === projectId);
 }
 
-// ── Reset (for testing) ─────────────────────────────────────────────────────────
+// ── Reset (for testing) ────────────────────────────────────────────────────────
 
 export function resetProjectRecordState(): void {
   projectRecords.length = 0;
-  kpiMetrics.length = 0;
-  seq = 1;
-  kpiSeq = 1;
+  recordSeq = 1;
 }
