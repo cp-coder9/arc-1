@@ -13,6 +13,8 @@ import { runMunicipalBrowserAutomation, trackMunicipalityStatus } from "./munici
 import { notificationService } from "../services/notificationService";
 import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../services/auditService";
 import { normalizeUserRole } from "../services/permissionService";
+import { requireAdmin, requireAuth } from "./roleMiddleware";
+import popiaRoutes from "./popiaRoutes";
 import {
   applyVerificationReview,
   assertVerificationSubjectType,
@@ -1496,17 +1498,12 @@ router.post("/project-briefs/:briefId/interpretations", async (req, res) => {
   }
 });
 
-router.post("/auth/check-admin", async (req, res) => {
-  let decoded;
-  try {
-    decoded = await verifyAuth(req.headers);
-  } catch (err: any) {
-    return res.status(err.status || 401).json({ error: err.message });
-  }
+router.post("/auth/check-admin", requireAuth, async (req, res) => {
+  const authContext = req.authContext!;
 
   try {
-    const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
-    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const isAdminEmail = ADMIN_EMAILS.includes(authContext.decoded.email || '');
+    const userRef = adminDb.collection("users").doc(authContext.uid);
     const userDoc = await userRef.get();
     const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'].includes(req.body.role)
       ? req.body.role
@@ -1516,21 +1513,21 @@ router.post("/auth/check-admin", async (req, res) => {
       const bootstrapProfileData = sanitizeUserProfileData(req.body.profileData, isAdminEmail ? 'admin' : requestedRole);
       // Create user with admin role if applicable
       const newUser = {
-        uid: decoded.uid,
-        email: decoded.email || '',
-        displayName: req.body.displayName || decoded.displayName || decoded.name || 'Anonymous',
+        uid: authContext.uid,
+        email: authContext.decoded.email || '',
+        displayName: req.body.displayName || authContext.decoded.displayName || authContext.decoded.name || 'Anonymous',
         role: isAdminEmail ? 'admin' : requestedRole,
         ...bootstrapProfileData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await userRef.set(newUser);
-      await projectDirectoryProfile(decoded.uid, newUser);
+      await projectDirectoryProfile(authContext.uid, newUser);
       await recordAuditEvent(req, {
         category: 'auth',
         action: 'auth.user_bootstrapped',
-        actor: decodedAuditActor(decoded, newUser.role),
-        target: { type: 'user', id: decoded.uid },
+        actor: decodedAuditActor(authContext.decoded, newUser.role),
+        target: { type: 'user', id: authContext.uid },
         metadata: { requestedRole, assignedRole: newUser.role, normalizedRole: normalizeUserRole(newUser.role) },
       });
       return res.json({ role: newUser.role, isAdmin: isAdminEmail, created: true });
@@ -1545,7 +1542,7 @@ router.post("/auth/check-admin", async (req, res) => {
         ...profileData,
         updatedAt,
       }, { merge: true });
-      await projectDirectoryProfile(decoded.uid, { ...userData, ...profileData, updatedAt });
+      await projectDirectoryProfile(authContext.uid, { ...userData, ...profileData, updatedAt });
     }
 
     // If user is in admin list but doesn't have admin role, upgrade them
@@ -1557,8 +1554,8 @@ router.post("/auth/check-admin", async (req, res) => {
       await recordAuditEvent(req, {
         category: 'role',
         action: 'role.admin_allowlist_upgraded',
-        actor: decodedAuditActor(decoded, 'admin'),
-        target: { type: 'user', id: decoded.uid },
+        actor: decodedAuditActor(authContext.decoded, 'admin'),
+        target: { type: 'user', id: authContext.uid },
         metadata: { previousRole: currentRole, assignedRole: 'admin' },
       });
       return res.json({ role: 'admin', isAdmin: true, upgraded: true });
@@ -1608,15 +1605,12 @@ router.put("/profile/me", async (req, res) => {
   }
 });
 
-router.post(["/governance/records", "/api/governance/records"], async (req, res) => {
+router.post(["/governance/records", "/api/governance/records"], requireAdmin, async (req, res) => {
   try {
-    const authContext = await getAuthContext(req.headers);
+    const authContext = req.authContext!;
     const subjectUserId = typeof req.body.subjectUserId === 'string' && req.body.subjectUserId.trim()
       ? req.body.subjectUserId.trim()
       : authContext.uid;
-    if (subjectUserId !== authContext.uid && !authContext.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required to create governance records for another user' });
-    }
 
     const record = buildGovernanceRecord({
       type: req.body.type as GovernanceRecordType,
@@ -1697,10 +1691,9 @@ router.put(["/users/:userId/profile", "/api/users/:userId/profile"], async (req,
   }
 });
 
-router.put("/admin/users/:userId/profile", async (req, res) => {
+router.put("/admin/users/:userId/profile", requireAdmin, async (req, res) => {
   try {
-    const authContext = await getAuthContext(req.headers);
-    if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+    const authContext = req.authContext!;
     const { userId } = req.params;
     const userRef = adminDb.collection('users').doc(userId);
     const userSnap = await userRef.get();
@@ -1709,6 +1702,22 @@ router.put("/admin/users/:userId/profile", async (req, res) => {
     const profileData = sanitizeUserProfileData(req.body.profileData || req.body, existing.role);
     if (Object.keys(profileData).length === 0) return res.status(400).json({ error: 'No supported profile fields supplied' });
     const now = new Date().toISOString();
+
+    // Detect and audit role changes
+    const rawBody = (req.body.profileData || req.body) as Record<string, unknown>;
+    const requestedRole = typeof rawBody.role === 'string' ? rawBody.role.trim() : undefined;
+    if (requestedRole && requestedRole !== existing.role && authContext.isAdmin) {
+      await userRef.set({ role: requestedRole, updatedAt: now }, { merge: true });
+      await recordAuditEvent(req, {
+        category: 'role',
+        action: 'role.admin_changed',
+        actor: decodedAuditActor(authContext.decoded, authContext.role),
+        target: { type: 'user', id: userId },
+        reason: req.body.reason || `Admin changed role from ${existing.role} to ${requestedRole}`,
+        metadata: { previousRole: existing.role, assignedRole: requestedRole, fields: Object.keys(profileData) },
+      });
+    }
+
     await userRef.set({ ...profileData, updatedAt: now }, { merge: true });
     const updatedSnap = await userRef.get();
     const updatedProfile = { uid: userId, ...updatedSnap.data() } as Record<string, any>;
@@ -2200,7 +2209,7 @@ router.post("/projects/:projectId/tasks", async (req, res) => {
   }
 });
 
-router.post("/projects/:projectId/approvals", async (req, res) => {
+router.post("/projects/:projectId/approvals", requireAuth, async (req, res) => {
   try {
     const { projectId } = req.params;
     const { authContext } = await getProjectCoordinatorContext(req, projectId);
@@ -2490,7 +2499,7 @@ router.post("/ai/action-logs", async (req, res) => {
   }
 });
 
-router.post("/admin/ai-review/:itemId/resolve", async (req, res) => {
+router.post("/admin/ai-review/:itemId/resolve", requireAdmin, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Only admins can resolve AI review queue items' });
@@ -3222,7 +3231,7 @@ router.post("/proposals/:proposalId/compare", async (req, res) => {
   }
 });
 
-router.post("/jobs/:jobId/fee-proposals", async (req, res) => {
+router.post("/jobs/:jobId/fee-proposals", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -3920,7 +3929,7 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
 });
 
 // Test provider/model settings before saving an agent configuration.
-router.post("/agent/test-settings", apiLimiter, async (req, res) => {
+router.post("/agent/test-settings", apiLimiter, requireAdmin, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4262,7 +4271,7 @@ router.post("/notifications/token", async (req, res) => {
 });
 
 // Payment – initialize escrow
-router.post("/payment/escrow/init", async (req, res) => {
+router.post("/payment/escrow/init", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4363,7 +4372,7 @@ router.post("/payment/escrow/init", async (req, res) => {
 });
 
 // Payment – release milestone
-router.post("/payment/milestone/release", async (req, res) => {
+router.post("/payment/milestone/release", requireAdmin, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4436,7 +4445,7 @@ router.post("/payment/milestone/release", async (req, res) => {
 });
 
 // Payment – confirm (client return from PayFast)
-router.post("/payment/confirm", async (req, res) => {
+router.post("/payment/confirm", requireAuth, async (req, res) => {
   const { paymentId, pfData } = req.body;
   if (!paymentId || !pfData) return res.status(400).json({ error: "paymentId and pfData are required" });
 
@@ -4463,6 +4472,13 @@ router.post("/payment/confirm", async (req, res) => {
     if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
 
     const payment = paymentDoc.data()!;
+    await recordAuditEvent(req, {
+      category: 'payment',
+      action: payment.status === "completed" ? 'payment.confirmation_verified' : 'payment.confirmation_pending',
+      actor: { uid: payment.payerId || 'payfast_client', role: 'client', authorizationType: 'payfast_return' },
+      target: { type: 'payment', id: paymentId, projectId: payment.jobId || undefined },
+      metadata: { jobId: payment.jobId || null, paymentStatus: payment.status },
+    });
     if (payment.status === "completed") {
       return res.json({ success: true, message: "Payment completed" });
     } else {
@@ -4476,7 +4492,7 @@ router.post("/payment/confirm", async (req, res) => {
 });
 
 // Payment – milestone request (architect initiates)
-router.post("/payment/milestone/request", async (req, res) => {
+router.post("/payment/milestone/request", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4508,6 +4524,14 @@ router.post("/payment/milestone/request", async (req, res) => {
       return res.status(400).json({ error: "Milestone already released" });
     }
 
+    await recordAuditEvent(req, {
+      category: 'payment',
+      action: 'payment.milestone_requested',
+      actor: decodedAuditActor(decoded, 'architect'),
+      target: { type: 'escrow', id: jobId, projectId: jobId },
+      metadata: { jobId, milestone, architectId: decoded.uid },
+    });
+
 // Server-side notification emitted here (single source of truth).
 // JSDoc: This handler emits notifyMilestoneRequest to notify the client of the architect's release request.
  res.json({ success: true });
@@ -4518,7 +4542,7 @@ router.post("/payment/milestone/request", async (req, res) => {
 });
 
 // Payment – request refund (creates pending refund request)
-router.post("/payment/refund/request", async (req, res) => {
+router.post("/payment/refund/request", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4638,7 +4662,7 @@ router.get("/payment/refund/requests", async (req, res) => {
 });
 
 // Payment – approve/reject refund (admin only)
-router.post("/payment/refund/:requestId/process", async (req, res) => {
+router.post("/payment/refund/:requestId/process", requireAdmin, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4797,7 +4821,7 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
 });
 
 // Legacy Payment – refund (admin only, direct refund without approval flow)
-router.post("/payment/refund", async (req, res) => {
+router.post("/payment/refund", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -5664,7 +5688,7 @@ router.get("/verifications/me", async (req, res) => {
   }
 });
 
-router.post("/verifications/submit", async (req, res) => {
+router.post("/verifications/submit", requireAuth, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     const subjectType = req.body.subjectType as VerificationSubjectType;
@@ -5765,7 +5789,7 @@ router.get("/admin/verifications", async (req, res) => {
   }
 });
 
-router.post("/admin/verifications/:verificationId/recheck", async (req, res) => {
+router.post("/admin/verifications/:verificationId/recheck", requireAdmin, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
@@ -5814,7 +5838,7 @@ router.post("/admin/verifications/:verificationId/recheck", async (req, res) => 
   }
 });
 
-router.post("/admin/verifications/:verificationId/review", async (req, res) => {
+router.post("/admin/verifications/:verificationId/review", requireAdmin, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
@@ -6012,7 +6036,7 @@ router.get("/payment/:paymentId/receipt", async (req, res) => {
 });
 
 // Payment – generate PDF receipt
-router.post("/payment/:paymentId/receipt/pdf", async (req, res) => {
+router.post("/payment/:paymentId/receipt/pdf", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -6437,5 +6461,8 @@ router.get("/firebase/test", async (_req, res) => {
     });
   }
 })
+
+// Mount POPIA/PAIA compliance routes
+router.use("/popia", popiaRoutes);
 
 export default router;
