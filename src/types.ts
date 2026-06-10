@@ -1,4 +1,4 @@
-import type { CPDProfessionalBody, ArchitexBuiltEnvironmentRole } from './services/cpdTypes';
+﻿import type { CPDProfessionalBody, ArchitexBuiltEnvironmentRole } from './services/cpdTypes';
 
 export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
 
@@ -497,7 +497,12 @@ export type NotificationType =
   | 'cpd_certificate_issued'
   | 'subscription_status_changed'
   | 'refund_processed'
-  | 'contractor_delivery_update';
+  | 'contractor_delivery_update'
+  | 'timesheet_due'
+  | 'registration_expiring'
+  | 'cpd_shortfall'
+  | 'invoice_ready_for_review'
+  | 'supervision_log_required';
 
 export interface Notification {
   id: string;
@@ -524,6 +529,8 @@ export interface Notification {
     subscriptionId?: string;
     refundId?: string;
     deliveryId?: string;
+    supervisionLogId?: string;
+    invoiceReadinessId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -1411,3 +1418,104 @@ export interface AgentRecommendation {
   requiresHumanApproval: boolean;
   createdAt: string;
 }
+
+// â”€â”€â”€ Pack 12: Practice Management Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export type PipelineStatus = 'lead' | 'qualified' | 'proposal_sent' | 'negotiation' | 'won' | 'lost' | 'on_hold' | 'active' | 'abandoned';
+
+export interface PipelineProject { id: string; projectId?: string; title: string; name: string; clientName: string; value: number; estimatedValueCents?: number; stage?: ProjectStage; firmId?: string; status: PipelineStatus; probability: number; expectedCloseDate: string; closedAt?: string; assignedTo: string; notes?: string; createdAt: string; updatedAt?: string; }
+
+export interface PipelineForecast {
+  totalPipeline: number;
+  weightedValue: number;
+  projectedRevenue: number;
+  totalValueCents?: number;
+  weightedValueCents?: number;
+  byStatus: Record<string, { count: number; value: number }>;
+  byStage?: Record<string, { count: number; value: number; weighted: number }>;
+}
+
+export type RegistrationStatus = 'active' | 'expiring' | 'expired' | 'suspended' | 'pending';
+
+export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACPLAN' | 'SACNASP' | 'SACPCMP' | 'Other';
+
+export interface ProfessionalRegistration {
+  id: string;
+  userId: string;
+  professionalBody: RegistrationBody;
+  registrationNumber: string;
+  status: RegistrationStatus;
+  expiryDate: string;
+  evidenceDocumentIds: string[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type TemplateCategory = 'appointment' | 'submission' | 'payment' | 'closeout' | 'communication' | 'governance' | 'general';
+
+export type TemplateVersion = 'draft' | 'published' | 'superseded' | 'archived';
+
+export interface PracticeTemplate {
+  id: string;
+  title: string;
+  description: string;
+  category: TemplateCategory;
+  version: TemplateVersion;
+  content: string;
+  variables: string[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
+
+export interface TimesheetEntry {
+  id: string;
+  userId: string;
+  projectId: string;
+  date: string;
+  hours: number;
+  description: string;
+  billableStatus: TimesheetBillableStatus;
+  hourlyRate?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TimesheetSummary {
+  userId: string;
+  periodStart: string;
+  periodEnd: string;
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  entries: TimesheetEntry[];
+}
+
+export interface FeeReconciliation {
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+  byProject: Record<string, { billed: number; paid: number }>;
+}
+
+export type PracticeTaskStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'completed' | 'cancelled';
+
+export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface PracticeTask { id: string; title: string; description: string; status: PracticeTaskStatus; priority: PracticeTaskPriority; assignedTo: string; projectId?: string; firmId?: string; dueDate?: string; createdAt: string; updatedAt?: string; }
+
+export interface WorkloadSummary {
+  userId: string;
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  byPriority: Record<PracticeTaskPriority, number>;
+}
+
+export type SupervisionLogStatus = 'draft' | 'submitted' | 'reviewed' | 'signed_off' | 'rejected';
+
+export interface CandidateSupervisionLog { id: string; candidateId: string; supervisorId: string; mentorId?: string; firmId?: string; projectId: string; periodStart?: string; status: SupervisionLogStatus; notes: string; createdAt: string; updatedAt?: string; }
+
+export interface InvoiceReadinessCheck { id: string; projectId: string; firmId?: string; timesheetIds?: string[]; expenseIds?: string[]; status: 'ready' | 'not_ready' | 'review_required'; blockers: string[]; checkedAt: string; checkedBy: string; }

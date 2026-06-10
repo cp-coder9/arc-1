@@ -256,7 +256,7 @@ export default function CloseoutWizard({ projectId }: { projectId: string }) {
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {practicalCompletionEval.preconditions.map((pc) => (
-                    <PreconditionCard key={pc.key} precondition={pc} />
+                    <PreconditionCard precondition={pc} />
                   ))}
                 </div>
                 {practicalCompletionEval.ready ? (
