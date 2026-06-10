@@ -18,6 +18,7 @@ import ContractSigningPage from './ContractSigningPage';
 import DisputeResolutionPage from './DisputeResolutionPage';
 import PackageConstructionOpsPage from './PackageConstructionOpsPage';
 import PackageCloseoutPage from './PackageCloseoutPage';
+import SiteExecutionDashboard from './SiteExecutionDashboard';
 import { subscribeToMergedQuerySnapshots } from '../lib/firestoreQueryMerge';
 
 type Props = {
@@ -151,6 +152,7 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
           <GanttChart projectId={activeProject.id} teamMembers={activeProject.teamMembers} />
           <RFIManager projectId={activeProject.id} jobId={activeProject.jobId} currentUser={user} teamMembers={activeProject.teamMembers} />
           <SiteLogManager projectId={activeProject.id} jobId={activeProject.jobId} currentUserId={user.uid} />
+          <SiteExecutionDashboard projectId={activeProject.id} jobId={activeProject.jobId} user={user} />
         </div>
       )}
       {pageId === 'snagging' && activeProject && <CloseoutWizard projectId={activeProject.id} />}
