@@ -1,5 +1,5 @@
-/**
- * Inbox Event Adapter — Trust, Verification & Compliance
+﻿/**
+ * Inbox Event Adapter â€” Trust, Verification & Compliance
  *
  * Creates inbox events for compliance actions requiring attention.
  * Routes events to appropriate recipient roles based on compliance state.
@@ -134,7 +134,7 @@ export function buildConsentRequiredEvent(
   });
 }
 
-// ── Backwards-compatible exports ───────────────────────────────────────────────
+// â”€â”€ Backwards-compatible exports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function inbox(
   recipientRole: string, title: string, sourceObjectId: string,
@@ -148,7 +148,7 @@ export function inbox(
   });
 }
 
-// ── Queries ────────────────────────────────────────────────────────────────────
+// â”€â”€ Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getInboxEvents(options?: {
   recipientRole?: string; projectId?: string; unacknowledgedOnly?: boolean;
@@ -202,4 +202,23 @@ export function workflowEventsFromReadiness(
   return events;
 }
 
+
+export function subscribeToInboxEvents(_projectId: string, _callback?: (evts: InboxEvent[]) => void): () => void { if (_callback) _callback(getInboxEvents({ projectId: _projectId })); return () => {}; }
+
+export function createInboxEvent(input: {
+  recipientRole: string; title: string; sourceObjectId: string;
+  priority: InboxPriority; eventType?: InboxEventType;
+  description?: string; projectId?: string;
+}): string {
+  const event = buildComplianceInboxEvent({
+    recipientRole: input.recipientRole,
+    title: input.title,
+    sourceObjectId: input.sourceObjectId,
+    priority: input.priority,
+    eventType: input.eventType ?? 'verification_required',
+    description: input.description,
+    projectId: input.projectId,
+  });
+  return event.eventId;
+}
 export function resetInboxState(): void { inboxEvents.length = 0; eventSeq = 1; }

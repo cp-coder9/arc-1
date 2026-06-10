@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Site Execution + Field Control Workflow Orchestrator
  *
  * Runs a connected field-control demo scenario:
- *   daily log → evidence → RFI → response → site instruction →
- *   NCR → snag → inspection → delay early warning → programme impact →
- *   payment blockers → ProjectRecords → inbox events → audit trail → agent recommendations
+ *   daily log â†’ evidence â†’ RFI â†’ response â†’ site instruction â†’
+ *   NCR â†’ snag â†’ inspection â†’ delay early warning â†’ programme impact â†’
+ *   payment blockers â†’ ProjectRecords â†’ inbox events â†’ audit trail â†’ agent recommendations
  */
 import type { UserRole } from '@/types';
 import { captureEvidence } from './fieldEvidenceService';
@@ -31,10 +31,10 @@ export interface SiteExecutionDemoResult {
   deliveryNoteEvidenceId: string;
   // Daily log (handled by constructionService)
   // RFI (handled by constructionService)
-  // Site instruction — tracked via siteInstructionService
-  // NCR — tracked via ncrService
-  // Snag — tracked via snagService
-  // Delay warning — tracked via delayWarningService
+  // Site instruction â€” tracked via siteInstructionService
+  // NCR â€” tracked via ncrService
+  // Snag â€” tracked via snagService
+  // Delay warning â€” tracked via delayWarningService
   // Programme impact
   impactId: string;
   // Payment blockers
@@ -160,11 +160,9 @@ export async function runSiteExecutionDemo(
       projectId,
       recipientRole: 'contractor',
       title: 'Submit method statement for beam chase corrective action',
-      description: 'NCR corrective action pending',
+      description: 'NCR corrective action pending (type: ncr)',
       sourceObjectId: input.ncrId,
-      sourceObjectType: 'ncr',
       priority: 'high',
-      dueDate: new Date(Date.now() + 2 * 86400000).toISOString(),
     }));
   }
 
@@ -174,9 +172,7 @@ export async function runSiteExecutionDemo(
       recipientRole: 'architect',
       title: 'Issue formal instruction linked to RFI response',
       sourceObjectId: input.rfiId,
-      sourceObjectType: 'rfi',
       priority: 'medium',
-      dueDate: new Date(Date.now() + 86400000).toISOString(),
     }));
   }
 
@@ -186,7 +182,6 @@ export async function runSiteExecutionDemo(
       recipientRole: 'contractor',
       title: 'Review possible cost/time impact from site instruction',
       sourceObjectId: input.instructionId,
-      sourceObjectType: 'site_instruction',
       priority: 'medium',
     }));
   }
@@ -208,13 +203,12 @@ export async function runSiteExecutionDemo(
       actorId,
       actorRole,
       action: 'site_execution_record_created',
-      sourceObjectId: obj.sourceObjectId,
-      sourceObjectType: obj.sourceObjectType,
+      sourceObjectId: obj.sourceObjectId, sourceObjectType: obj.sourceObjectType,
     }));
   }
 
   // 7. Agent Recommendations
-  const recommendationIds = await generateFieldRecommendations(projectId, {
+  const recommendationIds = await generateFieldRecommendations({ projectId, 
     hasRespondedRfiNeedingInstruction: input.rfiNeedsInstruction,
     rfiId: input.rfiId,
     hasBlockingNcr: input.hasBlockingNcr,

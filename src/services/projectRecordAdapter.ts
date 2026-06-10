@@ -1,5 +1,5 @@
-/**
- * ProjectRecord Adapter — Trust, Verification & Compliance
+﻿/**
+ * ProjectRecord Adapter â€” Trust, Verification & Compliance
  *
  * Maps trust/verification/compliance records to ProjectRecord format
  * for the Project Passport lifecycle.
@@ -75,7 +75,7 @@ export function insuranceComplianceToProjectRecord(
   ctx: BaseProjectContext, insurance: InsuranceComplianceRecord, linked?: string[],
 ): ProjectRecord {
   return toProjectRecord(ctx, 'insurance_compliance',
-    `PI Insurance: ${insurance.provider} — ${insurance.policyNumber}`,
+    `PI Insurance: ${insurance.provider} â€” ${insurance.policyNumber}`,
     insurance.status, insurance as unknown as Record<string, unknown>, linked);
 }
 
@@ -173,6 +173,30 @@ export function projectRecordsFromDocuments(
   }
   projectRecords.push(...records);
   return records;
+}
+
+export function subscribeToProjectRecords(_projectId: string, _callback?: (recs: ProjectRecord[]) => void): () => void { if (_callback) _callback(getProjectRecords(_projectId)); return () => {}; }
+
+export function createProjectRecord(input: {
+  projectId: string; tenantId: string; recordType: string;
+  title: string; status?: string; payload?: unknown;
+  moduleKey?: string; createdBy?: string; linkedRecordIds?: string[];
+  phase?: string;
+}): string {
+  const record: ProjectRecord = {
+    recordId: nextRecordId(),
+    recordType: input.recordType as ProjectRecordType,
+    projectId: input.projectId,
+    tenantId: input.tenantId,
+    moduleKey: input.moduleKey ?? 'site_execution',
+    title: input.title,
+    status: input.status ?? 'active',
+    payload: (input.payload ?? {}) as Record<string, unknown>,
+    linkedRecordIds: input.linkedRecordIds ?? [],
+    audit: { createdBy: input.createdBy ?? 'system', createdAt: new Date().toISOString() },
+  };
+  projectRecords.push(record);
+  return record.recordId;
 }
 
 export function resetProjectRecordState(): void {

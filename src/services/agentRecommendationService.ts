@@ -261,4 +261,14 @@ export function recommendationsFromDocumentState(
   return recs;
 }
 
+export function subscribeToRecommendations(_projectId: string, _callback?: (recs: AgentRecommendation[]) => void): () => void {
+  if (_callback) _callback(getRecommendations());
+  return () => {};
+}
+
+export function generateFieldRecommendations(input: Record<string, unknown>): string[] {
+  const recs = generateComplianceRecommendations(input as unknown as Parameters<typeof generateComplianceRecommendations>[0]);
+  return recs.map((r) => r.recommendationId);
+}
+
 export function resetRecommendationState(): void { recommendations.length = 0; recSeq = 1; }
