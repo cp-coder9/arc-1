@@ -5,6 +5,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'command_centre',
     label: 'Command Centre',
     description: 'Personal daily cockpit curated by the user agent.',
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
       { key: 'active_projects', label: 'Active Projects', description: 'Current project responsibilities.' },
@@ -17,6 +18,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'inbox',
     label: 'Inbox / Action Centre',
     description: 'Protected action centre for required work and agent-pushed tasks.',
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
     sections: [
       { key: 'required_actions', label: 'Required Actions', description: 'Tasks requiring user action.', supportsContextualMessaging: true },
       { key: 'approvals', label: 'Approvals', description: 'Items awaiting approval.', supportsContextualMessaging: true },
@@ -28,6 +30,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'projects',
     label: 'Projects',
     description: 'Phase-aware project workspace.',
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier'],
     sections: [
       { key: 'dashboard', label: 'Project Dashboard', description: 'Project overview.', projectScoped: true, phaseAware: true },
       { key: 'team', label: 'Team', description: 'Project team and responsibilities.', projectScoped: true, supportsContextualMessaging: true },
@@ -43,6 +46,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'toolboxes',
     label: 'Toolboxes',
     description: 'Role-specific professional tools, not a flat list.',
+    roles: ['architect', 'admin', 'freelancer', 'contractor'],
     sections: [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
       { key: 'design_compliance', label: 'Design & Compliance', description: 'NBR/SANS/municipal/drawing checks.', supportsContextualMessaging: true },
@@ -56,6 +60,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'cpd_learning',
     label: 'CPD & Learning',
     description: 'Separate CPD platform for learning, assessments and professional records.',
+    roles: ['architect', 'admin', 'freelancer'],
     sections: [
       { key: 'cpd_dashboard', label: 'CPD Dashboard', description: 'Role/body-aware CPD status.' },
       { key: 'courses', label: 'Courses & Webinars', description: 'CPD learning content.' },
@@ -69,6 +74,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'documents',
     label: 'Documents / Knowledge Hub',
     description: 'Global document, template and knowledge hub.',
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor'],
     sections: [
       { key: 'my_documents', label: 'My Documents', description: 'User documents.' },
       { key: 'project_documents', label: 'Project Documents', description: 'Cross-project document search.', supportsContextualMessaging: true },
@@ -81,6 +87,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'marketplace',
     label: 'Marketplace / Resource Centre',
     description: 'Industry network, resources, suppliers and opportunities.',
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'supplier'],
     sections: [
       { key: 'professionals', label: 'Professionals', description: 'Find consultants and professionals.' },
       { key: 'contractors', label: 'Contractors', description: 'Find contractors and subcontractors.' },
@@ -94,6 +101,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'finance',
     label: 'Finance & Commercial',
     description: 'Commercial controls, payments, escrow and financial records.',
+    roles: ['client', 'admin', 'contractor', 'subcontractor'],
     sections: [
       { key: 'quotes', label: 'Quotes', description: 'Quotes and comparisons.', supportsContextualMessaging: true },
       { key: 'invoices', label: 'Invoices', description: 'Invoices and payments.', supportsContextualMessaging: true },
@@ -106,6 +114,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'messages',
     label: 'Messages',
     description: 'Full persistent messaging centre linked to project context.',
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
     sections: [
       { key: 'direct', label: 'Direct Messages', description: 'One-to-one messages.' },
       { key: 'project_groups', label: 'Project Groups', description: 'Project group conversations.' },
@@ -119,6 +128,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'settings',
     label: 'Settings',
     description: 'User, company, permissions, billing and admin configuration.',
+    roles: ['admin'],
     sections: [
       { key: 'profile', label: 'Profile', description: 'Personal profile and preferences.' },
       { key: 'professional_registrations', label: 'Professional Registrations', description: 'Professional body details.' },
@@ -126,6 +136,16 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'billing', label: 'Billing', description: 'Subscription and billing.' },
       { key: 'roles_permissions', label: 'Roles & Permissions', description: 'Access control.', roles: ['admin'] },
       { key: 'platform_admin', label: 'Platform Admin', description: 'System configuration.', roles: ['admin'] },
+    ],
+  },
+  {
+    key: 'user_settings',
+    label: 'My Account',
+    description: 'Profile, professional registrations and preferences.',
+    roles: ['client', 'architect', 'freelancer', 'contractor', 'subcontractor', 'supplier'],
+    sections: [
+      { key: 'profile', label: 'Profile', description: 'Personal profile and preferences.' },
+      { key: 'professional_registrations', label: 'Professional Registrations', description: 'Professional body details.' },
     ],
   },
 ];

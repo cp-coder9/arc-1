@@ -10,7 +10,8 @@ export type ArchitexNavKey =
   | 'marketplace'
   | 'finance'
   | 'messages'
-  | 'settings';
+  | 'settings'
+  | 'user_settings';
 
 export type WorkspaceSection = {
   key: string;
