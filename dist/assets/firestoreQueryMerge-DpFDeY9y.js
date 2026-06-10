@@ -1,0 +1,1 @@
+import{r as m}from"./firebase-CrCqCnMW.js";function r(o,i,a,c){const f=new Map,p=()=>{const s=new Map;for(const n of f.values())for(const[t,e]of n.entries())s.set(t,e);a(Array.from(s.values()))},b=o.map((s,n)=>m(s,t=>{const e=new Map;t.docs.forEach(u=>{e.set(u.id,i(u))}),f.set(n,e),p()},t=>{c==null||c(t)}));return o.length===0&&a([]),()=>b.forEach(s=>s())}export{r as s};
