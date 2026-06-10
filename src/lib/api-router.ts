@@ -59,6 +59,16 @@ import {
 } from "../services/marketplaceWorkflowService";
 import { assertAppointmentPreconditions } from "../services/appointmentWorkflowService";
 import { getApplicationProfessionalId, withProfessionalJobAliases, withProfessionalProjectAliases } from "./professionalRoleCompatibility";
+import {
+  createAppointmentFromAcceptedProposal,
+  createKickoffPackage,
+  confirmProfessionalAppointment,
+  validateKickoffReadiness,
+} from "../services/appointmentKickoffService";
+import { createAppointmentDocumentOutputs } from "../services/appointmentDocumentAdapter";
+import { createKickoffInboxEvents } from "../services/appointmentInboxAdapter";
+import { createAppointmentAuditTrail } from "../services/appointmentAuditService";
+import { recommendNextActions } from "../services/appointmentRecommendationService";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
@@ -2022,6 +2032,282 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
       metadata: { clientBriefId: req.params.briefId, bepId, projectCode, professionalFee, platformFee, invoiceCount: invoices.length, escrowId: projectRef.id },
     });
     res.status(201).json({ project, contract, escrowId: projectRef.id, paymentId: paymentRef.id, invoices });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ── Pack 5: Appointment & Kickoff API ────────────────────────────────────────────
+
+router.post("/api/appointments", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { proposalSnapshot, projectFacts } = req.body || {};
+
+    if (!proposalSnapshot || typeof proposalSnapshot !== 'object') {
+      return res.status(400).json({ error: 'proposalSnapshot (AcceptedProposalSnapshot) is required' });
+    }
+    if (!projectFacts || typeof projectFacts !== 'object') {
+      return res.status(400).json({ error: 'projectFacts is required' });
+    }
+
+    // Validate the proposal snapshot has required fields
+    const nowIso = new Date().toISOString();
+    const appointment = createAppointmentFromAcceptedProposal({
+      proposal: proposalSnapshot,
+      projectFacts,
+      nowIso,
+    });
+
+    const kickoff = createKickoffPackage(appointment);
+    const documents = createAppointmentDocumentOutputs(kickoff.workspace, appointment);
+    const inboxEvents = createKickoffInboxEvents(appointment, kickoff);
+    const auditTrail = createAppointmentAuditTrail(appointment, kickoff, nowIso);
+    const recommendations = recommendNextActions(appointment, kickoff);
+
+    // Persist to Firestore
+    const batch = adminDb.batch();
+
+    const appointmentRef = adminDb.collection('appointment_records').doc(appointment.appointmentId);
+    batch.set(appointmentRef, { ...appointment, createdBy: authContext.uid });
+
+    const workspaceRef = adminDb.collection('project_workspaces').doc(kickoff.workspace.projectId);
+    batch.set(workspaceRef, { ...kickoff.workspace, createdBy: authContext.uid, createdAt: nowIso });
+
+    const kickoffRef = adminDb.collection('kickoff_checklists').doc(kickoff.workspace.projectId);
+    batch.set(kickoffRef, {
+      projectId: kickoff.workspace.projectId,
+      appointmentId: appointment.appointmentId,
+      checklist: kickoff.checklist,
+      initialTasks: kickoff.initialTasks,
+      readiness: kickoff.readiness,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+
+    // Write document placeholders
+    for (const doc of documents) {
+      const docRef = adminDb.collection('document_placeholders').doc(doc.documentId);
+      batch.set(docRef, { ...doc, createdBy: authContext.uid, createdAt: nowIso });
+    }
+
+    // Write inbox events
+    for (const event of inboxEvents) {
+      const eventRef = adminDb.collection('inbox_events').doc(event.eventId);
+      batch.set(eventRef, { ...event, createdBy: 'system', createdAt: nowIso });
+    }
+
+    // Write audit trail
+    for (const audit of auditTrail) {
+      const auditRef = adminDb.collection('audit_trail').doc(audit.auditId);
+      batch.set(auditRef, { ...audit, createdBy: 'system' });
+    }
+
+    await batch.commit();
+
+    res.status(201).json({
+      appointment,
+      workspace: kickoff.workspace,
+      passport: kickoff.passport,
+      checklist: kickoff.checklist,
+      readiness: kickoff.readiness,
+      documents: documents.length,
+      inboxEvents: inboxEvents.length,
+      recommendations,
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/api/appointments/:id/client-acceptance", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { id } = req.params;
+    const { acceptanceId, acceptedAtIso } = req.body || {};
+
+    if (!acceptanceId) {
+      return res.status(400).json({ error: 'acceptanceId is required' });
+    }
+
+    const appointmentRef = adminDb.collection('appointment_records').doc(id);
+    const appointmentSnap = await appointmentRef.get();
+
+    if (!appointmentSnap.exists) {
+      return res.status(404).json({ error: 'Appointment record not found' });
+    }
+
+    const appointment = appointmentSnap.data() as Record<string, any>;
+    if (!appointment.proposalSnapshot) {
+      return res.status(400).json({ error: 'Appointment has no proposal snapshot' });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // Update the proposal snapshot with client acceptance
+    const updatedSnapshot = {
+      ...appointment.proposalSnapshot,
+      clientAcceptanceId: acceptanceId,
+      acceptedAtIso: acceptedAtIso || nowIso,
+    };
+
+    await appointmentRef.update({
+      'proposalSnapshot.clientAcceptanceId': acceptanceId,
+      'proposalSnapshot.acceptedAtIso': acceptedAtIso || nowIso,
+      updatedAt: nowIso,
+    });
+
+    // Record audit event
+    await adminDb.collection('audit_trail').add({
+      entityId: id,
+      action: 'client_acceptance_recorded',
+      actor: authContext.uid,
+      atIso: nowIso,
+      notes: `Client acceptance ${acceptanceId} recorded for appointment ${id}.`,
+      createdBy: 'system',
+    });
+
+    res.json({
+      appointmentId: id,
+      clientAcceptanceId: acceptanceId,
+      acceptedAtIso: acceptedAtIso || nowIso,
+      updatedAt: nowIso,
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post("/api/appointments/:id/professional-confirmation", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { id } = req.params;
+    const { confirmedBy } = req.body || {};
+
+    const appointmentRef = adminDb.collection('appointment_records').doc(id);
+    const appointmentSnap = await appointmentRef.get();
+
+    if (!appointmentSnap.exists) {
+      return res.status(404).json({ error: 'Appointment record not found' });
+    }
+
+    const raw = appointmentSnap.data() as Record<string, any>;
+    if (raw.status === 'confirmed') {
+      return res.status(409).json({ error: 'Appointment is already confirmed' });
+    }
+
+    // Reconstruct the appointment record from Firestore data
+    const appointment = raw as import('../types/appointmentKickoff').KickoffAppointmentRecord;
+    const nowIso = new Date().toISOString();
+    const confirmed = confirmProfessionalAppointment(appointment, nowIso);
+    const kickoff = createKickoffPackage(confirmed);
+    const gates = validateKickoffReadiness(confirmed);
+
+    // Update the appointment record and kickoff checklist
+    const batch = adminDb.batch();
+    batch.update(appointmentRef, {
+      status: confirmed.status,
+      professionalConfirmedAtIso: confirmed.professionalConfirmedAtIso,
+      requiresHumanApprovalBeforeFormalIssue: confirmed.requiresHumanApprovalBeforeFormalIssue,
+      updatedAt: nowIso,
+    });
+
+    // Update kickoff checklist if workspace exists
+    const workspaceRef = adminDb.collection('project_workspaces')
+      .doc(`project-${id}`);
+    const workspaceSnap = await workspaceRef.get();
+    if (workspaceSnap.exists) {
+      batch.update(workspaceRef, {
+        phase: confirmed.status === 'confirmed' ? 'appointment_confirmed' : 'pre_appointment',
+        updatedAt: nowIso,
+      });
+    }
+
+    const kickoffRef = adminDb.collection('kickoff_checklists')
+      .doc(`project-${id}`);
+    const kickoffSnap = await kickoffRef.get();
+    if (kickoffSnap.exists) {
+      batch.update(kickoffRef, {
+        checklist: kickoff.checklist,
+        readiness: kickoff.readiness,
+        updatedAt: nowIso,
+      });
+    }
+
+    // Record audit event
+    const auditRef = adminDb.collection('audit_trail').doc();
+    batch.set(auditRef, {
+      auditId: auditRef.id,
+      entityId: id,
+      action: 'professional_confirmed_appointment',
+      actor: confirmedBy || authContext.uid,
+      atIso: nowIso,
+      notes: `Professional confirmed appointment ${id} at revision ${confirmed.revision}.`,
+      createdBy: 'system',
+    });
+
+    await batch.commit();
+
+    res.json({
+      appointmentId: id,
+      status: confirmed.status,
+      professionalConfirmedAtIso: confirmed.professionalConfirmedAtIso,
+      readiness: kickoff.readiness,
+      gates: gates.gates,
+      blockers: gates.blockers,
+    });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/api/projects/:id/kickoff-checklist", async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const authContext = await getAuthContext(req.headers);
+
+    const [workspaceSnap, kickoffSnap] = await Promise.all([
+      adminDb.collection('project_workspaces').doc(projectId).get(),
+      adminDb.collection('kickoff_checklists').doc(projectId).get(),
+    ]);
+
+    if (!workspaceSnap.exists && !kickoffSnap.exists) {
+      return res.status(404).json({ error: 'No kickoff data found for this project' });
+    }
+
+    const workspace = workspaceSnap.exists ? workspaceSnap.data() : null;
+    const kickoff = kickoffSnap.exists ? kickoffSnap.data() : null;
+
+    // If we have an appointment, also run fresh validation
+    let gatesResult = null;
+    if (kickoff?.appointmentId) {
+      const appointmentSnap = await adminDb
+        .collection('appointment_records')
+        .doc(kickoff.appointmentId)
+        .get();
+      if (appointmentSnap.exists) {
+        const appointmentData = appointmentSnap.data() as import('../types/appointmentKickoff').KickoffAppointmentRecord;
+        gatesResult = validateKickoffReadiness(appointmentData);
+      }
+    }
+
+    res.json({
+      projectId,
+      workspace: workspace
+        ? {
+            projectId: workspace.projectId,
+            projectName: workspace.projectName,
+            phase: workspace.phase,
+            roles: workspace.roles,
+          }
+        : null,
+      checklist: kickoff?.checklist || [],
+      initialTasks: kickoff?.initialTasks || [],
+      readiness: kickoff?.readiness || 'blocked',
+      gates: gatesResult?.gates || [],
+      blockers: gatesResult?.blockers || [],
+      updatedAt: kickoff?.updatedAt || null,
+    });
   } catch (err: any) {
     res.status(err.status || 500).json({ error: err.message });
   }

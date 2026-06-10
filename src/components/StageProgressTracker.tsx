@@ -30,31 +30,15 @@ export default function StageProgressTracker({
   const currentIndex = PROJECT_STAGE_ORDER.indexOf(currentStage);
 
   return (
-    <section
-      className={cn(
-        'rounded-[2rem] border border-primary/10 bg-white/90 p-5 shadow-sm',
-        className,
-      )}
-      aria-label="Project lifecycle progress"
-    >
+    <section className={cn('rounded-[2rem] border border-primary/10 bg-white/90 p-5 shadow-sm', className)} aria-label="Project lifecycle progress">
       <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary">
-              Project Lifecycle
-            </p>
-            <h3 className="font-heading text-xl font-black tracking-tight text-foreground">
-              {PROJECT_STAGE_LABELS[currentStage]}
-            </h3>
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary">Project Lifecycle</p>
+            <h3 className="font-heading text-xl font-black tracking-tight text-foreground">{PROJECT_STAGE_LABELS[currentStage]}</h3>
           </div>
           {riskLevel && riskLevel !== 'low' && (
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest',
-                RISK_COLORS[riskLevel],
-              )}
-              title={`Project risk level: ${riskLevel}`}
-            >
+            <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest', RISK_COLORS[riskLevel])} title={`Project risk level: ${riskLevel}`}>
               <AlertTriangle size={10} />
               {riskLevel}
             </span>
@@ -69,7 +53,7 @@ export default function StageProgressTracker({
         {PROJECT_STAGE_ORDER.map((stage, index) => {
           const isComplete = index < currentIndex;
           const isCurrent = index === currentIndex;
-          const historyEntry = stageHistory.find((entry) => entry.stage === stage);
+          const historyEntry = stageHistory.find(entry => entry.stage === stage);
           const blockerInfo = phaseBlockers?.[stage];
           const hasBlockers = blockerInfo && blockerInfo.count > 0;
           const blockerSeverity = blockerInfo?.maxSeverity ?? 'medium';
@@ -80,7 +64,7 @@ export default function StageProgressTracker({
                 <span
                   className={cn(
                     'absolute left-5 top-[-0.875rem] h-3 w-px bg-border md:left-[-0.5rem] md:top-5 md:h-px md:w-4',
-                    index <= currentIndex && 'bg-primary/50',
+                    index <= currentIndex && 'bg-primary/50'
                   )}
                   aria-hidden="true"
                 />
@@ -91,54 +75,30 @@ export default function StageProgressTracker({
                   isComplete && 'border-primary/20 bg-primary/5 text-primary',
                   isCurrent && 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20',
                   !isComplete && !isCurrent && 'border-border bg-secondary/20 text-muted-foreground',
-                  !isComplete && !isCurrent && hasBlockers && 'border-red-300 bg-red-50/30',
+                  !isComplete && !isCurrent && hasBlockers && 'border-red-300 bg-red-50/30'
                 )}
               >
                 <span
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white',
                     isComplete && 'border-primary text-primary',
-                    isCurrent &&
-                      'border-primary-foreground/40 bg-primary-foreground/15 text-primary-foreground',
+                    isCurrent && 'border-primary-foreground/40 bg-primary-foreground/15 text-primary-foreground',
                     !isComplete && !isCurrent && 'border-border text-muted-foreground',
-                    !isComplete && !isCurrent && hasBlockers && 'border-red-400 text-red-600',
+                    !isComplete && !isCurrent && hasBlockers && 'border-red-400 text-red-600'
                   )}
                 >
-                  {isComplete ? (
-                    <CheckCircle2 size={18} />
-                  ) : isCurrent ? (
-                    <Clock3 size={18} />
-                  ) : hasBlockers ? (
-                    <AlertTriangle size={18} />
-                  ) : (
-                    <Circle size={18} />
-                  )}
+                  {isComplete ? <CheckCircle2 size={18} /> : isCurrent ? <Clock3 size={18} /> : hasBlockers ? <AlertTriangle size={18} /> : <Circle size={18} />}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">
-                    {String(index + 1).padStart(2, '0')}
-                  </p>
-                  <p className="text-xs font-black leading-tight md:text-[11px]">
-                    {PROJECT_STAGE_LABELS[stage]}
-                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">{String(index + 1).padStart(2, '0')}</p>
+                  <p className="text-xs font-black leading-tight md:text-[11px]">{PROJECT_STAGE_LABELS[stage]}</p>
                   {historyEntry?.enteredAt && (
-                    <p
-                      className={cn(
-                        'mt-1 text-[10px]',
-                        isCurrent ? 'text-primary-foreground/80' : 'text-muted-foreground',
-                      )}
-                    >
+                    <p className={cn('mt-1 text-[10px]', isCurrent ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
                       {new Date(historyEntry.enteredAt).toLocaleDateString()}
                     </p>
                   )}
                   {hasBlockers && (
-                    <span
-                      className={cn(
-                        'mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase',
-                        RISK_COLORS[blockerSeverity] || RISK_COLORS.medium,
-                      )}
-                      title={`${blockerInfo.count} blocker(s) at ${blockerSeverity} severity`}
-                    >
+                    <span className={cn('mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase', RISK_COLORS[blockerSeverity] || RISK_COLORS.medium)} title={`${blockerInfo.count} blocker(s) at ${blockerSeverity} severity`}>
                       <AlertTriangle size={8} />
                       {blockerInfo.count} {blockerInfo.count === 1 ? 'blocker' : 'blockers'}
                     </span>
@@ -152,3 +112,4 @@ export default function StageProgressTracker({
     </section>
   );
 }
+

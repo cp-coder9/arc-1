@@ -45,14 +45,10 @@ export default function AdvanceStageButton({
   const currentIndex = PROJECT_STAGE_ORDER.indexOf(project.currentStage);
   const nextStage = currentIndex >= 0 ? PROJECT_STAGE_ORDER[currentIndex + 1] : undefined;
   const gateEvaluation = nextStage
-    ? evaluateStageGateTransition(
-        project.currentStage,
-        nextStage,
-        project.stageGateEvidence || {},
-      )
+    ? evaluateStageGateTransition(project.currentStage, nextStage, project.stageGateEvidence || {})
     : undefined;
   const missingGateSummary = gateEvaluation?.missingRequirements
-    .map((requirement) => `• ${requirement.label}: ${requirement.reason}`)
+    .map(requirement => `• ${requirement.label}: ${requirement.reason}`)
     .join('\n');
   const hasBlockers = (blockerCount ?? 0) > 0;
 
@@ -60,17 +56,16 @@ export default function AdvanceStageButton({
 
   const handleAdvance = async () => {
     if (gateEvaluation && !gateEvaluation.transitionAllowed) {
-      const message =
-        gateEvaluation.missingRequirements.length > 0
-          ? `This project cannot advance to ${PROJECT_STAGE_LABELS[nextStage]} yet. Missing stage-gate evidence:\n${missingGateSummary}`
-          : `This project cannot advance from ${PROJECT_STAGE_LABELS[project.currentStage]} to ${PROJECT_STAGE_LABELS[nextStage]}.`;
+      const message = gateEvaluation.missingRequirements.length > 0
+        ? `This project cannot advance to ${PROJECT_STAGE_LABELS[nextStage]} yet. Missing stage-gate evidence:\n${missingGateSummary}`
+        : `This project cannot advance from ${PROJECT_STAGE_LABELS[project.currentStage]} to ${PROJECT_STAGE_LABELS[nextStage]}.`;
       toast.error(message);
       window.alert(message);
       return;
     }
 
     const confirmed = window.confirm(
-      `Advance this project from ${PROJECT_STAGE_LABELS[project.currentStage]} to ${PROJECT_STAGE_LABELS[nextStage]}?`,
+      `Advance this project from ${PROJECT_STAGE_LABELS[project.currentStage]} to ${PROJECT_STAGE_LABELS[nextStage]}?`
     );
     if (!confirmed) return;
 
@@ -80,23 +75,18 @@ export default function AdvanceStageButton({
         project.id,
         nextStage,
         actorId,
-        `Stage advanced to ${PROJECT_STAGE_LABELS[nextStage]}`,
+        `Stage advanced to ${PROJECT_STAGE_LABELS[nextStage]}`
       );
       toast.success(`Project advanced to ${PROJECT_STAGE_LABELS[nextStage]}`);
     } catch (error: any) {
-      toast.error(
-        error?.message ||
-          'Failed to advance project stage. Check permissions and try again.',
-      );
+      toast.error(error?.message || 'Failed to advance project stage. Check permissions and try again.');
     } finally {
       setIsAdvancing(false);
     }
   };
 
-  const gateBlocked =
-    gateEvaluation && !gateEvaluation.transitionAllowed;
-  const missingCount =
-    gateEvaluation?.missingRequirements.length ?? 0;
+  const gateBlocked = gateEvaluation && !gateEvaluation.transitionAllowed;
+  const missingCount = gateEvaluation?.missingRequirements.length ?? 0;
 
   return (
     <div className="inline-flex items-center gap-2">
@@ -105,58 +95,28 @@ export default function AdvanceStageButton({
         onClick={handleAdvance}
         disabled={isAdvancing}
         title={missingGateSummary || undefined}
-        className={
-          className ||
-          cn(
-            'rounded-full font-bold gap-2',
-            gateBlocked && 'opacity-70',
-          )
-        }
+        className={className || cn('rounded-full font-bold gap-2', gateBlocked && 'opacity-70')}
         variant={variant}
         size={size}
         aria-label={`Advance project to ${PROJECT_STAGE_LABELS[nextStage]}`}
       >
-        {isAdvancing ? (
-          <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-        ) : (
-          <ArrowRight size={16} aria-hidden="true" />
-        )}
+        {isAdvancing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />}
         Advance to {PROJECT_STAGE_LABELS[nextStage]}
       </Button>
-
       {riskLevel && riskLevel !== 'low' && (
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest',
-            RISK_BADGE_COLORS[riskLevel],
-          )}
-          title={`Project risk level: ${riskLevel}`}
-        >
-          <span
-            className={cn('h-2 w-2 rounded-full', RISK_DOT_COLORS[riskLevel])}
-          />
+        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest', RISK_BADGE_COLORS[riskLevel])} title={`Project risk level: ${riskLevel}`}>
+          <span className={cn('h-2 w-2 rounded-full', RISK_DOT_COLORS[riskLevel])} />
           {riskLevel}
         </span>
       )}
-
       {hasBlockers && (
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest',
-            RISK_BADGE_COLORS[riskLevel ?? 'medium'],
-          )}
-          title={`${blockerCount} blocker(s) in the next phase`}
-        >
+        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest', RISK_BADGE_COLORS[riskLevel ?? 'medium'])} title={`${blockerCount} blocker(s) in the next phase`}>
           <AlertTriangle size={10} />
           {blockerCount} {blockerCount === 1 ? 'blocker' : 'blockers'}
         </span>
       )}
-
       {gateBlocked && missingCount > 0 && (
-        <span
-          className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-red-700"
-          title={`${missingCount} missing stage-gate requirement(s)`}
-        >
+        <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-red-700" title={`${missingCount} missing stage-gate requirement(s)`}>
           <AlertTriangle size={10} />
           {missingCount} missing
         </span>
