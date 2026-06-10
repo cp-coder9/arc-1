@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+const navConfigSource = readFileSync(resolve(process.cwd(), 'src/navigation/architexNavigationConfig.ts'), 'utf8');
 const onboardingSource = readFileSync(resolve(process.cwd(), 'src/components/OnboardingFlow.tsx'), 'utf8');
 const backendSource = readFileSync(resolve(process.cwd(), 'backend.html'), 'utf8');
 const workflowSource = readFileSync(resolve(process.cwd(), 'src/components/ProjectWorkflowPage.tsx'), 'utf8');
@@ -238,12 +239,17 @@ describe('canonical dashboard page registry', () => {
   });
 
   it('exposes backend role navigation sections and deterministic page test ids', () => {
-    for (const heading of ['Account', 'Project', 'Client Tools', 'BEP Tools', 'Contractor Tools', 'Freelancer Tools', 'System']) {
-      expect(appSource).toContain(heading);
+    // Navigation labels are now in architexNavigationConfig (single source of truth)
+    for (const heading of ['Command Centre', 'Inbox / Action Centre', 'Projects', 'Toolboxes', 'CPD & Learning', 'Documents / Knowledge Hub', 'Marketplace / Resource Centre', 'Finance & Commercial', 'Messages', 'Settings']) {
+      expect(navConfigSource).toContain(heading);
     }
-    expect(appSource).toContain('function dashboardSectionLabel');
-    expect(appSource).toContain('data-testid="nav-page-command"');
-    expect(appSource).toContain('data-testid={`nav-page-${page.id}`}');
+    // App.tsx integrates the navigation config for rendering
+    expect(appSource).toContain('architexNavigation');
+    expect(appSource).toContain('visibleNavItems');
+    expect(appSource).toContain('activeNavKey');
+    expect(appSource).toContain('navKeyIcon');
+    expect(appSource).toContain('getDefaultPageForNavKey');
+    expect(appSource).toContain('getNavKeyForActiveTab');
   });
 
   it('keeps role-aware dashboard keyboard shortcuts discoverable and input-safe', () => {

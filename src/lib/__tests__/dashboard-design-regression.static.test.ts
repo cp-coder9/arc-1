@@ -56,7 +56,7 @@ describe('dashboard design regression safeguards', () => {
     const appSource = readSource('src/App.tsx');
     expect(appSource).toContain('aria-label="Close navigation menu"');
     expect(appSource).toContain('aria-label="Open navigation menu"');
-    expect(appSource).toContain('aria-label="Role workspace navigation"');
+    expect(appSource).toContain('aria-label="Architex navigation"');
     expect(appSource).toContain('aria-expanded={isSidebarOpen}');
   });
 
