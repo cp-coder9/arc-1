@@ -31,6 +31,7 @@ const AUTH_HELPERS = [
   'getVerifiedFreelancerContext',
   'getResourceCentreContext',
   'requireAdmin',
+  'requireAuth',
 ];
 
 const PUBLIC_ROUTES = new Set(['GET /health', 'POST /payment/notify', 'GET /firebase/test']);
