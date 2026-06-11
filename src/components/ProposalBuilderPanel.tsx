@@ -29,7 +29,7 @@ import {
   termsRequireApproval,
   calculateValidityExpiry,
   daysUntilExpiry,
-  isProposalExpired,
+  isProposalExpiredFn as isProposalExpired,
   type TermsTemplate,
 } from '@/services/termsTemplateService';
 import {

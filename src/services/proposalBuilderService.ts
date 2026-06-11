@@ -1,7 +1,7 @@
 import { calculatePlatformTransactionFee, roundMoney } from './platformTransactionFeeService';
 import { snapshotTerms } from './termsService';
 import { calculateExpiryDate } from './termsService';
-import type { ProposalBuilderInput, ProposalBuilderResult, ProposalLineItem, ProposalStatus } from '../types';
+import type { ProposalBuilderInput, ProposalBuilderResult, ProposalLineItem, ProposalStatus } from '../types/proposalBuilder';
 
 function sumLineItems(items: ProposalLineItem[], predicate: (item: ProposalLineItem) => boolean): number {
   return roundMoney(items.filter(predicate).reduce((sum, item) => sum + item.total, 0));

@@ -65,8 +65,8 @@ export function registerProposalRoutes(router: Router, adminDb: Firestore): void
         payeeRole: input.payeeRole,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        stateMachineStatus: stateMachine.currentState,
-        stateMachineHistory: stateMachine.getHistory(),
+        stateMachineStatus: stateMachine.currentStatus,
+        stateMachineHistory: stateMachine.auditTrail,
       };
 
       const docRef = await adminDb.collection(PROPOSALS_COLLECTION).add(proposalDoc);
@@ -170,7 +170,7 @@ export function registerProposalRoutes(router: Router, adminDb: Firestore): void
       // Update Firestore
       const updates: Record<string, unknown> = {
         status: 'issued',
-        stateMachineStatus: state.currentState,
+        stateMachineStatus: state.currentStatus,
         issuedAt: state.issuedAt,
         lockedAt: state.lockedAt,
         updatedAt: new Date().toISOString(),
@@ -207,7 +207,7 @@ export function registerProposalRoutes(router: Router, adminDb: Firestore): void
       return res.json({
         id,
         status: 'issued',
-        stateMachineStatus: state.currentState,
+        stateMachineStatus: state.currentStatus,
         issuedAt: state.issuedAt,
         integrationOutputs: {
           proposalRecord: integrationOutputs.proposalRecord,

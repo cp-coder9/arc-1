@@ -7,14 +7,14 @@
 
 import type { ProposalBuilderResult, ProposalTermsSnapshot } from '../types/proposalBuilder';
 import { generateAllProposalRecords, createProposalDocumentOutput } from './proposalIntegrationAdapters';
-import type { ProjectRecord, DocumentOutputPlaceholder } from './proposalIntegrationAdapters';
+import type { ProjectRecord as AdapterProjectRecord, DocumentOutputPlaceholder } from './proposalIntegrationAdapters';
 import { generateProposalInboxEvents } from './proposalInboxEvents';
 import type { InboxEvent } from './proposalInboxEvents';
 import { recommendationsFromProposal as genRecommendations } from './proposalAgentRecommendations';
 import type { ProposalAgentRecommendation } from './proposalAgentRecommendations';
 
 // Re-export types the component expects
-export type ProjectRecord = ProjectRecord;
+export type ProjectRecord = AdapterProjectRecord;
 export type DocumentOutput = DocumentOutputPlaceholder & { placeholderNote: string };
 export type WorkflowEvent = InboxEvent & { title: string; detail: string; assignedRoles: string[] };
 export type AgentRecommendation = ProposalAgentRecommendation;
