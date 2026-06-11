@@ -109,8 +109,8 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
   {
     domain: 'marketplace',
     label: API_ROUTE_DOMAIN_LABELS.marketplace,
-    description: 'Marketplace opportunities, proposals, jobs, fee proposals, and application endpoints.',
-    prefixes: ['/jobs/', '/marketplace/', '/proposals'],
+    description: 'Marketplace opportunities, proposals, jobs, fee proposals, procurement, tender, RFQ, and application endpoints.',
+    prefixes: ['/jobs/', '/marketplace/', '/procurement/', '/proposals'],
   },
   {
     domain: 'ai',

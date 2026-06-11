@@ -6592,8 +6592,12 @@ router.post("/procurement/scope/classify", async (req, res) => {
 });
 
 // GET /api/procurement/rfq/defaults — get default returnables & evaluation criteria
-router.get("/procurement/rfq/defaults", async (_req, res) => {
+router.get("/procurement/rfq/defaults", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
     res.json({
       returnables: getDefaultReturnables(),
       evaluationCriteria: getDefaultEvaluationCriteria(),
@@ -6627,6 +6631,10 @@ router.post("/procurement/rfq", async (req, res) => {
 // POST /api/procurement/rfq/validate — validate RFQ package completeness
 router.post("/procurement/rfq/validate", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
     const result = validateRfqPackageCompleteness(req.body);
     res.json(result);
   } catch (err: any) {

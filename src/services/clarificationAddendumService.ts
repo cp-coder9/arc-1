@@ -228,6 +228,12 @@ export function createAddendum(input: AddendumInput): AddendumRecord {
   if (!input.description.trim()) throw new Error('Description is required');
   if (input.allBidderIds.length === 0)
     throw new Error('At least one bidder must be specified for distribution');
+  if (input.allBidderIds.length < 2)
+    throw new Error(
+      'EQUAL-INFORMATION VIOLATION: Addenda must be distributed to ALL invited bidders, not just the bidder who asked the question.',
+    );
+  if (input.allBidderEmails.length !== input.allBidderIds.length)
+    throw new Error('Each bidder distribution must include a matching bidder email');
   if (input.sourceQuestionIds.length === 0)
     throw new Error('At least one source question ID is required');
 
