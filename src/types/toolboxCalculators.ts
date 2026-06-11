@@ -149,3 +149,59 @@ export interface ToolboxAgentRecommendation {
   suggestedCalculatorIds?: string[];
   suggestedExportTargets?: CalculatorExportTarget[];
 }
+
+// ============== Calculator Input Types ==============
+
+export interface DuctSizingInputs {
+  airflowM3s: number;
+  maxVelocityMs?: number;
+  aspectRatio?: number;
+}
+
+export interface FixtureUnitInputs {
+  fixtureUnits: number;
+  buildingType: string;
+  flushType: string;
+}
+
+export interface ManningPipeFlowInputs {
+  pipeDiameterMm: number;
+  slopePercent: number;
+  manningN: number;
+  flowDepthPercent?: number;
+}
+
+export interface OccupantLoadInputs {
+  occupancyType: string;
+  floorAreaM2: number;
+  customFactorM2PerPerson?: number;
+}
+
+export interface PaintCoverageInputs {
+  surfaceAreaM2: number;
+  coatsCount?: number;
+  spreadRateM2PerLitre?: number;
+  surfaceType?: string;
+}
+
+export interface PipeGradientInputs {
+  upstreamInvertLevel: number;
+  downstreamInvertLevel: number;
+  pipeLengthM: number;
+  pipeDiameterMm: number;
+}
+
+export interface VentilationAirChangeInputs {
+  roomVolumeM3: number;
+  roomType: string;
+  occupantCount?: number;
+}
+
+export interface VoltageDropInputs {
+  voltage: number;
+  currentAmps: number;
+  cableLengthM: number;
+  conductorAreaMm2: number;
+  conductorMaterial: string;
+  phaseType: string;
+}

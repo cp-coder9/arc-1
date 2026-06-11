@@ -326,6 +326,15 @@ const ROLE_STAGE_ACTIONS: Record<UserRole, Partial<Record<CanonicalProjectStage,
       detail: 'Review unresolved disputes, missing documents, payment holds, and governance exceptions before closure.',
     },
   },
+  engineer: {},
+  quantity_surveyor: {},
+  town_planner: {},
+  energy_professional: {},
+  fire_engineer: {},
+  site_manager: {},
+  developer: {},
+  firm_admin: {},
+  platform_admin: {},
 };
 
 function canonicalStage(input: ProjectCommandCentreInput): CanonicalProjectStage {

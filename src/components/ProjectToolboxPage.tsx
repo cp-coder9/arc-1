@@ -166,6 +166,15 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
+  engineer: { title: 'Engineer Toolbox', subtitle: 'Engineering calculations, compliance, and design coordination.', scope: 'Engineering design and compliance.', primaryResponsibilities: ['Lead engineering design', 'Compliance sign-off'], handoffBoundaries: ['Cannot issue architectural compliance'], toolGroups: [] },
+  quantity_surveyor: { title: 'QS Toolbox', subtitle: 'Cost control, bills of quantities, and commercial governance.', scope: 'Commercial management.', primaryResponsibilities: ['Cost plans and BoQs', 'Valuations'], handoffBoundaries: ['Cannot sign professional compliance'], toolGroups: [] },
+  town_planner: { title: 'Planner Toolbox', subtitle: 'Zoning, land use, and statutory planning tools.', scope: 'Planning approvals.', primaryResponsibilities: ['Zoning applications', 'Land use consents'], handoffBoundaries: ['Cannot certify building compliance'], toolGroups: [] },
+  energy_professional: { title: 'Energy Toolbox', subtitle: 'Energy modelling, XA compliance, and sustainability.', scope: 'Energy and sustainability.', primaryResponsibilities: ['Energy modelling', 'XA sign-off'], handoffBoundaries: ['Cannot issue structural sign-off'], toolGroups: [] },
+  fire_engineer: { title: 'Fire Engineer Toolbox', subtitle: 'Fire safety design and SANS 10400-T compliance.', scope: 'Fire safety engineering.', primaryResponsibilities: ['Rational fire designs', 'SANS 10400-T'], handoffBoundaries: ['Cannot certify structural stability'], toolGroups: [] },
+  site_manager: { title: 'Site Manager Toolbox', subtitle: 'Site operations, H&S, and programme delivery.', scope: 'Construction site management.', primaryResponsibilities: ['Site programme', 'H&S'], handoffBoundaries: ['Cannot issue design changes'], toolGroups: [] },
+  developer: { title: 'Developer Toolbox', subtitle: 'Portfolio oversight and investment governance.', scope: 'Development governance.', primaryResponsibilities: ['Portfolio health', 'Programme strategy'], handoffBoundaries: ['Cannot certify compliance'], toolGroups: [] },
+  firm_admin: { title: 'Firm Admin Toolbox', subtitle: 'Practice operations, staff, and CPD management.', scope: 'Practice administration.', primaryResponsibilities: ['Staff management', 'CPD tracking'], handoffBoundaries: ['Cannot sign professional outputs'], toolGroups: [] },
+  platform_admin: { title: 'Platform Admin Toolbox', subtitle: 'System configuration and governance.', scope: 'Platform governance.', primaryResponsibilities: ['System configuration', 'Audit oversight'], handoffBoundaries: ['Cannot override professional sign-off'], toolGroups: [] },
 };
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {

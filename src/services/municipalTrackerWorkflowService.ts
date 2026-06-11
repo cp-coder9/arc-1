@@ -108,6 +108,15 @@ const ROLE_VISIBILITY: Record<MunicipalTrackerRole, MunicipalVisibilityLevel[]> 
   subcontractor: ['public_project'],
   freelancer: ['public_project', 'project_team'],
   supplier: ['public_project'],
+  engineer: ['public_project', 'project_team', 'bep_admin'],
+  quantity_surveyor: ['public_project', 'project_team'],
+  town_planner: ['public_project', 'project_team'],
+  energy_professional: ['public_project', 'project_team', 'bep_admin'],
+  fire_engineer: ['public_project', 'project_team', 'bep_admin'],
+  site_manager: ['public_project', 'project_team'],
+  developer: ['public_project'],
+  firm_admin: ['public_project', 'project_team', 'bep_admin', 'admin_only'],
+  platform_admin: ['public_project', 'project_team', 'bep_admin', 'admin_only'],
 };
 
 function requireString(value: unknown, field: string): string {

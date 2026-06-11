@@ -83,7 +83,7 @@ export default function BEPToolboxPage({ user, projectId, phase }: BEPToolboxPag
     );
   }, [availableTools, searchQuery]);
 
-  const toolsByCategory = useMemo(() => {
+  const toolsByCategory = useMemo((): Record<string, ToolDefinition[]> => {
     const grouped: Record<string, ToolDefinition[]> = {};
     for (const tool of filteredTools) {
       if (!grouped[tool.category]) grouped[tool.category] = [];
@@ -126,7 +126,9 @@ export default function BEPToolboxPage({ user, projectId, phase }: BEPToolboxPag
           </div>
 
           <ScrollArea className="h-[calc(100vh-280px)]">
-            {Object.entries(toolsByCategory).map(([category, tools]) => (
+            {Object.entries(toolsByCategory).map(([category, rawTools]) => {
+              const tools = rawTools as ToolDefinition[];
+              return (
               <div key={category} className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
                   {TOOL_CATEGORY_LABELS[category]?.icon ?? <Wrench className="h-4 w-4" />}
@@ -155,7 +157,7 @@ export default function BEPToolboxPage({ user, projectId, phase }: BEPToolboxPag
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
             {Object.keys(toolsByCategory).length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Search className="mx-auto h-8 w-8 mb-2" />

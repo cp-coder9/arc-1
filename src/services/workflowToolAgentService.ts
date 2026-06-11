@@ -62,30 +62,30 @@ export function createStaffActivityLog(
   context: ToolContext,
   payload: StaffActivityLogPayload,
 ): ToolRunEnvelope<StaffActivityLogPayload> {
-  return createToolRun('workforce_attendance_timesheet', context, payload, [
+  return createToolRun('workforce_attendance_timesheet', context, payload as unknown as Record<string, unknown>, [
     'Attendance/activity data should be verified by site manager before payroll export or payment claim use.',
     'Payroll compliance should be handled through an approved payroll system/export rather than assumed by Architex MVP.',
-  ]);
+  ]) as unknown as ToolRunEnvelope<StaffActivityLogPayload>;
 }
 
 export function createPlantAllocation(
   context: ToolContext,
   payload: PlantAllocationPayload,
 ): ToolRunEnvelope<PlantAllocationPayload> {
-  return createToolRun('plant_equipment_manager', context, payload, [
-    'Internal hire/fuel rates must be agreed in contract or company policy before valuation use.',
-    'Maintenance/certificate flags should block use where safety-critical.',
-  ]);
+  return createToolRun('plant_equipment_manager', context, payload as unknown as Record<string, unknown>, [
+    'Internal hire/fuel rates must be agreed in contract or company policy before using values exported by this tool.',
+    'Plant utilisation data should be verified by project/plant manager before payment or claims use.',
+  ]) as unknown as ToolRunEnvelope<PlantAllocationPayload>;
 }
 
 export function createProcurementPackage(
   context: ToolContext,
   payload: ProcurementPackagePayload,
 ): ToolRunEnvelope<ProcurementPackagePayload> {
-  return createToolRun('supplier_rfq_order_portal', context, payload, [
-    'RFQ quantities should reference source drawing/BOQ/calculator versions.',
-    'Supplier quotes should be normalised for delivery, VAT, lead time, pack size, exclusions and payment terms.',
-  ]);
+  return createToolRun('supplier_rfq_order_portal', context, payload as unknown as Record<string, unknown>, [
+    'Supplier quotes/orders should be confirmed in writing before commitment.',
+    'Procurement values should align with budget/cost-plan approvals.',
+  ]) as unknown as ToolRunEnvelope<ProcurementPackagePayload>;
 }
 
 export function routeToolRunToProjectObject(

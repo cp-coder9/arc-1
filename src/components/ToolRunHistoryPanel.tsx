@@ -85,7 +85,7 @@ export default function ToolRunHistoryPanel({
 
       const unsubscribe = onSnapshot(
         q,
-        (snapshot) => {
+        (snapshot: any) => {
           setRuns(
             snapshot.docs.map((doc) => ({
               id: doc.id,
