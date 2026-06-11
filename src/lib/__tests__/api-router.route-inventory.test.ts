@@ -110,7 +110,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(106);
+    expect(inventory).toHaveLength(124);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -218,6 +218,24 @@ describe('api-router route inventory', () => {
         "POST /api/agents/:agentId/recommend",
         "POST /api/agents/:agentId/apply",
         "POST /api/jobs/:jobId/chat/agent-message",
+        "POST /procurement/scope/classify",
+        "GET /procurement/rfq/defaults",
+        "POST /procurement/rfq",
+        "POST /procurement/rfq/validate",
+        "POST /procurement/marketplace/search",
+        "POST /procurement/:rfqId/invitations",
+        "GET /procurement/:rfqId/invitations",
+        "POST /procurement/:rfqId/clarifications",
+        "POST /procurement/:rfqId/clarifications/:questionId/respond",
+        "POST /procurement/:rfqId/addenda",
+        "POST /procurement/:rfqId/addenda/:addendumId/issue",
+        "POST /procurement/:rfqId/quotes",
+        "GET /procurement/:rfqId/quotes",
+        "POST /procurement/:rfqId/quotes/:quoteId/validate",
+        "GET /procurement/:rfqId/comparison",
+        "POST /procurement/:rfqId/award",
+        "POST /procurement/:rfqId/award/:recommendationId/approve",
+        "POST /procurement/:rfqId/guardrails",
         "GET /firebase/test",
       ]
     `);
