@@ -110,7 +110,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(105);
+    expect(inventory).toHaveLength(106);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -162,6 +162,7 @@ describe('api-router route inventory', () => {
         "POST /proposals",
         "GET /proposals/:proposalId",
         "GET /proposals/:proposalId/appointment-readiness",
+        "GET /projects/:projectId/submission-readiness",
         "POST /proposals/:proposalId/compare",
         "POST /jobs/:jobId/fee-proposals",
         "POST /jobs/:jobId/applications",

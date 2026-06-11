@@ -127,6 +127,7 @@ const InvoiceManagement = lazyWithChunkRetry(() => import('./components/InvoiceM
 const FileManager = lazyWithChunkRetry(() => import('./components/FileManager'));
 const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingFlow'));
 const MunicipalTracker = lazyWithChunkRetry(() => import('./components/MunicipalTracker'));
+const SubmissionReadinessDashboard = lazyWithChunkRetry(() => import('./components/SubmissionReadinessDashboard'));
 const KnowledgeSources = lazyWithChunkRetry(() => import('./components/KnowledgeSources').then((module) => ({ default: module.KnowledgeSources })));
 const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));
 const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));
@@ -217,6 +218,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'client-proposals', label: 'BEP Proposals', roles: ['client'], group: 'Client tools', icon: <Users size={18} />, summary: 'Proposal comparison shell for fit, fee, timeline, risk notes, and appointment decisions.', backedBy: ['job applications'] },
   { id: 'directory-search', label: 'Directory Search', roles: ['client', 'bep', 'architect', 'contractor'], group: 'Client tools', icon: <Search size={18} />, summary: 'Manual verified directory search/invite shell.', backedBy: ['marketplace user profiles'] },
   { id: 'municipal-tracker', label: 'Municipal Status', roles: ['client', 'bep', 'architect', 'contractor'], group: 'Client tools', icon: <MapPin size={18} />, summary: 'Municipal status shell backed by the existing tracker component/domain.', backedBy: ['MunicipalTracker'] },
+  { id: 'submission-readiness', label: 'Submission Readiness', roles: ['client', 'bep', 'architect', 'contractor', 'admin'], group: 'Client tools', icon: <ClipboardCheck size={18} />, summary: 'Municipal submission readiness assessment — complexity, routing, evidence pack, and score.', backedBy: ['SubmissionReadinessDashboard'] },
   { id: 'client-progress', label: 'Progress Reports', roles: ['client'], group: 'Client tools', icon: <Clock size={18} />, summary: 'Plain-language progress report shell for client decisions and risks.', backedBy: ['StageProgressTracker', 'GanttChart'] },
   { id: 'design', label: 'Design & Compliance', roles: [...DESIGN_TEAM_ROLES, 'freelancer', 'admin'], group: 'BEP tools', icon: <Network size={18} />, summary: 'Design-team deliverables, registers, responsibility matrix, and compliance shell.', backedBy: ['ResponsibilityMatrix', 'TeamBuilder'] },
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
@@ -1423,6 +1425,7 @@ function DashboardPageShell({ pageId, user }: { pageId: string; user: UserProfil
       {(pageId === 'payments' || pageId === 'invoicing') && <InvoiceManagement user={user} />}
       {(pageId === 'toolbox' || pageId === 'drawing-checker' || pageId === 'freelancer-submissions') && <FileManager user={user} />}
       {pageId === 'municipal-tracker' && <MunicipalTracker user={user} />}
+      {pageId === 'submission-readiness' && <SubmissionReadinessDashboard user={user} />}
       {(pageId === 'ai' || pageId === 'resource-centre') && (
         <KnowledgeSources
           citations={DASHBOARD_ALIGNMENT_CITATIONS.filter((citation) => (
