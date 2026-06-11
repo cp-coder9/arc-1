@@ -113,9 +113,9 @@ describe('practiceTaskService', () => {
     });
     const summary = await getWorkloadSummary('firm-1');
     expect(summary).toHaveLength(1); // one user
-    expect(summary[0].totalTasks).toBe(2);
-    expect(summary[0].completedTasks).toBe(1);
+    expect(summary[0].openTasks).toBe(1);
     expect(summary[0].overdueTasks).toBe(1);
+    expect(summary[0].estimatedHours).toBe(8);
   });
 
   it('updates task fields', async () => {

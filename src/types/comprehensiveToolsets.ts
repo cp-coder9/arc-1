@@ -14,6 +14,9 @@ export type ArchitexUserRole =
   | 'firm_admin'
   | 'platform_admin';
 
+/** Alias expected by services written against the original naming convention. */
+export type ArchitexComprehensiveRole = ArchitexUserRole;
+
 export type ArchitexWorkflowPhase =
   | 'lead'
   | 'brief_feasibility'

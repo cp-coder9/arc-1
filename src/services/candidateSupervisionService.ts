@@ -67,7 +67,7 @@ export async function createSupervisionLog(input: {
       input.mentorId,
       'supervision_log_required',
       `New supervision log created for candidate. ${input.hoursLogged}h logged.`,
-      { supervisionLogId: ref.id, firmId: input.firmId }
+      { entityId: ref.id, firmId: input.firmId }
     );
 
     return log;

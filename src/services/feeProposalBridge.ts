@@ -1,22 +1,15 @@
-﻿/**
- * Fee Proposal Bridge
- *
- * Bridges fee estimator outputs into proposal builder inputs.
- * Provides a consolidated workflow: estimate fee → build proposal.
- */
-import type { FeeEstimatorInput, FeeEstimateResult } from './feeEstimatorService';
-import type { ProposalBuilderInput, ProposalBuilderResult, ProposalDiscount } from '../types/proposalBuilder';
-import { estimateArchitecturalFee } from './feeEstimatorService';
+import type { FeeEstimateResult } from './feeEstimatorService';
 import { buildProposal } from './proposalBuilderService';
+import type { ProposalBuilderInput, ProposalBuilderResult, ProposalLineItem, ProposalPartyRole } from '../types/proposalBuilder';
 
-export interface FeeToProposalOptions {
+interface FeeProposalBridgeInput {
   estimate: FeeEstimateResult;
-  calculatorId?: string;
-  calculatorVersion?: string;
+  calculatorId: string;
+  calculatorVersion: string;
   issuingUserId: string;
   payerUserId: string;
   payeeUserId: string;
-  payeeRole?: ProposalBuilderInput['payeeRole'];
+  payeeRole: ProposalPartyRole;
   projectId?: string;
   jobId?: string;
   discountPercentage?: number;
@@ -24,52 +17,70 @@ export interface FeeToProposalOptions {
   discountAppliedBy?: string;
 }
 
-export function feeEstimateToProposalInput(opts: FeeToProposalOptions): ProposalBuilderInput {
-  const discount: ProposalDiscount | undefined = opts.discountPercentage ? {
-    percentage: opts.discountPercentage,
-    amount: (opts.estimate.professionalFee * opts.discountPercentage) / 100,
-    reason: opts.discountReason ?? 'Discount applied',
-    appliedBy: opts.discountAppliedBy ?? opts.issuingUserId,
-    appliedAt: new Date().toISOString(),
-  } : undefined;
+function lineItemFromBreakdown(item: FeeEstimateResult['breakdown'][number], index: number): ProposalLineItem {
+  const lower = item.label.toLowerCase();
+  const category: ProposalLineItem['category'] = lower.includes('council') || lower.includes('statutory')
+    ? 'statutory_fee'
+    : lower.includes('platform')
+      ? 'platform_fee'
+      : lower.includes('deliverable')
+        ? 'additional_service'
+        : 'professional_fee';
 
   return {
-    calculatorId: opts.calculatorId ?? 'fee-estimator',
-    calculatorVersion: opts.calculatorVersion ?? '1.0',
-    issuingUserId: opts.issuingUserId,
-    payerUserId: opts.payerUserId,
-    payeeUserId: opts.payeeUserId,
-    payeeRole: opts.payeeRole ?? 'architect',
-    projectId: opts.projectId,
-    jobId: opts.jobId,
-    title: `Fee Proposal — ZAR ${opts.estimate.valueOfWorks}`,
-    scopeSummary: `Professional architectural services (base fee: ZAR ${opts.estimate.baseProfessionalFee})`,
-    lineItems: [
-      {
-        id: 'fee-1',
-        description: 'Professional fee',
-        category: 'professional_fee',
-        quantity: 1,
-        unitPrice: opts.estimate.professionalFee,
-        total: opts.estimate.professionalFee,
-        chargeableForPlatformFee: true,
-      },
-    ],
-    discount,
-    vatRatePercent: 15,
+    id: `fee_line_${index + 1}`,
+    description: item.label,
+    category,
+    quantity: 1,
+    unitPrice: item.amount,
+    total: item.amount,
+    chargeableForPlatformFee: category === 'professional_fee' || category === 'additional_service',
   };
 }
 
-export function estimateAndBuildProposal(
-  input: FeeEstimatorInput,
-): { estimate: FeeEstimateResult; proposal: ProposalBuilderResult } {
-  const estimate = estimateArchitecturalFee(input);
-  const proposalInput = feeEstimateToProposalInput({
-    estimate,
-    issuingUserId: 'system',
-    payerUserId: 'client',
-    payeeUserId: 'professional',
-  });
-  const proposal = buildProposal(proposalInput);
-  return { estimate, proposal };
+export function feeEstimateToProposalInput(input: FeeProposalBridgeInput): ProposalBuilderInput {
+  const lineItems = input.estimate.breakdown
+    .filter((item) => item.amount !== 0)
+    .map(lineItemFromBreakdown)
+    .filter((item) => item.category !== 'platform_fee');
+
+  if (lineItems.length === 0) {
+    lineItems.push({
+      id: 'professional_fee',
+      description: 'Professional fee',
+      category: 'professional_fee',
+      quantity: 1,
+      unitPrice: input.estimate.professionalFee,
+      total: input.estimate.professionalFee,
+      chargeableForPlatformFee: true,
+    });
+  }
+
+  return {
+    projectId: input.projectId,
+    jobId: input.jobId,
+    calculatorId: input.calculatorId,
+    calculatorVersion: input.calculatorVersion,
+    issuingUserId: input.issuingUserId,
+    payerUserId: input.payerUserId,
+    payeeUserId: input.payeeUserId,
+    payeeRole: input.payeeRole,
+    title: 'Professional fee proposal',
+    scopeSummary: input.estimate.assumptions.join('\n'),
+    lineItems,
+    discount: input.discountPercentage
+      ? {
+          percentage: input.discountPercentage,
+          amount: 0,
+          reason: input.discountReason ?? 'Commercial discount',
+          appliedBy: input.discountAppliedBy ?? input.issuingUserId,
+          appliedAt: new Date().toISOString(),
+        }
+      : undefined,
+    vatRatePercent: input.estimate.subtotalExVat > 0 ? (input.estimate.vat / input.estimate.subtotalExVat) * 100 : 15,
+  };
+}
+
+export function estimateAndBuildProposal(input: FeeProposalBridgeInput): ProposalBuilderResult {
+  return buildProposal(feeEstimateToProposalInput(input));
 }

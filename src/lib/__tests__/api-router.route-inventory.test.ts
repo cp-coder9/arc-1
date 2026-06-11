@@ -31,6 +31,7 @@ const AUTH_HELPERS = [
   'getVerifiedFreelancerContext',
   'getResourceCentreContext',
   'requireAdmin',
+  'requireAuth',
 ];
 
 const PUBLIC_ROUTES = new Set(['GET /health', 'POST /payment/notify', 'GET /firebase/test']);
@@ -109,7 +110,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(105);
+    expect(inventory).toHaveLength(138);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -161,6 +162,7 @@ describe('api-router route inventory', () => {
         "POST /proposals",
         "GET /proposals/:proposalId",
         "GET /proposals/:proposalId/appointment-readiness",
+        "GET /projects/:projectId/submission-readiness",
         "POST /proposals/:proposalId/compare",
         "POST /jobs/:jobId/fee-proposals",
         "POST /jobs/:jobId/applications",
@@ -216,6 +218,38 @@ describe('api-router route inventory', () => {
         "POST /api/agents/:agentId/recommend",
         "POST /api/agents/:agentId/apply",
         "POST /api/jobs/:jobId/chat/agent-message",
+        "POST /procurement/scope/classify",
+        "GET /procurement/rfq/defaults",
+        "POST /procurement/rfq",
+        "POST /procurement/rfq/validate",
+        "POST /procurement/marketplace/search",
+        "POST /procurement/:rfqId/invitations",
+        "GET /procurement/:rfqId/invitations",
+        "POST /procurement/:rfqId/clarifications",
+        "POST /procurement/:rfqId/clarifications/:questionId/respond",
+        "POST /procurement/:rfqId/addenda",
+        "POST /procurement/:rfqId/addenda/:addendumId/issue",
+        "POST /procurement/:rfqId/quotes",
+        "GET /procurement/:rfqId/quotes",
+        "POST /procurement/:rfqId/quotes/:quoteId/validate",
+        "GET /procurement/:rfqId/comparison",
+        "POST /procurement/:rfqId/award",
+        "POST /procurement/:rfqId/award/:recommendationId/approve",
+        "POST /procurement/:rfqId/guardrails",
+        "POST /api/practice/timesheets",
+        "GET /api/practice/timesheets",
+        "GET /api/practice/pipeline",
+        "POST /api/practice/pipeline",
+        "GET /api/practice/tasks",
+        "POST /api/practice/tasks",
+        "GET /api/practice/registrations",
+        "POST /api/practice/registrations",
+        "GET /api/practice/templates",
+        "POST /api/practice/templates",
+        "GET /api/practice/supervision",
+        "POST /api/practice/supervision",
+        "GET /api/practice/invoice-readiness",
+        "POST /api/practice/invoice-readiness",
         "GET /firebase/test",
       ]
     `);
@@ -244,6 +278,7 @@ describe('api-router route inventory', () => {
       'resources',
       'municipal',
       'verifications',
+      'practice',
     ]);
     expect(API_ROUTE_DOMAIN_LABELS.projects).toBe('Project OS spine');
     expect(new Set(API_ROUTE_REGISTRY.map(entry => entry.domain))).toEqual(new Set(API_ROUTE_DOMAINS));

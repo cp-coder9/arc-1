@@ -32,6 +32,15 @@ const ROLE_COMMAND_VISUALS: Record<UserProfile['role'], { viewLabel: string; hea
   supplier: { viewLabel: 'Supplier View', headline: 'Make procurement traceable.', description: 'Track orders, deliveries, product records, warranties, and project commitments.', accent: '#1d8d6f', accentSoft: 'rgba(29, 141, 111, 0.13)' },
   freelancer: { viewLabel: 'Freelancer View', headline: 'Deliver assigned work clearly.', description: 'Stay aligned to delegated tasks, submissions, comments, and resource bookings.', accent: '#165a4c', accentSoft: 'rgba(22, 90, 76, 0.12)' },
   admin: { viewLabel: 'Admin View', headline: 'Whole-system platform oversight.', description: 'Monitor system health, governance queues, disputes, and operational controls.', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)' },
+  engineer: { viewLabel: 'Engineer View', headline: 'Lead engineering delivery.', description: 'Manage calculations, compliance sign-off, and technical coordination.', accent: '#1565c0', accentSoft: 'rgba(21, 101, 192, 0.12)' },
+  quantity_surveyor: { viewLabel: 'QS View', headline: 'Own the commercial position.', description: 'Track cost plans, BoQs, valuations, and financial governance.', accent: '#00838f', accentSoft: 'rgba(0, 131, 143, 0.12)' },
+  town_planner: { viewLabel: 'Planner View', headline: 'Secure planning certainty.', description: 'Manage zoning applications, land use consents, and statutory pathways.', accent: '#6a1b9a', accentSoft: 'rgba(106, 27, 154, 0.12)' },
+  energy_professional: { viewLabel: 'Energy View', headline: 'Drive sustainability compliance.', description: 'Lead energy modelling, XA sign-off, and green building targets.', accent: '#2e7d32', accentSoft: 'rgba(46, 125, 50, 0.12)' },
+  fire_engineer: { viewLabel: 'Fire View', headline: 'Own life safety design.', description: 'Manage rational fire designs, detection layouts, and SANS 10400-T.', accent: '#c62828', accentSoft: 'rgba(198, 40, 40, 0.12)' },
+  site_manager: { viewLabel: 'Site View', headline: 'Run the site.', description: 'Track daily programme, H&S, deliveries, and site evidence.', accent: '#e65100', accentSoft: 'rgba(230, 81, 0, 0.12)' },
+  developer: { viewLabel: 'Developer View', headline: 'Govern the portfolio.', description: 'Oversee project health, investment returns, and programme strategy.', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)' },
+  firm_admin: { viewLabel: 'Firm View', headline: 'Run the practice.', description: 'Manage staff, CPD, registrations, and practice operations.', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)' },
+  platform_admin: { viewLabel: 'Platform View', headline: 'Full platform control.', description: 'Govern system configuration, compliance, and platform-wide operations.', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)' },
 };
 
 const canListProjectsByRole = (user: UserProfile) => ['client', 'architect', 'bep', 'admin'].includes(user.role);

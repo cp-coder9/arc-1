@@ -117,6 +117,10 @@ export interface ProposalBuilderInput {
   terms?: ProposalTermsSnapshot;
   vatRatePercent: number;
   platformFeeConfig?: Partial<PlatformTransactionFeeConfig>;
+  /** Section 14: Professional confirmed the proposal is correct */
+  professionalConfirmed?: boolean;
+  /** Section 14: User ID of the confirming professional */
+  professionalConfirmedBy?: string;
 }
 
 export interface ProposalBuilderResult {
@@ -134,6 +138,20 @@ export interface ProposalBuilderResult {
   architexPlatformRevenue: number;
   visibleLineItems: ProposalLineItem[];
   terms?: ProposalTermsSnapshot;
+  /** Section 12: Validity period in days */
+  validityPeriodDays?: number;
+  /** Section 12: ISO date when the proposal expires */
+  validityExpiryDate?: string;
+  /** Section 13: Acceptance method */
+  acceptanceMethod?: 'digital_acceptance' | 'signature_upload' | 'manual_admin_capture';
+  /** Section 13: Current acceptance status */
+  acceptanceStatus?: 'pending' | 'accepted' | 'rejected';
+  /** Section 14: Whether the professional has confirmed responsibility */
+  professionalConfirmed?: boolean;
+  /** Section 14: User ID of confirming professional */
+  professionalConfirmedBy?: string;
+  /** Section 14: ISO timestamp of professional confirmation */
+  professionalConfirmedAt?: string;
   auditSnapshot: Record<string, unknown>;
 }
 

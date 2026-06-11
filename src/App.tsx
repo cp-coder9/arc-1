@@ -369,6 +369,15 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   supplier: { label: 'Supplier', viewLabel: 'Supplier View', accent: '#1d8d6f', accentSoft: 'rgba(29, 141, 111, 0.13)', description: 'Track procurement, deliveries, warranties, and product evidence.' },
   freelancer: { label: 'Freelancer', viewLabel: 'Freelancer View', accent: '#165a4c', accentSoft: 'rgba(22, 90, 76, 0.12)', description: 'Complete assigned deliverables, submissions, and resource bookings.' },
   admin: { label: 'Platform Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Oversee governance, system health, disputes, and platform controls.' },
+  engineer: { label: 'Engineer', viewLabel: 'Engineer View', accent: '#1565c0', accentSoft: 'rgba(21, 101, 192, 0.12)', description: 'Lead engineering design, calculations, and compliance sign-off.' },
+  quantity_surveyor: { label: 'Quantity Surveyor', viewLabel: 'QS View', accent: '#00838f', accentSoft: 'rgba(0, 131, 143, 0.12)', description: 'Manage cost control, bills of quantities, and commercial governance.' },
+  town_planner: { label: 'Town Planner', viewLabel: 'Planner View', accent: '#6a1b9a', accentSoft: 'rgba(106, 27, 154, 0.12)', description: 'Manage zoning, land use, and statutory planning approvals.' },
+  energy_professional: { label: 'Energy Professional', viewLabel: 'Energy View', accent: '#2e7d32', accentSoft: 'rgba(46, 125, 50, 0.12)', description: 'Lead energy modelling, SANS 10400-XA compliance, and sustainability.' },
+  fire_engineer: { label: 'Fire Engineer', viewLabel: 'Fire View', accent: '#c62828', accentSoft: 'rgba(198, 40, 40, 0.12)', description: 'Lead fire safety design, rational designs, and SANS 10400-T compliance.' },
+  site_manager: { label: 'Site Manager', viewLabel: 'Site View', accent: '#e65100', accentSoft: 'rgba(230, 81, 0, 0.12)', description: 'Manage site operations, health & safety, and daily programme delivery.' },
+  developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Oversee project portfolio, investment governance, and programme strategy.' },
+  firm_admin: { label: 'Firm Admin', viewLabel: 'Firm View', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)', description: 'Manage practice operations, staff, CPD, and professional registrations.' },
+  platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
 };
 
 function roleVisualFor(role: UserRole) {

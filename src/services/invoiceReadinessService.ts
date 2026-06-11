@@ -80,7 +80,7 @@ export async function checkInvoiceReadiness(input: {
         '', // Will be sent to firm admins via firm subscription
         'invoice_ready_for_review',
         `Invoice readiness check complete for project ${input.projectId}: R${(totalAmountCents / 100).toFixed(2)} ready.`,
-        { invoiceReadinessId: ref.id, firmId: input.firmId, projectId: input.projectId }
+        { entityId: ref.id, firmId: input.firmId, projectId: input.projectId }
       );
     }
 

@@ -14,7 +14,8 @@ export type ApiRouteDomain =
   | 'payments'
   | 'resources'
   | 'municipal'
-  | 'verifications';
+  | 'verifications'
+  | 'practice';
 
 export interface ApiRouteDomainRegistryEntry {
   domain: ApiRouteDomain;
@@ -41,6 +42,7 @@ export const API_ROUTE_DOMAINS: readonly ApiRouteDomain[] = [
   'resources',
   'municipal',
   'verifications',
+  'practice',
 ] as const;
 
 export const API_ROUTE_DOMAIN_LABELS: Record<ApiRouteDomain, string> = {
@@ -60,6 +62,7 @@ export const API_ROUTE_DOMAIN_LABELS: Record<ApiRouteDomain, string> = {
   resources: 'Resource centre',
   municipal: 'Municipal and statutory tracking',
   verifications: 'Professional verification',
+  practice: 'Practice management',
 };
 
 export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
@@ -109,8 +112,8 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
   {
     domain: 'marketplace',
     label: API_ROUTE_DOMAIN_LABELS.marketplace,
-    description: 'Marketplace opportunities, proposals, jobs, fee proposals, and application endpoints.',
-    prefixes: ['/jobs/', '/marketplace/', '/proposals'],
+    description: 'Marketplace opportunities, proposals, jobs, fee proposals, procurement, tender, RFQ, and application endpoints.',
+    prefixes: ['/jobs/', '/marketplace/', '/procurement/', '/proposals'],
   },
   {
     domain: 'ai',
@@ -160,6 +163,12 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
     label: API_ROUTE_DOMAIN_LABELS.verifications,
     description: 'Professional verification self-service and admin review endpoints.',
     prefixes: ['/verifications/', '/admin/verifications', '/architect/verify-sacap'],
+  },
+  {
+    domain: 'practice',
+    label: API_ROUTE_DOMAIN_LABELS.practice,
+    description: 'Practice management, timesheets, pipeline, tasks, registrations, templates, supervision, and invoice readiness endpoints.',
+    prefixes: ['/practice/'],
   },
 ] as const;
 

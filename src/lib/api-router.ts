@@ -14,6 +14,8 @@ import { notificationService } from "../services/notificationService";
 import { assessMunicipalSubmissionReadiness, buildScopeFactsFromProject } from "../services/municipalSubmissionReadinessService";
 import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../services/auditService";
 import { normalizeUserRole } from "../services/permissionService";
+import { requireAdmin, requireAuth } from "./roleMiddleware";
+import popiaRoutes from "./popiaRoutes";
 import {
   applyVerificationReview,
   assertVerificationSubjectType,
@@ -59,31 +61,9 @@ import {
 } from "../services/marketplaceWorkflowService";
 import { assertAppointmentPreconditions } from "../services/appointmentWorkflowService";
 import { getApplicationProfessionalId, withProfessionalJobAliases, withProfessionalProjectAliases } from "./professionalRoleCompatibility";
-import {
-  createAppointmentFromAcceptedProposal,
-  createKickoffPackage,
-  confirmProfessionalAppointment,
-  validateKickoffReadiness,
-} from "../services/appointmentKickoffService";
-import { createAppointmentDocumentOutputs } from "../services/appointmentDocumentAdapter";
-import { createKickoffInboxEvents } from "../services/appointmentInboxAdapter";
-import { createAppointmentAuditTrail } from "../services/appointmentAuditService";
-import { recommendNextActions } from "../services/appointmentRecommendationService";
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
-// Analytics & Reporting Pack 15 services
-import { computeAllKPIs, computeScheduleVariance, computeCostToComplete, computeDefectLiabilityRemaining, computeRetentionReleaseReadiness, computeComplianceGapCount } from "../services/kpiCalculatorService";
-import type { KPIInputData } from "../services/kpiCalculatorService";
-import { buildDashboard, getAvailableWidgets, getDashboardConfig } from "../services/dashboardService";
-import type { DashboardRole, KPIResult } from "../types/analyticsReporting";
-import { registerAlertRule, evaluateAllAlerts, getAlertEvents, getAlertEventCount, acknowledgeAlertEvent, getAlertRulesForProject, disableAlertRule } from "../services/alertSchedulerService";
-import { exportRecords, exportAlerts, exportAuditTrail, createExportJob, generateExportFilename } from "../services/exportApiService";
-import { recordLatency, recordError, recordRequest, recordMemoryViolation, computeHealthSnapshot } from "../services/observabilityService";
-import { audit } from "../services/auditTrailService";
-import { toAnalyticsProjectRecord, storeAllAnalyticsKPIMetrics, getAnalyticsKPIMetrics } from "../services/analyticsProjectRecordAdapter";
-import { createInboxEvent, getAnalyticsInboxEvents } from "../services/analyticsInboxEventAdapter";
-// agentRecommendationService integration via AgentWorkflow services
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -1519,17 +1499,12 @@ router.post("/project-briefs/:briefId/interpretations", async (req, res) => {
   }
 });
 
-router.post("/auth/check-admin", async (req, res) => {
-  let decoded;
-  try {
-    decoded = await verifyAuth(req.headers);
-  } catch (err: any) {
-    return res.status(err.status || 401).json({ error: err.message });
-  }
+router.post("/auth/check-admin", requireAuth, async (req, res) => {
+  const authContext = req.authContext!;
 
   try {
-    const isAdminEmail = ADMIN_EMAILS.includes(decoded.email || '');
-    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const isAdminEmail = ADMIN_EMAILS.includes(authContext.decoded.email || '');
+    const userRef = adminDb.collection("users").doc(authContext.uid);
     const userDoc = await userRef.get();
     const requestedRole = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'].includes(req.body.role)
       ? req.body.role
@@ -1539,21 +1514,21 @@ router.post("/auth/check-admin", async (req, res) => {
       const bootstrapProfileData = sanitizeUserProfileData(req.body.profileData, isAdminEmail ? 'admin' : requestedRole);
       // Create user with admin role if applicable
       const newUser = {
-        uid: decoded.uid,
-        email: decoded.email || '',
-        displayName: req.body.displayName || decoded.displayName || decoded.name || 'Anonymous',
+        uid: authContext.uid,
+        email: authContext.decoded.email || '',
+        displayName: req.body.displayName || authContext.decoded.displayName || authContext.decoded.name || 'Anonymous',
         role: isAdminEmail ? 'admin' : requestedRole,
         ...bootstrapProfileData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await userRef.set(newUser);
-      await projectDirectoryProfile(decoded.uid, newUser);
+      await projectDirectoryProfile(authContext.uid, newUser);
       await recordAuditEvent(req, {
         category: 'auth',
         action: 'auth.user_bootstrapped',
-        actor: decodedAuditActor(decoded, newUser.role),
-        target: { type: 'user', id: decoded.uid },
+        actor: decodedAuditActor(authContext.decoded, newUser.role),
+        target: { type: 'user', id: authContext.uid },
         metadata: { requestedRole, assignedRole: newUser.role, normalizedRole: normalizeUserRole(newUser.role) },
       });
       return res.json({ role: newUser.role, isAdmin: isAdminEmail, created: true });
@@ -1568,7 +1543,7 @@ router.post("/auth/check-admin", async (req, res) => {
         ...profileData,
         updatedAt,
       }, { merge: true });
-      await projectDirectoryProfile(decoded.uid, { ...userData, ...profileData, updatedAt });
+      await projectDirectoryProfile(authContext.uid, { ...userData, ...profileData, updatedAt });
     }
 
     // If user is in admin list but doesn't have admin role, upgrade them
@@ -1580,8 +1555,8 @@ router.post("/auth/check-admin", async (req, res) => {
       await recordAuditEvent(req, {
         category: 'role',
         action: 'role.admin_allowlist_upgraded',
-        actor: decodedAuditActor(decoded, 'admin'),
-        target: { type: 'user', id: decoded.uid },
+        actor: decodedAuditActor(authContext.decoded, 'admin'),
+        target: { type: 'user', id: authContext.uid },
         metadata: { previousRole: currentRole, assignedRole: 'admin' },
       });
       return res.json({ role: 'admin', isAdmin: true, upgraded: true });
@@ -1631,15 +1606,12 @@ router.put("/profile/me", async (req, res) => {
   }
 });
 
-router.post(["/governance/records", "/api/governance/records"], async (req, res) => {
+router.post(["/governance/records", "/api/governance/records"], requireAdmin, async (req, res) => {
   try {
-    const authContext = await getAuthContext(req.headers);
+    const authContext = req.authContext!;
     const subjectUserId = typeof req.body.subjectUserId === 'string' && req.body.subjectUserId.trim()
       ? req.body.subjectUserId.trim()
       : authContext.uid;
-    if (subjectUserId !== authContext.uid && !authContext.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required to create governance records for another user' });
-    }
 
     const record = buildGovernanceRecord({
       type: req.body.type as GovernanceRecordType,
@@ -1720,10 +1692,9 @@ router.put(["/users/:userId/profile", "/api/users/:userId/profile"], async (req,
   }
 });
 
-router.put("/admin/users/:userId/profile", async (req, res) => {
+router.put("/admin/users/:userId/profile", requireAdmin, async (req, res) => {
   try {
-    const authContext = await getAuthContext(req.headers);
-    if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+    const authContext = req.authContext!;
     const { userId } = req.params;
     const userRef = adminDb.collection('users').doc(userId);
     const userSnap = await userRef.get();
@@ -1732,6 +1703,22 @@ router.put("/admin/users/:userId/profile", async (req, res) => {
     const profileData = sanitizeUserProfileData(req.body.profileData || req.body, existing.role);
     if (Object.keys(profileData).length === 0) return res.status(400).json({ error: 'No supported profile fields supplied' });
     const now = new Date().toISOString();
+
+    // Detect and audit role changes
+    const rawBody = (req.body.profileData || req.body) as Record<string, unknown>;
+    const requestedRole = typeof rawBody.role === 'string' ? rawBody.role.trim() : undefined;
+    if (requestedRole && requestedRole !== existing.role && authContext.isAdmin) {
+      await userRef.set({ role: requestedRole, updatedAt: now }, { merge: true });
+      await recordAuditEvent(req, {
+        category: 'role',
+        action: 'role.admin_changed',
+        actor: decodedAuditActor(authContext.decoded, authContext.role),
+        target: { type: 'user', id: userId },
+        reason: req.body.reason || `Admin changed role from ${existing.role} to ${requestedRole}`,
+        metadata: { previousRole: existing.role, assignedRole: requestedRole, fields: Object.keys(profileData) },
+      });
+    }
+
     await userRef.set({ ...profileData, updatedAt: now }, { merge: true });
     const updatedSnap = await userRef.get();
     const updatedProfile = { uid: userId, ...updatedSnap.data() } as Record<string, any>;
@@ -2037,282 +2024,6 @@ router.post("/client-briefs/:briefId/appoint-bep", async (req, res) => {
   }
 });
 
-// ── Pack 5: Appointment & Kickoff API ────────────────────────────────────────────
-
-router.post("/api/appointments", async (req, res) => {
-  try {
-    const authContext = await getAuthContext(req.headers);
-    const { proposalSnapshot, projectFacts } = req.body || {};
-
-    if (!proposalSnapshot || typeof proposalSnapshot !== 'object') {
-      return res.status(400).json({ error: 'proposalSnapshot (AcceptedProposalSnapshot) is required' });
-    }
-    if (!projectFacts || typeof projectFacts !== 'object') {
-      return res.status(400).json({ error: 'projectFacts is required' });
-    }
-
-    // Validate the proposal snapshot has required fields
-    const nowIso = new Date().toISOString();
-    const appointment = createAppointmentFromAcceptedProposal({
-      proposal: proposalSnapshot,
-      projectFacts,
-      nowIso,
-    });
-
-    const kickoff = createKickoffPackage(appointment);
-    const documents = createAppointmentDocumentOutputs(kickoff.workspace, appointment);
-    const inboxEvents = createKickoffInboxEvents(appointment, kickoff);
-    const auditTrail = createAppointmentAuditTrail(appointment, kickoff, nowIso);
-    const recommendations = recommendNextActions(appointment, kickoff);
-
-    // Persist to Firestore
-    const batch = adminDb.batch();
-
-    const appointmentRef = adminDb.collection('appointment_records').doc(appointment.appointmentId);
-    batch.set(appointmentRef, { ...appointment, createdBy: authContext.uid });
-
-    const workspaceRef = adminDb.collection('project_workspaces').doc(kickoff.workspace.projectId);
-    batch.set(workspaceRef, { ...kickoff.workspace, createdBy: authContext.uid, createdAt: nowIso });
-
-    const kickoffRef = adminDb.collection('kickoff_checklists').doc(kickoff.workspace.projectId);
-    batch.set(kickoffRef, {
-      projectId: kickoff.workspace.projectId,
-      appointmentId: appointment.appointmentId,
-      checklist: kickoff.checklist,
-      initialTasks: kickoff.initialTasks,
-      readiness: kickoff.readiness,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    });
-
-    // Write document placeholders
-    for (const doc of documents) {
-      const docRef = adminDb.collection('document_placeholders').doc(doc.documentId);
-      batch.set(docRef, { ...doc, createdBy: authContext.uid, createdAt: nowIso });
-    }
-
-    // Write inbox events
-    for (const event of inboxEvents) {
-      const eventRef = adminDb.collection('inbox_events').doc(event.eventId);
-      batch.set(eventRef, { ...event, createdBy: 'system', createdAt: nowIso });
-    }
-
-    // Write audit trail
-    for (const audit of auditTrail) {
-      const auditRef = adminDb.collection('audit_trail').doc(audit.auditId);
-      batch.set(auditRef, { ...audit, createdBy: 'system' });
-    }
-
-    await batch.commit();
-
-    res.status(201).json({
-      appointment,
-      workspace: kickoff.workspace,
-      passport: kickoff.passport,
-      checklist: kickoff.checklist,
-      readiness: kickoff.readiness,
-      documents: documents.length,
-      inboxEvents: inboxEvents.length,
-      recommendations,
-    });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-router.post("/api/appointments/:id/client-acceptance", async (req, res) => {
-  try {
-    const authContext = await getAuthContext(req.headers);
-    const { id } = req.params;
-    const { acceptanceId, acceptedAtIso } = req.body || {};
-
-    if (!acceptanceId) {
-      return res.status(400).json({ error: 'acceptanceId is required' });
-    }
-
-    const appointmentRef = adminDb.collection('appointment_records').doc(id);
-    const appointmentSnap = await appointmentRef.get();
-
-    if (!appointmentSnap.exists) {
-      return res.status(404).json({ error: 'Appointment record not found' });
-    }
-
-    const appointment = appointmentSnap.data() as Record<string, any>;
-    if (!appointment.proposalSnapshot) {
-      return res.status(400).json({ error: 'Appointment has no proposal snapshot' });
-    }
-
-    const nowIso = new Date().toISOString();
-
-    // Update the proposal snapshot with client acceptance
-    const updatedSnapshot = {
-      ...appointment.proposalSnapshot,
-      clientAcceptanceId: acceptanceId,
-      acceptedAtIso: acceptedAtIso || nowIso,
-    };
-
-    await appointmentRef.update({
-      'proposalSnapshot.clientAcceptanceId': acceptanceId,
-      'proposalSnapshot.acceptedAtIso': acceptedAtIso || nowIso,
-      updatedAt: nowIso,
-    });
-
-    // Record audit event
-    await adminDb.collection('audit_trail').add({
-      entityId: id,
-      action: 'client_acceptance_recorded',
-      actor: authContext.uid,
-      atIso: nowIso,
-      notes: `Client acceptance ${acceptanceId} recorded for appointment ${id}.`,
-      createdBy: 'system',
-    });
-
-    res.json({
-      appointmentId: id,
-      clientAcceptanceId: acceptanceId,
-      acceptedAtIso: acceptedAtIso || nowIso,
-      updatedAt: nowIso,
-    });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-router.post("/api/appointments/:id/professional-confirmation", async (req, res) => {
-  try {
-    const authContext = await getAuthContext(req.headers);
-    const { id } = req.params;
-    const { confirmedBy } = req.body || {};
-
-    const appointmentRef = adminDb.collection('appointment_records').doc(id);
-    const appointmentSnap = await appointmentRef.get();
-
-    if (!appointmentSnap.exists) {
-      return res.status(404).json({ error: 'Appointment record not found' });
-    }
-
-    const raw = appointmentSnap.data() as Record<string, any>;
-    if (raw.status === 'confirmed') {
-      return res.status(409).json({ error: 'Appointment is already confirmed' });
-    }
-
-    // Reconstruct the appointment record from Firestore data
-    const appointment = raw as import('../types/appointmentKickoff').KickoffAppointmentRecord;
-    const nowIso = new Date().toISOString();
-    const confirmed = confirmProfessionalAppointment(appointment, nowIso);
-    const kickoff = createKickoffPackage(confirmed);
-    const gates = validateKickoffReadiness(confirmed);
-
-    // Update the appointment record and kickoff checklist
-    const batch = adminDb.batch();
-    batch.update(appointmentRef, {
-      status: confirmed.status,
-      professionalConfirmedAtIso: confirmed.professionalConfirmedAtIso,
-      requiresHumanApprovalBeforeFormalIssue: confirmed.requiresHumanApprovalBeforeFormalIssue,
-      updatedAt: nowIso,
-    });
-
-    // Update kickoff checklist if workspace exists
-    const workspaceRef = adminDb.collection('project_workspaces')
-      .doc(`project-${id}`);
-    const workspaceSnap = await workspaceRef.get();
-    if (workspaceSnap.exists) {
-      batch.update(workspaceRef, {
-        phase: confirmed.status === 'confirmed' ? 'appointment_confirmed' : 'pre_appointment',
-        updatedAt: nowIso,
-      });
-    }
-
-    const kickoffRef = adminDb.collection('kickoff_checklists')
-      .doc(`project-${id}`);
-    const kickoffSnap = await kickoffRef.get();
-    if (kickoffSnap.exists) {
-      batch.update(kickoffRef, {
-        checklist: kickoff.checklist,
-        readiness: kickoff.readiness,
-        updatedAt: nowIso,
-      });
-    }
-
-    // Record audit event
-    const auditRef = adminDb.collection('audit_trail').doc();
-    batch.set(auditRef, {
-      auditId: auditRef.id,
-      entityId: id,
-      action: 'professional_confirmed_appointment',
-      actor: confirmedBy || authContext.uid,
-      atIso: nowIso,
-      notes: `Professional confirmed appointment ${id} at revision ${confirmed.revision}.`,
-      createdBy: 'system',
-    });
-
-    await batch.commit();
-
-    res.json({
-      appointmentId: id,
-      status: confirmed.status,
-      professionalConfirmedAtIso: confirmed.professionalConfirmedAtIso,
-      readiness: kickoff.readiness,
-      gates: gates.gates,
-      blockers: gates.blockers,
-    });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-router.get("/api/projects/:id/kickoff-checklist", async (req, res) => {
-  try {
-    const { id: projectId } = req.params;
-    const authContext = await getAuthContext(req.headers);
-
-    const [workspaceSnap, kickoffSnap] = await Promise.all([
-      adminDb.collection('project_workspaces').doc(projectId).get(),
-      adminDb.collection('kickoff_checklists').doc(projectId).get(),
-    ]);
-
-    if (!workspaceSnap.exists && !kickoffSnap.exists) {
-      return res.status(404).json({ error: 'No kickoff data found for this project' });
-    }
-
-    const workspace = workspaceSnap.exists ? workspaceSnap.data() : null;
-    const kickoff = kickoffSnap.exists ? kickoffSnap.data() : null;
-
-    // If we have an appointment, also run fresh validation
-    let gatesResult = null;
-    if (kickoff?.appointmentId) {
-      const appointmentSnap = await adminDb
-        .collection('appointment_records')
-        .doc(kickoff.appointmentId)
-        .get();
-      if (appointmentSnap.exists) {
-        const appointmentData = appointmentSnap.data() as import('../types/appointmentKickoff').KickoffAppointmentRecord;
-        gatesResult = validateKickoffReadiness(appointmentData);
-      }
-    }
-
-    res.json({
-      projectId,
-      workspace: workspace
-        ? {
-            projectId: workspace.projectId,
-            projectName: workspace.projectName,
-            phase: workspace.phase,
-            roles: workspace.roles,
-          }
-        : null,
-      checklist: kickoff?.checklist || [],
-      initialTasks: kickoff?.initialTasks || [],
-      readiness: kickoff?.readiness || 'blocked',
-      gates: gatesResult?.gates || [],
-      blockers: gatesResult?.blockers || [],
-      updatedAt: kickoff?.updatedAt || null,
-    });
-  } catch (err: any) {
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
 router.get("/projects/:projectId/command-centre", async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -2499,7 +2210,7 @@ router.post("/projects/:projectId/tasks", async (req, res) => {
   }
 });
 
-router.post("/projects/:projectId/approvals", async (req, res) => {
+router.post("/projects/:projectId/approvals", requireAuth, async (req, res) => {
   try {
     const { projectId } = req.params;
     const { authContext } = await getProjectCoordinatorContext(req, projectId);
@@ -2789,7 +2500,7 @@ router.post("/ai/action-logs", async (req, res) => {
   }
 });
 
-router.post("/admin/ai-review/:itemId/resolve", async (req, res) => {
+router.post("/admin/ai-review/:itemId/resolve", requireAdmin, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Only admins can resolve AI review queue items' });
@@ -3488,16 +3199,19 @@ router.get("/projects/:projectId/submission-readiness", async (req, res) => {
     const authContext = await getAuthContext(req.headers);
     const { projectId } = req.params;
 
+    // Fetch project record from Firestore
     const projectSnap = await adminDb.collection('projects').doc(projectId).get();
     if (!projectSnap.exists) return res.status(404).json({ error: 'Project not found' });
     const project = { id: projectId, ...projectSnap.data() } as Record<string, any>;
 
+    // Auth check: admins, project owner, and team members can view readiness
     const isOwner = project.clientId === authContext.uid;
     const isLeadProfessional =
       project.leadProfessionalId === authContext.uid ||
       project.leadBepId === authContext.uid ||
       project.leadArchitectId === authContext.uid;
     if (!authContext.isAdmin && !isOwner && !isLeadProfessional) {
+      // Check if the user is a project team member
       const memberSnap = await adminDb
         .collection('project_team_members')
         .where('projectId', '==', projectId)
@@ -3511,6 +3225,7 @@ router.get("/projects/:projectId/submission-readiness", async (req, res) => {
       }
     }
 
+    // Build scope facts from the project record
     const scopeFacts = buildScopeFactsFromProject({
       projectId,
       projectName: project.name || project.projectName || 'Untitled',
@@ -3539,6 +3254,7 @@ router.get("/projects/:projectId/submission-readiness", async (req, res) => {
 
     const result = assessMunicipalSubmissionReadiness(scopeFacts);
 
+    // Record audit event for API access
     await recordAuditEvent(req as any, {
       category: 'compliance',
       action: 'municipal_readiness_accessed',
@@ -3602,7 +3318,7 @@ router.post("/proposals/:proposalId/compare", async (req, res) => {
   }
 });
 
-router.post("/jobs/:jobId/fee-proposals", async (req, res) => {
+router.post("/jobs/:jobId/fee-proposals", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4300,7 +4016,7 @@ Analyze these labels and dimensions against SANS 10400 requirements (e.g. room s
 });
 
 // Test provider/model settings before saving an agent configuration.
-router.post("/agent/test-settings", apiLimiter, async (req, res) => {
+router.post("/agent/test-settings", apiLimiter, requireAdmin, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4642,7 +4358,7 @@ router.post("/notifications/token", async (req, res) => {
 });
 
 // Payment – initialize escrow
-router.post("/payment/escrow/init", async (req, res) => {
+router.post("/payment/escrow/init", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4743,7 +4459,7 @@ router.post("/payment/escrow/init", async (req, res) => {
 });
 
 // Payment – release milestone
-router.post("/payment/milestone/release", async (req, res) => {
+router.post("/payment/milestone/release", requireAdmin, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4816,7 +4532,7 @@ router.post("/payment/milestone/release", async (req, res) => {
 });
 
 // Payment – confirm (client return from PayFast)
-router.post("/payment/confirm", async (req, res) => {
+router.post("/payment/confirm", requireAuth, async (req, res) => {
   const { paymentId, pfData } = req.body;
   if (!paymentId || !pfData) return res.status(400).json({ error: "paymentId and pfData are required" });
 
@@ -4843,6 +4559,13 @@ router.post("/payment/confirm", async (req, res) => {
     if (!paymentDoc.exists) return res.status(404).json({ error: "Payment not found" });
 
     const payment = paymentDoc.data()!;
+    await recordAuditEvent(req, {
+      category: 'payment',
+      action: payment.status === "completed" ? 'payment.confirmation_verified' : 'payment.confirmation_pending',
+      actor: { uid: payment.payerId || 'payfast_client', role: 'client', authorizationType: 'payfast_return' },
+      target: { type: 'payment', id: paymentId, projectId: payment.jobId || undefined },
+      metadata: { jobId: payment.jobId || null, paymentStatus: payment.status },
+    });
     if (payment.status === "completed") {
       return res.json({ success: true, message: "Payment completed" });
     } else {
@@ -4856,7 +4579,7 @@ router.post("/payment/confirm", async (req, res) => {
 });
 
 // Payment – milestone request (architect initiates)
-router.post("/payment/milestone/request", async (req, res) => {
+router.post("/payment/milestone/request", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -4888,6 +4611,14 @@ router.post("/payment/milestone/request", async (req, res) => {
       return res.status(400).json({ error: "Milestone already released" });
     }
 
+    await recordAuditEvent(req, {
+      category: 'payment',
+      action: 'payment.milestone_requested',
+      actor: decodedAuditActor(decoded, 'architect'),
+      target: { type: 'escrow', id: jobId, projectId: jobId },
+      metadata: { jobId, milestone, architectId: decoded.uid },
+    });
+
 // Server-side notification emitted here (single source of truth).
 // JSDoc: This handler emits notifyMilestoneRequest to notify the client of the architect's release request.
  res.json({ success: true });
@@ -4898,7 +4629,7 @@ router.post("/payment/milestone/request", async (req, res) => {
 });
 
 // Payment – request refund (creates pending refund request)
-router.post("/payment/refund/request", async (req, res) => {
+router.post("/payment/refund/request", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -5018,7 +4749,7 @@ router.get("/payment/refund/requests", async (req, res) => {
 });
 
 // Payment – approve/reject refund (admin only)
-router.post("/payment/refund/:requestId/process", async (req, res) => {
+router.post("/payment/refund/:requestId/process", requireAdmin, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -5177,7 +4908,7 @@ router.post("/payment/refund/:requestId/process", async (req, res) => {
 });
 
 // Legacy Payment – refund (admin only, direct refund without approval flow)
-router.post("/payment/refund", async (req, res) => {
+router.post("/payment/refund", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -6044,7 +5775,7 @@ router.get("/verifications/me", async (req, res) => {
   }
 });
 
-router.post("/verifications/submit", async (req, res) => {
+router.post("/verifications/submit", requireAuth, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     const subjectType = req.body.subjectType as VerificationSubjectType;
@@ -6145,7 +5876,7 @@ router.get("/admin/verifications", async (req, res) => {
   }
 });
 
-router.post("/admin/verifications/:verificationId/recheck", async (req, res) => {
+router.post("/admin/verifications/:verificationId/recheck", requireAdmin, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
@@ -6194,7 +5925,7 @@ router.post("/admin/verifications/:verificationId/recheck", async (req, res) => 
   }
 });
 
-router.post("/admin/verifications/:verificationId/review", async (req, res) => {
+router.post("/admin/verifications/:verificationId/review", requireAdmin, async (req, res) => {
   try {
     const authContext = await getAuthContext(req.headers);
     if (!authContext.isAdmin) return res.status(403).json({ error: 'Admin access required' });
@@ -6392,7 +6123,7 @@ router.get("/payment/:paymentId/receipt", async (req, res) => {
 });
 
 // Payment – generate PDF receipt
-router.post("/payment/:paymentId/receipt/pdf", async (req, res) => {
+router.post("/payment/:paymentId/receipt/pdf", requireAuth, async (req, res) => {
   let decoded;
   try {
     decoded = await verifyAuth(req.headers);
@@ -6798,6 +6529,379 @@ router.post("/api/jobs/:jobId/chat/agent-message", apiLimiter, async (req, res) 
   }
 });
 
+// ─── Procurement Marketplace Routes (Pack 7) ────────────────────────────────
+
+import {
+  classifyProcurementScope,
+} from "../services/procurementScopeClassifier";
+import {
+  buildRfqPackage,
+  getDefaultReturnables,
+  getDefaultEvaluationCriteria,
+  validateRfqPackageCompleteness,
+} from "../services/rfqPackageBuilder";
+import {
+  matchMarketplaceListings,
+} from "../services/marketplaceMatcherService";
+import {
+  createBidderInvitation,
+  createBatchInvitations,
+  getInvitationStatusSummary,
+} from "../services/bidderInvitationService";
+import {
+  submitClarificationQuestion,
+  respondToClarification,
+  createAddendum,
+  issueAddendum,
+  verifyEqualDistribution,
+} from "../services/clarificationAddendumService";
+import {
+  createQuoteSubmission,
+  validateQuoteSubmission,
+} from "../services/quoteReturnableValidator";
+import {
+  createAwardRecommendation,
+  recordClientApproval,
+  recordProfessionalApproval,
+  checkConflictOfInterest,
+  checkCandidateProfessionalSupervision,
+} from "../services/awardRecommendationService";
+import {
+  runAllGuardrails,
+} from "../services/procurementGuardrails";
+
+// POST /api/procurement/scope/classify — classify procurement scope
+router.post("/procurement/scope/classify", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const result = classifyProcurementScope(req.body);
+    await recordAuditEvent(req, {
+      category: "project",
+      action: "procurement.scope_classified",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "procurement_scope", id: req.body.projectId },
+      metadata: { classification: result.classification, confidence: result.confidence, canonicalRoute: true },
+    });
+    res.json({ ...result, advisoryOnly: true, governanceNote: result.governanceNote });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/rfq/defaults — get default returnables & evaluation criteria
+router.get("/procurement/rfq/defaults", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    res.json({
+      returnables: getDefaultReturnables(),
+      evaluationCriteria: getDefaultEvaluationCriteria(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/rfq — build RFQ package
+router.post("/procurement/rfq", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const pkg = buildRfqPackage({ ...req.body, createdBy: authContext.uid });
+    await recordAuditEvent(req, {
+      category: "project",
+      action: "procurement.rfq_package_created",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "rfq_package", id: pkg.rfqId, projectId: pkg.projectId },
+      metadata: { rfqId: pkg.rfqId, classification: pkg.procurementClassification, isComplete: pkg.isComplete, canonicalRoute: true },
+    });
+    res.status(201).json({ rfqPackage: pkg });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/rfq/validate — validate RFQ package completeness
+router.post("/procurement/rfq/validate", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const result = validateRfqPackageCompleteness(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/marketplace/search — search marketplace
+router.post("/procurement/marketplace/search", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const { trades, location, category, limit } = req.body;
+    const listingsSnap = await adminDb.collection("marketplace_listings")
+      .where("availability", "in", ["available", "limited"])
+      .limit(limit ? Math.min(Number(limit), 50) : 50)
+      .get();
+    const listings = listingsSnap.docs.map(doc => ({ listingId: doc.id, ...doc.data() })) as any[];
+    if (listings.length === 0) {
+      return res.json({ matches: [], totalListingsSearched: 0, advisoryNote: "Marketplace matches are advisory only." });
+    }
+    const result = matchMarketplaceListings(listings, {
+      projectId: String(req.body.projectId || "adhoc"),
+      location: String(location || ""),
+      requiredTrades: Array.isArray(trades) ? trades : [],
+      requiredDisciplines: [],
+      estimatedValueZar: Number(req.body.budget) || 0,
+      categoryPreferences: category ? [category as any] : [],
+      verificationRequirements: [],
+      excludeListingIds: [],
+    });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.marketplace_searched",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "marketplace_search", id: authContext.uid },
+      metadata: { matchCount: result.matches.length, canonicalRoute: true },
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/invitations — create bidder invitations
+router.post("/procurement/:rfqId/invitations", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const { bidders } = req.body;
+    if (!bidders || !Array.isArray(bidders) || bidders.length === 0) {
+      return res.status(400).json({ error: "At least one bidder is required" });
+    }
+    const inputs = bidders.map((b: any) => ({
+      rfqId: req.params.rfqId, rfqTitle: b.rfqTitle || req.params.rfqId,
+      bidderId: String(b.bidderId || ""), bidderName: String(b.bidderName || ""),
+      bidderEmail: String(b.bidderEmail || ""), bidderCategory: String(b.bidderCategory || "contractor"),
+      invitedBy: authContext.uid, message: b.message, expiryDays: b.expiryDays,
+    }));
+    const batchResult = createBatchInvitations(inputs);
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.invitations_created",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "bidder_invitation", id: req.params.rfqId },
+      metadata: { rfqId: req.params.rfqId, totalInvited: batchResult.totalInvited, canonicalRoute: true },
+    });
+    res.status(201).json(batchResult);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/:rfqId/invitations
+router.get("/procurement/:rfqId/invitations", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const invSnap = await adminDb.collection("procurement_invitations").where("rfqId", "==", req.params.rfqId).get();
+    const invitations = invSnap.docs.map(doc => ({ invitationId: doc.id, ...doc.data() })) as any[];
+    const summary = getInvitationStatusSummary(invitations);
+    res.json({ rfqId: req.params.rfqId, invitations, summary });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/clarifications
+router.post("/procurement/:rfqId/clarifications", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const clarification = submitClarificationQuestion({ ...req.body, rfqId: req.params.rfqId });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.clarification_submitted",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "clarification_question", id: clarification.questionId },
+      metadata: { rfqId: req.params.rfqId, isMaterial: clarification.isMaterial, canonicalRoute: true },
+    });
+    res.status(201).json(clarification);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/clarifications/:questionId/respond
+router.post("/procurement/:rfqId/clarifications/:questionId/respond", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const { response } = req.body;
+    if (!response) return res.status(400).json({ error: "response is required" });
+    const questionSnap = await adminDb.collection("procurement_clarifications").doc(req.params.questionId).get();
+    if (!questionSnap.exists) return res.status(404).json({ error: "Clarification question not found" });
+    const question = { questionId: questionSnap.id, ...questionSnap.data() } as any;
+    const updated = respondToClarification(question, authContext.uid, response);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/addenda
+router.post("/procurement/:rfqId/addenda", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const addendum = createAddendum({ ...req.body, rfqId: req.params.rfqId, issuedBy: authContext.uid });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.addendum_created",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "addendum", id: addendum.addendumId },
+      metadata: { rfqId: req.params.rfqId, distributionCount: addendum.distributedToBidderIds.length, equalInformationCompliant: true, canonicalRoute: true },
+    });
+    res.status(201).json(addendum);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/addenda/:addendumId/issue
+router.post("/procurement/:rfqId/addenda/:addendumId/issue", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const addendumSnap = await adminDb.collection("procurement_addenda").doc(req.params.addendumId).get();
+    if (!addendumSnap.exists) return res.status(404).json({ error: "Addendum not found" });
+    const addendum = { addendumId: addendumSnap.id, ...addendumSnap.data() } as any;
+    const { addendum: issued, distributions } = issueAddendum(addendum, authContext.uid);
+    res.json({ addendum: issued, distributions });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/quotes
+router.post("/procurement/:rfqId/quotes", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const quote = createQuoteSubmission({ ...req.body, rfqId: req.params.rfqId });
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.quote_submitted",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "quote_submission", id: quote.quoteId },
+      metadata: { rfqId: req.params.rfqId, bidderId: quote.bidderId, priceZar: quote.priceZar, canonicalRoute: true },
+    });
+    res.status(201).json(quote);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/:rfqId/quotes
+router.get("/procurement/:rfqId/quotes", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const quotesSnap = await adminDb.collection("procurement_quotes").where("rfqId", "==", req.params.rfqId).get();
+    const quotes = quotesSnap.docs.map(doc => ({ quoteId: doc.id, ...doc.data() }));
+    res.json({ rfqId: req.params.rfqId, quotes });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/quotes/:quoteId/validate
+router.post("/procurement/:rfqId/quotes/:quoteId/validate", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const returnables = req.body.returnables || getDefaultReturnables();
+    const validation = validateQuoteSubmission(req.body, returnables, req.body.budgetEstimateZar);
+    res.json(validation);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// GET /api/procurement/:rfqId/comparison
+router.get("/procurement/:rfqId/comparison", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const quotesSnap = await adminDb.collection("procurement_quotes").where("rfqId", "==", req.params.rfqId).get();
+    const quotes = quotesSnap.docs.map(doc => ({ quoteId: doc.id, ...doc.data() })) as any[];
+    const returnables = getDefaultReturnables();
+    const validations = quotes.map(q => validateQuoteSubmission(q, returnables, q.budgetEstimateZar));
+    res.json({ rfqId: req.params.rfqId, quoteCount: quotes.length, validations, advisoryNote: "Quote comparison is advisory only. Human review required." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/award
+router.post("/procurement/:rfqId/award", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const conflictChecks = checkConflictOfInterest(req.body.recommendedBidderId, req.body.recommendedBidderName, req.body.declarations || [], authContext.uid);
+    const supervisionCheck = checkCandidateProfessionalSupervision(req.body.bidderCategory || "contractor", req.body.bidderRegistrations || []);
+    const recommendation = createAwardRecommendation(
+      { ...req.body, rfqId: req.params.rfqId, createdBy: authContext.uid, createdByRole: authContext.normalizedRole || "unknown" },
+      conflictChecks, supervisionCheck,
+    );
+    await recordAuditEvent(req, {
+      category: "project", action: "procurement.award_recommended",
+      actor: decodedAuditActor(authContext.decoded, authContext.role),
+      target: { type: "award_recommendation", id: recommendation.recommendationId, projectId: req.body.projectId },
+      metadata: { rfqId: req.params.rfqId, humanApprovalGate: true, canonicalRoute: true },
+    });
+    res.status(201).json({ recommendation, advisoryNote: "Client AND professional approval required before appointment." });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/award/:recommendationId/approve
+router.post("/procurement/:rfqId/award/:recommendationId/approve", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const recSnap = await adminDb.collection("procurement_award_recommendations").doc(req.params.recommendationId).get();
+    if (!recSnap.exists) return res.status(404).json({ error: "Award recommendation not found" });
+    let recommendation = { recommendationId: recSnap.id, ...recSnap.data() } as any;
+    const { approvalType } = req.body;
+    if (approvalType === "client") recommendation = recordClientApproval(recommendation, authContext.uid);
+    else if (approvalType === "professional") recommendation = recordProfessionalApproval(recommendation, authContext.uid);
+    else return res.status(400).json({ error: "approvalType must be 'client' or 'professional'" });
+    res.json({ recommendation, note: recommendation.status === "approved" ? "Appointment may proceed." : "Awaiting remaining approval." });
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// POST /api/procurement/:rfqId/guardrails
+router.post("/procurement/:rfqId/guardrails", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    if (!authContext.normalizedRole) return res.status(401).json({ error: "Authentication required" });
+    const report = runAllGuardrails(req.body);
+    res.json(report);
+  } catch (err: any) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+// Firebase test endpoint
 // ── Pack 12 Practice Management Routes ───────────────────────────────────────
 
 // Timesheets
@@ -7101,164 +7205,6 @@ router.post("/api/practice/invoice-readiness", apiLimiter, async (req, res) => {
   }
 });
 
-// Firebase test endpoint
-// ── Pack 15: Analytics & Reporting API Routes ───────────────────────────────────
-
-router.get(["/analytics/dashboard/:role", "/api/analytics/dashboard/:role"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const role = (req.params.role as any) || 'principal_agent';
-    const kpiData: Record<string, KPIResult> = {};
-    const dashboard = buildDashboard(role, { kpiData, alertCount: getAlertEventCount({ unacknowledgedOnly: true }) });
-    res.json({ ...dashboard, requestedBy: decoded.uid, requestedRole: role });
-  } catch (err: any) {
-    console.error("Analytics dashboard error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to build dashboard" });
-  }
-});
-
-router.get(["/analytics/kpis/:projectId", "/api/analytics/kpis/:projectId"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { projectId } = req.params;
-    const storedMetrics = getAnalyticsKPIMetrics({ projectId, limit: 50 });
-    const input: KPIInputData = { projectId, milestones: [], costLineItems: [], complianceItems: [] };
-    const freshKpis = computeAllKPIs(input);
-    res.json({ projectId, storedMetricCount: storedMetrics.length, storedMetrics: storedMetrics.slice(0, 10), freshComputation: freshKpis, requestedBy: decoded.uid });
-  } catch (err: any) {
-    console.error("Analytics KPIs error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to get KPIs" });
-  }
-});
-
-router.post(["/analytics/kpis/compute/:projectId", "/api/analytics/kpis/compute/:projectId"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { projectId } = req.params;
-    const input: KPIInputData = {
-      projectId, milestones: req.body?.milestones || [], costLineItems: req.body?.costLineItems || [],
-      defectLiability: req.body?.defectLiability, retentionAmount: req.body?.retentionAmount,
-      retentionConditions: req.body?.retentionConditions || [], complianceItems: req.body?.complianceItems || [],
-    };
-    const result = computeAllKPIs(input);
-    const tenantId = req.body?.tenantId;
-    if (!tenantId) { return res.status(400).json({ error: "tenantId is required" }); }
-    const ctx = { tenantId, projectId, userId: decoded.uid, actorRole: decoded.role || 'platform_admin', now: new Date().toISOString() };
-    const storedMetrics = storeAllAnalyticsKPIMetrics(result.kpis, ctx);
-    audit(ctx, 'analytics_kpi_computed', projectId, { kpiCount: result.kpis.length });
-    res.json({ projectId, computation: result, storedMetrics: storedMetrics.map((m) => m.metricId), computedAt: result.computedAt });
-  } catch (err: any) {
-    console.error("Analytics KPI computation error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to compute KPIs" });
-  }
-});
-
-router.post(["/analytics/alerts", "/api/analytics/alerts"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { name, description, condition, severity, recipientRole, requiresAcknowledgement, cooldownMinutes, projectId, tenantId } = req.body;
-    if (!name || !condition || !severity || !recipientRole) {
-      return res.status(400).json({ error: "name, condition, severity, and recipientRole are required" });
-    }
-    if (!tenantId) { return res.status(400).json({ error: "tenantId is required" }); }
-    const rule = registerAlertRule({ name, description: description || '', condition, severity, recipientRole, requiresAcknowledgement, cooldownMinutes, projectId, tenantId, createdBy: decoded.uid });
-    res.status(201).json({ rule });
-  } catch (err: any) {
-    console.error("Alert registration error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to register alert" });
-  }
-});
-
-router.get(["/analytics/alerts/:projectId", "/api/analytics/alerts/:projectId"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { projectId } = req.params;
-    const unacknowledgedOnly = req.query.unacknowledged === 'true';
-    const events = getAlertEvents({ projectId, unacknowledgedOnly });
-    res.json({ projectId, alertCount: events.length, alerts: events, requestedBy: decoded.uid });
-  } catch (err: any) {
-    console.error("Alert events error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to get alerts" });
-  }
-});
-
-router.post(["/analytics/alerts/:eventId/acknowledge", "/api/analytics/alerts/:eventId/acknowledge"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const { eventId } = req.params;
-    const event = acknowledgeAlertEvent(eventId, decoded.uid);
-    if (!event) return res.status(404).json({ error: "Alert event not found" });
-    res.json({ event, acknowledgedBy: decoded.uid });
-  } catch (err: any) {
-    console.error("Alert acknowledge error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to acknowledge alert" });
-  }
-});
-
-router.get(["/analytics/export/:type", "/api/analytics/export/:type"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const exportType = req.params.type as 'records' | 'alerts' | 'audit';
-    const format = (req.query.format as string) || 'json';
-    const projectId = req.query.projectId as string | undefined;
-    if (!['csv', 'json'].includes(format)) {
-      return res.status(400).json({ error: "Format must be csv or json" });
-    }
-    let result;
-    if (exportType === 'alerts') {
-      const allAlerts = getAlertEvents({ projectId });
-      const exportable = allAlerts.map((a) => ({ eventId: a.eventId, title: a.title, severity: a.severity, recipientRole: a.recipientRole, projectId: a.projectId, firedAt: a.firedAt, acknowledged: a.acknowledged }));
-      const tenantId = (req.query.tenantId as string) || (decoded as any).tenantId || 'unknown';
-      const job = createExportJob({ format: format as 'csv' | 'json', scope: projectId ? 'project' : 'tenant', projectId, tenantId, filters: {}, requestedBy: decoded.uid });
-      result = exportAlerts({ format: format as 'csv' | 'json', alerts: exportable, jobId: job.jobId });
-    } else if (exportType === 'audit') {
-      result = exportAuditTrail({ format: format as 'csv' | 'json', audits: [] });
-    } else {
-      result = exportRecords({ format: format as 'csv' | 'json', records: [] });
-    }
-    const filename = generateExportFilename(exportType, format as 'csv' | 'json', projectId);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
-    res.send(result.content);
-  } catch (err: any) {
-    console.error("Export error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Export failed" });
-  }
-});
-
-router.get(["/analytics/observability", "/api/analytics/observability"], async (req, res) => {
-  try {
-    const decoded = await verifyAuth(req.headers);
-    const since = req.query.since as string | undefined;
-    const snapshot = computeHealthSnapshot({ since });
-    res.json({ ...snapshot, requestedBy: decoded.uid });
-  } catch (err: any) {
-    console.error("Observability error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to compute health snapshot" });
-  }
-});
-
-router.post(["/analytics/observability/record", "/api/analytics/observability/record"], async (req, res) => {
-  try {
-    await verifyAuth(req.headers);
-    const { type, serviceName, moduleKey, value, unit, tags } = req.body;
-    if (!type || !serviceName || !moduleKey) {
-      return res.status(400).json({ error: "type, serviceName, and moduleKey are required" });
-    }
-    let metric;
-    switch (type) {
-      case 'latency': metric = recordLatency(serviceName, moduleKey, value || 0, tags); break;
-      case 'error_count': metric = recordError(serviceName, moduleKey, tags); break;
-      case 'request_count': metric = recordRequest(serviceName, moduleKey, tags); break;
-      case 'memory_boundary_violation': metric = recordMemoryViolation(serviceName, moduleKey, value || 0, tags?.limit || 0, tags); break;
-      default: return res.status(400).json({ error: `Unknown metric type: ${type}` });
-    }
-    res.status(201).json({ metric });
-  } catch (err: any) {
-    console.error("Observability record error:", err);
-    res.status(err.status || 500).json({ error: err.message || "Failed to record metric" });
-  }
-});
 
 router.get("/firebase/test", async (_req, res) => {
   try {
@@ -7279,103 +7225,7 @@ router.get("/firebase/test", async (_req, res) => {
   }
 })
 
-// ── Trust, Verification & Compliance Routes (Pack 13) ───────────────────────────
-
-import {
-  buildProfessionalRegistration,
-  getRegistrationLifecycle,
-  buildRegistrationQueueProjection,
-} from '../services/professionalRegistrationService';
-import {
-  buildCompanyDocument,
-  getDocumentLifecycle,
-  getEntityPublicVerificationSummary,
-} from '../services/companyDocumentService';
-import {
-  buildInsuranceCompliance,
-  getInsuranceLifecycle,
-} from '../services/insuranceComplianceService';
-import {
-  buildContractorCompliance,
-  getComplianceCheckSummary,
-} from '../services/contractorSupplierComplianceService';
-import {
-  evaluateComplianceRisk,
-  buildRiskDashboardSummary,
-} from '../services/complianceRiskService';
-import {
-  buildVerificationBadge,
-  getDisplayBadgesForEntity,
-} from '../services/verificationBadgeService';
-
-// GET /api/verification/:entityId — Get verification status for an entity
-router.get(['/verification/:entityId', '/api/verification/:entityId'], async (req, res) => {
-  try {
-    const { entityId } = req.params;
-    // Aggregate verification status from badges, registrations, documents
-    res.json({
-      entityId,
-      status: 'pending',
-      message: 'Verification status endpoint — integration with Firestore pending',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// POST /api/verification/check — Trigger a verification check
-router.post(['/verification/check', '/api/verification/check'], async (req, res) => {
-  try {
-    const { entityId, entityType } = req.body || {};
-    if (!entityId || !entityType) {
-      return res.status(400).json({ error: 'entityId and entityType are required' });
-    }
-    res.json({
-      entityId,
-      entityType,
-      status: 'queued',
-      message: 'Verification check queued for processing',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/compliance/status — Get compliance status
-router.get(['/compliance/status', '/api/compliance/status'], async (req, res) => {
-  try {
-    const { entityId, projectId } = req.query;
-    res.json({
-      entityId: entityId || null,
-      projectId: projectId || null,
-      complianceStatus: 'pending',
-      message: 'Compliance status endpoint — integration with Firestore pending',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/governance/audit — Get audit trail
-router.get(['/governance/audit', '/api/governance/audit'], async (req, res) => {
-  try {
-    const { entityId, projectId, limit } = req.query;
-    const limitNum = Math.min(Number(limit) || 50, 200);
-    res.json({
-      entityId: entityId || null,
-      projectId: projectId || null,
-      entries: [],
-      total: 0,
-      limit: limitNum,
-      message: 'Governance audit endpoint — integration with Firestore pending',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Mount POPIA/PAIA compliance routes
+router.use("/popia", popiaRoutes);
 
 export default router;

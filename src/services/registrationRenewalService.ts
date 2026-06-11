@@ -81,7 +81,7 @@ export async function registerProfessional(input: {
         input.userId,
         'registration_expiring',
         `Your ${input.body} registration (${input.registrationNumber}) ${status === 'expired' ? 'has expired' : 'expires soon'} on ${input.expiryDate}.`,
-        { registrationId: ref.id, firmId: input.firmId }
+        { entityId: ref.id, firmId: input.firmId }
       );
     }
 
@@ -112,7 +112,7 @@ export async function updateCpdPoints(id: string, cpdPointsEarned: number, actor
         reg.userId,
         'cpd_shortfall',
         `CPD shortfall: You need ${shortfall} more points to meet the ${reg.cpdPointsRequired} requirement for ${reg.body}.`,
-        { registrationId: id, firmId: reg.firmId }
+        { entityId: id, firmId: reg.firmId }
       );
     }
   } catch (error) {
@@ -167,7 +167,7 @@ export async function renewRegistration(id: string, newExpiryDate: string, actor
       reg.userId,
       'registration_expiring',
       `Your ${reg.body} registration has been renewed. New expiry: ${newExpiryDate}.`,
-      { registrationId: id, firmId: reg.firmId }
+      { entityId: id, firmId: reg.firmId }
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${REGISTRATIONS_COL}/${id}`);
@@ -235,7 +235,7 @@ export async function sendRenewalReminders(firmId: string): Promise<number> {
         reg.userId,
         'registration_expiring',
         `Reminder: Your ${reg.body} registration (${reg.registrationNumber}) expires in ${days} days on ${reg.expiryDate}.`,
-        { registrationId: reg.id, firmId: reg.firmId }
+        { entityId: reg.id, firmId: reg.firmId }
       );
       await updateDoc(doc(db, REGISTRATIONS_COL, reg.id), { renewalReminderSent: true, updatedAt: new Date().toISOString() });
       sent++;

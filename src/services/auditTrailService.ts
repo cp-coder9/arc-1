@@ -46,26 +46,3 @@ export function createAuditTrail(
     },
   ];
 }
-
-export interface AuditContext {
-  userId: string;
-  tenantId?: string;
-  now?: string;
-}
-
-export function audit(
-  ctx: AuditContext,
-  action: string,
-  sourceObjectId: string,
-  _metadata?: Record<string, unknown>,
-) {
-  const seq = Math.floor(Math.random() * 1000000);
-  return {
-    auditId: `audit-${seq}`,
-    actorId: ctx.userId,
-    action,
-    sourceObjectId,
-    metadata: _metadata || {},
-    createdAt: ctx.now || new Date().toISOString(),
-  };
-}

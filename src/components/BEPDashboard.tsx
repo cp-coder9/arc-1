@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   BadgeCheck,
   Zap,
-  Target
+  Target,
+  Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ProfileEditor from './ProfileEditor';
@@ -32,6 +33,7 @@ import { safeFormat } from '../lib/utils';
 import { Chat } from './Chat';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import SiteLogManager from './SiteLogManager';
+import BEPToolboxPage from './BEPToolboxPage';
 
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
@@ -44,7 +46,7 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'overview' | 'marketplace'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'marketplace' | 'toolbox'>('overview');
 
   useEffect(() => {
     const qTasks = query(collectionGroup(db, 'tasks'), where('assigneeId', '==', user.uid));
@@ -140,6 +142,14 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
             onClick={() => setActiveView('marketplace')}
           >
             Marketplace
+          </Button>
+          <Button
+            variant={activeView === 'toolbox' ? 'default' : 'outline'}
+            className="rounded-full px-6 h-12 font-bold beos-button-shadow"
+            onClick={() => setActiveView('toolbox')}
+          >
+            <Wrench className="h-4 w-4 mr-2" />
+            Toolbox
           </Button>
         </div>
       </div>
@@ -276,6 +286,10 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
             ))}
           </div>
         </div>
+      )}
+
+      {activeView === 'toolbox' && (
+        <BEPToolboxPage user={user} />
       )}
     </div>
   );

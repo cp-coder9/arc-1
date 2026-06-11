@@ -1,6 +1,4 @@
-﻿import type { CPDProfessionalBody, ArchitexBuiltEnvironmentRole } from './services/cpdTypes';
-
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin';
 
 export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
 export type FirmMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';
@@ -92,10 +90,6 @@ export interface UserProfile {
   firmStatus?: FirmMemberStatus;
   subscriptionStatus?: FirmSubscriptionStatus;
   billingRole?: FirmRole | 'none';
-  professionalBody?: CPDProfessionalBody;
-  builtEnvironmentRole?: ArchitexBuiltEnvironmentRole;
-  cpdCycleStart?: string;
-  cpdCycleEnd?: string;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -499,10 +493,10 @@ export type NotificationType =
   | 'refund_processed'
   | 'contractor_delivery_update'
   | 'timesheet_due'
+  | 'supervision_log_required'
   | 'registration_expiring'
   | 'cpd_shortfall'
-  | 'invoice_ready_for_review'
-  | 'supervision_log_required';
+  | 'invoice_ready_for_review';
 
 export interface Notification {
   id: string;
@@ -529,8 +523,7 @@ export interface Notification {
     subscriptionId?: string;
     refundId?: string;
     deliveryId?: string;
-    supervisionLogId?: string;
-    invoiceReadinessId?: string;
+    entityId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -621,7 +614,7 @@ export interface Conversation {
 }
 
 // Payment types
-export type PaymentType = 'escrow_deposit' | 'milestone_release' | 'refund' | 'platform_fee' | 'platform_fee_client_share' | 'platform_fee_payee_share';
+export type PaymentType = 'escrow_deposit' | 'milestone_release' | 'refund' | 'platform_fee';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
 export interface Payment {
@@ -673,8 +666,6 @@ export interface EscrowMilestone {
 export interface EscrowV2 extends Omit<Escrow, 'milestones'> {
   milestones: EscrowMilestone[];
   linkedProjectId?: string;
-  payerSurchargeAmount?: number;
-  payeeDeductionAmount?: number;
 }
 
 export interface LedgerEntry {
@@ -1144,245 +1135,6 @@ export interface InspectionItem {
   comment?: string;
 }
 
-// --- Site Execution & Field Control Types (Pack 10) ----------------------------
-
-export type Severity = 'low' | 'medium' | 'high' | 'critical';
-
-export type EvidenceType =
-  | 'photo'
-  | 'drawing'
-  | 'specification'
-  | 'delivery_note'
-  | 'weather_report'
-  | 'file';
-
-export interface FieldEvidence {
-  id: string;
-  projectId: string;
-  type: EvidenceType;
-  title: string;
-  uri: string;
-  location?: string;
-  gps?: { lat: number; lng: number };
-  capturedBy: string;
-  capturedAt: string;
-  linkedObjectId?: string;
-}
-
-export type NCRStatus = 'open' | 'corrective_action_submitted' | 'verified_closed' | 'rejected';
-
-export interface NonConformanceReport {
-  id: string;
-  projectId: string;
-  title: string;
-  description?: string;
-  severity: Severity;
-  responsiblePartyId: string;
-  correctiveAction?: string;
-  evidenceIds: string[];
-  status: NCRStatus;
-  blocksPayment: boolean;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
-  verifiedBy?: string;
-  verifiedAt?: string;
-  rejectedReason?: string;
-}
-
-export type SiteInstructionStatus = 'draft' | 'issued' | 'acknowledged' | 'superseded';
-
-export interface SiteInstruction {
-  id: string;
-  projectId: string;
-  title: string;
-  instruction: string;
-  issuedBy: string;
-  issuedByRole: UserRole;
-  authorised: boolean;
-  authorisedBy?: string;
-  authorisedAt?: string;
-  costImpact: 'none' | 'possible' | 'confirmed';
-  timeImpact: 'none' | 'possible' | 'confirmed';
-  linkedRfiId?: string;
-  linkedDocumentIds?: string[];
-  status: SiteInstructionStatus;
-  acknowledgedBy?: string;
-  acknowledgedAt?: string;
-  supersededById?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export type SnagStatus = 'open' | 'allocated' | 'ready_for_reinspection' | 'closed' | 'rejected';
-
-export interface SnagItem {
-  id: string;
-  projectId: string;
-  location: string;
-  description: string;
-  priority: Severity;
-  responsiblePartyId: string;
-  dueDate: string;
-  evidenceIds: string[];
-  status: SnagStatus;
-  blocksPayment: boolean;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
-  closedBy?: string;
-  closedAt?: string;
-  rejectedReason?: string;
-}
-
-export type InspectionStatus = 'draft' | 'issued' | 'requires_follow_up' | 'closed';
-
-export type InspectionType =
-  | 'architectural'
-  | 'structural'
-  | 'quality'
-  | 'safety'
-  | 'municipal'
-  | 'progress'
-  | 'foundation'
-  | 'dpc'
-  | 'roof'
-  | 'final'
-  | 'custom';
-
-export interface InspectionRecord {
-  id: string;
-  projectId: string;
-  inspectorId: string;
-  inspectorRole: UserRole;
-  inspectionType: InspectionType;
-  date: string;
-  findings: string[];
-  followUps: string[];
-  photos: { url: string; caption: string }[];
-  status: InspectionStatus;
-  signOffRequired: boolean;
-  signedOffBy?: string;
-  signedOffAt?: string;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export type DelayWarningCause =
-  | 'weather'
-  | 'materials'
-  | 'labour'
-  | 'client'
-  | 'professional'
-  | 'contractor'
-  | 'unknown';
-
-export type DelayWarningStatus = 'recorded' | 'notice_required' | 'under_review' | 'closed';
-
-export interface DelayEarlyWarning {
-  id: string;
-  projectId: string;
-  cause: DelayWarningCause;
-  description: string;
-  noticeDeadline: string;
-  likelyProgrammeImpactDays: number;
-  status: DelayWarningStatus;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  reviewNotes?: string;
-}
-
-export type ProgrammeImpactSourceType = 'delay_warning' | 'site_instruction' | 'ncr' | 'snag';
-
-export interface ProgrammeImpact {
-  id: string;
-  projectId: string;
-  sourceObjectId: string;
-  sourceType: ProgrammeImpactSourceType;
-  estimatedDays: number;
-  requiresPlannerReview: boolean;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  reviewNotes?: string;
-  createdBy: string;
-  createdAt: string;
-}
-
-export type BlockerSourceType = 'ncr' | 'snag' | 'inspection';
-
-export interface PaymentBlocker {
-  id: string;
-  projectId: string;
-  sourceObjectId: string;
-  sourceType: BlockerSourceType;
-  reason: string;
-  severity: Severity;
-  status: 'active' | 'cleared';
-  clearedBy?: string;
-  clearedAt?: string;
-  createdBy: string;
-  createdAt: string;
-}
-
-// Site Execution Integration Record types
-export type SiteExecutionPhase = 'construction_execution' | 'closeout';
-
-export interface SiteProjectRecord {
-  id: string;
-  projectId: string;
-  tenantId: string;
-  phase: SiteExecutionPhase;
-  moduleKey: string;
-  recordType: string;
-  title: string;
-  status: string;
-  payload: unknown;
-  linkedRecordIds: string[];
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface SiteInboxEvent {
-  id: string;
-  projectId: string;
-  recipientRole: UserRole;
-  title: string;
-  description?: string;
-  sourceObjectId: string;
-  sourceObjectType: string;
-  priority: Severity;
-  dueDate?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-export interface SiteAuditRecord {
-  id: string;
-  projectId: string;
-  actorId: string;
-  actorRole: UserRole;
-  action: string;
-  sourceObjectId: string;
-  sourceObjectType: string;
-  createdAt: string;
-}
-
-export interface SiteAgentRecommendation {
-  id: string;
-  projectId: string;
-  agentKey: string;
-  title: string;
-  rationale: string;
-  sourceObjectId: string;
-  severity: Severity;
-  status: 'suggested' | 'applied' | 'dismissed';
-  createdAt: string;
-}
-
 // Agent workflow types for platform-wide agent orchestration
 export type AgentOwnerType = 'user' | 'project';
 export type AgentSurface = 'dashboard' | 'chat' | 'notification' | 'document' | 'workflow' | 'admin';
@@ -1419,103 +1171,243 @@ export interface AgentRecommendation {
   createdAt: string;
 }
 
-// â”€â”€â”€ Pack 12: Practice Management Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Re-export toolset types from pack
+export type {
+  ToolboxUserRole,
+  ToolboxFamilyId,
+  CalculatorRiskStatus,
+  CalculatorUseClass,
+  CalculatorExportTarget,
+  ToolboxContext,
+  CalculatorDefinition,
+  CalculatorRun,
+  XAfenestrationInputs,
+  RValueInputs,
+  RationalMethodInputs,
+  ConcreteOrderInputs,
+  BrickBlockworkInputs,
+  TenderRateBuildUpInputs,
+  LabourProductivityInputs,
+  ToolboxAgentRecommendation,
+} from './types/toolboxCalculators';
 
-export type PipelineStatus = 'lead' | 'qualified' | 'proposal_sent' | 'negotiation' | 'won' | 'lost' | 'on_hold' | 'active' | 'abandoned';
-
-export interface PipelineProject { id: string; projectId?: string; title: string; name: string; clientName: string; value: number; estimatedValueCents?: number; stage?: ProjectStage; firmId?: string; status: PipelineStatus; probability: number; expectedCloseDate: string; closedAt?: string; assignedTo: string; notes?: string; createdAt: string; updatedAt?: string; }
-
-export interface PipelineForecast {
-  totalPipeline: number;
-  weightedValue: number;
-  projectedRevenue: number;
-  totalValueCents?: number;
-  weightedValueCents?: number;
-  byStatus: Record<string, { count: number; value: number }>;
-  byStage?: Record<string, { count: number; value: number; weighted: number }>;
-}
-
-export type RegistrationStatus = 'active' | 'expiring' | 'expired' | 'suspended' | 'pending';
-
-export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACPLAN' | 'SACNASP' | 'SACPCMP' | 'Other';
-
-export interface ProfessionalRegistration {
-  id: string;
-  userId: string;
-  professionalBody: RegistrationBody;
-  registrationNumber: string;
-  status: RegistrationStatus;
-  expiryDate: string;
-  evidenceDocumentIds: string[];
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export type TemplateCategory = 'appointment' | 'submission' | 'payment' | 'closeout' | 'communication' | 'governance' | 'general';
-
-export type TemplateVersion = 'draft' | 'published' | 'superseded' | 'archived';
-
-export interface PracticeTemplate {
-  id: string;
-  title: string;
-  description: string;
-  category: TemplateCategory;
-  version: TemplateVersion;
-  content: string;
-  variables: string[];
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
+export type {
+  ArchitexComprehensiveRole,
+  ArchitexWorkflowPhase,
+  ToolCategory,
+  ToolExportTarget,
+  ToolContext,
+  ToolDefinition,
+  ToolRecommendation,
+  ToolRunEnvelope,
+  StaffActivityLogPayload,
+  PlantAllocationPayload,
+  ProcurementPackagePayload,
+  DrawingComplianceCheckPayload,
+  BomBoqQuotePayload,
+  SnagItemPayload,
+  ResourceMarketplaceListingPayload,
+} from './types/comprehensiveToolsets';
+// Pack 12: Practice management and office operations
 export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
 
 export interface TimesheetEntry {
   id: string;
   userId: string;
-  projectId: string;
+  firmId: string;
+  projectId?: string;
+  workstage?: ProjectStage;
   date: string;
-  hours: number;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
   description: string;
-  billableStatus: TimesheetBillableStatus;
-  hourlyRate?: number;
+  billable: TimesheetBillableStatus;
+  hourlyRateCents?: number;
+  totalValueCents: number;
+  invoiced?: boolean;
+  invoiceId?: string;
+  tags?: string[];
   createdAt: string;
-  updatedAt?: string;
+  updatedAt: string;
 }
 
 export interface TimesheetSummary {
-  userId: string;
+  firmId: string;
+  userId?: string;
   periodStart: string;
   periodEnd: string;
   totalHours: number;
   billableHours: number;
   nonBillableHours: number;
+  totalValueCents: number;
   entries: TimesheetEntry[];
+  byProject?: Record<string, { hours: number; valueCents: number }>;
+  byUser?: Record<string, { hours: number; valueCents: number }>;
 }
 
 export interface FeeReconciliation {
-  totalBilled: number;
-  totalPaid: number;
-  outstanding: number;
-  byProject: Record<string, { billed: number; paid: number }>;
+  id: string;
+  firmId: string;
+  projectId: string;
+  timesheetIds: string[];
+  totalTimeValueCents: number;
+  proposalValueCents?: number;
+  varianceCents?: number;
+  createdAt: string;
+  updatedAt?: string;
 }
 
-export type PracticeTaskStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'completed' | 'cancelled';
+export type PipelineStatus = 'active' | 'won' | 'lost' | 'abandoned' | 'on_hold';
+
+export interface PipelineProject {
+  id: string;
+  firmId: string;
+  projectId: string;
+  jobId?: string;
+  title: string;
+  stage: ProjectStage;
+  status: PipelineStatus;
+  estimatedValueCents: number;
+  probability: number;
+  expectedCloseDate?: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PipelineForecast {
+  firmId: string;
+  generatedAt: string;
+  totalEstimatedValueCents: number;
+  weightedForecastCents: number;
+  activeProjectCount: number;
+  wonProjectCount: number;
+  lostProjectCount: number;
+  byStage: Record<string, { count: number; estimatedValueCents: number; weightedValueCents: number }>;
+  projects?: PipelineProject[];
+}
 
 export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type PracticeTaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'cancelled';
 
-export interface PracticeTask { id: string; title: string; description: string; status: PracticeTaskStatus; priority: PracticeTaskPriority; assignedTo: string; projectId?: string; firmId?: string; dueDate?: string; createdAt: string; updatedAt?: string; }
+export interface PracticeTask {
+  id: string;
+  firmId: string;
+  projectId?: string;
+  title: string;
+  description?: string;
+  assigneeId?: string;
+  assignedBy: string;
+  priority: PracticeTaskPriority;
+  status: PracticeTaskStatus;
+  dueDate?: string;
+  slaDeadline?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  tags?: string[];
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface WorkloadSummary {
   userId: string;
-  totalTasks: number;
-  completedTasks: number;
+  firmId?: string;
+  openTasks: number;
+  urgentTasks: number;
   overdueTasks: number;
-  byPriority: Record<PracticeTaskPriority, number>;
+  estimatedHours: number;
+  tasks: PracticeTask[];
+}
+
+export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACLAP' | 'SACPCMP';
+export type RegistrationStatus = 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'suspended';
+
+export interface ProfessionalRegistration {
+  id: string;
+  userId: string;
+  firmId: string;
+  body: RegistrationBody;
+  registrationNumber: string;
+  expiryDate: string;
+  status: RegistrationStatus;
+  cpdPointsRequired: number;
+  cpdPointsEarned: number;
+  renewalReminderSent: boolean;
+  documents?: { name: string; url: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TemplateCategory = 'appointment' | 'certificate' | 'report' | 'submission' | 'contract' | 'invoice' | 'general';
+
+export interface PracticeTemplate {
+  id: string;
+  firmId: string;
+  name: string;
+  description?: string;
+  category: TemplateCategory;
+  version: number;
+  fileUrl?: string;
+  fileName?: string;
+  roles: UserRole[];
+  tags?: string[];
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateVersion {
+  id: string;
+  templateId: string;
+  version: number;
+  fileUrl?: string;
+  fileName?: string;
+  changes: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface InvoiceReadinessCheck {
+  id: string;
+  firmId: string;
+  projectId: string;
+  timesheetIds: string[];
+  expenseIds?: string[];
+  readyForInvoice: boolean;
+  blockers: string[];
+  warnings: string[];
+  totalAmountCents: number;
+  currency: string;
+  invoiced: boolean;
+  invoiceId?: string;
+  checkedAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type SupervisionLogStatus = 'draft' | 'submitted' | 'reviewed' | 'signed_off' | 'rejected';
 
-export interface CandidateSupervisionLog { id: string; candidateId: string; supervisorId: string; mentorId?: string; firmId?: string; projectId: string; periodStart?: string; status: SupervisionLogStatus; notes: string; createdAt: string; updatedAt?: string; }
+export interface CandidateSupervisionLog {
+  id: string;
+  candidateId: string;
+  mentorId: string;
+  firmId: string;
+  projectId?: string;
+  periodStart: string;
+  periodEnd: string;
+  hoursLogged: number;
+  activities: string;
+  category?: string;
+  sacapCategory?: string;
+  status: SupervisionLogStatus;
+  mentorComments?: string;
+  reviewedAt?: string;
+  signedOffAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export interface InvoiceReadinessCheck { id: string; projectId: string; firmId?: string; timesheetIds?: string[]; expenseIds?: string[]; status: 'ready' | 'not_ready' | 'review_required'; blockers: string[]; checkedAt: string; checkedBy: string; }
