@@ -44,6 +44,11 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   subscription_status_changed: '💳',
   refund_processed: '↩️',
   contractor_delivery_update: '🏗️',
+  timesheet_due: '⏰',
+  supervision_log_required: '📋',
+  registration_expiring: '🪪',
+  cpd_shortfall: '📊',
+  invoice_ready_for_review: '🧾',
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {

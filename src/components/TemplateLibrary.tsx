@@ -93,7 +93,7 @@ export default function TemplateLibrary({ user, firmId }: Props) {
               className="h-12 rounded-xl border border-input bg-background px-3 text-sm min-w-[140px]"
             >
               <option value="">All Categories</option>
-              {categories.map((cat) => (
+              {categories.map((cat: string) => (
                 <option key={cat} value={cat}>{CATEGORY_LABELS[cat] || cat}</option>
               ))}
             </select>

@@ -203,12 +203,11 @@ export async function getWorkloadSummary(firmId: string): Promise<WorkloadSummar
 
     return Array.from(byUser.entries()).map(([userId, data]) => ({
       userId,
-      displayName: data.displayName,
-      totalTasks: data.total,
-      completedTasks: data.completed,
+      openTasks: data.total - data.completed,
+      urgentTasks: 0,
       overdueTasks: data.overdue,
-      totalEstimatedHours: data.estHours,
-      totalActualHours: data.actualHours,
+      estimatedHours: data.estHours,
+      tasks: [],
     }));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TASKS_COL}/workload/${firmId}`);

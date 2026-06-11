@@ -304,6 +304,11 @@ class NotificationService {
       subscription_status_changed: '💳',
       refund_processed: '↩️',
       contractor_delivery_update: '🏗️',
+      timesheet_due: '⏰',
+      supervision_log_required: '📋',
+      registration_expiring: '🪪',
+      cpd_shortfall: '📊',
+      invoice_ready_for_review: '🧾',
     };
 
     toast(`${icons[type] || '🔔'} ${title}`, {

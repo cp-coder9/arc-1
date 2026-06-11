@@ -93,7 +93,7 @@ export async function logTime(input: {
       input.userId,
       'timesheet_due',
       `Timesheet entry logged: ${input.description.slice(0, 80)}`,
-      { timesheetId: ref.id, firmId: input.firmId, projectId: input.projectId }
+      { entityId: ref.id, firmId: input.firmId, projectId: input.projectId }
     );
 
     return entry;
@@ -201,7 +201,6 @@ export async function getTimesheetSummary(input: {
     let totalHours = 0;
     let billableHours = 0;
     let nonBillableHours = 0;
-    let internalHours = 0;
     let totalValueCents = 0;
     const byProject: Record<string, { hours: number; valueCents: number }> = {};
     const byUser: Record<string, { hours: number; valueCents: number }> = {};
@@ -213,26 +212,30 @@ export async function getTimesheetSummary(input: {
 
       if (entry.billable === 'billable') billableHours += hours;
       else if (entry.billable === 'non_billable') nonBillableHours += hours;
-      else internalHours += hours;
 
-      const projectKey = entry.projectId || 'no_project';
-      if (!byProject[projectKey]) byProject[projectKey] = { hours: 0, valueCents: 0 };
-      byProject[projectKey].hours += hours;
-      byProject[projectKey].valueCents += entry.totalValueCents || 0;
+      if (entry.projectId) {
+        if (!byProject[entry.projectId]) byProject[entry.projectId] = { hours: 0, valueCents: 0 };
+        byProject[entry.projectId].hours += hours;
+        byProject[entry.projectId].valueCents += entry.totalValueCents || 0;
+      }
 
-      if (!byUser[entry.userId]) byUser[entry.userId] = { hours: 0, valueCents: 0 };
-      byUser[entry.userId].hours += hours;
-      byUser[entry.userId].valueCents += entry.totalValueCents || 0;
+      if (entry.userId) {
+        if (!byUser[entry.userId]) byUser[entry.userId] = { hours: 0, valueCents: 0 };
+        byUser[entry.userId].hours += hours;
+        byUser[entry.userId].valueCents += entry.totalValueCents || 0;
+      }
     }
 
     return {
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
+      firmId: input.firmId,
+      userId: input.userId,
       totalHours: Math.round(totalHours * 100) / 100,
       billableHours: Math.round(billableHours * 100) / 100,
       nonBillableHours: Math.round(nonBillableHours * 100) / 100,
-      internalHours: Math.round(internalHours * 100) / 100,
       totalValueCents,
+      entries,
       byProject,
       byUser,
     };
@@ -244,21 +247,25 @@ export async function getTimesheetSummary(input: {
 export async function reconcileFees(projectId: string, feeChargedCents: number): Promise<FeeReconciliation[]> {
   try {
     const entries = await getTimesheetEntries({ firmId: '', projectId });
-    return entries.map((entry) => {
-      const timesheetValue = entry.totalValueCents || 0;
-      const variance = feeChargedCents - timesheetValue;
-      return {
-        timesheetEntryId: entry.id,
-        projectId,
-        userId: entry.userId,
-        hoursLogged: minutesToHours(entry.durationMinutes),
-        timesheetValueCents: timesheetValue,
-        feeChargedCents: feeChargedCents,
-        varianceCents: variance,
-        variancePercent: feeChargedCents > 0 ? Math.round((variance / feeChargedCents) * 10000) / 100 : 0,
-        reconciled: Math.abs(variance) < feeChargedCents * 0.1,
-      };
-    });
+    const timesheetIds = entries.map((e) => e.id);
+    const totalTimeValueCents = entries.reduce((sum, e) => sum + (e.totalValueCents || 0), 0);
+    const varianceCents = feeChargedCents - totalTimeValueCents;
+    const firmIds = [...new Set(entries.map((e) => e.firmId))];
+    const firmId = firmIds[0] || '';
+    const now = new Date().toISOString();
+
+    const result: FeeReconciliation = {
+      id: `recon_${projectId}_${Date.now()}`,
+      firmId,
+      projectId,
+      timesheetIds,
+      totalTimeValueCents,
+      proposalValueCents: feeChargedCents,
+      varianceCents,
+      createdAt: now,
+    };
+
+    return [result];
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TIMESHEETS_COL}/reconcile/${projectId}`);
   }
