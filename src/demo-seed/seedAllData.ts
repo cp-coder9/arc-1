@@ -126,10 +126,10 @@ async function seedUser(uid: string, force: boolean) {
   console.log(`   - ${MOCK_USER_LIST.length} mock users`);
   console.log(`   - ${MOCK_PROJECTS.length} projects across all stages`);
   console.log(`   - Submissions, messages, compliance per project`);
-  console.log(`   - ${MOCK_CPD_ARTICLES.length} CPD articles`);
-  console.log(`   - ${MOCK_CPD_ASSESSMENTS.length} CPD assessments`);
-  console.log(`   - ${MOCK_CPD_LEARNING_MODULES.length} CPD learning modules`);
-  console.log(`   - ${MOCK_CPD_CERTIFICATES.length} CPD certificates`);
+  console.log(`   - ${mockCPDArticles.length} CPD articles`);
+  console.log(`   - ${mockCPDAssessments.length} CPD assessments`);
+  console.log(`   - ${mockCPDLearningModules.length} CPD learning modules`);
+  console.log(`   - ${mockCPDCertificates.length} CPD certificates`);
   console.log(`   - All data under /demo/${uid}/`);
 }
 

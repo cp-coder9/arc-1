@@ -1,4 +1,4 @@
-import type { SubmissionStatus, SubmissionIndexItem } from '../../types';
+import type { SubmissionStatus, SubmissionIndexItem } from '@/types';
 import type { MockProject, ProjectStage } from './mockProjects';
 
 export interface MockSubmission {

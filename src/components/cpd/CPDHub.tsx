@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestor
 import { Award, BookOpen, Calendar, Clock, GraduationCap, Loader2, TrendingUp, User } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import type { UserProfile } from '@/types';
-import type { CPDCourse, CPDRecord, CPDCertificate, CPDProfessionalBody } from '@/services/cpdTypes';
+import type { CPDCourse, CPDRecord, CPDCertificate, CPDProfessionalBody, ArchitexBuiltEnvironmentRole } from '@/services/cpdTypes';
 import { getProfessionalBodyRuleSet, getRoleBodyMapping, calculateCPDCredits } from '@/services/cpdIndex';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,9 @@ export default function CPDHub({ user, onNavigate }: CPDHubProps) {
   const [records, setRecords] = useState<CPDRecord[]>([]);
   const [certificates, setCertificates] = useState<CPDCertificate[]>([]);
 
-  const professionalBody: CPDProfessionalBody = user.professionalBody || 'SACAP';
+  const professionalBody: CPDProfessionalBody = (user.professionalBody as CPDProfessionalBody) || 'SACAP';
   const ruleSet = getProfessionalBodyRuleSet(professionalBody);
-  const roleMapping = user.builtEnvironmentRole ? getRoleBodyMapping(user.builtEnvironmentRole) : null;
+  const roleMapping = user.builtEnvironmentRole ? getRoleBodyMapping(user.builtEnvironmentRole as ArchitexBuiltEnvironmentRole) : null;
 
   const unitLabel = useMemo(() => {
     if (professionalBody === 'SACPLAN') return 'points';

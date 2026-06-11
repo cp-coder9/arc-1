@@ -90,6 +90,11 @@ export interface UserProfile {
   firmStatus?: FirmMemberStatus;
   subscriptionStatus?: FirmSubscriptionStatus;
   billingRole?: FirmRole | 'none';
+  // CPD Assessment Platform fields
+  professionalBody?: string;
+  builtEnvironmentRole?: string;
+  cpdCycleStart?: string;
+  cpdCycleEnd?: string;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
