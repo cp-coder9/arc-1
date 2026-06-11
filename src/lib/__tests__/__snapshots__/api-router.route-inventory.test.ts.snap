@@ -585,6 +585,48 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
     "method": "get",
   },
   {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/agents",
+    "domain": "agents",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/agents/me",
+    "domain": "agents",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/jobs/:jobId/agent",
+    "domain": "marketplace",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/agents/event",
+    "domain": "agents",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/agents/:agentId/recommend",
+    "domain": "agents",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/agents/:agentId/apply",
+    "domain": "agents",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/api/jobs/:jobId/chat/agent-message",
+    "domain": "marketplace",
+    "method": "post",
+  },
+  {
     "authExpectation": "public",
     "canonicalPath": "/firebase/test",
     "domain": "platform",

@@ -14,7 +14,8 @@ export type ApiRouteDomain =
   | 'payments'
   | 'resources'
   | 'municipal'
-  | 'verifications';
+  | 'verifications'
+  | 'agents';
 
 export interface ApiRouteDomainRegistryEntry {
   domain: ApiRouteDomain;
@@ -41,6 +42,7 @@ export const API_ROUTE_DOMAINS: readonly ApiRouteDomain[] = [
   'resources',
   'municipal',
   'verifications',
+  'agents',
 ] as const;
 
 export const API_ROUTE_DOMAIN_LABELS: Record<ApiRouteDomain, string> = {
@@ -60,6 +62,7 @@ export const API_ROUTE_DOMAIN_LABELS: Record<ApiRouteDomain, string> = {
   resources: 'Resource centre',
   municipal: 'Municipal and statutory tracking',
   verifications: 'Professional verification',
+  agents: 'Agent orchestration and recommendations',
 };
 
 export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
@@ -159,6 +162,13 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
     label: API_ROUTE_DOMAIN_LABELS.verifications,
     description: 'Professional verification self-service and admin review endpoints.',
     prefixes: ['/verifications/', '/admin/verifications', '/architect/verify-sacap'],
+  },
+  {
+    domain: 'agents',
+    label: API_ROUTE_DOMAIN_LABELS.agents,
+    description: 'Agent orchestration, recommendations, and event endpoints.',
+    prefixes: ['/agents/'],
+    exactPaths: ['/agents'],
   },
 ] as const;
 

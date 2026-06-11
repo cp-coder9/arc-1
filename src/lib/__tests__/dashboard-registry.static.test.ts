@@ -238,18 +238,19 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab)');
   });
 
-  it('exposes backend role navigation sections and deterministic page test ids', () => {
-    // Navigation labels are now in architexNavigationConfig (single source of truth)
-    for (const heading of ['Command Centre', 'Inbox / Action Centre', 'Projects', 'Toolboxes', 'CPD & Learning', 'Documents / Knowledge Hub', 'Marketplace / Resource Centre', 'Finance & Commercial', 'Messages', 'Settings']) {
-      expect(navConfigSource).toContain(heading);
+  it('exposes architex navigation framework with deterministic nav config', () => {
+    // Navigation labels are in architexNavigationConfig (single source of truth)
+    for (const label of ['Command Centre', 'Inbox / Action Centre', 'Projects', 'Toolboxes', 'CPD & Learning', 'Documents / Knowledge Hub', 'Marketplace / Resource Centre', 'Finance & Commercial', 'Messages', 'Settings']) {
+      expect(navConfigSource).toContain(label);
     }
     // App.tsx integrates the navigation config for rendering
-    expect(appSource).toContain('architexNavigation');
     expect(appSource).toContain('visibleNavItems');
     expect(appSource).toContain('activeNavKey');
     expect(appSource).toContain('navKeyIcon');
     expect(appSource).toContain('getDefaultPageForNavKey');
     expect(appSource).toContain('getNavKeyForActiveTab');
+    expect(appSource).toContain('aria-label="Architex navigation"');
+    expect(appSource).toContain('aria-current={active ? "page" : undefined}');
   });
 
   it('keeps role-aware dashboard keyboard shortcuts discoverable and input-safe', () => {
