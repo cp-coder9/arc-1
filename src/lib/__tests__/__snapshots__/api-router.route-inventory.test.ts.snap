@@ -298,6 +298,12 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
   },
   {
     "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:projectId/submission-readiness",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
     "canonicalPath": "/proposals/:proposalId/compare",
     "domain": "marketplace",
     "method": "post",
