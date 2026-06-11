@@ -6902,6 +6902,310 @@ router.post("/procurement/:rfqId/guardrails", async (req, res) => {
   }
 });
 // Firebase test endpoint
+// ── Pack 12 Practice Management Routes ───────────────────────────────────────
+
+// Timesheets
+router.post("/api/practice/timesheets", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { logTime } = await import("../services/timesheetService");
+    const entry = await logTime(req.body);
+    res.status(201).json(entry);
+  } catch (err: any) {
+    console.error("Timesheet log error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.get("/api/practice/timesheets", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getTimesheetEntries, getTimesheetSummary } = await import("../services/timesheetService");
+    const { summary, periodStart, periodEnd, ...filters } = req.query;
+    if (summary === 'true' && periodStart && periodEnd) {
+      const result = await getTimesheetSummary({
+        firmId: req.query.firmId as string,
+        periodStart: periodStart as string,
+        periodEnd: periodEnd as string,
+        userId: req.query.userId as string | undefined,
+      });
+      return res.json(result);
+    }
+    const entries = await getTimesheetEntries(filters as any);
+    res.json(entries);
+  } catch (err: any) {
+    console.error("Timesheet query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Pipeline
+router.get("/api/practice/pipeline", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getFirmPipeline, getPipelineForecast } = await import("../services/pipelineService");
+    const { firmId, forecast, stage, status } = req.query;
+    if (forecast === 'true') {
+      const result = await getPipelineForecast(firmId as string);
+      return res.json(result);
+    }
+    const projects = await getFirmPipeline(firmId as string, {
+      stage: stage as any,
+      status: status as any,
+    });
+    res.json(projects);
+  } catch (err: any) {
+    console.error("Pipeline query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/api/practice/pipeline", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { addPipelineProject, updatePipelineStatus } = await import("../services/pipelineService");
+    const { action, ...data } = req.body;
+    if (action === 'updateStatus') {
+      await updatePipelineStatus(data.id, data.status, data.updates);
+      return res.json({ success: true });
+    }
+    const project = await addPipelineProject(data);
+    res.status(201).json(project);
+  } catch (err: any) {
+    console.error("Pipeline mutation error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Practice Tasks
+router.get("/api/practice/tasks", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getFirmTasks, getUserTasks, getWorkloadSummary } = await import("../services/practiceTaskService");
+    const { firmId, userId, workload, ...filters } = req.query;
+    if (workload === 'true') {
+      const summary = await getWorkloadSummary(firmId as string);
+      return res.json(summary);
+    }
+    if (userId) {
+      const tasks = await getUserTasks(userId as string, firmId as string);
+      return res.json(tasks);
+    }
+    const tasks = await getFirmTasks(firmId as string, filters as any);
+    res.json(tasks);
+  } catch (err: any) {
+    console.error("Task query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/api/practice/tasks", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { createTask, assignTask, updateTaskStatus, updateTask } = await import("../services/practiceTaskService");
+    const { action, ...data } = req.body;
+    switch (action) {
+      case 'assign':
+        await assignTask(data.taskId, data.assigneeId, data.assignedBy);
+        return res.json({ success: true });
+      case 'updateStatus':
+        await updateTaskStatus(data.taskId, data.status, data.actorId);
+        return res.json({ success: true });
+      case 'update':
+        await updateTask(data.taskId, data.updates);
+        return res.json({ success: true });
+      default:
+        const task = await createTask(data);
+        return res.status(201).json(task);
+    }
+  } catch (err: any) {
+    console.error("Task mutation error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Registrations
+router.get("/api/practice/registrations", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getFirmRegistrations, getUserRegistrations, getExpiringRegistrations, checkRenewalEligibility } = await import("../services/registrationRenewalService");
+    const { firmId, userId, expiring, eligibilityId, ...filters } = req.query;
+    if (eligibilityId) {
+      const result = await checkRenewalEligibility(eligibilityId as string);
+      return res.json(result);
+    }
+    if (expiring === 'true') {
+      const registrations = await getExpiringRegistrations(firmId as string);
+      return res.json(registrations);
+    }
+    if (userId) {
+      const registrations = await getUserRegistrations(userId as string, firmId as string);
+      return res.json(registrations);
+    }
+    const registrations = await getFirmRegistrations(firmId as string, filters as any);
+    res.json(registrations);
+  } catch (err: any) {
+    console.error("Registration query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/api/practice/registrations", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { registerProfessional, renewRegistration, updateCpdPoints, sendRenewalReminders } = await import("../services/registrationRenewalService");
+    const { action, ...data } = req.body;
+    switch (action) {
+      case 'renew':
+        await renewRegistration(data.id, data.newExpiryDate, data.actorId);
+        return res.json({ success: true });
+      case 'updateCpd':
+        await updateCpdPoints(data.id, data.cpdPointsEarned, data.actorId);
+        return res.json({ success: true });
+      case 'sendReminders':
+        const sent = await sendRenewalReminders(data.firmId);
+        return res.json({ success: true, remindersSent: sent });
+      default:
+        const registration = await registerProfessional(data);
+        return res.status(201).json(registration);
+    }
+  } catch (err: any) {
+    console.error("Registration mutation error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Templates
+router.get("/api/practice/templates", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getFirmTemplates, getTemplatesByRole, getTemplateVersions } = await import("../services/templateLibraryService");
+    const { firmId, role, versions, templateId, ...filters } = req.query;
+    if (versions === 'true' && templateId) {
+      const result = await getTemplateVersions(templateId as string);
+      return res.json(result);
+    }
+    if (role) {
+      const templates = await getTemplatesByRole(firmId as string, role as any);
+      return res.json(templates);
+    }
+    const templates = await getFirmTemplates(firmId as string, filters as any);
+    res.json(templates);
+  } catch (err: any) {
+    console.error("Template query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/api/practice/templates", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { createTemplate, updateTemplate, versionTemplate } = await import("../services/templateLibraryService");
+    const { action, ...data } = req.body;
+    switch (action) {
+      case 'update':
+        await updateTemplate(data.id, data.updates);
+        return res.json({ success: true });
+      case 'version':
+        const template = await versionTemplate(data.templateId, data);
+        return res.json(template);
+      default:
+        const newTemplate = await createTemplate(data);
+        return res.status(201).json(newTemplate);
+    }
+  } catch (err: any) {
+    console.error("Template mutation error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Supervision
+router.get("/api/practice/supervision", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getCandidateLogs, getMentorLogs, getFirmSupervisionLogs } = await import("../services/candidateSupervisionService");
+    const { firmId, candidateId, mentorId, ...filters } = req.query;
+    if (candidateId) {
+      const logs = await getCandidateLogs(candidateId as string, firmId as string);
+      return res.json(logs);
+    }
+    if (mentorId) {
+      const logs = await getMentorLogs(mentorId as string, firmId as string);
+      return res.json(logs);
+    }
+    const logs = await getFirmSupervisionLogs(firmId as string, filters as any);
+    res.json(logs);
+  } catch (err: any) {
+    console.error("Supervision query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/api/practice/supervision", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { createSupervisionLog, submitForReview, reviewLog, signOffLog, rejectLog } = await import("../services/candidateSupervisionService");
+    const { action, ...data } = req.body;
+    switch (action) {
+      case 'submit':
+        await submitForReview(data.logId, data.actorId);
+        return res.json({ success: true });
+      case 'review':
+        await reviewLog(data.logId, data.mentorId, data.mentorNotes);
+        return res.json({ success: true });
+      case 'signOff':
+        await signOffLog(data.logId, data.mentorId);
+        return res.json({ success: true });
+      case 'reject':
+        await rejectLog(data.logId, data.mentorId, data.reason);
+        return res.json({ success: true });
+      default:
+        const log = await createSupervisionLog(data);
+        return res.status(201).json(log);
+    }
+  } catch (err: any) {
+    console.error("Supervision mutation error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Invoice Readiness
+router.get("/api/practice/invoice-readiness", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { getReadyInvoices, getProjectReadinessChecks } = await import("../services/invoiceReadinessService");
+    const { firmId, projectId } = req.query;
+    if (!firmId) return res.status(400).json({ error: "firmId is required" });
+    if (projectId) {
+      const checks = await getProjectReadinessChecks(firmId as string, projectId as string);
+      return res.json(checks);
+    }
+    const checks = await getReadyInvoices(firmId as string);
+    res.json(checks);
+  } catch (err: any) {
+    console.error("Invoice readiness query error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/api/practice/invoice-readiness", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { checkInvoiceReadiness, markInvoiced } = await import("../services/invoiceReadinessService");
+    const { action, ...data } = req.body;
+    if (action === 'markInvoiced') {
+      await markInvoiced(data.id, data.invoiceId);
+      return res.json({ success: true });
+    }
+    const check = await checkInvoiceReadiness(data);
+    res.status(201).json(check);
+  } catch (err: any) {
+    console.error("Invoice readiness mutation error:", err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+
 router.get("/firebase/test", async (_req, res) => {
   try {
     const collections = await adminDb.listCollections();

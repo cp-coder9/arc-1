@@ -75,7 +75,8 @@ import {
   Construction,
   ArrowLeft,
   Factory,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -155,6 +156,10 @@ const CPDAssessmentPage = lazyWithChunkRetry(() => import('./components/CPDAsses
 const ToolsetReviewDashboard = lazyWithChunkRetry(() => import('./components/toolsets/ToolsetReviewDashboard'));
 const DrawingRegisterPage = lazyWithChunkRetry(() => import('./components/DrawingRegisterPage'));
 const AdminGovernanceConsolePage = lazyWithChunkRetry(() => import('./components/AdminGovernanceConsolePage'));
+const TimesheetEntryPage = lazyWithChunkRetry(() => import('./components/TimesheetEntry'));
+const PipelineKanbanPage = lazyWithChunkRetry(() => import('./components/PipelineKanban'));
+const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/TemplateLibrary'));
+const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -240,6 +245,10 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'resource-centre', label: 'Resource Centre / Checklists', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'Governance', icon: <Database size={18} />, summary: 'Role-based resource centre and checklist shell.', backedBy: ['KnowledgeSources'] },
   { id: 'cpd-assessment', label: 'CPD Assessment', roles: DESIGN_TEAM_ROLES, group: 'Governance', icon: <BookOpen size={18} />, summary: 'CPD assessment workflow backed by live assessment and attempt records with human-reviewed certificates.', backedBy: ['cpdService'] },
   { id: 'admin-console', label: 'Admin Console', roles: ['admin'], group: 'Governance', icon: <Settings2 size={18} />, summary: 'Whole-system governance console backed by current admin dashboard tabs.', backedBy: ['AdminDashboard'] },
+  { id: 'timesheets', label: 'Timesheets', roles: ['architect', 'bep', 'freelancer', 'contractor', 'subcontractor', 'admin'], group: 'Governance', icon: <Clock size={18} />, summary: 'Time capture with billable/non-billable tracking and fee reconciliation.', backedBy: ['timesheetService'] },
+  { id: 'pipeline', label: 'Pipeline', roles: ['architect', 'bep', 'admin'], group: 'Governance', icon: <BarChart3 size={18} />, summary: 'Visual pipeline kanban with win/loss tracking and value forecasting.', backedBy: ['pipelineService'] },
+  { id: 'templates', label: 'Templates', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <FileText size={18} />, summary: 'Practice document template library with versioning and role-based access.', backedBy: ['templateLibraryService'] },
+  { id: 'registrations', label: 'Registrations', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <ShieldCheck size={18} />, summary: 'Professional registration renewal tracker with CPD monitoring.', backedBy: ['registrationRenewalService'] },
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
@@ -273,6 +282,10 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'sans-forms',
   'cpd-assessment',
   'messages',
+  'timesheets',
+  'pipeline',
+  'templates',
+  'registrations',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1190,6 +1203,10 @@ export default function App() {
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
+              {activeTab === 'timesheets' && <TimesheetEntryPage user={user} />}
+              {activeTab === 'pipeline' && <PipelineKanbanPage user={user} />}
+              {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
+              {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
