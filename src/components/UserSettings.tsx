@@ -85,6 +85,43 @@ const ROLE_PROFILE_FIELDS: Record<UserProfile['role'], RoleProfileField[]> = {
     { key: 'twoFactorEnabled', label: '2FA enabled', helper: 'Confirm whether 2FA is enabled.', kind: 'boolean' },
     { key: 'auditIdentity', label: 'Audit identity', helper: 'Audit identity or staff reference.', kind: 'object' },
   ],
+  engineer: [
+    { key: 'disciplines', label: 'Engineering disciplines', helper: 'Comma-separated, e.g. structural, civil, mechanical, electrical.', kind: 'array' },
+    { key: 'registrationNumber', label: 'ECSA registration number', helper: 'Professional registration for compliance and verification.' },
+    { key: 'professionalIndemnity', label: 'Professional indemnity', helper: 'PI insurance status or policy reference.', kind: 'object' },
+  ],
+  quantity_surveyor: [
+    { key: 'registrationNumber', label: 'SACQSP registration number', helper: 'Professional registration for compliance and verification.' },
+    { key: 'professionalIndemnity', label: 'Professional indemnity', helper: 'PI insurance status or policy reference.', kind: 'object' },
+  ],
+  town_planner: [
+    { key: 'registrationNumber', label: 'SACPLAN registration number', helper: 'Professional registration for compliance and verification.' },
+    { key: 'professionalIndemnity', label: 'Professional indemnity', helper: 'PI insurance status or policy reference.', kind: 'object' },
+  ],
+  energy_professional: [
+    { key: 'registrationNumber', label: 'Professional registration number', helper: 'SACAP/ECSA or recognised energy body registration.' },
+    { key: 'certifications', label: 'Energy certifications', helper: 'Comma-separated, e.g. EDGE, Green Star, NABERS.', kind: 'array' },
+  ],
+  fire_engineer: [
+    { key: 'registrationNumber', label: 'ECSA / IFE registration number', helper: 'Professional fire engineering registration.' },
+    { key: 'professionalIndemnity', label: 'Professional indemnity', helper: 'PI insurance status or policy reference.', kind: 'object' },
+  ],
+  site_manager: [
+    { key: 'registrationNumber', label: 'SACPCMP registration number', helper: 'Professional registration for construction management.' },
+    { key: 'healthSafetyFiles', label: 'Health & safety credentials', helper: 'SHE file references or uploaded document names.', kind: 'array' },
+  ],
+  developer: [
+    { key: 'companyRegistration', label: 'Company registration number', helper: 'CIPC or equivalent company registration.' },
+    { key: 'portfolioUrls', label: 'Portfolio URLs', helper: 'Comma-separated links to past projects.', kind: 'array' },
+  ],
+  firm_admin: [
+    { key: 'department', label: 'Department', helper: 'Practice department or function.' },
+    { key: 'permissionLevel', label: 'Permission level', helper: 'Governance permission level for audit visibility.' },
+  ],
+  platform_admin: [
+    { key: 'permissionLevel', label: 'Permission level', helper: 'Governance permission level for audit visibility.' },
+    { key: 'twoFactorEnabled', label: '2FA enabled', helper: 'Confirm whether 2FA is enabled.', kind: 'boolean' },
+  ],
 };
 
 const ARRAY_FIELDS = new Set(['disciplines', 'healthSafetyFiles', 'plantCapacity', 'tradeCategories', 'packageTypes', 'serviceAreas', 'productCategories', 'deliveryRegions', 'catalogueUrls', 'skills', 'software', 'portfolioUrls']);

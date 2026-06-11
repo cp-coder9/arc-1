@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin';
 
 export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
 export type FirmMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';
@@ -1164,3 +1164,41 @@ export interface AgentRecommendation {
   requiresHumanApproval: boolean;
   createdAt: string;
 }
+
+// Re-export toolset types from pack
+export type {
+  ToolboxUserRole,
+  ToolboxFamilyId,
+  CalculatorRiskStatus,
+  CalculatorUseClass,
+  CalculatorExportTarget,
+  ToolboxContext,
+  CalculatorDefinition,
+  CalculatorRun,
+  XAfenestrationInputs,
+  RValueInputs,
+  RationalMethodInputs,
+  ConcreteOrderInputs,
+  BrickBlockworkInputs,
+  TenderRateBuildUpInputs,
+  LabourProductivityInputs,
+  ToolboxAgentRecommendation,
+} from './types/toolboxCalculators';
+
+export type {
+  ArchitexComprehensiveRole,
+  ArchitexWorkflowPhase,
+  ToolCategory,
+  ToolExportTarget,
+  ToolContext,
+  ToolDefinition,
+  ToolRecommendation,
+  ToolRunEnvelope,
+  StaffActivityLogPayload,
+  PlantAllocationPayload,
+  ProcurementPackagePayload,
+  DrawingComplianceCheckPayload,
+  BomBoqQuotePayload,
+  SnagItemPayload,
+  ResourceMarketplaceListingPayload,
+} from './types/comprehensiveToolsets';

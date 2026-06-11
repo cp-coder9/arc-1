@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AIReviewResult, AICategory, AIIssue, Finding } from '@/types';
+import { AIReviewResult, AICategory, AIIssue, Finding, UserRole } from '@/types';
 import { ShieldCheck, CheckCircle2, Printer, Download, Loader2, Search, AlertTriangle, FileText } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -16,7 +16,7 @@ interface ComplianceReportProps {
   drawingName?: string;
   projectName?: string;
   onClose?: () => void;
-  userRole?: 'admin' | 'architect' | 'client' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier';
+  userRole?: UserRole;
   submissionId?: string;
   userId?: string;
 }
