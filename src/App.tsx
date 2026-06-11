@@ -158,6 +158,7 @@ const AICoPilotPage = lazyWithChunkRetry(() => import('./components/AICoPilotPag
 const ContractorStaffPlantPage = lazyWithChunkRetry(() => import('./components/ContractorStaffPlantPage'));
 const BEPFreelancerJobsPage = lazyWithChunkRetry(() => import('./components/BEPFreelancerJobsPage'));
 const SANSComplianceFormsPage = lazyWithChunkRetry(() => import('./components/SANSComplianceFormsPage'));
+const ComplianceToolboxHub = lazyWithChunkRetry(() => import('./components/ComplianceToolboxHub'));
 const CPDAssessmentPage = lazyWithChunkRetry(() => import('./components/CPDAssessmentPage'));
 const ToolsetReviewDashboard = lazyWithChunkRetry(() => import('./components/toolsets/ToolsetReviewDashboard'));
 const DrawingRegisterPage = lazyWithChunkRetry(() => import('./components/DrawingRegisterPage'));
@@ -235,6 +236,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
   { id: 'drawing-checker', label: 'AI Drawing Checker', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Drawing compliance checker backed by upload/review records and FileManager quick scans.', backedBy: ['FileManager'] },
   { id: 'sans-forms', label: 'SANS / Compliance Forms', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Compliance form autofill shell using project/profile/team data.', backedBy: ['ComplianceReport'] },
+  { id: 'compliance', label: 'SANS Codified Compliance', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <ShieldCheck size={18} />, summary: 'SANS/NBR Compliance Intelligence Engine: clause search, part browser, boundary wall checker, AI drawing compliance bridge.', backedBy: ['complianceEngineService', 'AI Drawing Checker'] },
   { id: 'technical-brief', label: 'Technical Brief Editor', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <Briefcase size={18} />, summary: 'BEP technical brief refinement shell after client intake.', backedBy: ['job brief data'] },
   { id: 'bep-marketplace', label: 'Client Marketplace', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Search size={18} />, summary: 'Live client opportunity marketplace for design-team proposal submissions.', backedBy: ['jobs', 'applications'] },
   { id: 'bep-team', label: 'Design Team Matrix', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Users size={18} />, summary: 'Discipline responsibility matrix and consultant invitation workspace.', backedBy: ['projects.teamMembers', 'teamService'] },
@@ -286,6 +288,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'bep-team',
   'bep-freelancers',
   'sans-forms',
+  'compliance',
   'cpd-assessment',
   'messages',
   'timesheets',
@@ -1046,6 +1049,7 @@ export default function App() {
               {activeTab === 'contractor-staff' && <ContractorStaffPlantPage user={user} />}
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
+              {activeTab === 'compliance' && <ComplianceToolboxHub />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
               {activeTab === 'timesheets' && <TimesheetEntryPage user={user} />}
               {activeTab === 'pipeline' && <PipelineKanbanPage user={user} />}
