@@ -8,6 +8,9 @@ import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
 import { trackUserActivity, type UserActivitySource } from './lib/userActivity';
 import { apiFetch } from './lib/apiClient';
+import { DemoModeProvider, useDemoMode } from './demo-context/DemoModeProvider';
+import { DemoRoleSwitcher } from './components/DemoRoleSwitcher';
+import { DemoBanner } from './components/DemoBanner';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -917,6 +920,7 @@ export default function App() {
   const visibleShortcutPages = pagesForRole(user.role).slice(0, 9);
 
   return (
+    <DemoModeProvider>
     <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:w-[288px] md:shrink-0 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -929,6 +933,7 @@ export default function App() {
                 <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
               </div>
             </div>
+            <DemoRoleSwitcher />
             <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-primary/10" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
@@ -1065,8 +1070,10 @@ export default function App() {
           </motion.div>
         </ScrollArea>
       </main>
+      <DemoBanner />
       <Toaster />
     </div>
+    </DemoModeProvider>
   );
 }
 

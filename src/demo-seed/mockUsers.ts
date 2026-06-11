@@ -1,0 +1,225 @@
+import type { UserRole } from '../../types';
+
+/**
+ * Mock user profiles — one per role type.
+ * Used to populate demo sandbox and assign to projects.
+ */
+export interface MockUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  firmName: string;
+  phone: string;
+  sacapReg?: string;
+  ecoReg?: string;
+  speciality?: string;
+  bio: string;
+  avatarSeed: string;
+}
+
+export const MOCK_USERS: Record<string, MockUser> = {
+  client_01: {
+    uid: 'demo_client_01',
+    email: 'client@demo.architex.co.za',
+    displayName: 'Sarah van der Merwe',
+    role: 'client',
+    firmName: 'Van der Merwe Developments',
+    phone: '+27 82 555 0101',
+    bio: 'Property developer specialising in residential and mixed-use projects in Gauteng.',
+    avatarSeed: 'sarah-vdm',
+  },
+  client_02: {
+    uid: 'demo_client_02',
+    email: 'michael@demo.architex.co.za',
+    displayName: 'Michael Nkosi',
+    role: 'client',
+    firmName: 'Nkosi Property Group',
+    phone: '+27 72 555 0202',
+    bio: 'Commercial property investor focusing on office and retail developments in Cape Town.',
+    avatarSeed: 'michael-nkosi',
+  },
+  client_03: {
+    uid: 'demo_client_03',
+    email: 'thandi@demo.architex.co.za',
+    displayName: 'Thandi Mthembu',
+    role: 'client',
+    firmName: 'Mthembu Healthcare Properties',
+    phone: '+27 83 555 0303',
+    bio: 'Healthcare facility developer with projects across KwaZulu-Natal.',
+    avatarSeed: 'thandi-m',
+  },
+  architect_01: {
+    uid: 'demo_architect_01',
+    email: 'architect@demo.architex.co.za',
+    displayName: 'Gregory Thompson PrArch',
+    role: 'architect',
+    firmName: 'Thompson Architecture Studio',
+    phone: '+27 82 555 1001',
+    sacapReg: 'PrArch 45672',
+    bio: 'Registered architect with 15 years experience in residential and commercial projects.',
+    avatarSeed: 'greg-thompson',
+  },
+  architect_02: {
+    uid: 'demo_architect_02',
+    email: 'lisa@demo.architex.co.za',
+    displayName: 'Lisa Naidoo PrArch',
+    role: 'architect',
+    firmName: 'Naidoo & Partners Architects',
+    phone: '+27 71 555 1002',
+    sacapReg: 'PrArch 48123',
+    bio: 'Award-winning architect specialising in educational and civic buildings.',
+    avatarSeed: 'lisa-naidoo',
+  },
+  technologist_01: {
+    uid: 'demo_technologist_01',
+    email: 'tech@demo.architex.co.za',
+    displayName: 'Pieter Botha',
+    role: 'architect', // maps to architect dashboard for internal routing
+    firmName: 'Botha Design Works',
+    phone: '+27 72 555 2001',
+    sacapReg: 'SACAP AT 12345',
+    bio: 'Architectural technologist with Revit expertise and 8 years in building documentation.',
+    avatarSeed: 'pieter-botha',
+  },
+  engineer_struct_01: {
+    uid: 'demo_engineer_struct_01',
+    email: 'engineer.struct@demo.architex.co.za',
+    displayName: 'David Govender PrEng',
+    role: 'bep',
+    firmName: 'Govender Structural Engineers',
+    phone: '+27 82 555 3001',
+    ecoReg: 'PrEng 20190012',
+    bio: 'Structural engineer specialising in reinforced concrete and steel design.',
+    avatarSeed: 'david-govender',
+  },
+  engineer_civil_01: {
+    uid: 'demo_engineer_civil_01',
+    email: 'engineer.civil@demo.architex.co.za',
+    displayName: 'Nomsa Zulu PrEng',
+    role: 'bep',
+    firmName: 'Zulu Civil Consulting',
+    phone: '+27 73 555 3002',
+    ecoReg: 'PrEng 20210034',
+    bio: 'Civil engineer focusing on drainage, stormwater, and earthworks design.',
+    avatarSeed: 'nomsa-zulu',
+  },
+  engineer_elec_01: {
+    uid: 'demo_engineer_elec_01',
+    email: 'engineer.elec@demo.architex.co.za',
+    displayName: 'Ahmed Cassim PrEng',
+    role: 'bep',
+    firmName: 'Cassim Electrical Engineers',
+    phone: '+27 74 555 3003',
+    ecoReg: 'PrEng 20200056',
+    bio: 'Electrical engineer with expertise in building services and LV reticulation.',
+    avatarSeed: 'ahmed-cassim',
+  },
+  engineer_mech_01: {
+    uid: 'demo_engineer_mech_01',
+    email: 'engineer.mech@demo.architex.co.za',
+    displayName: 'Jenna Williams PrEng',
+    role: 'bep',
+    firmName: 'Williams Mechanical Consulting',
+    phone: '+27 81 555 3004',
+    ecoReg: 'PrEng 20180078',
+    bio: 'Mechanical engineer specialising in HVAC and wet services for commercial buildings.',
+    avatarSeed: 'jenna-williams',
+  },
+  engineer_fire_01: {
+    uid: 'demo_engineer_fire_01',
+    email: 'engineer.fire@demo.architex.co.za',
+    displayName: 'Sipho Khumalo',
+    role: 'bep',
+    firmName: 'Khumalo Fire Safety Associates',
+    phone: '+27 78 555 3005',
+    bio: 'Fire engineer with SANS 10400-T expertise and 12 years in fire plan reviews.',
+    avatarSeed: 'sipho-khumalo',
+  },
+  qs_01: {
+    uid: 'demo_qs_01',
+    email: 'qs@demo.architex.co.za',
+    displayName: 'Maria Pretorius PrQS',
+    role: 'bep',
+    firmName: 'Pretorius Quantity Surveyors',
+    phone: '+27 82 555 4001',
+    sacapReg: 'PrQS 56789',
+    bio: 'Professional quantity surveyor with experience in commercial and residential projects.',
+    avatarSeed: 'maria-pretorius',
+  },
+  contractor_01: {
+    uid: 'demo_contractor_01',
+    email: 'contractor@demo.architex.co.za',
+    displayName: 'James Mokoena',
+    role: 'contractor',
+    firmName: 'Mokoena Construction (Pty) Ltd',
+    phone: '+27 83 555 5001',
+    bio: 'NHBRC registered Grade 7GB contractor with 20 years in commercial construction.',
+    avatarSeed: 'james-mokoena',
+  },
+  subcontractor_01: {
+    uid: 'demo_subcontractor_01',
+    email: 'subby@demo.architex.co.za',
+    displayName: 'Andre Ferreira',
+    role: 'subcontractor',
+    firmName: 'Ferreira Steel & Glazing',
+    phone: '+27 72 555 6001',
+    bio: 'Steelwork and aluminium glazing subcontractor operating in Gauteng.',
+    avatarSeed: 'andre-ferreira',
+  },
+  supplier_01: {
+    uid: 'demo_supplier_01',
+    email: 'supplier@demo.architex.co.za',
+    displayName: 'Michelle Jacobs',
+    role: 'supplier',
+    firmName: 'Jacobs Building Supplies CC',
+    phone: '+27 76 555 7001',
+    bio: 'Building materials supplier — cement, rebar, bricks, and sanitaryware.',
+    avatarSeed: 'michelle-jacobs',
+  },
+  bep_01: {
+    uid: 'demo_bep_01',
+    email: 'bep@demo.architex.co.za',
+    displayName: 'Tendai Mukwena',
+    role: 'bep',
+    firmName: 'Mukwena Energy Compliance',
+    phone: '+27 71 555 8001',
+    sacapReg: 'SACAP BEP 23456',
+    bio: 'Built environment professional with SANS 10400-XA compliance expertise.',
+    avatarSeed: 'tendai-mukwena',
+  },
+  freelancer_01: {
+    uid: 'demo_freelancer_01',
+    email: 'freelancer@demo.architex.co.za',
+    displayName: 'Chloe Marais',
+    role: 'freelancer',
+    firmName: 'Marais Drafting Services',
+    phone: '+27 62 555 9001',
+    bio: 'Freelance architectural draughtsperson with ArchiCAD and Revit skills.',
+    avatarSeed: 'chloe-marais',
+  },
+  admin_01: {
+    uid: 'demo_admin_01',
+    email: 'admin@demo.architex.co.za',
+    displayName: 'Admin User',
+    role: 'admin',
+    firmName: 'Architex Platform',
+    phone: '+27 82 555 0001',
+    bio: 'Platform administrator overseeing compliance, moderation, and user management.',
+    avatarSeed: 'admin-user',
+  },
+  cpd_officer_01: {
+    uid: 'demo_cpd_officer_01',
+    email: 'cpd@demo.architex.co.za',
+    displayName: 'Dr. Fatima Patel',
+    role: 'admin',
+    firmName: 'Architex CPD Academy',
+    phone: '+27 82 555 1100',
+    sacapReg: 'SACAP CPD-ADMIN 89012',
+    speciality: 'CPD Administration & Compliance',
+    bio: 'SACAP-accredited CPD administrator managing CPD event verification, attendance tracking, and compliance reporting for the Architex CPD Academy. Ensures all continuing professional development activities meet SACAP Category 1 and Category 2 requirements.',
+    avatarSeed: 'fatima-patel',
+  },
+};
+
+export const MOCK_USER_LIST = Object.values(MOCK_USERS);
