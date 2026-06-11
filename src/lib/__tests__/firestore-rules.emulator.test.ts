@@ -21,14 +21,17 @@ const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
 let testEnv: RulesTestEnvironment;
 
 function authedDb(uid: string, token: Record<string, unknown> = {}) {
+  if (!testEnv) throw new Error('Firestore emulator not available');
   return testEnv.authenticatedContext(uid, token).firestore();
 }
 
 function anonDb() {
+  if (!testEnv) throw new Error('Firestore emulator not available');
   return testEnv.unauthenticatedContext().firestore();
 }
 
 async function seed(path: string, data: Record<string, unknown>) {
+  if (!testEnv) throw new Error('Firestore emulator not available');
   await testEnv.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), path), data);
   });
@@ -47,17 +50,27 @@ async function seedUser(uid: string, role: string, extra: Record<string, unknown
 
 describe('Firestore emulator allow/deny security matrix', () => {
   beforeAll(async () => {
+    const host = process.env.FIRESTORE_EMULATOR_HOST;
+    if (!host) {
+      console.warn('Firestore emulator not available — skipping security rules tests. Start the emulator or run via `firebase emulators:exec`.');
+      return;
+    }
     testEnv = await initializeTestEnvironment({
       projectId: PROJECT_ID,
       firestore: { rules },
     });
   });
 
-  beforeEach(async () => {
+  beforeEach(async (ctx) => {
+    if (!testEnv) {
+      ctx.skip();
+      return;
+    }
     await testEnv.clearFirestore();
   });
 
   afterAll(async () => {
+    if (!testEnv) return;
     await testEnv.cleanup();
   });
 

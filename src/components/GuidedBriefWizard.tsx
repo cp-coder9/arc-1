@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { addDoc, collection, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { AlertTriangle, Loader2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../lib/firebase';
 import { MAX_UPLOAD_SIZE_LABEL, uploadAndTrackFile } from '../lib/uploadService';
 import type { JobCategory, UserProfile } from '../types';
 import { buildBriefInterpretation, buildProjectAttachmentMetadata, buildProjectBrief } from '../services/briefWorkflowService';
 import { buildMarketplaceOpportunityFromBrief } from '../services/marketplaceWorkflowService';
+import { findMissingFacts } from '../services/appointmentKickoffService';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -163,6 +164,38 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
             <Field label="Municipal area"><Input value={form.municipalArea} onChange={(event) => update('municipalArea', event.target.value)} /></Field>
             <Field label="Property address" className="md:col-span-2"><Input value={form.propertyAddress} onChange={(event) => update('propertyAddress', event.target.value)} /></Field>
             <Field label="Requirements, one per line" className="md:col-span-2"><textarea className="w-full min-h-28 rounded-md border border-input bg-background p-3 text-sm" value={form.requirements} onChange={(event) => update('requirements', event.target.value)} placeholder="More bedrooms\nOpen-plan kitchen\nMunicipal submission support" /></Field>
+
+            {/* Pack 5: Project facts readiness for kickoff */}
+            {(() => {
+              const facts = {
+                municipality: form.municipalArea || undefined,
+                province: undefined,
+                propertyDescription: form.propertyAddress || undefined,
+                erfNumber: form.erfNumber || undefined,
+                professionalBody: undefined,
+                professionalRegistrationNumber: undefined,
+              };
+              const missing = findMissingFacts(facts);
+              if (missing.length === 0) return null;
+              return (
+                <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-800 dark:bg-amber-950/20">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    Project facts needed for kickoff readiness:
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {missing.map((fact, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                        <span>{fact}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    These facts are required before a professional can be appointed and the project can kick off.
+                  </p>
+                </div>
+              );
+            })()}
           </div>}
 
           {step === 3 && <div className="space-y-4">

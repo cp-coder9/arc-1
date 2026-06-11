@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Suspense, lazy, useCallback, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useState, useEffect } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
 import { trackUserActivity, type UserActivitySource } from './lib/userActivity';
 import { apiFetch } from './lib/apiClient';
+import { DemoModeProvider, useDemoMode } from './demo-context/DemoModeProvider';
+import { DemoRoleSwitcher } from './components/DemoRoleSwitcher';
+import { DemoBanner } from './components/DemoBanner';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -81,6 +84,9 @@ import {
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
+import { architexNavigation } from './navigation/architexNavigationConfig';
+import { getDefaultPageForNavKey, getNavKeyForActiveTab } from './navigation/navDashboardAdapter';
+import type { ArchitexNavKey } from './navigation/navTypes';
 
 // Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
@@ -152,6 +158,7 @@ const AICoPilotPage = lazyWithChunkRetry(() => import('./components/AICoPilotPag
 const ContractorStaffPlantPage = lazyWithChunkRetry(() => import('./components/ContractorStaffPlantPage'));
 const BEPFreelancerJobsPage = lazyWithChunkRetry(() => import('./components/BEPFreelancerJobsPage'));
 const SANSComplianceFormsPage = lazyWithChunkRetry(() => import('./components/SANSComplianceFormsPage'));
+const ComplianceToolboxHub = lazyWithChunkRetry(() => import('./components/ComplianceToolboxHub'));
 const CPDAssessmentPage = lazyWithChunkRetry(() => import('./components/CPDAssessmentPage'));
 const ToolsetReviewDashboard = lazyWithChunkRetry(() => import('./components/toolsets/ToolsetReviewDashboard'));
 const DrawingRegisterPage = lazyWithChunkRetry(() => import('./components/DrawingRegisterPage'));
@@ -229,6 +236,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
   { id: 'drawing-checker', label: 'AI Drawing Checker', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Drawing compliance checker backed by upload/review records and FileManager quick scans.', backedBy: ['FileManager'] },
   { id: 'sans-forms', label: 'SANS / Compliance Forms', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Compliance form autofill shell using project/profile/team data.', backedBy: ['ComplianceReport'] },
+  { id: 'compliance', label: 'SANS Codified Compliance', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <ShieldCheck size={18} />, summary: 'SANS/NBR Compliance Intelligence Engine: clause search, part browser, boundary wall checker, AI drawing compliance bridge.', backedBy: ['complianceEngineService', 'AI Drawing Checker'] },
   { id: 'technical-brief', label: 'Technical Brief Editor', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <Briefcase size={18} />, summary: 'BEP technical brief refinement shell after client intake.', backedBy: ['job brief data'] },
   { id: 'bep-marketplace', label: 'Client Marketplace', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Search size={18} />, summary: 'Live client opportunity marketplace for design-team proposal submissions.', backedBy: ['jobs', 'applications'] },
   { id: 'bep-team', label: 'Design Team Matrix', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Users size={18} />, summary: 'Discipline responsibility matrix and consultant invitation workspace.', backedBy: ['projects.teamMembers', 'teamService'] },
@@ -280,6 +288,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'bep-team',
   'bep-freelancers',
   'sans-forms',
+  'compliance',
   'cpd-assessment',
   'messages',
   'timesheets',
@@ -418,6 +427,15 @@ export default function App() {
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('command');
+  const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
+
+  const visibleNavItems = useMemo(() => {
+    if (!user) return [];
+    return architexNavigation.filter((item) => {
+      if (!item.roles || item.roles.length === 0) return true;
+      return item.roles.includes(user.role);
+    });
+  }, [user]);
 
   const navigateDashboard = useCallback((targetPage: string, source: UserActivitySource = 'component') => {
     setActiveTab(targetPage);
@@ -914,6 +932,7 @@ export default function App() {
   const visibleShortcutPages = pagesForRole(user.role).slice(0, 9);
 
   return (
+    <DemoModeProvider>
     <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:w-[288px] md:shrink-0 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -926,6 +945,7 @@ export default function App() {
                 <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
               </div>
             </div>
+            <DemoRoleSwitcher />
             <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-primary/10" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
@@ -942,180 +962,16 @@ export default function App() {
             </div>
           </div>
 
-          <nav className="flex-1 space-y-1.5" aria-label="Role workspace navigation">
-            <NavSectionLabel>Project</NavSectionLabel>
-            <NavItem
-              icon={<LayoutDashboard size={18} />}
-              label="Command Centre"
-              active={activeTab === 'command'}
-              onClick={() => navigateDashboard('command', 'sidebar')}
-              data-testid="nav-page-command"
-            />
-            {Object.entries(
-              pagesForRole(user!.role)
-                .filter((page) => page.id !== 'command')
-                .reduce<Record<string, DashboardPage[]>>((sections, page) => {
-                  const section = page.id === 'profile' ? 'Account' : dashboardSectionLabel(page.group);
-                  sections[section] = [...(sections[section] ?? []), page];
-                  return sections;
-                }, {})
-            ).map(([section, pages]) => (
-              <React.Fragment key={section}>
-                {section !== 'Project' && <NavSectionLabel>{section}</NavSectionLabel>}
-                {pages.map((page) => (
-                  <NavItem
-                    key={page.id}
-                    icon={page.icon}
-                    label={page.label}
-                    active={activeTab === page.id}
-                    onClick={() => navigateDashboard(page.id, 'sidebar')}
-                    data-testid={`nav-page-${page.id}`}
-                  />
-                ))}
-              </React.Fragment>
+          <nav className="flex-1 space-y-1.5" aria-label="Architex navigation">
+            {visibleNavItems.map((item) => (
+              <NavItem
+                key={item.key}
+                icon={navKeyIcon(item.key)}
+                label={item.label}
+                active={activeNavKey === item.key}
+                onClick={() => navigateDashboard(getDefaultPageForNavKey(item.key), 'sidebar')}
+              />
             ))}
-            {user!.role === 'client' && (
-              <NavItem
-                icon={<Plus size={18} />}
-                label="Post a Job (legacy)"
-                active={activeTab === 'post-job'}
-                onClick={() => navigateDashboard('post-job', 'sidebar')}
-              />
-            )}
-            {(DESIGN_TEAM_ROLES.includes(user!.role) || user!.primaryFirmId) && (
-              <NavItem
-                icon={<Building2 size={18} />}
-                label="Firm Workspace"
-                active={activeTab === 'firm'}
-                onClick={() => navigateDashboard('firm', 'sidebar')}
-              />
-            )}
-            {user!.role === 'contractor' && (
-              <NavItem
-                icon={<Search size={18} />}
-                label="Tender Marketplace"
-                active={activeTab === 'marketplace'}
-                onClick={() => navigateDashboard('marketplace', 'sidebar')}
-              />
-            )}
-            {DESIGN_TEAM_ROLES.includes(user!.role) && (
-              <NavItem
-                icon={<Search size={18} />}
-                label="Marketplace"
-                active={activeTab === 'marketplace'}
-                onClick={() => navigateDashboard('marketplace', 'sidebar')}
-              />
-            )}
-            {DESIGN_TEAM_ROLES.includes(user!.role) && (
-              <NavItem
-                icon={<Send size={18} />}
-                label="My Applications"
-                active={activeTab === 'applications'}
-                onClick={() => navigateDashboard('applications', 'sidebar')}
-              />
-            )}
-            {DESIGN_TEAM_ROLES.includes(user!.role) && (
-              <NavItem
-                icon={<Users size={18} />}
-                label="Team & Freelancers"
-                active={activeTab === 'team'}
-                onClick={() => navigateDashboard('team', 'sidebar')}
-              />
-            )}
-            {DESIGN_TEAM_ROLES.includes(user!.role) && (
-              <NavItem
-                icon={<Users size={18} />}
-                label="Coordination"
-                active={activeTab === 'coordination'}
-                onClick={() => navigateDashboard('coordination', 'sidebar')}
-              />
-            )}
-            {(user!.role === 'client' || DESIGN_TEAM_ROLES.includes(user!.role)) && (
-              <NavItem
-                icon={<Calculator size={18} />}
-                label="Fee Estimator"
-                active={activeTab === 'fees'}
-                onClick={() => navigateDashboard('fees', 'sidebar')}
-              />
-            )}
-            <NavItem
-              icon={<FileText size={18} />}
-              label="Active Projects"
-              active={activeTab === 'projects'}
-              onClick={() => navigateDashboard('projects', 'sidebar')}
-            />
-            {user!.role === 'admin' && (
-              <>
-                <NavItem
-                  icon={<ShieldCheck size={18} />}
-                  label="Compliance Hub"
-                  active={activeTab === 'compliance'}
-                  onClick={() => navigateDashboard('compliance', 'sidebar')}
-                />
-                <NavItem
-                  icon={<Users size={18} />}
-                  label="User Management"
-                  active={activeTab === 'users'}
-                  onClick={() => navigateDashboard('users', 'sidebar')}
-                />
-                <NavItem
-                  icon={<Settings2 size={18} />}
-                  label="LLM Settings"
-                  active={activeTab === 'settings'}
-                  onClick={() => navigateDashboard('settings', 'sidebar')}
-                />
-                <NavItem
-                  icon={<Sparkles size={18} />}
-                  label="Knowledge Base"
-                  active={activeTab === 'knowledge'}
-                  onClick={() => navigateDashboard('knowledge', 'sidebar')}
-                />
-                <NavItem
-                  icon={<Calculator size={18} />}
-                  label="Fees"
-                  active={activeTab === 'fees'}
-                  onClick={() => navigateDashboard('fees', 'sidebar')}
-                />
-                <NavItem
-                  icon={<Landmark size={18} />}
-                  label="Financial"
-                  active={activeTab === 'financial'}
-                  onClick={() => navigateDashboard('financial', 'sidebar')}
-                />
-                <NavItem
-                  icon={<Building2 size={18} />}
-                  label="Firms"
-                  active={activeTab === 'firms'}
-                  onClick={() => navigateDashboard('firms', 'sidebar')}
-                />
-              </>
-            )}
-            <NavItem
-              icon={<History size={18} />}
-              label="Audit Logs"
-              active={activeTab === 'audit'}
-              onClick={() => navigateDashboard('audit', 'sidebar')}
-            />
-            <div className="pt-4 mt-4 border-t border-border/70">
-              <NavItem
-                icon={<CreditCard size={18} />}
-                label="Invoices"
-                active={activeTab === 'invoices'}
-                onClick={() => navigateDashboard('invoices', 'sidebar')}
-              />
-              <NavItem
-                icon={<HardDrive size={18} />}
-                label="Files"
-                active={activeTab === 'files'}
-                onClick={() => navigateDashboard('files', 'sidebar')}
-              />
-              <NavItem
-                icon={<UserCircle size={18} />}
-                label="My Settings"
-                active={activeTab === 'profile-settings'}
-                onClick={() => navigateDashboard('profile-settings', 'sidebar')}
-              />
-            </div>
           </nav>
 
             <div className="mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground" data-testid="dashboard-keyboard-shortcuts">
@@ -1202,6 +1058,7 @@ export default function App() {
               {activeTab === 'contractor-staff' && <ContractorStaffPlantPage user={user} />}
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
+              {activeTab === 'compliance' && <ComplianceToolboxHub />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
               {activeTab === 'timesheets' && <TimesheetEntryPage user={user} />}
               {activeTab === 'pipeline' && <PipelineKanbanPage user={user} />}
@@ -1226,8 +1083,10 @@ export default function App() {
           </motion.div>
         </ScrollArea>
       </main>
+      <DemoBanner />
       <Toaster />
     </div>
+    </DemoModeProvider>
   );
 }
 
@@ -1672,6 +1531,22 @@ function NavItem({ icon, label, active, onClick, ...props }: any) {
       {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary" />}
     </button>
   );
+}
+
+/** Icon resolver for architex navigation config keys */
+function navKeyIcon(key: ArchitexNavKey, size = 18) {
+  switch (key) {
+    case 'command_centre': return <LayoutDashboard size={size} />;
+    case 'inbox': return <ClipboardCheck size={size} />;
+    case 'projects': return <FileText size={size} />;
+    case 'toolboxes': return <Files size={size} />;
+    case 'cpd_learning': return <BookOpen size={size} />;
+    case 'documents': return <Database size={size} />;
+    case 'marketplace': return <Search size={size} />;
+    case 'finance': return <CreditCard size={size} />;
+    case 'messages': return <Mail size={size} />;
+    case 'settings': return <Settings2 size={size} />;
+  }
 }
 
 function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLogin: () => void }) {

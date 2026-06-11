@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── DEMO MODE: per-user sandbox ───
+    // All demo data lives under /demo/{userId}/
+    // Each authenticated user sees ONLY their own data.
+    match /demo/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+                        && request.auth.uid == userId;
+    }
+
+    // ─── DEMO MODE: seed flag ───
+    // Tracks whether this user's sandbox has been seeded.
+    match /demo_seed_flags/{userId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == userId;
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.seeded == true;
+      allow update: if request.auth != null
+                    && request.auth.uid == userId;
+      allow delete: if false; // never delete
+    }
+
+    // ─── PRODUCTION DATA (protected when in demo mode) ───
+    // Only admins can write to production collections from demo.
+    match /{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+                   && !exists(/databases/$(database)/documents/demo_seed_flags/$(request.auth.uid));
+    }
+  }
+}

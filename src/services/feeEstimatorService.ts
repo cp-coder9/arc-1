@@ -1,4 +1,6 @@
-import { PRD_PLATFORM_FEE_PERCENT } from './platformFeePolicy';
+import { PRD_PLATFORM_FEE_PERCENT, calculateSplitPlatformFee } from './platformFeePolicy';
+import { roundMoney } from './platformTransactionFeeService';
+import type { PlatformTransactionFeeBreakdown } from '../types/proposalBuilder';
 import type { Firestore } from 'firebase/firestore';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -57,7 +59,9 @@ export interface FeeEstimateResult {
   professionalFee: number;
   deliverableTotal: number;
   councilAdminFee: number;
+  /** Total platform fee (payer + payee shares). */
   platformFee: number;
+  platformFeeBreakdown?: PlatformTransactionFeeBreakdown;
   subtotalExVat: number;
   vat: number;
   total: number;
@@ -253,7 +257,8 @@ export function estimateArchitecturalFee(input: FeeEstimatorInput, settings = DE
   const deliverableTotal = input.deliverables.reduce((sum, deliverable) => sum + (merged.deliverableFees[deliverable] || 0), 0);
   const councilAdminFee = input.includeCouncilAdmin ? merged.councilAdminFee : 0;
   const prePlatformSubtotal = professionalFee + deliverableTotal + councilAdminFee;
-  const platformFee = input.includePlatformFee ? prePlatformSubtotal * (merged.platformFeePercent / 100) : 0;
+  const platformFeeBreakdown = input.includePlatformFee ? calculateSplitPlatformFee(roundMoney(prePlatformSubtotal)) : undefined;
+  const platformFee = platformFeeBreakdown?.totalPlatformFee ?? 0;
   const subtotalExVat = prePlatformSubtotal + platformFee;
   const vat = input.vatApplicable ? subtotalExVat * (merged.vatRate / 100) : 0;
   const total = subtotalExVat + vat;
@@ -266,6 +271,7 @@ export function estimateArchitecturalFee(input: FeeEstimatorInput, settings = DE
     deliverableTotal,
     councilAdminFee,
     platformFee,
+    platformFeeBreakdown,
     subtotalExVat,
     vat,
     total,
@@ -282,7 +288,9 @@ export function estimateArchitecturalFee(input: FeeEstimatorInput, settings = DE
       { label: 'Professional architectural fee', amount: professionalFee, note: 'Value-of-works fee adjusted for complexity, municipality, urgency and selected stages.' },
       { label: 'Optional deliverables', amount: deliverableTotal, note: 'Fixed-fee allowances for selected Architex outputs.' },
       { label: 'Council submission / admin allowance', amount: councilAdminFee, note: input.includeCouncilAdmin ? 'Indicative allowance for submission administration.' : 'Not included.' },
-      { label: 'Architex platform fee', amount: platformFee, note: input.includePlatformFee ? `${merged.platformFeePercent}% of professional fee, deliverables and admin allowance.` : 'Not included.' },
+      { label: 'Architex platform fee', amount: platformFee, note: input.includePlatformFee ?
+        `1% total (client pays 0.5% surcharge, professional deducts 0.5% on release). Calculated on R${roundMoney(prePlatformSubtotal).toLocaleString()}.` :
+        'Not included.' },
       { label: 'VAT', amount: vat, note: input.vatApplicable ? `${merged.vatRate}% VAT applied.` : 'VAT excluded unless the professional is VAT registered.' },
     ],
   };

@@ -1,11 +1,13 @@
-import React from 'react';
-import { ArrowRight, Files, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, Files, Grid3X3, ShieldCheck, Workflow } from 'lucide-react';
 import { MOCK_EXTERNAL_API_INTEGRATIONS, MOCK_EXTERNAL_API_NOTICE } from '@/data/mockExternalApiIntegrations';
 import type { UserProfile, UserRole } from '@/types';
 import FileManager from './FileManager';
+import StandaloneToolTilesPage from './tools/StandaloneToolTilesPage';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 
 type ToolboxAction = {
   label: string;
@@ -179,9 +181,33 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {
   const config = TOOLBOX_CONFIG[user.role] ?? TOOLBOX_CONFIG.client;
+  const [mode, setMode] = useState<'workflow' | 'tiles'>('workflow');
 
   return (
     <div className="space-y-6" data-testid="project-toolbox-page">
+      {/* Mode toggle */}
+      <div className="flex items-center justify-end">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as 'workflow' | 'tiles')}>
+          <TabsList className="rounded-full">
+            <TabsTrigger value="workflow" className="rounded-full gap-1.5">
+              <Workflow className="h-4 w-4" /> AI-guided
+            </TabsTrigger>
+            <TabsTrigger value="tiles" className="rounded-full gap-1.5">
+              <Grid3X3 className="h-4 w-4" /> All tools
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {mode === 'tiles' ? (
+        <StandaloneToolTilesPage
+          user={user}
+          onNavigate={onNavigate ?? (() => {})}
+          mode={mode}
+          onModeChange={setMode}
+        />
+      ) : (
+        <>
       <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
         <CardHeader className="bg-primary/5 border-b border-border">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -262,6 +288,8 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
         </CardContent>
       </Card>
       <FileManager user={user} />
+        </>
+      )}
     </div>
   );
 }

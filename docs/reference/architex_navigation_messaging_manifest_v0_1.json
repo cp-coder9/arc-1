@@ -1,0 +1,100 @@
+{
+  "version": "0.1-draft",
+  "name": "Architex Navigation + Contextual Messaging Framework",
+  "purpose": "Simplify the Architex web platform into primary workflow zones while preserving cellphone-first messaging persistence and contextual communication inside workflows.",
+  "topLevelSidebar": [
+    "command_centre",
+    "inbox",
+    "projects",
+    "toolboxes",
+    "cpd_learning",
+    "documents",
+    "marketplace",
+    "finance",
+    "messages",
+    "settings"
+  ],
+  "corePrinciples": [
+    "Do not expose every tool as a sidebar item.",
+    "The Messages centre is a full communication workspace but contextual messaging must be available inside workflows.",
+    "Mobile-first messaging persistence must link to the full web platform.",
+    "Agents should push action cards and contextual communication prompts, not force users to hunt through modules.",
+    "CPD is separate from Toolboxes.",
+    "Project-linked outputs should write back into project records."
+  ],
+  "messagingModes": {
+    "messagesCentre": {
+      "description": "Full persistent communication workspace linked to mobile messaging app and project records.",
+      "sections": [
+        "direct_messages",
+        "project_groups",
+        "phase_channels",
+        "cpd_conversations",
+        "agent_conversations",
+        "attachments",
+        "search",
+        "message_linked_tasks"
+      ]
+    },
+    "contextualMessaging": {
+      "description": "Quick communication action available next to workflow objects such as snags, RFIs, CPD submissions and payment certificates.",
+      "requiredContextFields": [
+        "contextId",
+        "projectId",
+        "phaseId",
+        "moduleKey",
+        "sourceObjectType",
+        "sourceObjectId",
+        "title",
+        "status",
+        "suggestedRecipients",
+        "suggestedChannel",
+        "summary",
+        "persistencePolicy"
+      ]
+    }
+  },
+  "contextualMessagingTargets": [
+    "snag_item",
+    "rfi",
+    "site_instruction",
+    "variation",
+    "payment_certificate",
+    "drawdown_request",
+    "quote_comparison",
+    "drawing_compliance_issue",
+    "council_submission_item",
+    "cpd_assessment",
+    "cpd_certificate",
+    "cpd_manual_submission",
+    "marketplace_quote_request",
+    "document_review_item",
+    "agent_inbox_action_card"
+  ],
+  "agentRoles": {
+    "personalUserAgent": [
+      "curate_command_centre",
+      "push_inbox_actions",
+      "suggest_recipients",
+      "draft_contextual_messages"
+    ],
+    "projectAgent": [
+      "maintain_project_context",
+      "link_messages_to_project_objects",
+      "summarise_threads",
+      "convert_outcomes_to_tasks_with_approval"
+    ],
+    "cpdAgent": [
+      "assessment_retake_reminders",
+      "manual_submission_reminders",
+      "certificate_ready_prompts",
+      "professional_body_deadline_alerts"
+    ],
+    "systemGovernanceAgent": [
+      "permission_enforcement",
+      "audit_policy",
+      "cross_project_privacy",
+      "agent_identity_boundaries"
+    ]
+  }
+}
