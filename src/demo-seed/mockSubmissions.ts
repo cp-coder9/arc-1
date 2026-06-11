@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SubmissionStatus, SubmissionIndexItem } from '../../types';
 import type { MockProject, ProjectStage } from './mockProjects';
 

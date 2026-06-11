@@ -26,6 +26,7 @@ const NAV_TO_DASHBOARD: Record<ArchitexNavKey, string[]> = {
   finance: ['payments', 'invoicing', 'escrow', 'fees'],
   messages: ['messages'],
   settings: ['profile', 'admin-console'],
+  user_settings: ['profile'],
 };
 
 /**
@@ -75,6 +76,7 @@ const NAV_KEY_TO_ICON_HINT: Record<ArchitexNavKey, string> = {
   finance: 'CreditCard',
   messages: 'Mail',
   settings: 'Settings2',
+  user_settings: 'UserCog',
 };
 
 export function getIconHintForNavKey(navKey: ArchitexNavKey): string {

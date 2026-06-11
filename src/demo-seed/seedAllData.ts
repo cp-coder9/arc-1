@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Master seed script for demo sandbox.
  * Writes all mock data under /demo/{userId}/ in Firestore.

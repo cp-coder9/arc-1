@@ -216,12 +216,13 @@ export default function SACouncilDrawingComplianceNavigator() {
                   )}
                 </h3>
                 <div className="space-y-1">
-                  {groupItems.map((item) => (
+                  {groupItems.map((item: ChecklistItem) => (
+                    <React.Fragment key={item.id}>
                     <ChecklistItemRow
-                      key={item.id}
                       item={item}
                       onToggle={(status) => toggleItem(item.id, status)}
                     />
+                    </React.Fragment>
                   ))}
                 </div>
               </div>

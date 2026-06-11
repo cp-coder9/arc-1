@@ -36,6 +36,15 @@ export function userRoleToArchitexRole(role: UserRole): ArchitexRole {
     contractor: 'contractor',
     subcontractor: 'contractor',
     supplier: 'supplier',
+    engineer: 'contractor',
+    quantity_surveyor: 'contractor',
+    town_planner: 'contractor',
+    energy_professional: 'contractor',
+    fire_engineer: 'contractor',
+    site_manager: 'contractor',
+    developer: 'client_developer',
+    firm_admin: 'admin',
+    platform_admin: 'admin',
   };
 
   return mapping[role];

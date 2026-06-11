@@ -96,6 +96,7 @@ export interface ComplianceScenario {
   status: "draft" | "checking" | "pass" | "watch" | "fail" | "signed_off";
   sourceSnapshotIds: string[];
   resultSummary?: string;
+  nodes?: ComplianceScenarioNode[];
   createdAt: string;
   source: typeof SOURCE_BOUNDARY;
 }

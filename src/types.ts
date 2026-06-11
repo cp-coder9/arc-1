@@ -90,6 +90,11 @@ export interface UserProfile {
   firmStatus?: FirmMemberStatus;
   subscriptionStatus?: FirmSubscriptionStatus;
   billingRole?: FirmRole | 'none';
+  // CPD fields (Pack 10/12)
+  professionalBody?: string;
+  builtEnvironmentRole?: string;
+  cpdCycleStart?: string;
+  cpdCycleEnd?: string;
 }
 
 export type JobCategory = 'Residential' | 'Commercial' | 'Industrial' | 'Renovation' | 'Interior' | 'Landscape';
@@ -614,7 +619,7 @@ export interface Conversation {
 }
 
 // Payment types
-export type PaymentType = 'escrow_deposit' | 'milestone_release' | 'refund' | 'platform_fee';
+export type PaymentType = 'escrow_deposit' | 'milestone_release' | 'refund' | 'platform_fee' | 'platform_fee_client_share' | 'platform_fee_payee_share';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
 export interface Payment {
@@ -666,6 +671,8 @@ export interface EscrowMilestone {
 export interface EscrowV2 extends Omit<Escrow, 'milestones'> {
   milestones: EscrowMilestone[];
   linkedProjectId?: string;
+  payerSurchargeAmount?: number;
+  payeeDeductionAmount?: number;
 }
 
 export interface LedgerEntry {
@@ -1409,5 +1416,176 @@ export interface CandidateSupervisionLog {
   signedOffAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============== Site Execution Types (Pack 5) ==============
+
+export type Severity = 'low' | 'medium' | 'high' | 'critical';
+export type NCRStatus = string;
+export type SnagStatus = string;
+export type DelayWarningStatus = string;
+export type DelayWarningCause = string;
+export type SiteInstructionStatus = string;
+export type EvidenceType = 'photo' | 'video' | 'document' | 'inspection_report' | 'test_certificate' | 'delivery_note';
+
+export interface NonConformanceReport {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  severity: Severity;
+  responsiblePartyId: string;
+  correctiveAction: string;
+  evidenceIds: string[];
+  status: NCRStatus;
+  blocksPayment: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SnagItem {
+  id: string;
+  projectId: string;
+  location: string;
+  description: string;
+  priority: Severity;
+  responsiblePartyId: string;
+  dueDate: string;
+  evidenceIds: string[];
+  status: SnagStatus;
+  blocksPayment: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DelayEarlyWarning {
+  id: string;
+  projectId: string;
+  cause: DelayWarningCause;
+  description: string;
+  noticeDeadline: string;
+  likelyProgrammeImpactDays: number;
+  status: DelayWarningStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SiteInstruction {
+  id: string;
+  projectId: string;
+  title: string;
+  instruction: string;
+  issuedBy: string;
+  issuedByRole: UserRole;
+  authorised: boolean;
+  costImpact: 'none' | 'low' | 'medium' | 'high';
+  timeImpact: 'none' | 'days' | 'weeks' | 'critical';
+  linkedRfiId?: string;
+  linkedDocumentIds: string[];
+  status: SiteInstructionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FieldEvidence {
+  id: string;
+  projectId: string;
+  type: EvidenceType;
+  title: string;
+  uri: string;
+  location: string;
+  gps: { lat: number; lng: number };
+  capturedBy: string;
+  capturedAt: string;
+  linkedObjectId?: string;
+}
+
+export interface PaymentBlocker {
+  id: string;
+  projectId: string;
+  sourceObjectId: string;
+  sourceType: 'ncr' | 'snag' | 'instruction' | 'inspection' | 'delay_warning';
+  reason: string;
+  severity: Severity;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+export interface InspectionRecord {
+  id: string;
+  projectId: string;
+  type: string;
+  inspector: string;
+  date: string;
+  location: string;
+  findings: string;
+  status: 'scheduled' | 'completed' | 'failed' | 'passed';
+  evidenceIds: string[];
+  createdAt: string;
+}
+
+export interface SiteAuditRecord {
+  id: string;
+  projectId: string;
+  actorId: string;
+  actorRole: UserRole;
+  action: string;
+  sourceObjectId: string;
+  sourceObjectType: string;
+  createdAt: string;
+}
+export type SiteAgentRecommendation = AgentRecommendation;
+
+export interface SiteProjectRecord {
+  id: string;
+  projectId: string;
+  type: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface SiteInboxEvent {
+  id: string;
+  projectId: string;
+  type: string;
+  title: string;
+  description: string;
+  priority: Severity;
+  sourceId: string;
+  sourceType: string;
+  assignedTo?: string;
+  createdAt: string;
+}
+
+export interface ProgrammeImpact {
+  id: string;
+  projectId: string;
+  sourceType: string;
+  sourceId?: string;
+  sourceObjectId: string;
+  impactDays?: number;
+  estimatedDays: number;
+  requiresPlannerReview: boolean;
+  description?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type ProgrammeImpactSourceType = string;
+
+export interface ComplianceScenario {
+  id: string;
+  projectId: string;
+  title: string;
+  nodes: unknown[];
+  createdAt: string;
 }
 
