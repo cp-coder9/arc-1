@@ -134,8 +134,8 @@ describe('pipelineService', () => {
       ],
     });
     const forecast = await getPipelineForecast('firm-1');
-    expect(forecast.totalValueCents).toBe(150000);
-    expect(forecast.weightedValueCents).toBe(80000 + 25000); // (100000*0.8) + (50000*0.5)
+    expect(forecast.totalEstimatedValueCents).toBe(150000);
+    expect(forecast.weightedForecastCents).toBe(80000 + 25000); // (100000*0.8) + (50000*0.5)
   });
 
   it('deletes a pipeline project', async () => {
