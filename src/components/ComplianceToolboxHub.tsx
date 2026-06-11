@@ -2,6 +2,7 @@ import React, { useState, useCallback } from "react";
 import {
   AlertTriangle,
   CheckCircle,
+  ClipboardCheck,
   FileText,
   Search,
   Shield,
@@ -19,6 +20,7 @@ import {
 import {
   runBoundaryWallDemoCheck,
 } from "@/services/complianceEngineService";
+import SACouncilDrawingComplianceNavigator from "./SACouncilDrawingComplianceNavigator";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -244,7 +246,7 @@ function SANSPartBrowser() {
 }
 
 export default function ComplianceToolboxHub() {
-  const [activeTool, setActiveTool] = useState<"browser" | "boundary-wall">("boundary-wall");
+  const [activeTool, setActiveTool] = useState<"browser" | "boundary-wall" | "council-navigator">("boundary-wall");
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -272,10 +274,19 @@ export default function ComplianceToolboxHub() {
           <FileText className="w-4 h-4 mr-1" />
           Part Browser
         </Button>
+        <Button
+          variant={activeTool === "council-navigator" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveTool("council-navigator")}
+        >
+          <ClipboardCheck className="w-4 h-4 mr-1" />
+          Council Checklist
+        </Button>
       </div>
 
       {activeTool === "boundary-wall" && <BoundaryWallChecker />}
       {activeTool === "browser" && <SANSPartBrowser />}
+      {activeTool === "council-navigator" && <SACouncilDrawingComplianceNavigator />}
 
       <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
         <CardContent className="py-3">
