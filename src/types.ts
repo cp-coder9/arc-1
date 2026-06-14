@@ -1088,17 +1088,28 @@ export interface GanttTask {
   updatedAt?: string;
 }
 
+export type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'stormy';
+
 export interface SiteLog {
   id: string;
   projectId: string;
   date: string;
-  weather: 'sunny' | 'cloudy' | 'rainy' | 'stormy';
+  weather: WeatherCondition;
+  weatherDetail?: string;
   temperature?: number;
   workDescription: string;
+  labourOnSite?: Record<string, number>;
   labourCount?: number;
+  plantOnSite?: string[];
+  deliveries?: string[];
+  visitors?: string[];
+  safetyNotes?: string[];
+  delayNotes?: string[];
   materialsUsed?: string[];
   issues?: string[];
+  evidenceIds?: string[];
   photos: { url: string; caption: string }[];
+  status: 'draft' | 'submitted';
   createdBy: string;
   createdAt: string;
 }
@@ -1333,30 +1344,6 @@ export interface FeeReconciliation {
   reconciled: boolean;
 }
 
-// Candidate Supervision types
-export type SupervisionLogStatus = 'draft' | 'submitted' | 'reviewed' | 'signed_off' | 'rejected';
-
-export interface CandidateSupervisionLog {
-  id: string;
-  candidateId: string;
-  mentorId: string;
-  firmId: string;
-  projectId?: string;
-  periodStart: string;
-  periodEnd: string;
-  hoursLogged: number;
-  activities: string;
-  category?: string;
-  sacapCategory?: string;
-  status: SupervisionLogStatus;
-  mentorNotes?: string;
-  signedOffBy?: string;
-  signedOffAt?: string;
-  rejectedReason?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
 // Registration Renewal types
 export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACLAP' | 'SACPCMP';
 export type RegistrationStatus = 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'suspended';
@@ -1375,25 +1362,6 @@ export interface ProfessionalRegistration {
   lastRenewedAt?: string;
   renewalSubmittedAt?: string;
   documents?: { name: string; url: string }[];
-  createdAt: string;
-  updatedAt?: string;
-}
-
-// Invoice Readiness types
-export interface InvoiceReadinessCheck {
-  id: string;
-  firmId: string;
-  projectId: string;
-  timesheetIds: string[];
-  expenseIds: string[];
-  readyForInvoice: boolean;
-  blockers: string[];
-  warnings: string[];
-  totalAmountCents: number;
-  currency: string;
-  invoiced: boolean;
-  invoiceId?: string;
-  checkedAt: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -1479,6 +1447,12 @@ export type DelayWarningCause = string;
 export type SiteInstructionStatus = string;
 export type EvidenceType = 'photo' | 'video' | 'document' | 'inspection_report' | 'test_certificate' | 'delivery_note';
 
+export type SiteExecutionPhase =
+  | 'construction_execution'
+  | 'closeout'
+  | 'defects_liability'
+  | 'operations_post_occupancy';
+
 export interface NonConformanceReport {
   id: string;
   projectId: string;
@@ -1532,10 +1506,15 @@ export interface SiteInstruction {
   issuedBy: string;
   issuedByRole: UserRole;
   authorised: boolean;
-  costImpact: 'none' | 'low' | 'medium' | 'high';
-  timeImpact: 'none' | 'days' | 'weeks' | 'critical';
+  authorisedBy?: string;
+  authorisedAt?: string;
+  costImpact: 'none' | 'possible' | 'confirmed';
+  timeImpact: 'none' | 'possible' | 'confirmed';
   linkedRfiId?: string;
   linkedDocumentIds: string[];
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  supersededById?: string;
   status: SiteInstructionStatus;
   createdAt: string;
   updatedAt: string;
@@ -1553,6 +1532,8 @@ export interface FieldEvidence {
   capturedAt: string;
   linkedObjectId?: string;
 }
+
+export type BlockerSourceType = 'ncr' | 'snag' | 'instruction' | 'inspection' | 'delay_warning';
 
 export interface PaymentBlocker {
   id: string;
@@ -1591,28 +1572,43 @@ export interface SiteAuditRecord {
   sourceObjectType: string;
   createdAt: string;
 }
-export type SiteAgentRecommendation = AgentRecommendation;
+export interface SiteAgentRecommendation {
+  id: string;
+  projectId: string;
+  agentKey: string;
+  title: string;
+  rationale: string;
+  sourceObjectId: string;
+  severity: Severity;
+  status: string;
+  createdAt: string;
+}
 
 export interface SiteProjectRecord {
   id: string;
   projectId: string;
-  type: string;
+  tenantId: string;
+  phase: SiteExecutionPhase;
+  moduleKey: string;
+  recordType: string;
   title: string;
   status: string;
-  createdAt: string;
+  payload: unknown;
+  linkedRecordIds: string[];
   createdBy: string;
+  createdAt: string;
 }
 
 export interface SiteInboxEvent {
   id: string;
   projectId: string;
-  type: string;
+  recipientRole: UserRole;
   title: string;
-  description: string;
+  sourceObjectId: string;
+  sourceObjectType: string;
   priority: Severity;
-  sourceId: string;
-  sourceType: string;
-  assignedTo?: string;
+  dueDate?: string;
+  isRead: boolean;
   createdAt: string;
 }
 
@@ -1626,6 +1622,9 @@ export interface ProgrammeImpact {
   estimatedDays: number;
   requiresPlannerReview: boolean;
   description?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
   createdBy: string;
   createdAt: string;
 }

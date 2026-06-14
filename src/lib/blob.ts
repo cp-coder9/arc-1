@@ -34,7 +34,12 @@ export async function put(
   const destName = `uploads/${safe}${random}${ext ? "." + ext : ""}`;
 
   const file = bucket.file(destName);
-  await file.save(data, {
+  // Convert ArrayBuffer and Blob to Buffer for @google-cloud/storage SaveData
+  const normalized: Buffer =
+    data instanceof Buffer ? data :
+    data instanceof Uint8Array ? Buffer.from(data) :
+    Buffer.from(data instanceof ArrayBuffer ? data : await (data as Blob).arrayBuffer());
+  await file.save(normalized, {
     contentType: options?.contentType || "application/octet-stream",
     public: true,
     metadata: { cacheControl: "public, max-age=31536000" },
