@@ -1,0 +1,54 @@
+# AGENTS.md — Role-Aware Navigation
+
+## Purpose
+
+Central navigation configuration and routing infrastructure that determines what each user role sees, which modules are available per project phase, and how the app shell renders sidebar, workspace, and contextual messaging. This is the single source of truth for the platform's information architecture.
+
+## Ownership
+
+- **Path:** `src/navigation/`
+- **Owner:** Frontend / UX Architecture Team
+- **Key files:** `architexNavigationConfig.ts`, `navTypes.ts`, `navDashboardAdapter.ts`, `contextualMessagingService.ts`, `example.ts`
+
+## Local Contracts
+
+### Navigation Type System (`navTypes.ts`)
+| Type | Purpose |
+|------|---------|
+| `ArchitexNavKey` | Enumerated module keys: command_centre, inbox, projects, toolboxes, cpd_learning, documents, marketplace, finance, messages, settings, user_settings |
+| `WorkspaceSection` | Section definition with key, label, description, role filter, phase awareness, project scope, contextual messaging support |
+| `NavigationItem` | Module-level navigation entry with role filtering and icon |
+| `RoleBasedFilter` | Filter function type for role-aware navigation queries |
+
+### Navigation Config (`architexNavigationConfig.ts`)
+- Defines 11 top-level navigation modules
+- Each module specifies: role access list, key sections, phase awareness
+- Modules include: Command Centre, Inbox/Action Centre, Projects, Toolboxes, CPD & Learning, Documents/Knowledge Hub, People, Marketplace, Payments/Finance, Compliance Hub, Admin/Governance
+- Navigation is consumed by `src/App.tsx` for sidebar rendering
+
+### Dashboard Adapter (`navDashboardAdapter.ts`)
+- Maps navigation modules to their corresponding dashboard components
+- Provides `getDashboardForRole()` — returns the correct dashboard component for a given user role
+- Supports role-specific dashboards: Client, Architect, Admin, Contractor, BEP, Freelancer, Subcontractor, Supplier
+
+### Contextual Messaging (`contextualMessagingService.ts`)
+- Determines when contextual messaging UI surfaces based on navigation context
+- Integrates with `src/features/project-communications/` for project-scoped threads
+
+## Work Guidance
+
+- New navigation modules must: (1) add key to `ArchitexNavKey`, (2) define sections in `architexNavigationConfig.ts`, (3) add role filter, (4) register dashboard in `navDashboardAdapter.ts`
+- Role filters must use `UserRole` from `src/types.ts`
+- Phase-aware navigation entries must specify which project lifecycle stages they apply to
+- Navigation changes must be reflected in `src/App.tsx` routing
+- All navigation data is static/config-driven — no runtime permission checks in navigation
+
+## Verification
+
+- `npm test` covers navigation integration through dashboard tests
+- `npm test -- src/components/__tests__/*Dashboard.test.tsx` — validates role-specific dashboards render correct navigation
+- `npm run lint` for type safety across navigation types
+
+## Child DOX Index
+
+No child AGENTS.md files exist below this directory.
