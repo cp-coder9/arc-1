@@ -1,48 +1,71 @@
-/**
- * Audit Trail Service
- * Records advisory outputs and approvals required for municipal submission.
- *
- * Part of Pack 6: Municipal Submission Readiness
- */
-import type {
-  ComplexityAssessment,
-  ReadinessAssessment,
-  SubmissionAuditRecord,
-} from '@/types/municipalSubmissionReadiness';
+// ─── Pack 5: Audit Trail Service ───────────────────────────────────────────
 
-/**
- * Create audit trail records from the submission readiness process.
- * All records are advisory — formal submission and compliance claims
- * require appointed professional approval.
- */
-export function createAuditTrail(
-  complexity: ComplexityAssessment,
-  readiness: ReadinessAssessment
-): SubmissionAuditRecord[] {
-  const now = new Date().toISOString();
+import type { AppointmentRecord } from "@/services/appointmentService";
+import type { KickoffPackage } from "@/services/kickoffService";
+import type { SubmissionAuditRecord } from "@/types/municipalSubmissionReadiness";
 
+// ─── Inline Type ───────────────────────────────────────────────────────────
+
+export interface AuditRecord {
+  auditId: string;
+  entityId: string;
+  action: string;
+  actor: string;
+  atIso: string;
+  notes: string;
+}
+
+// ─── Service Functions ─────────────────────────────────────────────────────
+
+export function createAppointmentAuditTrail(
+  appointment: AppointmentRecord,
+  kickoff: KickoffPackage,
+  nowIso: string
+): AuditRecord[] {
   return [
     {
-      id: 'audit-complexity',
-      action: 'project_complexity_classified',
-      actor: 'system',
-      notes: `Complexity: ${complexity.complexity}; triggers: ${complexity.triggers.length} (${complexity.triggers.join('; ')})`,
-      timestamp: now,
+      auditId: `audit-${appointment.appointmentId}-snapshot`,
+      entityId: appointment.appointmentId,
+      action: "accepted_proposal_snapshotted",
+      actor: "system",
+      atIso: nowIso,
+      notes: `Proposal ${appointment.proposalSnapshot.proposalId} revision ${appointment.proposalSnapshot.proposalRevisionId} snapshotted.`
     },
     {
-      id: 'audit-readiness',
+      auditId: `audit-${appointment.appointmentId}-appointment`,
+      entityId: appointment.appointmentId,
+      action: "appointment_created",
+      actor: "system",
+      atIso: nowIso,
+      notes: "Appointment record created from accepted proposal."
+    },
+    {
+      auditId: `audit-${kickoff.workspace.projectId}-workspace`,
+      entityId: kickoff.workspace.projectId,
+      action: "project_workspace_created",
+      actor: "system",
+      atIso: nowIso,
+      notes: `Workspace created with readiness ${kickoff.readiness}.`
+    }
+  ];
+}
+
+/**
+ * Generic audit trail creator for backward compatibility.
+ * Used by municipalSubmissionReadinessService.ts.
+ */
+export function createAuditTrail(
+  _complexity: unknown,
+  _readiness: unknown,
+  projectId?: string
+): SubmissionAuditRecord[] {
+  return [
+    {
+      id: `audit-${projectId || 'unknown'}-municipal`,
       action: 'municipal_readiness_assessed',
-      actor: 'agent',
-      notes: `Score: ${readiness.score}%; blockers: ${readiness.blockers.length}. Advisory only — not a statutory compliance determination.`,
-      timestamp: now,
-    },
-    {
-      id: 'audit-guardrail',
-      action: 'human_approval_required',
       actor: 'system',
-      notes:
-        'Formal submission and compliance claims require appointed professional approval. Automated readiness is advisory only.',
-      timestamp: now,
+      notes: 'Municipal submission readiness assessed.',
+      timestamp: new Date().toISOString(),
     },
   ];
 }

@@ -339,6 +339,52 @@ Client vars: `process.env.VITE_*`. Server vars: `process.env.*`.
 
 ---
 
+## Pack 2 — Project Passport & Lifecycle Engine
+
+Central project state layer. 9-phase lifecycle, ProjectRecord generic envelope, risk engine, inbox events, agent recommendations.
+
+| File | Purpose |
+|------|---------|
+| `services/lifecycleTypes.ts` | Unified types: ProjectPhase, ProjectRecord\<T\>, WorkflowEvent, AgentRecommendation, ProjectPassport, RiskEvaluation |
+| `services/lifecycleDefinitions.ts` | 9-phase lifecycle with required/optional record types per phase |
+| `services/lifecycleEngine.ts` | evaluateLifecycle() — missing records, blockers, next-best actions |
+| `services/projectPassportService.ts` | buildProjectPassport() — assembles full project health card |
+| `services/riskEngine.ts` | evaluateRisks() — construction without approval, missing appointment, payment risks |
+| `services/inboxEventAdapter.ts` | workflowEventsFromProjectState() — maps risks to Platform Spine events |
+| `services/agentRecommendationService.ts` | recommendationsFromPassport() — sorted agent recommendations |
+
+## Pack 3 — Documents & Drawing Intelligence
+
+Structured document control and drawing intelligence — document registers, revision control, AI drawing analysis, readiness checks.
+
+| File | Purpose |
+|------|---------|
+| `services/documentRegisterService.ts` | Document/Drawing record types, register query/filter helpers |
+| `services/revisionControlService.ts` | Superseded drawing detection, revision chain lookup |
+| `services/drawingIntelligenceService.ts` | Simulated OCR/AI analysis — classification, revision detection |
+| `services/readinessCheckService.ts` | 4 readiness checks: municipal, tender, construction, closeout |
+| `services/projectRecordAdapter.ts` | Maps DocumentRecord → ProjectRecord envelope |
+| `services/inboxEventAdapter.ts` | Readiness findings → WorkflowEvents |
+| `services/agentRecommendationService.ts` | Recommendations from document state |
+| `services/sampleData.ts` | Demo documents, drawings, revisions |
+
+## Pack 5 — Appointment & Project Kickoff
+
+Converts accepted proposals into governed appointments and live project workspaces.
+
+| File | Purpose |
+|------|---------|
+| `services/appointmentService.ts` | Appointment lifecycle: create, confirm, revise, find missing facts |
+| `services/kickoffService.ts` | Workspace creation, kickoff checklist, initial tasks |
+| `services/projectPassportAdapter.ts` | Maps appointment data → ProjectPassport baseline |
+| `services/documentAdapter.ts` | Creates 6 appointment document placeholders |
+| `services/inboxEventAdapter.ts` | Kickoff inbox events |
+| `services/agentRecommendationService.ts` | Kickoff next-action recommendations |
+| `services/auditTrailService.ts` | Immutable audit records for appointment actions |
+| `services/sampleData.ts` | Demo accepted proposal + project facts |
+
+---
+
 ## Demo Pack — Demo Mode Infrastructure
 
 Same codebase, same `main` branch, one `VITE_DEMO_MODE` env flag. Demo code tree-shaken from live builds.
