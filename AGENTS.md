@@ -129,6 +129,27 @@ npx tsx update_agents.ts
 - `SPECIALIZED_AGENTS` array defines default agents
 - `seedAgents()` adds missing agents to Firestore
 
+## Recently Merged
+
+Packs #27 (Pack 8 Finance), #28 (CPD Assessment), #29 (Pack 9 Site Execution) merged 2026-06-14. Builds clean — zero tsc errors.
+
+### Pack 8 — Finance / Payment / Escrow + Commercial Control
+- New: `src/lib/finance-api-router.ts` — 20+ finance endpoints
+- Services in `src/services/finance/` (14 services, 10 test suites, 132 assertions)
+- **No Architex-held funds** — orchestrates provider references, approvals, webhooks
+- UI components not yet built; Firestore persistence not yet wired
+
+### CPD Assessment Platform (PR #28)
+- New: `src/cpd/` — 8 services (accreditation, analytics, assessment, category rules, certificates, payment, role-body mapping, types)
+- New: `src/components/cpd/CPDHub.tsx`
+- CPD professional body research matrix at `docs/reference/CPD_PROFESSIONAL_BODY_RESEARCH_MATRIX.md`
+
+### Pack 9 — Site Execution & Field Control (PR #29)
+- New: `src/components/NCRManager.tsx`, `SiteInstructionManager.tsx`, `SnagManager.tsx`
+- New: `src/services/` — dailyLog, delayWarning, fieldEvidence, ncr, paymentBlocker, programmeImpact, siteExecution, siteInstruction, snag (9 services)
+- **7 test suites** — dailyLog, delayWarning, fieldEvidence, ncr, paymentBlocker, programmeImpact, siteExecution, siteInstruction, snag
+- Site execution types merged into `src/types.ts`: Severity, NonConformanceReport, SnagItem, DelayEarlyWarning, SiteInstruction, FieldEvidence, PaymentBlocker, ProgrammeImpact, SiteLog
+
 ## Security Notes
 
 - Firestore rules in `firestore.rules` (not examined — verify production rules)
