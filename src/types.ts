@@ -90,7 +90,7 @@ export interface UserProfile {
   firmStatus?: FirmMemberStatus;
   subscriptionStatus?: FirmSubscriptionStatus;
   billingRole?: FirmRole | 'none';
-  // CPD fields (Pack 10/12)
+  // CPD Assessment Platform fields (Pack 10/12)
   professionalBody?: string;
   builtEnvironmentRole?: string;
   cpdCycleStart?: string;
