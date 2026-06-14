@@ -46,35 +46,38 @@
 │   ├── lib/                      # Core libraries
 │   │   ├── firebase.ts           # Client Firebase init
 │   │   ├── firebase-admin.ts     # Server Admin SDK
-│   │   ├── api-router.ts         # Express API router (lazy-loaded)
+│   │   ├── api-router.ts         # Express API router (lazy-loaded, ~6.4K lines)
+│   │   ├── finance-api-router.ts # Finance API endpoints (~20 routes)
 │   │   ├── apiClient.ts          # Client-side API fetch wrapper
 │   │   ├── schemas.ts            # Zod validation schemas
 │   │   └── ...
-│   ├── demo-context/AGENTS.md         ← Demo Mode Context — role switching, sandbox seeding
-│   ├── demo-seed/AGENTS.md           ← Demo Mock Data — projects, users, CPD, submissions
 │   ├── components/               # UI components + role-specific dashboards
 │   │   ├── ui/                   # shadcn/ui primitives (button, card, dialog, etc.)
-│   │   ├── ClientDashboard.tsx
-│   │   ├── ArchitectDashboard.tsx
-│   │   ├── AdminDashboard.tsx
-│   │   ├── ContractorDashboard.tsx
-│   │   ├── BEPDashboard.tsx
+│   │   ├── *Dashboard.tsx        # 39 canonical dashboard pages
+│   │   ├── cpd/                  # CPD Assessment UI components
+│   │   ├── NCRManager.tsx        # Non-conformance report UI (Pack 9)
+│   │   ├── SiteInstructionManager.tsx  # Site instruction UI (Pack 9)
+│   │   ├── SnagManager.tsx       # Snag list UI (Pack 9)
 │   │   └── ...
 │   ├── features/                 # Feature modules
 │   │   └── project-communications/  # Project chat + messaging
-│   ├── services/                 # ~150+ business logic services
+│   ├── services/                 # Business logic services (~190 top-level .ts files)
 │   │   ├── agents/               # AI agent implementations
+│   │   ├── agentWorkflow/        # Agent orchestration core (20+ files)
+│   │   ├── finance/              # Financial domain services (escrow, payments, certificates)
+│   │   ├── masterExpansion/      # Product expansion: modules, lifecycle, risk
 │   │   ├── tools/                # Standalone tool registry
 │   │   ├── toolsets/             # Tool grouping + orchestration
 │   │   ├── geminiService.ts      # AI seeding + orchestration
 │   │   ├── workflowToolAgentService.ts
 │   │   └── ...
+│   ├── cpd/                      # CPD Assessment Platform (8 services, accreditation, analytics)
 │   ├── navigation/               # Role-aware navigation config
 │   │   ├── architexNavigationConfig.ts
 │   │   └── navTypes.ts
 │   ├── hooks/                    # Custom React hooks
 │   ├── data/                     # Static data (demo, seed, examples)
-│   └── __tests__/                # Test files
+│   └── __tests__/                # Test files (79+ service test files, 200 total across project)
 ```
 
 ---
@@ -225,6 +228,7 @@ npm run start:api:host    # Standalone API on cPanel/DigitalOcean
 - `Cross-Origin-Opener-Policy: same-origin-allow-popups`
 - Rate limiting via `express-rate-limit`
 - Routes: `/api/health`, `/api/auth/check-admin`, `/api/review`, file uploads, payments, municipal automation
+- Finance API: `src/lib/finance-api-router.ts` (~20 endpoints)
 
 ---
 
@@ -263,6 +267,31 @@ npm test                # Vitest unit tests
 npm run docs:api-contracts  # API contract validation
 npm run build           # Production bundle
 ```
+
+CI workflow: `.github/workflows/verification.yml`
+
+---
+
+## Recently Merged
+
+Packs #27 (Pack 8 Finance), #28 (CPD Assessment), #29 (Pack 9 Site Execution) merged 2026-06-14. Builds clean — zero tsc errors.
+
+### Pack 8 — Finance / Payment / Escrow + Commercial Control
+- New: `src/lib/finance-api-router.ts` — 20+ finance endpoints
+- Services in `src/services/finance/` (14 services, 10 test suites, 132 assertions)
+- **No Architex-held funds** — orchestrates provider references, approvals, webhooks
+- UI components not yet built; Firestore persistence not yet wired
+
+### CPD Assessment Platform (PR #28)
+- New: `src/cpd/` — 8 services (accreditation, analytics, assessment, category rules, certificates, payment, role-body mapping, types)
+- New: `src/components/cpd/CPDHub.tsx`
+- CPD professional body research matrix at `docs/reference/CPD_PROFESSIONAL_BODY_RESEARCH_MATRIX.md`
+
+### Pack 9 — Site Execution & Field Control (PR #29)
+- New: `src/components/NCRManager.tsx`, `SiteInstructionManager.tsx`, `SnagManager.tsx`
+- New: `src/services/` — dailyLog, delayWarning, fieldEvidence, ncr, paymentBlocker, programmeImpact, siteExecution, siteInstruction, snag (9 services)
+- 7 test suites across site execution services
+- Site execution types merged into `src/types.ts`: Severity, NonConformanceReport, SnagItem, DelayEarlyWarning, SiteInstruction, FieldEvidence, PaymentBlocker, ProgrammeImpact, SiteLog
 
 ---
 
@@ -310,18 +339,49 @@ Client vars: `process.env.VITE_*`. Server vars: `process.env.*`.
 
 ---
 
+## Demo Pack — Demo Mode Infrastructure
+
+Same codebase, same `main` branch, one `VITE_DEMO_MODE` env flag. Demo code tree-shaken from live builds.
+
+| File | Purpose |
+|------|---------|
+| `demo-context/DemoModeProvider.tsx` | React context: detects `VITE_DEMO_MODE=true`, manages role state, auto-seeds sandbox |
+| `demo-seed/seedAllData.ts` | Master seeder: 12 projects, 19 users, CPD data |
+| `demo-seed/mockUsers.ts` | 19 user profiles |
+| `demo-seed/mockProjects.ts` | 12 projects across all stages (R3.2M-R220M) |
+| `demo-seed/mockSubmissions.ts` | Per-project submissions with drawing index |
+| `demo-seed/mockMessages.ts` | Project conversation threads |
+| `demo-seed/mockCompliance.ts` | SANS compliance check results |
+| `demo-seed/mockCPD.ts` | 6 articles, 4 assessments, 3 modules, 5 certs |
+| `demo-seed/demoFirestore.ts` | Persistence wrapper — prefixes paths under `/demo/{uid}/` |
+| `components/DemoRoleSwitcher.tsx` | Nav dropdown: 22 roles in 7 groups |
+| `components/DemoBanner.tsx` | Fixed-bottom "DEMO MODE" banner |
+
+### Per-User Sandbox
+Data stored under `/demo/{uid}/` in Firestore. Security rules enforce uid-scoped access. User changes persist across page reloads.
+
+### Deploy
+- Live: `VITE_DEMO_MODE=false` → demo code tree-shaken
+- Demo: `VITE_DEMO_MODE=true` → demo included
+- Vercel dual-deploy from same `main` branch
+- DNS: CNAME `demo.architex.co.za` → `cname.vercel-dns.com`
+- Firebase project: `architex-demo` (`demo-firebase-config.json`)
+
+---
+
 ## Key Files to Understand First
 
 1. `src/App.tsx` — Main app shell, routing, role-based auth, lazy loading
 2. `src/lib/firebase.ts` / `firebase-admin.ts` — Firebase initialization
-3. `src/lib/api-router.ts` — Backend API endpoints
+3. `src/lib/api-router.ts` — Backend API endpoints (~6.4K lines)
 4. `src/services/geminiService.ts` — AI agent orchestration
 5. `src/services/agents/` — Agent implementations
-6. `src/navigation/architexNavigationConfig.ts` — Role-aware navigation
-7. `src/components/*Dashboard.tsx` — Role-specific dashboards
-8. `src/types.ts` — Shared TypeScript types (UserRole, Firm, Project, etc.)
-9. `server.ts` + `api-server.ts` — Express dev + production servers
-10. `src/lib/schemas.ts` — Zod validation schemas
+6. `src/services/agentWorkflow/` — Orchestration core (20+ files)
+7. `src/navigation/architexNavigationConfig.ts` — Role-aware navigation
+8. `src/components/*Dashboard.tsx` — Role-specific dashboards
+9. `src/types.ts` — Shared TypeScript types (UserRole, Firm, Project, etc.)
+10. `server.ts` + `api-server.ts` — Express dev + production servers
+11. `src/lib/schemas.ts` — Zod validation schemas
 
 ---
 
@@ -335,8 +395,10 @@ Client vars: `process.env.VITE_*`. Server vars: `process.env.*`.
 - **Build chunks**: Manual chunk splitting in `vite.config.ts` (firebase, react, framer, pdf-vendor, etc.)
 - **Admin SDK**: Uses firebase-admin `v13` with service account credentials
 - **cPanel deployment**: Build bundles via `scripts/build-static-upload-bundle.mjs` / `scripts/build-cpanel-api-bundle.mjs`
-|- **~150+ services** in `src/services/` covering all project lifecycle phases
-|- **~70+ components** in `src/components/` with role-specific dashboards + specialized tools
+- **~190 top-level service files** in `src/services/` covering all project lifecycle phases
+- **~152 component TSX files** in `src/` with role-specific dashboards + specialized tools
+- **Vercel Blob** active in `api-router.ts` — not yet replaced
+- **CI exists** at `.github/workflows/verification.yml` — deployment automation incomplete
 
 ---
 
@@ -350,45 +412,6 @@ Client vars: `process.env.VITE_*`. Server vars: `process.env.*`.
 - AGENTS.md files are binding work contracts for their subtrees
 - Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable AGENTS.md plus every parent AGENTS.md above it
 
-## Demo Pack — Demo Mode Infrastructure
-
-Same codebase, same `main` branch, one `VITE_DEMO_MODE` env flag. Demo-specific code tree-shaken from live builds.
-
-| File | Purpose |
-|------|---------|
-| `demo-context/DemoModeProvider.tsx` | React context: detects `VITE_DEMO_MODE=true`, manages demo role state, auto-seeds sandbox on first login |
-| `demo-seed/seedAllData.ts` | Master seeder: writes 12 projects, 19 users, CPD data, submissions, messages, compliance checks |
-| `demo-seed/mockUsers.ts` | 19 user profiles (all roles + CPD Officer) |
-| `demo-seed/mockProjects.ts` | 12 projects across all lifecycle stages (R3.2M-R220M) |
-| `demo-seed/mockSubmissions.ts` | Per-project submissions with realistic drawing index per stage |
-| `demo-seed/mockMessages.ts` | Per-project conversation threads (brief → close-out) |
-| `demo-seed/mockCompliance.ts` | SANS compliance check results per project per stage |
-| `demo-seed/mockCPD.ts` | 6 CPD articles, 4 assessments, 3 learning modules, 5 certificates |
-| `demo-seed/demoFirestore.ts` | Persistence wrapper: transparently prefixes Firestore paths under `/demo/{uid}/` for per-user sandbox isolation |
-| `components/DemoRoleSwitcher.tsx` | Nav dropdown: 22 roles in 7 groups, persists to localStorage |
-| `components/DemoBanner.tsx` | Fixed-bottom "DEMO MODE" banner with role, seed status, reset button |
-
-### Per-User Sandbox
-All demo data lives under `/demo/{uid}/` in Firestore. Security rules enforce uid-scoped access. User changes persist across page reloads — isolated per user.
-
-### Deploy
-- Live: `VITE_DEMO_MODE=false` → demo code tree-shaken
-- Demo: `VITE_DEMO_MODE=true` → demo code included
-- Vercel dual-deploy from same `main` branch
-- DNS: CNAME `demo.architex.co.za` → `cname.vercel-dns.com`
-
----
-
-# DOX Framework
-
-## Core Contract
-
-1. AGENTS.md files are binding work contracts for their subtrees
-2. Read the root AGENTS.md and walk the DOX chain before ANY project interaction
-3. After editing, update the nearest owning AGENTS.md
-
-Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
-
 ## Read Before Editing
 
 1. Read the root AGENTS.md
@@ -396,6 +419,10 @@ Do not rely on memory. Re-read the applicable DOX chain in the current session b
 3. Walk from the repository root to each target path
 4. Read every AGENTS.md found along each route
 5. If a parent AGENTS.md lists a child AGENTS.md whose scope contains the path, read that child and continue from there
+6. Use the nearest AGENTS.md as the local contract and parent docs for repo-wide rules
+7. If docs conflict, the closer doc controls local work details, but no child doc may weaken DOX
+
+Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
 
 ## Update After Editing
 
@@ -459,7 +486,7 @@ When the user requests a durable behavior change, record it here or in the relev
 
 ### DOX Tree
 ```
-architex/
+arc/
 ├── AGENTS.md                          ← Root (this file) — project-wide contracts
 ├── src/
 │   ├── components/
@@ -482,6 +509,8 @@ architex/
 | `src/services/agentWorkflow/AGENTS.md` | Agent orchestration core: identity, routing, governance, monitoring, approval gates, audit trails | 20+ file subsystem with its own architecture, event routing, tenant scoping, and explicit module boundary (`agent_orchestration_core`). |
 | `src/services/finance/AGENTS.md` | Financial domain: cashflow, claims, escrow, payments, certificates, retention, variation control | Financial domain with strict regulatory rules, third-party provider contracts, state machines, and audit requirements that differ from general business logic. |
 | `src/services/masterExpansion/AGENTS.md` | Product expansion: module registry, navigation config, lifecycle engine, risk engine, passport | Architectural backbone defining product module structure, lifecycle state machine, and workspace routing — a durable platform expansion layer. |
+| `src/demo-context/AGENTS.md` | Demo mode React context — role switching, sandbox seeding, localStorage persistence | Single-file module with explicit contracts for demo mode state management consumed by App.tsx and all components. |
+| `src/demo-seed/AGENTS.md` | Demo mock data and Firestore persistence wrapper | 8-file subsystem (12 mock projects, 19 users, CPD data, persistence layer) with its own seed contracts and import patterns. |
 | `src/components/ui/AGENTS.md` | Reusable shadcn/ui primitive components | Atomic component library with its own styling conventions, accessibility contracts, and prop patterns consumed by every feature component in the app. |
 | `src/navigation/AGENTS.md` | Role-aware navigation configuration and routing | Central information architecture contract that determines what every user role sees. Consumed by App.tsx and all dashboards. |
 | `src/features/project-communications/AGENTS.md` | Project chat, messaging, phase-aware communication panels | Bounded feature module with its own component tree, service layer, type system, and config — the clearest feature boundary in the project. |
@@ -495,8 +524,6 @@ architex/
 | `src/test/` | Test infrastructure (setup, mocks) — already documented in root AGENTS.md testing section |
 | `src/hooks/` | Single custom hook — insufficient scope |
 | `src/data/` | Only 2 static data files — operational, not a durable boundary |
-| `src/demo-seed/` | Demo seed data — operational test data, not a durable code boundary |
-| `src/demo-context/` | Single provider component — insufficient scope |
 | `src/examples/` | Single example file — reference material, not a working boundary |
 | `src/components/cpd/` | 6 CPD UI components nested under components — defers to when components/ as a whole gets indexed |
 | `src/components/tools/` | Tool UI components — same deferral reasoning as cpd/ |
@@ -505,3 +532,5 @@ architex/
 | `src/services/toolsets/` | 7 files but tightly coupled to workflowToolAgentService — root doc already covers registry pattern |
 | `src/__tests__/` | Single test file — insufficient scope |
 | `src/services/__tests__/` | Test files for services — test organization, not a behavioral boundary |
+| `src/services/dailyLog/` | Thin service directories for supporting tool implementations closer to root doc |
+| `src/cpd/` | CPD platform — evaluated but root doc's "Recently Merged" section already covers it; promote to indexed child once stable past 2 releases |

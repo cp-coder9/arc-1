@@ -90,7 +90,7 @@ export interface UserProfile {
   firmStatus?: FirmMemberStatus;
   subscriptionStatus?: FirmSubscriptionStatus;
   billingRole?: FirmRole | 'none';
-  // CPD fields (Pack 10/12)
+  // CPD Assessment Platform fields (Pack 10/12)
   professionalBody?: string;
   builtEnvironmentRole?: string;
   cpdCycleStart?: string;
@@ -529,6 +529,10 @@ export interface Notification {
     refundId?: string;
     deliveryId?: string;
     entityId?: string;
+    timesheetId?: string;
+    supervisionLogId?: string;
+    registrationId?: string;
+    invoiceReadinessId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -1084,17 +1088,28 @@ export interface GanttTask {
   updatedAt?: string;
 }
 
+export type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'stormy';
+
 export interface SiteLog {
   id: string;
   projectId: string;
   date: string;
-  weather: 'sunny' | 'cloudy' | 'rainy' | 'stormy';
+  weather: WeatherCondition;
+  weatherDetail?: string;
   temperature?: number;
   workDescription: string;
+  labourOnSite?: Record<string, number>;
   labourCount?: number;
+  plantOnSite?: string[];
+  deliveries?: string[];
+  visitors?: string[];
+  safetyNotes?: string[];
+  delayNotes?: string[];
   materialsUsed?: string[];
   issues?: string[];
+  evidenceIds?: string[];
   photos: { url: string; caption: string }[];
+  status: 'draft' | 'submitted';
   createdBy: string;
   createdAt: string;
 }
@@ -1178,6 +1193,7 @@ export interface AgentRecommendation {
   createdAt: string;
 }
 
+
 // Re-export toolset types from pack
 export type {
   ToolboxUserRole,
@@ -1215,56 +1231,10 @@ export type {
   SnagItemPayload,
   ResourceMarketplaceListingPayload,
 } from './types/comprehensiveToolsets';
-// Pack 12: Practice management and office operations
-export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
 
-export interface TimesheetEntry {
-  id: string;
-  userId: string;
-  firmId: string;
-  projectId?: string;
-  workstage?: ProjectStage;
-  date: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  description: string;
-  billable: TimesheetBillableStatus;
-  hourlyRateCents?: number;
-  totalValueCents: number;
-  invoiced?: boolean;
-  invoiceId?: string;
-  tags?: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+// ── Pack 12: Practice Management & Professional Office Ops ────────────────
 
-export interface TimesheetSummary {
-  firmId: string;
-  userId?: string;
-  periodStart: string;
-  periodEnd: string;
-  totalHours: number;
-  billableHours: number;
-  nonBillableHours: number;
-  totalValueCents: number;
-  entries: TimesheetEntry[];
-  byProject?: Record<string, { hours: number; valueCents: number }>;
-  byUser?: Record<string, { hours: number; valueCents: number }>;
-}
-
-export interface FeeReconciliation {
-  id: string;
-  firmId: string;
-  projectId: string;
-  timesheetIds: string[];
-  totalTimeValueCents: number;
-  proposalValueCents?: number;
-  varianceCents?: number;
-  createdAt: string;
-  updatedAt?: string;
-}
-
+// Pipeline types
 export type PipelineStatus = 'active' | 'won' | 'lost' | 'abandoned' | 'on_hold';
 
 export interface PipelineProject {
@@ -1276,26 +1246,23 @@ export interface PipelineProject {
   stage: ProjectStage;
   status: PipelineStatus;
   estimatedValueCents: number;
-  probability: number;
+  probability: number; // 0-100
   expectedCloseDate?: string;
+  closedAt?: string;
+  closedReason?: string;
   notes?: string;
   createdBy: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface PipelineForecast {
-  firmId: string;
-  generatedAt: string;
-  totalEstimatedValueCents: number;
-  weightedForecastCents: number;
-  activeProjectCount: number;
-  wonProjectCount: number;
-  lostProjectCount: number;
-  byStage: Record<string, { count: number; estimatedValueCents: number; weightedValueCents: number }>;
-  projects?: PipelineProject[];
+  totalValueCents: number;
+  weightedValueCents: number;
+  byStage: Record<ProjectStage, { count: number; value: number; weighted: number }>;
 }
 
+// Practice Task types
 export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type PracticeTaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'cancelled';
 
@@ -1306,7 +1273,7 @@ export interface PracticeTask {
   title: string;
   description?: string;
   assigneeId?: string;
-  assignedBy: string;
+  assignedBy?: string;
   priority: PracticeTaskPriority;
   status: PracticeTaskStatus;
   dueDate?: string;
@@ -1316,19 +1283,68 @@ export interface PracticeTask {
   tags?: string[];
   completedAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface WorkloadSummary {
   userId: string;
-  firmId?: string;
-  openTasks: number;
-  urgentTasks: number;
+  displayName?: string;
+  totalTasks: number;
+  completedTasks: number;
   overdueTasks: number;
-  estimatedHours: number;
-  tasks: PracticeTask[];
+  totalEstimatedHours: number;
+  totalActualHours: number;
 }
 
+// Timesheet types
+export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
+
+export interface TimesheetEntry {
+  id: string;
+  userId: string;
+  firmId: string;
+  projectId?: string;
+  workstage?: ProjectStage;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  durationMinutes: number;
+  description: string;
+  billable: TimesheetBillableStatus;
+  hourlyRateCents?: number;
+  totalValueCents?: number;
+  tags?: string[];
+  invoiced?: boolean;
+  invoiceId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TimesheetSummary {
+  periodStart: string;
+  periodEnd: string;
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  internalHours: number;
+  totalValueCents: number;
+  byProject: Record<string, { hours: number; valueCents: number }>;
+  byUser: Record<string, { hours: number; valueCents: number }>;
+}
+
+export interface FeeReconciliation {
+  timesheetEntryId: string;
+  projectId: string;
+  userId: string;
+  hoursLogged: number;
+  timesheetValueCents: number;
+  feeChargedCents: number;
+  varianceCents: number;
+  variancePercent: number;
+  reconciled: boolean;
+}
+
+// Registration Renewal types
 export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACLAP' | 'SACPCMP';
 export type RegistrationStatus = 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'suspended';
 
@@ -1342,12 +1358,15 @@ export interface ProfessionalRegistration {
   status: RegistrationStatus;
   cpdPointsRequired: number;
   cpdPointsEarned: number;
-  renewalReminderSent: boolean;
+  renewalReminderSent?: boolean;
+  lastRenewedAt?: string;
+  renewalSubmittedAt?: string;
   documents?: { name: string; url: string }[];
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
+// Template Library types
 export type TemplateCategory = 'appointment' | 'certificate' | 'report' | 'submission' | 'contract' | 'invoice' | 'general';
 
 export interface PracticeTemplate {
@@ -1364,7 +1383,7 @@ export interface PracticeTemplate {
   isActive: boolean;
   createdBy: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface TemplateVersion {
@@ -1373,7 +1392,7 @@ export interface TemplateVersion {
   version: number;
   fileUrl?: string;
   fileName?: string;
-  changes: string;
+  changes?: string;
   createdBy: string;
   createdAt: string;
 }
@@ -1428,6 +1447,12 @@ export type DelayWarningCause = string;
 export type SiteInstructionStatus = string;
 export type EvidenceType = 'photo' | 'video' | 'document' | 'inspection_report' | 'test_certificate' | 'delivery_note';
 
+export type SiteExecutionPhase =
+  | 'construction_execution'
+  | 'closeout'
+  | 'defects_liability'
+  | 'operations_post_occupancy';
+
 export interface NonConformanceReport {
   id: string;
   projectId: string;
@@ -1481,10 +1506,15 @@ export interface SiteInstruction {
   issuedBy: string;
   issuedByRole: UserRole;
   authorised: boolean;
-  costImpact: 'none' | 'low' | 'medium' | 'high';
-  timeImpact: 'none' | 'days' | 'weeks' | 'critical';
+  authorisedBy?: string;
+  authorisedAt?: string;
+  costImpact: 'none' | 'possible' | 'confirmed';
+  timeImpact: 'none' | 'possible' | 'confirmed';
   linkedRfiId?: string;
   linkedDocumentIds: string[];
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  supersededById?: string;
   status: SiteInstructionStatus;
   createdAt: string;
   updatedAt: string;
@@ -1502,6 +1532,8 @@ export interface FieldEvidence {
   capturedAt: string;
   linkedObjectId?: string;
 }
+
+export type BlockerSourceType = 'ncr' | 'snag' | 'instruction' | 'inspection' | 'delay_warning';
 
 export interface PaymentBlocker {
   id: string;
@@ -1540,28 +1572,43 @@ export interface SiteAuditRecord {
   sourceObjectType: string;
   createdAt: string;
 }
-export type SiteAgentRecommendation = AgentRecommendation;
+export interface SiteAgentRecommendation {
+  id: string;
+  projectId: string;
+  agentKey: string;
+  title: string;
+  rationale: string;
+  sourceObjectId: string;
+  severity: Severity;
+  status: string;
+  createdAt: string;
+}
 
 export interface SiteProjectRecord {
   id: string;
   projectId: string;
-  type: string;
+  tenantId: string;
+  phase: SiteExecutionPhase;
+  moduleKey: string;
+  recordType: string;
   title: string;
   status: string;
-  createdAt: string;
+  payload: unknown;
+  linkedRecordIds: string[];
   createdBy: string;
+  createdAt: string;
 }
 
 export interface SiteInboxEvent {
   id: string;
   projectId: string;
-  type: string;
+  recipientRole: UserRole;
   title: string;
-  description: string;
+  sourceObjectId: string;
+  sourceObjectType: string;
   priority: Severity;
-  sourceId: string;
-  sourceType: string;
-  assignedTo?: string;
+  dueDate?: string;
+  isRead: boolean;
   createdAt: string;
 }
 
@@ -1575,6 +1622,9 @@ export interface ProgrammeImpact {
   estimatedDays: number;
   requiresPlannerReview: boolean;
   description?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
   createdBy: string;
   createdAt: string;
 }
@@ -1588,4 +1638,3 @@ export interface ComplianceScenario {
   nodes: unknown[];
   createdAt: string;
 }
-

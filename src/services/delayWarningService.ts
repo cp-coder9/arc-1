@@ -99,7 +99,10 @@ export async function closeWarning(
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
-    const update: Record<string, unknown> = { status: 'closed', updatedAt: now };
+    const update: Record<string, unknown> = {
+      status: 'closed',
+      updatedAt: now,
+    };
     if (reviewedBy) {
       update.reviewedBy = reviewedBy;
       update.reviewedAt = now;

@@ -229,13 +229,11 @@ export async function getTimesheetSummary(input: {
     return {
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
-      firmId: input.firmId,
-      userId: input.userId,
       totalHours: Math.round(totalHours * 100) / 100,
       billableHours: Math.round(billableHours * 100) / 100,
       nonBillableHours: Math.round(nonBillableHours * 100) / 100,
+      internalHours: 0,
       totalValueCents,
-      entries,
       byProject,
       byUser,
     };
@@ -247,25 +245,23 @@ export async function getTimesheetSummary(input: {
 export async function reconcileFees(projectId: string, feeChargedCents: number): Promise<FeeReconciliation[]> {
   try {
     const entries = await getTimesheetEntries({ firmId: '', projectId });
-    const timesheetIds = entries.map((e) => e.id);
     const totalTimeValueCents = entries.reduce((sum, e) => sum + (e.totalValueCents || 0), 0);
     const varianceCents = feeChargedCents - totalTimeValueCents;
-    const firmIds = [...new Set(entries.map((e) => e.firmId))];
-    const firmId = firmIds[0] || '';
-    const now = new Date().toISOString();
+    const variancePercent = feeChargedCents > 0
+      ? Math.round((varianceCents / feeChargedCents) * 10000) / 100
+      : 0;
 
-    const result: FeeReconciliation = {
-      id: `recon_${projectId}_${Date.now()}`,
-      firmId,
+    return entries.map((entry) => ({
+      timesheetEntryId: entry.id,
       projectId,
-      timesheetIds,
-      totalTimeValueCents,
-      proposalValueCents: feeChargedCents,
+      userId: entry.userId,
+      hoursLogged: minutesToHours(entry.durationMinutes),
+      timesheetValueCents: entry.totalValueCents || 0,
+      feeChargedCents,
       varianceCents,
-      createdAt: now,
-    };
-
-    return [result];
+      variancePercent,
+      reconciled: Math.abs(varianceCents) < 100,
+    }));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TIMESHEETS_COL}/reconcile/${projectId}`);
   }

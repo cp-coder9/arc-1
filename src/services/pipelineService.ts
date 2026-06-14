@@ -119,7 +119,7 @@ export async function getFirmPipeline(firmId: string, filters?: { stage?: Projec
 export async function getPipelineForecast(firmId: string): Promise<PipelineForecast> {
   try {
     const projects = await getFirmPipeline(firmId, { status: 'active' });
-    const byStage = {} as Record<string, { count: number; estimatedValueCents: number; weightedValueCents: number }>;
+    const byStage = {} as Record<string, { count: number; value: number; weighted: number }>;
 
     let totalEstimatedValueCents = 0;
     let weightedForecastCents = 0;
@@ -134,21 +134,16 @@ export async function getPipelineForecast(firmId: string): Promise<PipelineForec
       weightedForecastCents += weighted;
       activeProjectCount++;
 
-      if (!byStage[p.stage]) byStage[p.stage] = { count: 0, estimatedValueCents: 0, weightedValueCents: 0 };
+      if (!byStage[p.stage]) byStage[p.stage] = { count: 0, value: 0, weighted: 0 };
       byStage[p.stage].count++;
-      byStage[p.stage].estimatedValueCents += value;
-      byStage[p.stage].weightedValueCents += weighted;
+      byStage[p.stage].value += value;
+      byStage[p.stage].weighted += weighted;
     }
 
     return {
-      firmId,
-      generatedAt: new Date().toISOString(),
-      totalEstimatedValueCents,
-      weightedForecastCents,
-      activeProjectCount,
-      wonProjectCount,
-      lostProjectCount,
-      byStage,
+      totalValueCents: totalEstimatedValueCents,
+      weightedValueCents: weightedForecastCents,
+      byStage: byStage as Record<ProjectStage, { count: number; value: number; weighted: number }>,
     };
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${PIPELINES_COL}/forecast/${firmId}`);

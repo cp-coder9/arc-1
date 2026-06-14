@@ -1,0 +1,380 @@
+{
+  "packName": "Architex CPD Assessment Platform",
+  "version": "0.4-draft",
+  "separationRule": "Separate CPD menu/workflow; do not merge into calculators/toolboxes.",
+  "repoContext": {
+    "repoPath": "C:/Users/lylsl/AppData/Local/hermes/architex-current",
+    "existingPlanningFiles": [
+      "Phases/new-implementation-plan/phase-03-cpd-prd.md",
+      "Phases/new-implementation-plan/phase-03-cpd-workflow.md",
+      "Phases/new-implementation-plan/phase-03-cpd-tasks.md"
+    ],
+    "existingHooks": [
+      "pdfGenerationService",
+      "uploadService",
+      "knowledgeService",
+      "notificationService",
+      "auditService",
+      "AdminKnowledgeUploader",
+      "AdminDashboard",
+      "ArchitectDashboard",
+      "firestore.rules"
+    ]
+  },
+  "cpdCentralFindings": [
+    "Advertises accredited courses on a simple platform, learn on your schedule",
+    "Built-environment workshops/courses in Southern Africa, including SACAP-facing content",
+    "Architectural CPD administration/certificate submission service shown at R380/year or R59.99/month",
+    "Engineer CPD administration advertised under CESA accreditation with ECSA annual submission at R535/year",
+    "Digital resource bank includes municipal, SACAP and SANS resources"
+  ],
+  "roles": [
+    "professional_learner",
+    "content_creator",
+    "cpd_reviewer",
+    "accreditation_partner",
+    "platform_admin"
+  ],
+  "contentTypes": [
+    "webinar_recording",
+    "live_webinar",
+    "transcript",
+    "article",
+    "refereed_article",
+    "magazine_reading",
+    "slide_deck",
+    "external_partner_course",
+    "platform_training_course",
+    "municipal_or_regulatory_guide"
+  ],
+  "workflows": [
+    "content_intake",
+    "transcription_extraction",
+    "ai_assessment_generation",
+    "human_assessment_review",
+    "accreditation_submission_tracking",
+    "learner_enrolment",
+    "assessment_attempt_scoring",
+    "certificate_issue_verification",
+    "cpd_record_tracking",
+    "partner_launch_funnel",
+    "assessment_runner",
+    "assessment_analytics",
+    "lecturer_analytics",
+    "certificate_generation",
+    "assessment_purchase",
+    "payment_webhook_confirmation",
+    "content_owner_payout",
+    "payment_refund",
+    "professional_body_category_research",
+    "category_1_accreditation_targeting",
+    "body_specific_credit_calculation"
+  ],
+  "collections": [
+    "cpd_content_items",
+    "cpd_courses",
+    "cpd_assessment_drafts",
+    "cpd_assessments",
+    "cpd_accreditation_applications",
+    "users/{userId}/cpd_enrollments",
+    "users/{userId}/cpd_attempts",
+    "users/{userId}/cpd_records",
+    "cpd_certificates",
+    "cpd_partner_channels",
+    "cpd_professional_body_rules",
+    "cpd_assessment_analytics",
+    "cpd_lecturer_analytics",
+    "cpd_professional_body_connectors",
+    "cpd_payment_settings",
+    "cpd_assessment_purchases",
+    "cpd_instructor_payouts",
+    "cpd_payment_events",
+    "cpd_professional_body_rule_sets",
+    "cpd_category_rules",
+    "cpd_credit_calculations"
+  ],
+  "guardrails": [
+    "AI only drafts assessments; human review required",
+    "Accredited credit values must be provider/reviewer approved",
+    "Learners cannot self-award CPD credits",
+    "Server/admin-controlled scoring and certificate issuance",
+    "No fake SACAP/ECSA sync when no real API/provider exists",
+    "Respect source content permissions and POPIA",
+    "No fake integration with any professional body unless official API/permission exists; use connector modes instead",
+    "Certificates auto-issue only after accredited live course, passing server-side score, and no pending manual review",
+    "Paid assessments require confirmed payment/free entitlement before assessment runner starts",
+    "Assessment price, platform fee percent, minimum fee and payout settings must be admin-controlled and audit logged",
+    "Category and credit value must be approved/confirmed by the relevant professional body, VA, CPD Central or accrediting partner before certificate issue",
+    "Architecture/SACAP 0.1 credit per hour must not be assumed for SACPLAN/ECSA/SACQSP/SACLAP/SACPCMP/SAGC without body-specific confirmation",
+    "Do not apply SACAP architecture credit rules to engineers, quantity surveyors, construction managers, planners, landscape architects, geomatics practitioners or valuers.",
+    "Onboarding must collect professional role, professional body and registration category before the CPD engine calculates credits/points/hours.",
+    "Certificates must use the body-specific unit label and category wording: credits, points, hours, or compliance status.",
+    "Where body rules are incomplete, degrade to manual verification and do not invent CPD values."
+  ],
+  "mvpSequence": [
+    "separate_cpd_hub",
+    "admin_course_assessment_builder",
+    "accreditation_workflow",
+    "learner_attempts_certificates",
+    "cpd_central_launch_funnel",
+    "article_reading_assessments_knowledge_hub"
+  ],
+  "assessmentApplicationRequirements": {
+    "defaultQuestionTypes": [
+      "multiple_choice",
+      "scenario_mcq"
+    ],
+    "optionalQuestionTypes": [
+      "multiple_select",
+      "true_false",
+      "short_answer",
+      "reflection"
+    ],
+    "learnerRunner": [
+      "course_landing",
+      "start_or_resume",
+      "question_navigation",
+      "timer_optional",
+      "submit_attempt",
+      "result_screen",
+      "certificate_download_after_pass"
+    ],
+    "builder": [
+      "structured_question_bank",
+      "question_option_ids",
+      "correct_option_ids",
+      "points",
+      "explanations",
+      "learning_outcome_mapping",
+      "source_references",
+      "versioning"
+    ],
+    "policy": [
+      "mvp_mcq_first",
+      "short_text_requires_manual_review",
+      "no_certificate_until_manual_review_complete"
+    ]
+  },
+  "analyticsRequirements": [
+    "total_attempts",
+    "unique_learners",
+    "pass_rate_percent",
+    "average_score_percent",
+    "question_correct_rate",
+    "failed_retry_rate",
+    "certificate_issue_count",
+    "lecturer_course_dashboard",
+    "partner_admin_reporting"
+  ],
+  "certificateRequirements": [
+    "learner_full_name",
+    "professional_body",
+    "registration_number",
+    "course_title",
+    "provider_name",
+    "accreditation_reference",
+    "approved_cpd_credits",
+    "assessment_pass_status",
+    "issue_date",
+    "verification_code",
+    "qr_or_verification_url"
+  ],
+  "professionalBodies": [
+    "SACAP",
+    "ECSA",
+    "SACQSP",
+    "SACPLAN",
+    "SACLAP",
+    "SACPCMP",
+    "SAGC",
+    "Voluntary Association",
+    "Other"
+  ],
+  "connectorModes": [
+    "api",
+    "portal_assisted",
+    "document_export",
+    "email_submission",
+    "manual_record"
+  ],
+  "monetizationRequirements": {
+    "principle": "Content creators/lecturers must be able to monetize CPD assessment access at low per-assessment prices while Architex takes a configurable platform fee.",
+    "pricing": [
+      "admin_set_default_assessment_price_rand",
+      "course_level_price_override_rand",
+      "free_assessments_allowed",
+      "low_price_examples_10_to_50_rand",
+      "currency_ZAR"
+    ],
+    "fees": [
+      "configurable_architex_platform_fee_percent",
+      "initial_reference_options_1_percent_or_10_percent",
+      "optional_minimum_platform_fee_rand",
+      "optional_fixed_platform_fee_rand",
+      "content_owner_net_calculation"
+    ],
+    "paymentFlow": [
+      "course_landing_shows_price",
+      "learner_purchase_before_assessment",
+      "payment_provider_checkout",
+      "webhook_confirms_paid_status",
+      "paid_purchase_unlocks_assessment_runner",
+      "refund_status_blocks_certificate_if_required"
+    ],
+    "payoutFlow": [
+      "track_gross_assessment_revenue",
+      "track_architex_platform_fee",
+      "track_content_owner_net",
+      "content_owner_payout_batch",
+      "partner_reporting"
+    ],
+    "paymentProviders": [
+      "PayFast",
+      "Yoco",
+      "Stripe",
+      "manual_EFT",
+      "other_gateway"
+    ],
+    "guardrails": [
+      "No assessment start unless free or paid purchase is confirmed",
+      "Learners cannot alter price or fee records",
+      "Platform fee must be admin-configurable",
+      "Content-owner payout is separate from CPD accreditation approval",
+      "Pricing must distinguish post-webinar add-on assessments, standalone article-based assessments, and dedicated CPD course assessments"
+    ],
+    "pricingModels": {
+      "paid_webinar_addon_assessment": "Lower add-on assessment fee when the learner already paid a higher-value webinar/course fee through CPD Central or another partner; fee covers extra assessed CPD evidence/credits.",
+      "standalone_article_based_assessment": "Higher-value assessment price where the uploaded/approved article or reading is consumed primarily through Architex and the assessment/evidence is the monetised CPD product.",
+      "dedicated_cpd_course_assessment": "Price set by judgement/admin approval based on expected assessment time, approved CPD category, approved credit value, content depth and content-owner proposal.",
+      "partner_bundle_included": "Assessment included where partner contract already bundles course and assessment fees.",
+      "free_launch_or_partner_funnel": "Free where used as launch marketing, sponsorship, or strategic partner funnel."
+    },
+    "pricingJudgementFactors": [
+      "commercial_model",
+      "already_paid_partner_webinar_or_course_fee",
+      "article_vs_webinar_vs_dedicated_course",
+      "approved_cpd_category",
+      "approved_credit_value",
+      "expected_assessment_minutes",
+      "content_depth_and_review_burden",
+      "content_owner_proposed_price",
+      "admin_approved_price",
+      "partner_contract_terms"
+    ]
+  },
+  "cpdCategoryResearch": {
+    "strategicPrinciple": "Architex CPD should be framed around professional-body CPD categories, with Category 1 / developmental learning as the strategic target where the accrediting body/CPD Central/VA can approve it.",
+    "SACAP": {
+      "status": "researched_official",
+      "cycleYears": 5,
+      "category1": "Developmental Activities",
+      "category1Rule": "Generally 10 hours = 1 credit, i.e. 0.1 credit/hour, except mentoring rules. At least 1 Category 1 credit is compulsory annually, with 5 Category 1 credits required over the 5-year cycle. Up to 5 Category 1 credits may be accrued in one calendar year and claimed for the full cycle.",
+      "categories": [
+        "Category 1 - Developmental Activities",
+        "Category 2 - Work-Based Activities",
+        "Category 3 - Individual Activities"
+      ],
+      "platformImplication": "Course/assessment should store requested and approved SACAP Category 1 credits separately from raw duration. A 1-hour SACAP Category 1 activity estimates to 0.1 credit unless accreditor-approved otherwise."
+    },
+    "SACPLAN": {
+      "status": "researched_official",
+      "cycleYears": 3,
+      "ruleSummary": "SACPLAN CPD policy uses 75 points over a 3-year cycle, with Category A Professional Knowledge, Category B Mentorship and Category C Active Participation. Some non-credit-bearing planning-related courses are 1 point per hour subject to sub-area limits.",
+      "platformImplication": "Do not force SACPLAN into SACAP credits. Store body-specific unit label as points."
+    },
+    "ECSA": {
+      "status": "preliminary_needs_body_confirmation",
+      "platformImplication": "ECSA has CPD portals/documents/service-provider structures; do not issue ECSA category/credit claims until current ECSA or licensed-body approval confirms category and credits."
+    },
+    "SACQSP": {
+      "status": "preliminary_needs_body_confirmation"
+    },
+    "SACLAP": {
+      "status": "preliminary_needs_body_confirmation"
+    },
+    "SACPCMP": {
+      "status": "preliminary_needs_body_confirmation"
+    },
+    "SAGC": {
+      "status": "preliminary_needs_body_confirmation"
+    },
+    "guardrail": "Never assume architecture 0.1 credit/hour applies across all built-environment bodies. Store professionalBody, approvedCategory, creditUnitLabel, requestedCredits, approvedCredits, ruleStatus and accreditor approval evidence."
+  },
+  "professionalBodyRuleSets": {
+    "SACAP": {
+      "unit": "credits",
+      "cpdRequired": true,
+      "cycleYears": 5,
+      "strategicCategory": "Category 1 Developmental Activities",
+      "rule": "10 hours = 1 credit; 1 hour = 0.1 credit; minimum 1 Category 1 credit/year; 5 Category 1 credits/5-year cycle"
+    },
+    "ECSA": {
+      "unit": "credits",
+      "cpdRequired": true,
+      "cycleYears": 5,
+      "cycleTotal": 25,
+      "strategicCategory": "Category 1a Validated Educational / Developmental Activities",
+      "rule": "1 credit = 10 notional hours; minimum 5 Category 1a credits per cycle; minimum 3 credits/year across at least two categories"
+    },
+    "SACQSP": {
+      "unit": "hours",
+      "cpdRequired": true,
+      "cycleYears": 5,
+      "cycleTotal": 125,
+      "annualTotal": 25,
+      "strategicCategory": "Category 1 structured/validated QS CPD",
+      "rule": "Category 1 minimum 10 hours/year; Category 2 maximum 15 hours/year; Code of Conduct assessment pass mark 72%"
+    },
+    "SACPCMP": {
+      "unit": "credits",
+      "cpdRequired": true,
+      "cycleYears": 3,
+      "cycleTotal": 300,
+      "strategicCategory": "SACPCMP four-category CPD",
+      "rule": "Professional Practice 100; Personal Development 50; Mentorship 100; PPPI 50 over three financial years"
+    },
+    "SACPLAN": {
+      "unit": "points",
+      "cpdRequired": true,
+      "cycleYears": 3,
+      "cycleTotal": 75,
+      "strategicCategory": "Category A Professional Knowledge",
+      "rule": "Points model; selected planning courses may be 1 point/hour subject to focus-area rules"
+    },
+    "SACLAP": {
+      "unit": "credits",
+      "cpdRequired": true,
+      "cycleYears": 5,
+      "strategicCategory": "Category 1 Personal Professional Development",
+      "rule": "Category 1: 1 hour = 0.1 credits; minimum 3 credits/year including 1 Category 1 credit/year; cycle target 25 or 20 depending registration category"
+    },
+    "SAGC": {
+      "unit": "credits",
+      "cpdRequired": true,
+      "cycleYears": 5,
+      "strategicCategory": "Category 1 Developmental Activities",
+      "rule": "Professionals/technologists 20 credits/cycle; technicians 13; minimum 5 Category 1/cycle; 1 ethics credit/cycle; Category 1 uses 10 hours = 1 credit"
+    },
+    "SACPVP": {
+      "unit": "compliance_status",
+      "cpdRequired": true,
+      "cycleYears": 5,
+      "strategicCategory": "Manual CPD compliance/certificate validity tracking",
+      "rule": "Official public material confirms CPD compliance affects 5-year vs 1-year certificate validity; exact points/category formula requires manual confirmation"
+    }
+  },
+  "roleRouting": {
+    "architectural_professional": "SACAP",
+    "structural_engineer": "ECSA",
+    "civil_engineer": "ECSA",
+    "electrical_engineer": "ECSA",
+    "mechanical_engineer": "ECSA",
+    "quantity_surveyor": "SACQSP",
+    "construction_project_manager": "SACPCMP",
+    "construction_manager": "SACPCMP",
+    "professional_planner": "SACPLAN",
+    "landscape_architectural_professional": "SACLAP",
+    "geomatics_practitioner": "SAGC",
+    "property_valuer": "SACPVP"
+  }
+}

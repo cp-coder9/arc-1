@@ -1,6 +1,6 @@
-import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
-import type { PaymentBlocker, NonConformanceReport, SnagItem, InspectionRecord } from '@/types';
+import type { PaymentBlocker, BlockerSourceType, Severity, NonConformanceReport, SnagItem, InspectionRecord } from '@/types';
 
 const PROJECTS_COL = 'projects';
 const BLOCKERS_COL = 'payment_blockers';
@@ -21,57 +21,12 @@ function withId<T extends { id: string }>(snap: { id: string; data: () => Record
   return { id: snap.id, ...snap.data() } as T;
 }
 
-/** Derive payment blockers from unresolved NCRs and snags */
-export async function derivePaymentBlockers(
-  projectId: string,
-  ncrs: NonConformanceReport[],
-  snags: SnagItem[],
-  createdBy: string,
-): Promise<PaymentBlocker[]> {
-  const blockers: PaymentBlocker[] = [];
-  const now = new Date().toISOString();
-
-  for (const ncr of ncrs) {
-    if (ncr.blocksPayment && ncr.status !== 'verified_closed' && ncr.status !== 'rejected') {
-      blockers.push({
-        id: '', // placeholder — Firestore will assign
-        projectId,
-        sourceObjectId: ncr.id,
-        sourceType: 'ncr',
-        reason: `Unresolved NCR: ${ncr.title}`,
-        severity: ncr.severity,
-        status: 'active',
-        createdBy,
-        createdAt: now,
-      });
-    }
-  }
-
-  for (const snag of snags) {
-    if (snag.blocksPayment && snag.status !== 'closed' && snag.status !== 'rejected') {
-      blockers.push({
-        id: '',
-        projectId,
-        sourceObjectId: snag.id,
-        sourceType: 'snag',
-        reason: `Unresolved snag: ${snag.description}`,
-        severity: snag.priority,
-        status: 'active',
-        createdBy,
-        createdAt: now,
-      });
-    }
-  }
-
-  return blockers;
-}
-
 export async function createPaymentBlocker(input: {
   projectId: string;
   sourceObjectId: string;
-  sourceType: PaymentBlocker['sourceType'];
+  sourceType: BlockerSourceType;
   reason: string;
-  severity: PaymentBlocker['severity'];
+  severity: Severity;
   createdBy: string;
 }): Promise<string> {
   try {
@@ -119,6 +74,11 @@ export async function getPaymentBlockers(projectId: string): Promise<PaymentBloc
   }
 }
 
+export async function getActiveBlockers(projectId: string): Promise<PaymentBlocker[]> {
+  const blockers = await getPaymentBlockers(projectId);
+  return blockers.filter((b) => b.status === 'active');
+}
+
 export function subscribeToPaymentBlockers(
   projectId: string,
   cb: (blockers: PaymentBlocker[]) => void,
@@ -130,18 +90,95 @@ export function subscribeToPaymentBlockers(
   });
 }
 
-export async function getActiveBlockers(projectId: string): Promise<PaymentBlocker[]> {
-  const blockers = await getPaymentBlockers(projectId);
-  return blockers.filter((b) => b.status === 'active');
+/** Derive payment blockers from field-control items that block payment */
+export function blockersFromFieldItems(
+  items: Array<NonConformanceReport | SnagItem | InspectionRecord>,
+  projectId: string,
+  createdBy: string,
+): Array<Omit<PaymentBlocker, 'id' | 'createdAt'>> {
+  return items
+    .filter((item) => {
+      if ('blocksPayment' in item) return !!(item as any).blocksPayment;
+      // Inspections with failed results block payment
+      if ('overallResult' in item) return (item as any).overallResult === 'fail';
+      return false;
+    })
+    .map((item) => {
+      let sourceType: BlockerSourceType;
+      let sourceObjectId: string;
+      let reason: string;
+      let severity: Severity;
+
+      // Discriminate by distinguishing fields:
+      // NCR: has severity + responsiblePartyId (and may have correctiveAction)
+      // Snag: has location field
+      // Inspection: has inspectionType or overallResult
+      if (('severity' in item && 'responsiblePartyId' in item) || 'ncrId' in item) {
+        // NCR
+        const ncr = item as NonConformanceReport;
+        sourceType = 'ncr';
+        sourceObjectId = (item as any).ncrId || ncr.id;
+        reason = `Unresolved NCR: ${ncr.title ?? (ncr as any).title}`;
+        severity = ncr.severity;
+      } else if ('location' in item || 'snagId' in item) {
+        // Snag
+        const snag = item as SnagItem;
+        sourceType = 'snag';
+        sourceObjectId = (item as any).snagId || snag.id;
+        reason = `Unresolved snag: ${snag.description}`;
+        severity = snag.priority;
+      } else {
+        // Inspection
+        const inspection = item as InspectionRecord;
+        sourceType = 'inspection';
+        sourceObjectId = inspection.id;
+        reason = `Failed inspection: ${(inspection as any).inspectionType ?? 'unknown'}`;
+        severity = 'high';
+      }
+
+      return {
+        projectId,
+        sourceObjectId,
+        sourceType,
+        reason,
+        severity,
+        status: 'active' as const,
+        createdBy,
+      };
+    });
+}
+
+export async function syncBlockersFromFieldState(
+  projectId: string,
+  ncrs: NonConformanceReport[],
+  snags: SnagItem[],
+  createdBy: string,
+): Promise<number> {
+  const items = [...ncrs, ...snags].filter(
+    (item) => 'blocksPayment' in item && (item as NonConformanceReport | SnagItem).blocksPayment
+  ) as Array<NonConformanceReport | SnagItem>;
+  const newBlockers = blockersFromFieldItems(items, projectId, createdBy);
+  let count = 0;
+  for (const blocker of newBlockers) {
+    try {
+      const now = new Date().toISOString();
+      await addDoc(blockersCollection(projectId), { ...blocker, createdAt: now });
+      count++;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${projectId}/${BLOCKERS_COL}`);
+    }
+  }
+  return count;
 }
 
 export const paymentBlockerService = {
-  derivePaymentBlockers,
   createPaymentBlocker,
   clearPaymentBlocker,
   getPaymentBlockers,
-  subscribeToPaymentBlockers,
   getActiveBlockers,
+  subscribeToPaymentBlockers,
+  blockersFromFieldItems,
+  syncBlockersFromFieldState,
 };
 
 export default paymentBlockerService;
