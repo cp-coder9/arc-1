@@ -10,10 +10,17 @@ import {
 } from 'firebase/firestore';
 import { getAnalytics, isSupported, logEvent, type Analytics } from 'firebase/analytics';
 import firebaseConfig from '../../firebase-applet-config.json';
+import demoFirebaseConfig from '../../demo-firebase-config.json';
 
-const app = initializeApp(firebaseConfig);
-const firestoreDatabaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? firebaseConfig.firestoreDatabaseId
+// Demo mode override: use architex-demo Firebase project when VITE_DEMO_MODE=true
+const isDemoMode = typeof window !== 'undefined' && import.meta.env.VITE_DEMO_MODE === 'true';
+const config = isDemoMode
+  ? { ...firebaseConfig, ...demoFirebaseConfig, apiKey: demoFirebaseConfig.apiKey }
+  : firebaseConfig;
+
+const app = initializeApp(config);
+const firestoreDatabaseId = config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
+  ? config.firestoreDatabaseId
   : undefined;
 
 function canUsePersistentFirestoreCache() {
@@ -44,7 +51,7 @@ function initializeArchitexFirestore() {
 export const db = initializeArchitexFirestore();
 export const auth = getAuth(app);
 
-const measurementId = firebaseConfig.measurementId?.trim();
+const measurementId = config.measurementId?.trim();
 const isValidMeasurementId = Boolean(measurementId && measurementId !== 'undefined');
 
 // Initialize Analytics only when Firebase has a valid measurement ID.
