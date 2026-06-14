@@ -7,7 +7,7 @@ const SITE_INSTRUCTIONS_COL = 'site_instructions';
 
 type FirestoreUnsubscribe = () => void;
 
-/** Roles authorised to issue formal site instructions (architect, admin, main-contractor-blocked) */
+/** Roles authorised to issue formal site instructions per the pack guardrails */
 const AUTHORISED_ROLES: UserRole[] = ['architect', 'admin'];
 
 function instructionsCollection(projectId: string) {
@@ -24,7 +24,7 @@ function withId<T extends { id: string }>(snap: { id: string; data: () => Record
   return { id: snap.id, ...snap.data() } as T;
 }
 
-/** Site Instruction state machine */
+/** Site instruction state machine */
 const INSTRUCTION_TRANSITIONS: Record<SiteInstructionStatus, SiteInstructionStatus[]> = {
   draft: ['issued', 'superseded'],
   issued: ['acknowledged', 'superseded'],
@@ -36,40 +36,40 @@ export function isValidInstructionTransition(from: SiteInstructionStatus, to: Si
   return INSTRUCTION_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-export function canIssueInstruction(role: UserRole): boolean {
+export function isAuthorisedRole(role: UserRole): boolean {
   return AUTHORISED_ROLES.includes(role);
 }
 
-export async function createSiteInstruction(input: {
+export async function issueSiteInstruction(input: {
   projectId: string;
   title: string;
   instruction: string;
   issuedBy: string;
   issuedByRole: UserRole;
-  costImpact: SiteInstruction['costImpact'];
-  timeImpact: SiteInstruction['timeImpact'];
+  costImpact?: 'none' | 'possible' | 'confirmed';
+  timeImpact?: 'none' | 'possible' | 'confirmed';
   linkedRfiId?: string;
   linkedDocumentIds?: string[];
 }): Promise<string> {
   try {
-    const authorised = canIssueInstruction(input.issuedByRole);
     const now = new Date().toISOString();
-    const siteInstruction: Omit<SiteInstruction, 'id'> = {
+    const authorised = isAuthorisedRole(input.issuedByRole);
+    const instruction_: Omit<SiteInstruction, 'id'> = {
       projectId: input.projectId,
       title: input.title,
       instruction: input.instruction,
       issuedBy: input.issuedBy,
       issuedByRole: input.issuedByRole,
       authorised,
-      costImpact: input.costImpact,
-      timeImpact: input.timeImpact,
+      costImpact: input.costImpact ?? 'none',
+      timeImpact: input.timeImpact ?? 'none',
       linkedRfiId: input.linkedRfiId,
       linkedDocumentIds: input.linkedDocumentIds ?? [],
       status: authorised ? 'issued' : 'draft',
       createdAt: now,
       updatedAt: now,
     };
-    const ref = await addDoc(instructionsCollection(input.projectId), siteInstruction);
+    const ref = await addDoc(instructionsCollection(input.projectId), instruction_);
     return ref.id;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${input.projectId}/${SITE_INSTRUCTIONS_COL}`);
@@ -85,9 +85,12 @@ export async function authoriseInstruction(
     const now = new Date().toISOString();
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(instructionDocument(projectId, instructionId));
-      if (!snap.exists()) throw new Error(`Site instruction ${instructionId} not found`);
+      if (!snap.exists()) throw new Error(`Instruction ${instructionId} not found`);
       const current = snap.data() as SiteInstruction;
       if (current.authorised) throw new Error('Instruction is already authorised');
+      if (!isValidInstructionTransition(current.status, 'issued')) {
+        throw new Error(`Invalid transition from ${current.status} to issued`);
+      }
       transaction.update(instructionDocument(projectId, instructionId), {
         authorised: true,
         authorisedBy,
@@ -110,7 +113,7 @@ export async function acknowledgeInstruction(
     const now = new Date().toISOString();
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(instructionDocument(projectId, instructionId));
-      if (!snap.exists()) throw new Error(`Site instruction ${instructionId} not found`);
+      if (!snap.exists()) throw new Error(`Instruction ${instructionId} not found`);
       const current = snap.data() as SiteInstruction;
       if (!current.authorised) throw new Error('Cannot acknowledge an unauthorised instruction');
       if (!isValidInstructionTransition(current.status, 'acknowledged')) {
@@ -131,20 +134,14 @@ export async function acknowledgeInstruction(
 export async function supersedeInstruction(
   projectId: string,
   instructionId: string,
-  newInstructionId: string,
+  supersededById: string,
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
-    await runTransaction(db, async (transaction) => {
-      const snap = await transaction.get(instructionDocument(projectId, instructionId));
-      if (!snap.exists()) throw new Error(`Site instruction ${instructionId} not found`);
-      const current = snap.data() as SiteInstruction;
-      if (current.status === 'superseded') throw new Error('Instruction is already superseded');
-      transaction.update(instructionDocument(projectId, instructionId), {
-        status: 'superseded',
-        supersededById: newInstructionId,
-        updatedAt: now,
-      });
+    await updateDoc(instructionDocument(projectId, instructionId), {
+      status: 'superseded',
+      supersededById,
+      updatedAt: now,
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${SITE_INSTRUCTIONS_COL}/${instructionId}`);
@@ -171,27 +168,15 @@ export function subscribeToSiteInstructions(
   });
 }
 
-export async function getDraftInstructions(projectId: string): Promise<SiteInstruction[]> {
-  const instructions = await getSiteInstructions(projectId);
-  return instructions.filter((i) => i.status === 'draft');
-}
-
-export async function getActiveInstructions(projectId: string): Promise<SiteInstruction[]> {
-  const instructions = await getSiteInstructions(projectId);
-  return instructions.filter((i) => i.status !== 'superseded');
-}
-
 export const siteInstructionService = {
-  createSiteInstruction,
+  issueSiteInstruction,
   authoriseInstruction,
   acknowledgeInstruction,
   supersedeInstruction,
   getSiteInstructions,
   subscribeToSiteInstructions,
-  getDraftInstructions,
-  getActiveInstructions,
-  canIssueInstruction,
   isValidInstructionTransition,
+  isAuthorisedRole,
 };
 
 export default siteInstructionService;

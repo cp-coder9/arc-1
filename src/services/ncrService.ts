@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc, limit, runTransaction } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { NonConformanceReport, Severity, NCRStatus } from '@/types';
 
@@ -145,7 +145,10 @@ export async function reopenNcr(
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
-    await updateDoc(ncrDocument(projectId, ncrId), { status: 'open', updatedAt: now });
+    await updateDoc(ncrDocument(projectId, ncrId), {
+      status: 'open',
+      updatedAt: now,
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${NCR_COL}/${ncrId}`);
   }

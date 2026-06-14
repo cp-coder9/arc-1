@@ -529,6 +529,10 @@ export interface Notification {
     refundId?: string;
     deliveryId?: string;
     entityId?: string;
+    timesheetId?: string;
+    supervisionLogId?: string;
+    registrationId?: string;
+    invoiceReadinessId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];
@@ -1178,6 +1182,7 @@ export interface AgentRecommendation {
   createdAt: string;
 }
 
+
 // Re-export toolset types from pack
 export type {
   ToolboxUserRole,
@@ -1215,56 +1220,10 @@ export type {
   SnagItemPayload,
   ResourceMarketplaceListingPayload,
 } from './types/comprehensiveToolsets';
-// Pack 12: Practice management and office operations
-export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
 
-export interface TimesheetEntry {
-  id: string;
-  userId: string;
-  firmId: string;
-  projectId?: string;
-  workstage?: ProjectStage;
-  date: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  description: string;
-  billable: TimesheetBillableStatus;
-  hourlyRateCents?: number;
-  totalValueCents: number;
-  invoiced?: boolean;
-  invoiceId?: string;
-  tags?: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+// ── Pack 12: Practice Management & Professional Office Ops ────────────────
 
-export interface TimesheetSummary {
-  firmId: string;
-  userId?: string;
-  periodStart: string;
-  periodEnd: string;
-  totalHours: number;
-  billableHours: number;
-  nonBillableHours: number;
-  totalValueCents: number;
-  entries: TimesheetEntry[];
-  byProject?: Record<string, { hours: number; valueCents: number }>;
-  byUser?: Record<string, { hours: number; valueCents: number }>;
-}
-
-export interface FeeReconciliation {
-  id: string;
-  firmId: string;
-  projectId: string;
-  timesheetIds: string[];
-  totalTimeValueCents: number;
-  proposalValueCents?: number;
-  varianceCents?: number;
-  createdAt: string;
-  updatedAt?: string;
-}
-
+// Pipeline types
 export type PipelineStatus = 'active' | 'won' | 'lost' | 'abandoned' | 'on_hold';
 
 export interface PipelineProject {
@@ -1276,26 +1235,23 @@ export interface PipelineProject {
   stage: ProjectStage;
   status: PipelineStatus;
   estimatedValueCents: number;
-  probability: number;
+  probability: number; // 0-100
   expectedCloseDate?: string;
+  closedAt?: string;
+  closedReason?: string;
   notes?: string;
   createdBy: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface PipelineForecast {
-  firmId: string;
-  generatedAt: string;
-  totalEstimatedValueCents: number;
-  weightedForecastCents: number;
-  activeProjectCount: number;
-  wonProjectCount: number;
-  lostProjectCount: number;
-  byStage: Record<string, { count: number; estimatedValueCents: number; weightedValueCents: number }>;
-  projects?: PipelineProject[];
+  totalValueCents: number;
+  weightedValueCents: number;
+  byStage: Record<ProjectStage, { count: number; value: number; weighted: number }>;
 }
 
+// Practice Task types
 export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type PracticeTaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'cancelled';
 
@@ -1306,7 +1262,7 @@ export interface PracticeTask {
   title: string;
   description?: string;
   assigneeId?: string;
-  assignedBy: string;
+  assignedBy?: string;
   priority: PracticeTaskPriority;
   status: PracticeTaskStatus;
   dueDate?: string;
@@ -1316,19 +1272,92 @@ export interface PracticeTask {
   tags?: string[];
   completedAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface WorkloadSummary {
   userId: string;
-  firmId?: string;
-  openTasks: number;
-  urgentTasks: number;
+  displayName?: string;
+  totalTasks: number;
+  completedTasks: number;
   overdueTasks: number;
-  estimatedHours: number;
-  tasks: PracticeTask[];
+  totalEstimatedHours: number;
+  totalActualHours: number;
 }
 
+// Timesheet types
+export type TimesheetBillableStatus = 'billable' | 'non_billable' | 'internal';
+
+export interface TimesheetEntry {
+  id: string;
+  userId: string;
+  firmId: string;
+  projectId?: string;
+  workstage?: ProjectStage;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  durationMinutes: number;
+  description: string;
+  billable: TimesheetBillableStatus;
+  hourlyRateCents?: number;
+  totalValueCents?: number;
+  tags?: string[];
+  invoiced?: boolean;
+  invoiceId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TimesheetSummary {
+  periodStart: string;
+  periodEnd: string;
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  internalHours: number;
+  totalValueCents: number;
+  byProject: Record<string, { hours: number; valueCents: number }>;
+  byUser: Record<string, { hours: number; valueCents: number }>;
+}
+
+export interface FeeReconciliation {
+  timesheetEntryId: string;
+  projectId: string;
+  userId: string;
+  hoursLogged: number;
+  timesheetValueCents: number;
+  feeChargedCents: number;
+  varianceCents: number;
+  variancePercent: number;
+  reconciled: boolean;
+}
+
+// Candidate Supervision types
+export type SupervisionLogStatus = 'draft' | 'submitted' | 'reviewed' | 'signed_off' | 'rejected';
+
+export interface CandidateSupervisionLog {
+  id: string;
+  candidateId: string;
+  mentorId: string;
+  firmId: string;
+  projectId?: string;
+  periodStart: string;
+  periodEnd: string;
+  hoursLogged: number;
+  activities: string;
+  category?: string;
+  sacapCategory?: string;
+  status: SupervisionLogStatus;
+  mentorNotes?: string;
+  signedOffBy?: string;
+  signedOffAt?: string;
+  rejectedReason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Registration Renewal types
 export type RegistrationBody = 'SACAP' | 'ECSA' | 'SACQSP' | 'SACLAP' | 'SACPCMP';
 export type RegistrationStatus = 'active' | 'expiring_soon' | 'expired' | 'renewed' | 'suspended';
 
@@ -1342,12 +1371,34 @@ export interface ProfessionalRegistration {
   status: RegistrationStatus;
   cpdPointsRequired: number;
   cpdPointsEarned: number;
-  renewalReminderSent: boolean;
+  renewalReminderSent?: boolean;
+  lastRenewedAt?: string;
+  renewalSubmittedAt?: string;
   documents?: { name: string; url: string }[];
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
+// Invoice Readiness types
+export interface InvoiceReadinessCheck {
+  id: string;
+  firmId: string;
+  projectId: string;
+  timesheetIds: string[];
+  expenseIds: string[];
+  readyForInvoice: boolean;
+  blockers: string[];
+  warnings: string[];
+  totalAmountCents: number;
+  currency: string;
+  invoiced: boolean;
+  invoiceId?: string;
+  checkedAt: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Template Library types
 export type TemplateCategory = 'appointment' | 'certificate' | 'report' | 'submission' | 'contract' | 'invoice' | 'general';
 
 export interface PracticeTemplate {
@@ -1364,7 +1415,7 @@ export interface PracticeTemplate {
   isActive: boolean;
   createdBy: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface TemplateVersion {
@@ -1373,7 +1424,7 @@ export interface TemplateVersion {
   version: number;
   fileUrl?: string;
   fileName?: string;
-  changes: string;
+  changes?: string;
   createdBy: string;
   createdAt: string;
 }
@@ -1588,4 +1639,3 @@ export interface ComplianceScenario {
   nodes: unknown[];
   createdAt: string;
 }
-

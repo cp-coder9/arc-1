@@ -3,18 +3,18 @@ import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { FieldEvidence, EvidenceType } from '@/types';
 
 const PROJECTS_COL = 'projects';
-const EVIDENCE_COL = 'field_evidence';
+const FIELD_EVIDENCE_COL = 'field_evidence';
 
 type FirestoreUnsubscribe = () => void;
 
 function evidenceCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, EVIDENCE_COL);
+  return collection(db, PROJECTS_COL, projectId, FIELD_EVIDENCE_COL);
 }
 
 function evidenceDocument(projectId: string, evidenceId: string) {
   if (!evidenceId) throw new Error('evidenceId is required');
-  return doc(db, PROJECTS_COL, projectId, EVIDENCE_COL, evidenceId);
+  return doc(db, PROJECTS_COL, projectId, FIELD_EVIDENCE_COL, evidenceId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {
@@ -39,7 +39,7 @@ export async function captureEvidence(input: {
       title: input.title,
       uri: input.uri,
       location: input.location,
-      gps: input.gps ?? { lat: -26.1076, lng: 28.0567 },
+      gps: input.gps,
       capturedBy: input.capturedBy,
       capturedAt: now,
       linkedObjectId: input.linkedObjectId,
@@ -47,7 +47,7 @@ export async function captureEvidence(input: {
     const ref = await addDoc(evidenceCollection(input.projectId), evidence);
     return ref.id;
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${input.projectId}/${EVIDENCE_COL}`);
+    handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${input.projectId}/${FIELD_EVIDENCE_COL}`);
   }
 }
 
@@ -56,7 +56,7 @@ export async function getEvidence(projectId: string): Promise<FieldEvidence[]> {
     const snap = await getDocs(query(evidenceCollection(projectId), orderBy('capturedAt', 'desc')));
     return snap.docs.map((d) => withId<FieldEvidence>(d));
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `${PROJECTS_COL}/${projectId}/${EVIDENCE_COL}`);
+    handleFirestoreError(error, OperationType.GET, `${PROJECTS_COL}/${projectId}/${FIELD_EVIDENCE_COL}`);
   }
 }
 
@@ -71,7 +71,10 @@ export function subscribeToEvidence(
   });
 }
 
-export async function getEvidenceForObject(projectId: string, linkedObjectId: string): Promise<FieldEvidence[]> {
+export async function getEvidenceForObject(
+  projectId: string,
+  linkedObjectId: string,
+): Promise<FieldEvidence[]> {
   const all = await getEvidence(projectId);
   return all.filter((e) => e.linkedObjectId === linkedObjectId);
 }

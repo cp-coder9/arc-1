@@ -141,7 +141,10 @@ export async function rejectSnag(
 export async function reopenSnag(projectId: string, snagId: string): Promise<void> {
   try {
     const now = new Date().toISOString();
-    await updateDoc(snagDocument(projectId, snagId), { status: 'open', updatedAt: now });
+    await updateDoc(snagDocument(projectId, snagId), {
+      status: 'open',
+      updatedAt: now,
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${SNAGS_COL}/${snagId}`);
   }
