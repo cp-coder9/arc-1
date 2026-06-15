@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -16,6 +17,8 @@ import {
 import type { PracticeTemplate, TemplateCategory, TemplateVersion } from '@/types';
 import type { UserRole } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const TEMPLATES_COL = 'templates';
 const TEMPLATE_VERSIONS_COL = 'template_versions';
 
@@ -43,7 +46,7 @@ export async function createTemplate(input: {
     assertValidCategory(input.category);
 
     const now = new Date().toISOString();
-    const ref = doc(collection(db, TEMPLATES_COL));
+    const ref = doc(getDemoCol( TEMPLATES_COL));
     const template: PracticeTemplate = {
       id: ref.id,
       firmId: input.firmId,
@@ -64,7 +67,7 @@ export async function createTemplate(input: {
     await setDoc(ref, template);
 
     // Create initial version record
-    const versionRef = doc(collection(db, TEMPLATE_VERSIONS_COL));
+    const versionRef = doc(getDemoCol( TEMPLATE_VERSIONS_COL));
     const version: TemplateVersion = {
       id: versionRef.id,
       templateId: ref.id,
@@ -102,7 +105,7 @@ export async function updateTemplate(id: string, updates: {
     if (updates.tags !== undefined) data.tags = updates.tags;
     if (updates.isActive !== undefined) data.isActive = updates.isActive;
 
-    await updateDoc(doc(db, TEMPLATES_COL, id), data);
+    await updateDoc(getDemoDoc( TEMPLATES_COL, id), data);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${TEMPLATES_COL}/${id}`);
   }
@@ -119,7 +122,7 @@ export async function versionTemplate(templateId: string, input: {
       throw new Error('changes and createdBy are required.');
     }
 
-    const templateSnap = await getDoc(doc(db, TEMPLATES_COL, templateId));
+    const templateSnap = await getDoc(getDemoDoc( TEMPLATES_COL, templateId));
     if (!templateSnap.exists()) throw new Error('Template not found.');
 
     const template = { id: templateSnap.id, ...templateSnap.data() } as PracticeTemplate;
@@ -127,7 +130,7 @@ export async function versionTemplate(templateId: string, input: {
     const now = new Date().toISOString();
 
     // Create new version record
-    const versionRef = doc(collection(db, TEMPLATE_VERSIONS_COL));
+    const versionRef = doc(getDemoCol( TEMPLATE_VERSIONS_COL));
     const version: TemplateVersion = {
       id: versionRef.id,
       templateId,
@@ -142,7 +145,7 @@ export async function versionTemplate(templateId: string, input: {
     // Update template with new version and file info
     const batch = writeBatch(db);
     batch.set(versionRef, version);
-    batch.update(doc(db, TEMPLATES_COL, templateId), {
+    batch.update(getDemoDoc( TEMPLATES_COL, templateId), {
       version: newVersion,
       fileUrl: input.fileUrl || template.fileUrl,
       fileName: input.fileName || template.fileName,
@@ -158,7 +161,7 @@ export async function versionTemplate(templateId: string, input: {
 
 export async function getTemplate(id: string): Promise<PracticeTemplate | null> {
   try {
-    const snap = await getDoc(doc(db, TEMPLATES_COL, id));
+    const snap = await getDoc(getDemoDoc( TEMPLATES_COL, id));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as PracticeTemplate) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TEMPLATES_COL}/${id}`);
@@ -171,7 +174,7 @@ export async function getFirmTemplates(firmId: string, filters?: { category?: Te
     if (filters?.category) constraints.unshift(where('category', '==', filters.category));
     if (filters?.isActive !== undefined) constraints.unshift(where('isActive', '==', filters.isActive));
 
-    const q = query(collection(db, TEMPLATES_COL), ...constraints);
+    const q = query(getDemoCol( TEMPLATES_COL), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PracticeTemplate));
   } catch (error) {
@@ -191,7 +194,7 @@ export async function getTemplatesByRole(firmId: string, role: UserRole): Promis
 export async function getTemplateVersions(templateId: string): Promise<TemplateVersion[]> {
   try {
     const q = query(
-      collection(db, TEMPLATE_VERSIONS_COL),
+      getDemoCol( TEMPLATE_VERSIONS_COL),
       where('templateId', '==', templateId),
       orderBy('version', 'desc')
     );
@@ -205,11 +208,11 @@ export async function getTemplateVersions(templateId: string): Promise<TemplateV
 export async function deleteTemplate(id: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, TEMPLATES_COL, id));
+    batch.delete(getDemoDoc( TEMPLATES_COL, id));
     // Also clean up versions
     const versions = await getTemplateVersions(id);
     for (const v of versions) {
-      batch.delete(doc(db, TEMPLATE_VERSIONS_COL, v.id));
+      batch.delete(getDemoDoc( TEMPLATE_VERSIONS_COL, v.id));
     }
     await batch.commit();
   } catch (error) {
@@ -219,7 +222,7 @@ export async function deleteTemplate(id: string): Promise<void> {
 
 export function subscribeToFirmTemplates(firmId: string, callback: (templates: PracticeTemplate[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, TEMPLATES_COL), where('firmId', '==', firmId), orderBy('name', 'asc')),
+    query(getDemoCol( TEMPLATES_COL), where('firmId', '==', firmId), orderBy('name', 'asc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PracticeTemplate))),
     (error) => {
       console.error('Failed to subscribe to templates:', error);

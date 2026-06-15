@@ -6,6 +6,7 @@
 import { db } from '../lib/firebase';
 import {
   collection,
+
   addDoc,
   query,
   where,
@@ -19,6 +20,8 @@ import {
 import { Message, Conversation, UserRole, ProjectCommunicationCaptureType, ProjectCommunicationStructuredStatus, ProjectCommunicationVisibility, ProjectRecordLink, ProjectStage, ProjectCommunicationLocation } from '../types';
 import DOMPurify from 'dompurify';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export interface SendMessageParams {
   jobId: string;
   projectId?: string;
@@ -90,7 +93,7 @@ class MessagingService {
     };
 
     // Add message
-    const docRef = await addDoc(collection(db, 'messages'), message);
+    const docRef = await addDoc(getDemoCol( 'messages'), message);
 
     // Update conversation last message
     await this.updateConversationLastMessage(jobId, sanitizedContent, senderId);
@@ -106,7 +109,7 @@ class MessagingService {
     callback: (messages: Message[]) => void
   ): () => void {
     const q = query(
-      collection(db, 'messages'),
+      getDemoCol( 'messages'),
       where('jobId', '==', jobId),
       orderBy('createdAt', 'asc')
     );
@@ -128,7 +131,7 @@ class MessagingService {
    */
 async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
  const q = query(
- collection(db, 'messages'),
+ getDemoCol( 'messages'),
  where('jobId', '==', jobId),
  where('isRead', '==', false)
  );
@@ -158,7 +161,7 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
     architectId: string
   ): Promise<Conversation> {
     const q = query(
-      collection(db, 'conversations'),
+      getDemoCol( 'conversations'),
       where('jobId', '==', jobId)
     );
 
@@ -183,7 +186,7 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
       },
     };
 
-    const docRef = await addDoc(collection(db, 'conversations'), conversation);
+    const docRef = await addDoc(getDemoCol( 'conversations'), conversation);
     return { id: docRef.id, ...conversation };
   }
 
@@ -196,7 +199,7 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
     callback: (unreadCount: number) => void
   ): () => void {
     const q = query(
-      collection(db, 'conversations'),
+      getDemoCol( 'conversations'),
       where('jobId', '==', jobId)
     );
 
@@ -221,7 +224,7 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
     senderId: string
   ): Promise<void> {
     const q = query(
-      collection(db, 'conversations'),
+      getDemoCol( 'conversations'),
       where('jobId', '==', jobId)
     );
 
@@ -248,7 +251,7 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
    */
   async resetUnreadCount(jobId: string, userId: string): Promise<void> {
     const q = query(
-      collection(db, 'conversations'),
+      getDemoCol( 'conversations'),
       where('jobId', '==', jobId)
     );
 
@@ -266,12 +269,12 @@ async markMessagesAsRead(jobId: string, userId: string): Promise<void> {
    */
   async getTotalUnreadCount(userId: string): Promise<number> {
     const q = query(
-      collection(db, 'conversations'),
+      getDemoCol( 'conversations'),
       where('clientId', '==', userId)
     );
 
     const q2 = query(
-      collection(db, 'conversations'),
+      getDemoCol( 'conversations'),
       where('architectId', '==', userId)
     );
 

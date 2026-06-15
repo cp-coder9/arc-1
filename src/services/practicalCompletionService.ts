@@ -3,6 +3,8 @@ import { db } from '@/lib/firebase';
 import type { Project } from '@/types';
 import { CLOSEOUT_ARTIFACTS_REQUIRED_ERROR, evaluateCloseoutGate } from './closeoutService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type PracticalCompletionStatus = 'draft' | 'pending_review' | 'ready_with_minor_items' | 'blocked' | 'certified' | 'client_accepted' | 'superseded';
 export type SignatoryRole = 'principal_agent' | 'lead_professional' | 'registered_professional' | 'client';
 
@@ -230,18 +232,18 @@ export function evaluateOccupationReadinessGate(input: {
 }
 
 export async function persistPracticalCompletionCertificate(certificate: PracticalCompletionCertificate): Promise<void> {
-  const ref = doc(db, 'practical_completions', certificate.certificateId);
+  const ref = getDemoDoc( 'practical_completions', certificate.certificateId);
   await setDoc(ref, certificate);
 }
 
 export async function getPracticalCompletionCertificate(certificateId: string): Promise<PracticalCompletionCertificate | null> {
-  const snap = await getDoc(doc(db, 'practical_completions', certificateId));
+  const snap = await getDoc(getDemoDoc( 'practical_completions', certificateId));
   if (!snap.exists()) return null;
   return snap.data() as PracticalCompletionCertificate;
 }
 
 export async function getPracticalCompletionForProject(projectId: string): Promise<PracticalCompletionCertificate | null> {
-  const q = query(collection(db, 'practical_completions'), where('projectId', '==', projectId));
+  const q = query(getDemoCol( 'practical_completions'), where('projectId', '==', projectId));
   const snap = await getDocs(q);
   if (snap.empty) return null;
   return snap.docs[0].data() as PracticalCompletionCertificate;
@@ -264,7 +266,7 @@ export async function issuePracticalCompletion(input: {
   if (result.certificate) {
     await persistPracticalCompletionCertificate(result.certificate);
 
-    await updateDoc(doc(db, 'projects', input.projectId), {
+    await updateDoc(getDemoDoc( 'projects', input.projectId), {
       practicalCompletion: {
         certificateId: result.certificate.certificateId,
         status: result.certificate.status,
@@ -287,8 +289,8 @@ export async function acceptPracticalCompletion(projectId: string, acceptedBy: s
   const accepted = recordClientAcceptance(existing, acceptedBy, signatureRef);
 
   await runTransaction(db, async (transaction) => {
-    transaction.set(doc(db, 'practical_completions', accepted.certificateId), accepted, { merge: true });
-    transaction.update(doc(db, 'projects', projectId), {
+    transaction.set(getDemoDoc( 'practical_completions', accepted.certificateId), accepted, { merge: true });
+    transaction.update(getDemoDoc( 'projects', projectId), {
       'practicalCompletion.status': 'client_accepted',
       'practicalCompletion.clientAcceptedBy': acceptedBy,
       'practicalCompletion.clientAcceptedAt': accepted.clientAcceptance?.acceptedAt,

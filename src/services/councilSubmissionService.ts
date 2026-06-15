@@ -6,6 +6,7 @@
 import { db } from '../lib/firebase';
 import {
   collection,
+
   addDoc,
   doc,
   updateDoc,
@@ -21,6 +22,8 @@ import { notificationService } from './notificationService';
 import { pdfGenerationService } from './pdfGenerationService';
 import { toast } from 'sonner';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type Municipality = 
   | 'city_of_johannesburg'
   | 'city_of_cape_town'
@@ -186,10 +189,10 @@ class CouncilSubmissionService {
       ],
     };
 
-    const docRef = await addDoc(collection(db, 'council_submissions'), submission);
+    const docRef = await addDoc(getDemoCol( 'council_submissions'), submission);
 
     // Update job with council reference
-    await updateDoc(doc(db, 'jobs', job.id), {
+    await updateDoc(getDemoDoc( 'jobs', job.id), {
       councilReference: referenceNumber,
       status: 'council_submitted',
     });
@@ -216,7 +219,7 @@ class CouncilSubmissionService {
     notes?: string,
     queryData?: { description: string }
   ): Promise<void> {
-    const ref = doc(db, 'council_submissions', submissionId);
+    const ref = getDemoDoc( 'council_submissions', submissionId);
     const docSnap = await getDoc(ref);
     
     if (!docSnap.exists()) return;
@@ -256,7 +259,7 @@ class CouncilSubmissionService {
     await updateDoc(ref, update);
 
     // Notify client
-    const jobDoc = await getDoc(doc(db, 'jobs', submission.jobId));
+    const jobDoc = await getDoc(getDemoDoc( 'jobs', submission.jobId));
     if (jobDoc.exists()) {
       const job = jobDoc.data() as Job;
       await notificationService.notifyCouncilUpdate(
@@ -277,7 +280,7 @@ class CouncilSubmissionService {
     response: string,
     attachments?: { name: string; url: string }[]
   ): Promise<void> {
-    const ref = doc(db, 'council_submissions', submissionId);
+    const ref = getDemoDoc( 'council_submissions', submissionId);
     const docSnap = await getDoc(ref);
     
     if (!docSnap.exists()) return;
@@ -307,7 +310,7 @@ class CouncilSubmissionService {
     callback: (submission: CouncilSubmission | null) => void
   ): () => void {
     const q = query(
-      collection(db, 'council_submissions'),
+      getDemoCol( 'council_submissions'),
       where('jobId', '==', jobId)
     );
 

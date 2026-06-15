@@ -11,6 +11,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type ApprovalRecord = { id: string; projectId?: string; jobId?: string; title?: string; description?: string; status?: string; requestedBy?: string; assignedTo?: string; dueDate?: string; createdAt?: string; category?: string };
 
@@ -28,7 +30,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function jobsForUser(user: UserProfile): Query<DocumentData>[] {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'admin') return [query(jobs, limit(25))];
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'architect' || user.role === 'bep') return [
@@ -41,7 +43,7 @@ function jobsForUser(user: UserProfile): Query<DocumentData>[] {
 }
 
 function projectsForUser(user: UserProfile): Query<DocumentData>[] {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
   if (user.role === 'admin') return [query(projects, limit(25))];
   if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'architect' || user.role === 'bep') return [
@@ -120,7 +122,7 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
     if (!selectedJob || !assigneeName.trim() || !assigneeRole.trim() || !deadline) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, `jobs/${selectedJob.id}/tasks`), {
+      await addDoc(getDemoCol( `jobs/${selectedJob.id}/tasks`), {
         jobId: selectedJob.id,
         architectId: user.uid,
         assigneeName: assigneeName.trim(),
@@ -141,7 +143,7 @@ export default function TasksApprovalsPage({ user }: { user: UserProfile }) {
   };
 
   const updateTaskStatus = async (task: JobCard, status: JobCard['status']) => {
-    await updateDoc(doc(db, `jobs/${task.jobId}/tasks`, task.id), {
+    await updateDoc(getDemoDoc( `jobs/${task.jobId}/tasks`, task.id), {
       status,
       completedAt: status === 'completed' ? new Date().toISOString() : null,
       updatedAt: new Date().toISOString(),

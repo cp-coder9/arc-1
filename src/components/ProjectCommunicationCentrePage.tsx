@@ -15,6 +15,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 type MessageScope = {
@@ -40,7 +42,7 @@ function sortByOldest<T extends { createdAt?: unknown }>(items: T[]) {
 }
 
 function jobsForUser(user: UserProfile): Query<DocumentData>[] {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'admin') return [query(jobs, limit(50))];
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(50))];
   if (user.role === 'architect' || user.role === 'bep') return [
@@ -274,7 +276,7 @@ export default function ProjectCommunicationCentrePage({ user }: { user: UserPro
       return undefined;
     }
     setMessageState('loading');
-    const unsubscribe = onSnapshot(query(collection(db, 'messages'), where('jobId', '==', selectedJob.id), limit(100)), (snapshot) => {
+    const unsubscribe = onSnapshot(query(getDemoCol( 'messages'), where('jobId', '==', selectedJob.id), limit(100)), (snapshot) => {
       setMessages(sortByOldest(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Message))));
       setMessageState('ready');
     }, (error) => {

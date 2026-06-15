@@ -12,6 +12,7 @@ import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import {
   LayoutDashboard,
+
   Briefcase,
   Clock,
   CheckCircle2,
@@ -49,6 +50,8 @@ import { paginateItems, totalPages } from '@/lib/utils';
 import FeeEstimator from './FeeEstimator';
 import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 // import { motion } from 'framer-motion';
 
 export default function ClientDashboard({ 
@@ -84,13 +87,13 @@ export default function ClientDashboard({
   const jobPages = totalPages(myJobs.length, pageSize);
 
   useEffect(() => {
-    const q = query(collection(db, 'jobs'), where('clientId', '==', user.uid));
+    const q = query(getDemoCol( 'jobs'), where('clientId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
       setLoading(false);
     });
 
-    const qReviews = query(collection(db, 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
+    const qReviews = query(getDemoCol( 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
     const unsubReviews = onSnapshot(qReviews, (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
     });
@@ -104,7 +107,7 @@ export default function ClientDashboard({
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'jobs'), {
+      await addDoc(getDemoCol( 'jobs'), {
         ...newJob,
         clientId: user.uid,
         status: 'open',
@@ -234,7 +237,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   useEffect(() => {
     if (selectedProfessionalId) {
       const fetchArchitect = async () => {
-        const archDoc = await getDoc(doc(db, 'users', selectedProfessionalId));
+        const archDoc = await getDoc(getDemoDoc( 'users', selectedProfessionalId));
         if (archDoc.exists()) setArchitect({ uid: archDoc.id, ...archDoc.data() } as UserProfile);
       };
       fetchArchitect();
@@ -244,7 +247,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   }, [selectedProfessionalId]);
 
   useEffect(() => {
-    const q = query(collection(db, `jobs/${job.id}/applications`), where('status', '==', 'pending'));
+    const q = query(getDemoCol( `jobs/${job.id}/applications`), where('status', '==', 'pending'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application)));
     });
@@ -265,7 +268,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const handleSaveJob = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateDoc(doc(db, 'jobs', job.id), {
+      await updateDoc(getDemoDoc( 'jobs', job.id), {
         title: editJob.title,
         description: editJob.description,
         budget: Number(editJob.budget || 0),
@@ -283,7 +286,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const handleCancelJob = async () => {
     const reason = prompt('Reason for cancelling this job?') || 'Cancelled by client';
     try {
-      await updateDoc(doc(db, 'jobs', job.id), {
+      await updateDoc(getDemoDoc( 'jobs', job.id), {
         status: 'cancelled',
         cancellationReason: reason,
         cancelledAt: new Date().toISOString(),
@@ -298,7 +301,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
 
   const handleUnassignArchitect = async () => {
     try {
-      await updateDoc(doc(db, 'jobs', job.id), {
+      await updateDoc(getDemoDoc( 'jobs', job.id), {
         selectedProfessionalId: deleteField(),
         selectedBepId: deleteField(),
         selectedArchitectId: deleteField(),
@@ -342,7 +345,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const handleFileDispute = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'disputes'), {
+      await addDoc(getDemoCol( 'disputes'), {
         jobId: job.id,
         filedBy: user.uid,
         filedAgainst: selectedProfessionalId,

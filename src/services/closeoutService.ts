@@ -6,6 +6,8 @@ import { getLedgerForProject } from './financialLedgerService';
 import { transitionStage } from './projectLifecycleService';
 import { Job, LedgerEntry, Project, ProjectTeamMember, TenderPackage } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export interface ProjectSummary {
   project: Project;
   job: Job | null;
@@ -231,7 +233,7 @@ export function summaryHasPersistedCloseoutArtifacts(summary: ProjectSummary | n
 }
 
 async function getProjectOrThrow(projectId: string): Promise<Project> {
-  const snap = await getDoc(doc(db, 'projects', projectId));
+  const snap = await getDoc(getDemoDoc( 'projects', projectId));
   if (!snap.exists()) throw new Error(`Project ${projectId} not found`);
   return { id: snap.id, ...snap.data() } as Project;
 }
@@ -239,8 +241,8 @@ async function getProjectOrThrow(projectId: string): Promise<Project> {
 export async function getProjectSummary(projectId: string): Promise<ProjectSummary> {
   const project = await getProjectOrThrow(projectId);
   const [jobSnap, tenderSnap, ledgerEntries] = await Promise.all([
-    getDoc(doc(db, 'jobs', project.jobId)),
-    getDocs(query(collection(db, 'tender_packages'), where('projectId', '==', projectId))),
+    getDoc(getDemoDoc( 'jobs', project.jobId)),
+    getDocs(query(getDemoCol( 'tender_packages'), where('projectId', '==', projectId))),
     getLedgerForProject(projectId).catch(() => [] as LedgerEntry[]),
   ]);
   const job = jobSnap.exists() ? { id: jobSnap.id, ...jobSnap.data() } as Job : null;
@@ -277,23 +279,23 @@ export async function generateCompletionCertificate(projectId: string): Promise<
   const bytes = await pdf.save();
   const uploadedBy = summary.project.leadArchitectId || summary.project.clientId;
   const url = await uploadAndTrackFile(new Blob([bytes as any], { type: 'application/pdf' }), { fileName: `completion-certificate-${projectId}-${Date.now()}.pdf`, fileType: 'application/pdf', fileSize: bytes.length, uploadedBy, context: 'certificate', jobId: summary.project.jobId });
-  await setDoc(doc(db, 'projects', projectId, 'closeout_artifacts', 'completion_certificate'), { url, generatedAt: new Date().toISOString(), type: 'completion_certificate' }, { merge: true });
-  await updateDoc(doc(db, 'projects', projectId), { closeoutArtifacts: { ...(summary.artifacts || {}), completionCertificateUrl: url }, updatedAt: new Date().toISOString() });
+  await setDoc(getDemoDoc( 'projects', projectId, 'closeout_artifacts', 'completion_certificate'), { url, generatedAt: new Date().toISOString(), type: 'completion_certificate' }, { merge: true });
+  await updateDoc(getDemoDoc( 'projects', projectId), { closeoutArtifacts: { ...(summary.artifacts || {}), completionCertificateUrl: url }, updatedAt: new Date().toISOString() });
   return url;
 }
 
 export async function generateFinalReport(projectId: string): Promise<string> {
   const summary = await getProjectSummary(projectId);
   const report = [`# Final Project Report: ${summary.job?.title || projectId}`, '', `- Project ID: ${projectId}`, `- Job ID: ${summary.project.jobId}`, `- Current stage: ${summary.project.currentStage}`, `- Team members: ${summary.teamMembers.length}`, `- Tender packages: ${summary.tenders.length}`, `- Planned budget: ZAR ${summary.budget.planned.toLocaleString('en-ZA')}`, `- Ledger milestone releases: ZAR ${summary.budget.actualReleased.toLocaleString('en-ZA')}`, '', '## Close-out note', 'This report is generated from Architex production records and remains advisory. Professional statutory certificates must be retained separately where required.'].join('\n');
-  await setDoc(doc(db, 'projects', projectId, 'closeout_artifacts', 'final_report'), { report, generatedAt: new Date().toISOString(), type: 'final_report' }, { merge: true });
-  await updateDoc(doc(db, 'projects', projectId), { closeoutArtifacts: { ...(summary.artifacts || {}), finalReport: report }, updatedAt: new Date().toISOString() });
+  await setDoc(getDemoDoc( 'projects', projectId, 'closeout_artifacts', 'final_report'), { report, generatedAt: new Date().toISOString(), type: 'final_report' }, { merge: true });
+  await updateDoc(getDemoDoc( 'projects', projectId), { closeoutArtifacts: { ...(summary.artifacts || {}), finalReport: report }, updatedAt: new Date().toISOString() });
   return report;
 }
 
 export async function archiveProject(projectId: string): Promise<void> {
-  const projectRef = doc(db, 'projects', projectId);
-  const certificateRef = doc(db, 'projects', projectId, 'closeout_artifacts', 'completion_certificate');
-  const reportRef = doc(db, 'projects', projectId, 'closeout_artifacts', 'final_report');
+  const projectRef = getDemoDoc( 'projects', projectId);
+  const certificateRef = getDemoDoc( 'projects', projectId, 'closeout_artifacts', 'completion_certificate');
+  const reportRef = getDemoDoc( 'projects', projectId, 'closeout_artifacts', 'final_report');
 
   await runTransaction(db, async (transaction) => {
     const projectSnap = await transaction.get(projectRef);
@@ -323,7 +325,7 @@ export async function archiveProject(projectId: string): Promise<void> {
     }
 
     transaction.update(projectRef, projectUpdate);
-    transaction.update(doc(db, 'jobs', project.jobId), { status: 'completed', updatedAt: now });
+    transaction.update(getDemoDoc( 'jobs', project.jobId), { status: 'completed', updatedAt: now });
   });
 }
 

@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -16,6 +17,8 @@ import {
 import type { PracticeTask, PracticeTaskPriority, PracticeTaskStatus, WorkloadSummary } from '@/types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const TASKS_COL = 'practice_tasks';
 
 const VALID_PRIORITIES: PracticeTaskPriority[] = ['low', 'medium', 'high', 'urgent'];
@@ -52,7 +55,7 @@ export async function createTask(input: {
     }
 
     const now = new Date().toISOString();
-    const ref = doc(collection(db, TASKS_COL));
+    const ref = doc(getDemoCol( TASKS_COL));
     const task: PracticeTask = {
       id: ref.id,
       firmId: input.firmId,
@@ -90,7 +93,7 @@ export async function createTask(input: {
 
 export async function assignTask(taskId: string, assigneeId: string, assignedBy: string): Promise<void> {
   try {
-    const taskRef = doc(db, TASKS_COL, taskId);
+    const taskRef = getDemoDoc( TASKS_COL, taskId);
     const taskSnap = await getDoc(taskRef);
     if (!taskSnap.exists()) throw new Error('Task not found.');
 
@@ -116,7 +119,7 @@ export async function updateTaskStatus(taskId: string, status: PracticeTaskStatu
     const data: Record<string, unknown> = { status, updatedAt: now };
     if (status === 'completed') data.completedAt = now;
 
-    await updateDoc(doc(db, TASKS_COL, taskId), data);
+    await updateDoc(getDemoDoc( TASKS_COL, taskId), data);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${TASKS_COL}/${taskId}`);
   }
@@ -149,7 +152,7 @@ export async function updateTask(taskId: string, updates: {
     if (updates.tags !== undefined) data.tags = updates.tags;
     if (updates.projectId !== undefined) data.projectId = updates.projectId;
 
-    await updateDoc(doc(db, TASKS_COL, taskId), data);
+    await updateDoc(getDemoDoc( TASKS_COL, taskId), data);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${TASKS_COL}/${taskId}`);
   }
@@ -163,7 +166,7 @@ export async function getFirmTasks(firmId: string, filters?: { status?: Practice
     if (filters?.priority) constraints.unshift(where('priority', '==', filters.priority));
     if (filters?.projectId) constraints.unshift(where('projectId', '==', filters.projectId));
 
-    const q = query(collection(db, TASKS_COL), ...constraints);
+    const q = query(getDemoCol( TASKS_COL), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PracticeTask));
   } catch (error) {
@@ -177,7 +180,7 @@ export async function getUserTasks(userId: string, firmId: string): Promise<Prac
 
 export async function getTask(taskId: string): Promise<PracticeTask | null> {
   try {
-    const snap = await getDoc(doc(db, TASKS_COL, taskId));
+    const snap = await getDoc(getDemoDoc( TASKS_COL, taskId));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as PracticeTask) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TASKS_COL}/${taskId}`);
@@ -217,7 +220,7 @@ export async function getWorkloadSummary(firmId: string): Promise<WorkloadSummar
 export async function deleteTask(taskId: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, TASKS_COL, taskId));
+    batch.delete(getDemoDoc( TASKS_COL, taskId));
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${TASKS_COL}/${taskId}`);
@@ -226,7 +229,7 @@ export async function deleteTask(taskId: string): Promise<void> {
 
 export function subscribeToFirmTasks(firmId: string, callback: (tasks: PracticeTask[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, TASKS_COL), where('firmId', '==', firmId), orderBy('createdAt', 'desc')),
+    query(getDemoCol( TASKS_COL), where('firmId', '==', firmId), orderBy('createdAt', 'desc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PracticeTask))),
     (error) => {
       console.error('Failed to subscribe to tasks:', error);
@@ -237,7 +240,7 @@ export function subscribeToFirmTasks(firmId: string, callback: (tasks: PracticeT
 
 export function subscribeToUserTasks(userId: string, firmId: string, callback: (tasks: PracticeTask[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, TASKS_COL), where('firmId', '==', firmId), where('assigneeId', '==', userId), orderBy('priority'), orderBy('createdAt', 'desc')),
+    query(getDemoCol( TASKS_COL), where('firmId', '==', firmId), where('assigneeId', '==', userId), orderBy('priority'), orderBy('createdAt', 'desc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PracticeTask))),
     (error) => {
       console.error('Failed to subscribe to user tasks:', error);

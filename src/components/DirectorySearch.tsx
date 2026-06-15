@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type DirectoryProfile = {
   uid: string;
   role: UserRole | string;
@@ -48,7 +50,7 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
     const constraints = role === 'all'
       ? [where('visible', '==', true), limit(100)]
       : [where('visible', '==', true), where('role', '==', role), limit(100)];
-    const unsub = onSnapshot(query(collection(db, 'directoryProfiles'), ...constraints), (snapshot) => {
+    const unsub = onSnapshot(query(getDemoCol( 'directoryProfiles'), ...constraints), (snapshot) => {
       setProfiles(sortProfiles(snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() } as DirectoryProfile))));
     }, (error) => {
       console.error('Failed to load directory profiles:', error);
@@ -72,7 +74,7 @@ export default function DirectorySearch({ user }: { user: UserProfile }) {
   const invite = async (profile: DirectoryProfile) => {
     setInviting(profile.uid);
     try {
-      await addDoc(collection(db, 'directoryInvitations'), {
+      await addDoc(getDemoCol( 'directoryInvitations'), {
         fromUserId: user.uid,
         fromRole: user.role,
         targetUserId: profile.uid,

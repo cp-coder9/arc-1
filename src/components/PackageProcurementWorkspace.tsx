@@ -14,6 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface PackageProcurementWorkspaceProps {
   user: UserProfile;
   mode: 'packages' | 'procurement';
@@ -81,7 +83,7 @@ function sourceLabelForBoMItem(sourceType: string) {
 }
 
 function tenderQueriesForUser(user: UserProfile) {
-  const tenders = collection(db, 'tender_packages');
+  const tenders = getDemoCol( 'tender_packages');
 
   if (user.role === 'admin') return [query(tenders, limit(50))];
   if (user.role === 'bep' || user.role === 'architect') return [query(tenders, where('createdBy', '==', user.uid), limit(50)), query(tenders, where('status', '==', 'published'), limit(50))];
@@ -90,7 +92,7 @@ function tenderQueriesForUser(user: UserProfile) {
 }
 
 function projectQueriesForUser(user: UserProfile) {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
   if (user.role === 'admin') return [query(projects, limit(25))];
   if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'bep' || user.role === 'architect') return [query(projects, where('leadArchitectId', '==', user.uid), limit(25))];
@@ -194,7 +196,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
       setMyBids(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Bid)));
     }, (error) => console.warn('Package bid projection unavailable; continuing without bid context:', error)));
 
-    unsubs.push(onSnapshot(query(collection(db, 'directoryProfiles'), where('role', '==', 'supplier'), limit(50)), (snapshot) => {
+    unsubs.push(onSnapshot(query(getDemoCol( 'directoryProfiles'), where('role', '==', 'supplier'), limit(50)), (snapshot) => {
       setSupplierProfiles(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as SupplierProfile)));
     }, (error) => console.warn('Supplier catalogue projection unavailable; continuing without supplier directory:', error)));
 
@@ -215,13 +217,13 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
     }
 
     const unsubs = [
-      onSnapshot(query(collection(db, 'package_procurement_commitments'), where('packageId', 'in', packageIds)), (snapshot) => setCommitments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProcurementCommitment))), (error) => { console.warn('Package procurement commitments unavailable:', error); setCommitments([]); }),
-      onSnapshot(query(collection(db, 'package_delivery_evidence'), where('packageId', 'in', packageIds)), (snapshot) => setEvidence(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as DeliveryEvidenceItem))), (error) => { console.warn('Package delivery evidence unavailable:', error); setEvidence([]); }),
-      onSnapshot(query(collection(db, 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI))), (error) => { console.warn('Package RFIs unavailable:', error); setRfis([]); }),
-      onSnapshot(query(collection(db, 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask))), (error) => { console.warn('Package programme tasks unavailable:', error); setTasks([]); }),
-      onSnapshot(query(collection(db, 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog))), (error) => { console.warn('Package site logs unavailable:', error); setSiteLogs([]); }),
-      onSnapshot(query(collection(db, 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection))), (error) => { console.warn('Package inspections unavailable:', error); setInspections([]); }),
-      onSnapshot(query(collection(db, 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SnagItem))), (error) => { console.warn('Package snags unavailable:', error); setSnags([]); }),
+      onSnapshot(query(getDemoCol( 'package_procurement_commitments'), where('packageId', 'in', packageIds)), (snapshot) => setCommitments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProcurementCommitment))), (error) => { console.warn('Package procurement commitments unavailable:', error); setCommitments([]); }),
+      onSnapshot(query(getDemoCol( 'package_delivery_evidence'), where('packageId', 'in', packageIds)), (snapshot) => setEvidence(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as DeliveryEvidenceItem))), (error) => { console.warn('Package delivery evidence unavailable:', error); setEvidence([]); }),
+      onSnapshot(query(getDemoCol( 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI))), (error) => { console.warn('Package RFIs unavailable:', error); setRfis([]); }),
+      onSnapshot(query(getDemoCol( 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask))), (error) => { console.warn('Package programme tasks unavailable:', error); setTasks([]); }),
+      onSnapshot(query(getDemoCol( 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog))), (error) => { console.warn('Package site logs unavailable:', error); setSiteLogs([]); }),
+      onSnapshot(query(getDemoCol( 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection))), (error) => { console.warn('Package inspections unavailable:', error); setInspections([]); }),
+      onSnapshot(query(getDemoCol( 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SnagItem))), (error) => { console.warn('Package snags unavailable:', error); setSnags([]); }),
     ];
 
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
@@ -345,7 +347,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
           createdAt: now,
           updatedAt: now,
         };
-      await addDoc(collection(db, 'package_procurement_commitments'), {
+      await addDoc(getDemoCol( 'package_procurement_commitments'), {
         ...baseRecord,
         requestedByName: user.displayName || user.email,
       });
@@ -366,7 +368,7 @@ export default function PackageProcurementWorkspace({ user, mode }: PackageProcu
     try {
       const now = new Date().toISOString();
       const evidenceConfig = PACKAGE_EVIDENCE_TYPES.find((option) => option.value === evidenceType);
-      await addDoc(collection(db, 'package_delivery_evidence'), {
+      await addDoc(getDemoCol( 'package_delivery_evidence'), {
         packageId: selectedTender.id,
         projectId: selectedTender.projectId,
         jobId: selectedTender.jobId,

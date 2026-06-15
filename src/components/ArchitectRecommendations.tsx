@@ -11,6 +11,8 @@ import { ArchitectPortfolio } from './ArchitectPortfolio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface ArchitectRecommendationsProps {
   job: Job;
 }
@@ -27,7 +29,7 @@ export function ArchitectRecommendations({ job }: ArchitectRecommendationsProps)
   const fetchRecommendations = async () => {
     setIsLoading(true);
     try {
-      const profilesSnap = await getDocs(collection(db, 'architect_profiles'));
+      const profilesSnap = await getDocs(getDemoCol( 'architect_profiles'));
       const allProfiles = profilesSnap.docs.map(d => d.data() as ArchitectProfile);
 
       const jobKeywords = [
@@ -71,7 +73,7 @@ export function ArchitectRecommendations({ job }: ArchitectRecommendationsProps)
         .slice(0, 3);
 
       const results = await Promise.all(top3.map(async ({ profile }) => {
-        const userDoc = await getDoc(doc(db, 'users', profile.userId));
+        const userDoc = await getDoc(getDemoDoc( 'users', profile.userId));
         return {
           profile,
           user: userDoc.data() as UserProfile

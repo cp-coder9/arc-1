@@ -12,6 +12,8 @@ import { User, Mail, Shield, AlertCircle, Loader2, Save, Key, UserCircle, Bell }
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { getRoleProfileCompletion, sanitizeRoleProfileUpdate } from '../services/roleProfileService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface UserSettingsProps {
   user: UserProfile;
 }
@@ -186,7 +188,7 @@ export default function UserSettings({ user }: UserSettingsProps) {
         return payload;
       }, {});
       const sanitizedRoleProfile = sanitizeRoleProfileUpdate(user.role, roleProfilePayload);
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(getDemoDoc( 'users', user.uid), {
         displayName,
         bio,
         ...sanitizedRoleProfile,
@@ -244,7 +246,7 @@ export default function UserSettings({ user }: UserSettingsProps) {
     const nextPreferences = { ...notificationPreferences, [channel]: enabled };
     setNotificationPreferences(nextPreferences);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(getDemoDoc( 'users', user.uid), {
         notificationPreferences: nextPreferences,
         updatedAt: new Date().toISOString(),
       });
@@ -266,7 +268,7 @@ export default function UserSettings({ user }: UserSettingsProps) {
       await reauthenticateWithCredential(firebaseUser, credential);
       
       await updateEmail(firebaseUser, pendingEmail);
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(getDemoDoc( 'users', user.uid), {
         email: pendingEmail,
         updatedAt: new Date().toISOString()
       });

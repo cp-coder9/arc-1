@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy } from 'fi
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { SiteAuditRecord, UserRole } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const AUDIT_COL = 'site_audit_trail';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function auditCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, AUDIT_COL);
+  return getDemoCol( PROJECTS_COL, projectId, AUDIT_COL);
 }
 
 function auditDocument(projectId: string, auditId: string) {
   if (!auditId) throw new Error('auditId is required');
-  return doc(db, PROJECTS_COL, projectId, AUDIT_COL, auditId);
+  return getDemoDoc( PROJECTS_COL, projectId, AUDIT_COL, auditId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {

@@ -7,6 +7,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type ReportStatus = 'on_track' | 'watch' | 'at_risk' | 'complete';
 
@@ -41,13 +43,13 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown; gene
 }
 
 function jobQueryForClient(user: UserProfile) {
-  if (user.role === 'admin') return query(collection(db, 'jobs'), limit(25));
-  return query(collection(db, 'jobs'), where('clientId', '==', user.uid), limit(25));
+  if (user.role === 'admin') return query(getDemoCol( 'jobs'), limit(25));
+  return query(getDemoCol( 'jobs'), where('clientId', '==', user.uid), limit(25));
 }
 
 function projectQueryForClient(user: UserProfile) {
-  if (user.role === 'admin') return query(collection(db, 'projects'), limit(25));
-  return query(collection(db, 'projects'), where('clientId', '==', user.uid), limit(25));
+  if (user.role === 'admin') return query(getDemoCol( 'projects'), limit(25));
+  return query(getDemoCol( 'projects'), where('clientId', '==', user.uid), limit(25));
 }
 
 function statusFor(job?: Job, project?: Project, tasks: GanttTask[] = [], submissions: CouncilSubmission[] = []): ReportStatus {
@@ -161,7 +163,7 @@ export default function ClientProgressReports({ user }: { user: UserProfile }) {
     const unsubProjects = onSnapshot(projectQueryForClient(user), (snapshot) => {
       setProjects(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project))));
     }, (error) => console.error('Failed to load client progress projects:', error));
-    const unsubSnapshots = onSnapshot(query(collection(db, 'project_progress_reports'), where(user.role === 'admin' ? 'humanApprovalRequired' : 'clientId', '==', user.role === 'admin' ? true : user.uid), limit(25)), (snapshot) => {
+    const unsubSnapshots = onSnapshot(query(getDemoCol( 'project_progress_reports'), where(user.role === 'admin' ? 'humanApprovalRequired' : 'clientId', '==', user.role === 'admin' ? true : user.uid), limit(25)), (snapshot) => {
       setSnapshots(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProgressSnapshot))));
     }, (error) => console.error('Failed to load progress report snapshots:', error));
     return () => {
@@ -176,10 +178,10 @@ export default function ClientProgressReports({ user }: { user: UserProfile }) {
     const jobIds = jobs.map((job) => job.id).slice(0, 10);
     const unsubs: Array<() => void> = [];
     if (projectIds.length > 0) {
-      unsubs.push(onSnapshot(query(collection(db, 'gantt_tasks'), where('projectId', 'in', projectIds)), (snapshot) => setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask))), (error) => console.error('Failed to load progress programme tasks:', error)));
+      unsubs.push(onSnapshot(query(getDemoCol( 'gantt_tasks'), where('projectId', 'in', projectIds)), (snapshot) => setTasks(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask))), (error) => console.error('Failed to load progress programme tasks:', error)));
     }
     if (jobIds.length > 0) {
-      unsubs.push(onSnapshot(query(collection(db, 'council_submissions'), where('jobId', 'in', jobIds)), (snapshot) => setSubmissions(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as CouncilSubmission))), (error) => console.error('Failed to load progress municipal submissions:', error)));
+      unsubs.push(onSnapshot(query(getDemoCol( 'council_submissions'), where('jobId', 'in', jobIds)), (snapshot) => setSubmissions(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as CouncilSubmission))), (error) => console.error('Failed to load progress municipal submissions:', error)));
     }
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [jobs, projects]);
@@ -206,7 +208,7 @@ export default function ClientProgressReports({ user }: { user: UserProfile }) {
     if (!selectedJob) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'project_progress_reports'), {
+      await addDoc(getDemoCol( 'project_progress_reports'), {
         ...currentSnapshot,
         createdBy: user.uid,
         createdByRole: user.role,

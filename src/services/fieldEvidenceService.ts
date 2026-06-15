@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy } from 'fi
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { FieldEvidence, EvidenceType } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const FIELD_EVIDENCE_COL = 'field_evidence';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function evidenceCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, FIELD_EVIDENCE_COL);
+  return getDemoCol( PROJECTS_COL, projectId, FIELD_EVIDENCE_COL);
 }
 
 function evidenceDocument(projectId: string, evidenceId: string) {
   if (!evidenceId) throw new Error('evidenceId is required');
-  return doc(db, PROJECTS_COL, projectId, FIELD_EVIDENCE_COL, evidenceId);
+  return getDemoDoc( PROJECTS_COL, projectId, FIELD_EVIDENCE_COL, evidenceId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {

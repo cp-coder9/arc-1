@@ -2,6 +2,8 @@ import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writ
 import { db } from '@/lib/firebase';
 import { HandoverPackDocumentCategory, HandoverPackDocumentInput, HandoverPackManifest, HandoverPackManifestItem, buildHandoverPackManifest } from './closeoutService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type HandoverPackStatus = 'draft' | 'assembling' | 'ready_for_review' | 'approved' | 'issued' | 'superseded';
 export type DocumentType = 'as_built_drawing' | 'warranty' | 'manual' | 'compliance_certificate' | 'key_register' | 'test_certificate' | 'maintenance_schedule' | 'guarantee' | 'other';
 
@@ -341,17 +343,17 @@ export function assembleHandoverPack(input: {
 }
 
 export async function persistHandoverPack(pack: HandoverPackRecord): Promise<void> {
-  await setDoc(doc(db, 'handover_packs', pack.id), pack);
+  await setDoc(getDemoDoc( 'handover_packs', pack.id), pack);
 }
 
 export async function getHandoverPack(projectId: string): Promise<HandoverPackRecord | null> {
-  const snap = await getDoc(doc(db, 'handover_packs', `handover-pack-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'handover_packs', `handover-pack-${projectId}`));
   if (!snap.exists()) return null;
   return snap.data() as HandoverPackRecord;
 }
 
 export async function approveHandoverPack(projectId: string, approvedBy: string): Promise<HandoverPackRecord> {
-  const snap = await getDoc(doc(db, 'handover_packs', `handover-pack-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'handover_packs', `handover-pack-${projectId}`));
   if (!snap.exists()) throw new Error(`Handover pack for project ${projectId} not found`);
 
   const pack = snap.data() as HandoverPackRecord;
@@ -368,14 +370,14 @@ export async function approveHandoverPack(projectId: string, approvedBy: string)
     updatedAt: now,
   };
 
-  await updateDoc(doc(db, 'handover_packs', pack.id), {
+  await updateDoc(getDemoDoc( 'handover_packs', pack.id), {
     status: 'approved',
     approvedBy,
     approvedAt: now,
     updatedAt: now,
   });
 
-  await updateDoc(doc(db, 'projects', projectId), {
+  await updateDoc(getDemoDoc( 'projects', projectId), {
     handoverPack: {
       status: 'approved',
       approvedBy,
@@ -389,7 +391,7 @@ export async function approveHandoverPack(projectId: string, approvedBy: string)
 }
 
 export async function issueHandoverPack(projectId: string, issuedBy: string): Promise<HandoverPackRecord> {
-  const snap = await getDoc(doc(db, 'handover_packs', `handover-pack-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'handover_packs', `handover-pack-${projectId}`));
   if (!snap.exists()) throw new Error(`Handover pack for project ${projectId} not found`);
 
   const pack = snap.data() as HandoverPackRecord;
@@ -398,7 +400,7 @@ export async function issueHandoverPack(projectId: string, issuedBy: string): Pr
   }
 
   const now = new Date().toISOString();
-  await updateDoc(doc(db, 'handover_packs', pack.id), {
+  await updateDoc(getDemoDoc( 'handover_packs', pack.id), {
     status: 'issued',
     issuedBy,
     issuedAt: now,
@@ -421,7 +423,7 @@ export async function addDocumentToHandoverPack(projectId: string, document: Han
       complianceBundle: existing.complianceBundle,
     });
 
-    await updateDoc(doc(db, 'handover_packs', existing.id), {
+    await updateDoc(getDemoDoc( 'handover_packs', existing.id), {
       documents,
       status: evaluation.status,
       blockers: evaluation.blockers,

@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const DOCUMENT_TYPES = ['drawing', 'report', 'addendum', 'submission_pack', 'specification', 'schedule'] as const;
 const DOCUMENT_STATUSES = ['draft', 'active', 'issued', 'superseded', 'withdrawn'] as const;
 const TRANSMITTAL_STATUSES = ['draft', 'issued'] as const;
@@ -82,7 +84,7 @@ function sortByRecent<T extends { updatedAt?: unknown; createdAt?: unknown; issu
 }
 
 function projectQueriesForUser(user: UserProfile): Query[] {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
   if (user.role === 'admin') return [query(projects, limit(40))];
   if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'architect' || user.role === 'bep') {
@@ -195,8 +197,8 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
     setSelectedVersionKeys([]);
     if (!selectedProject) return undefined;
 
-    const documentsQuery = query(collection(db, 'projects', selectedProject.id, 'documents'), limit(80));
-    const transmittalsQuery = query(collection(db, 'projects', selectedProject.id, 'transmittals'), limit(80));
+    const documentsQuery = query(getDemoCol( 'projects', selectedProject.id, 'documents'), limit(80));
+    const transmittalsQuery = query(getDemoCol( 'projects', selectedProject.id, 'transmittals'), limit(80));
     const unsubDocuments = onSnapshot(documentsQuery, (snapshot) => {
       const nextDocuments = sortByRecent(snapshot.docs.map((documentSnapshot) => ({ id: documentSnapshot.id, ...documentSnapshot.data() } as DrawingRegisterDocument)));
       setDocuments(nextDocuments);
@@ -221,7 +223,7 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
     setSelectedVersions([]);
     setSelectedVersionKeys([]);
     if (!selectedProject || !selectedDocument) return undefined;
-    const versionsQuery = query(collection(db, 'projects', selectedProject.id, 'documents', selectedDocument.id, 'versions'), limit(50));
+    const versionsQuery = query(getDemoCol( 'projects', selectedProject.id, 'documents', selectedDocument.id, 'versions'), limit(50));
     return onSnapshot(versionsQuery, (snapshot) => {
       const versions = [...snapshot.docs.map((versionDoc) => ({ id: versionDoc.id, ...versionDoc.data() } as DrawingRegisterVersion))]
         .sort((a, b) => b.versionNumber - a.versionNumber);
@@ -258,7 +260,7 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
     setSaving(true);
     try {
       const now = new Date().toISOString();
-      const documentRef = doc(collection(db, 'projects', selectedProject.id, 'documents'));
+      const documentRef = doc(getDemoCol( 'projects', selectedProject.id, 'documents'));
       const versionRef = doc(collection(documentRef, 'versions'), 'v1');
       const version: Omit<DrawingRegisterVersion, 'id'> & { id: string } = {
         id: versionRef.id,
@@ -319,7 +321,7 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
     try {
       const now = new Date().toISOString();
       const nextVersionNumber = selectedVersions.length + 1;
-      const versionRef = doc(collection(db, 'projects', selectedProject.id, 'documents', selectedDocument.id, 'versions'), `v${nextVersionNumber}`);
+      const versionRef = doc(getDemoCol( 'projects', selectedProject.id, 'documents', selectedDocument.id, 'versions'), `v${nextVersionNumber}`);
       const version: Omit<DrawingRegisterVersion, 'id'> & { id: string } = {
         id: versionRef.id,
         documentId: selectedDocument.id,
@@ -337,7 +339,7 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
       };
       const batch = writeBatch(db);
       batch.set(versionRef, version);
-      batch.update(doc(db, 'projects', selectedProject.id, 'documents', selectedDocument.id), {
+      batch.update(getDemoDoc( 'projects', selectedProject.id, 'documents', selectedDocument.id), {
         currentVersionId: versionRef.id,
         currentRevision: revision,
         latestFileUrl: version.fileUrl,
@@ -371,8 +373,8 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
     setSaving(true);
     try {
       const now = new Date().toISOString();
-      const transmittalRef = doc(collection(db, 'projects', selectedProject.id, 'transmittals'));
-      const coordinationRef = doc(collection(db, 'projects', selectedProject.id, 'coordination_items'));
+      const transmittalRef = doc(getDemoCol( 'projects', selectedProject.id, 'transmittals'));
+      const coordinationRef = doc(getDemoCol( 'projects', selectedProject.id, 'coordination_items'));
       const transmittal: Omit<DrawingTransmittal, 'id'> & { id: string } = {
         id: transmittalRef.id,
         projectId: selectedProject.id,

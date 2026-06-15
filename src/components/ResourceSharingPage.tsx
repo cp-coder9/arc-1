@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase';
 import type { UserProfile } from '@/types';
 import {
   buildResourceBookingConflictAudit,
+
   buildResourceUsageLedgerEntry,
   type ResourceBookingStatus,
   type ResourceBookingWindow,
@@ -16,6 +17,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 type ResourceListing = {
@@ -75,7 +78,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setState('loading');
-    const unsubscribeListings = onSnapshot(collection(db, 'resource_listings'), (snapshot) => {
+    const unsubscribeListings = onSnapshot(getDemoCol( 'resource_listings'), (snapshot) => {
       setListings(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ResourceListing)));
       setState('ready');
     }, (error) => {
@@ -83,7 +86,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
       setState('error');
     });
 
-    const unsubscribeBookings = onSnapshot(query(collection(db, 'resource_bookings'), where('participantIds', 'array-contains', user.uid)), (snapshot) => {
+    const unsubscribeBookings = onSnapshot(query(getDemoCol( 'resource_bookings'), where('participantIds', 'array-contains', user.uid)), (snapshot) => {
       setBookings(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ResourceBookingRecord)));
     }, (error) => {
       console.error('Failed to load resource bookings:', error);
@@ -124,7 +127,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
     try {
       const request = { resourceId: selectedResource.id, startsAt: isoFromLocal(startsAt), endsAt: isoFromLocal(endsAt) };
       const audit = buildResourceBookingConflictAudit(request, activeBookings, new Date().toISOString());
-      await addDoc(collection(db, 'resource_bookings'), {
+      await addDoc(getDemoCol( 'resource_bookings'), {
         ...request,
         requesterId: user.uid,
         requesterName: user.displayName || user.email,
@@ -153,7 +156,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
     setSaving(true);
     setFeedback(null);
     try {
-      await addDoc(collection(db, 'resource_listings'), {
+      await addDoc(getDemoCol( 'resource_listings'), {
         ownerId: user.uid,
         ownerName: user.displayName || user.email,
         name: newResource.name.trim(),
@@ -180,7 +183,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
   };
 
   const updateBookingStatus = async (booking: ResourceBookingRecord, status: ResourceBookingStatus) => {
-    await updateDoc(doc(db, 'resource_bookings', booking.id), { status, updatedAt: new Date().toISOString() });
+    await updateDoc(getDemoDoc( 'resource_bookings', booking.id), { status, updatedAt: new Date().toISOString() });
     setFeedback(`Booking ${status}.`);
   };
 
@@ -203,7 +206,7 @@ export default function ResourceSharingPage({ user }: { user: UserProfile }) {
       notes: 'Usage logged from resource sharing workspace for owner review.',
     };
     const ledgerEntry = buildResourceUsageLedgerEntry(`usage-${booking.id}-${Date.now()}`, usage, policy, new Date().toISOString());
-    await addDoc(collection(db, 'resource_usage_logs'), {
+    await addDoc(getDemoCol( 'resource_usage_logs'), {
       ...ledgerEntry,
       ownerId: resource.ownerId,
       participantIds: Array.from(new Set([booking.requesterId, resource.ownerId].filter(Boolean))),

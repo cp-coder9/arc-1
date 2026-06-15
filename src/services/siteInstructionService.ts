@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { SiteInstruction, SiteInstructionStatus, UserRole } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const SITE_INSTRUCTIONS_COL = 'site_instructions';
 
@@ -12,12 +14,12 @@ const AUTHORISED_ROLES: UserRole[] = ['architect', 'admin'];
 
 function instructionsCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, SITE_INSTRUCTIONS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, SITE_INSTRUCTIONS_COL);
 }
 
 function instructionDocument(projectId: string, instructionId: string) {
   if (!instructionId) throw new Error('instructionId is required');
-  return doc(db, PROJECTS_COL, projectId, SITE_INSTRUCTIONS_COL, instructionId);
+  return getDemoDoc( PROJECTS_COL, projectId, SITE_INSTRUCTIONS_COL, instructionId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {

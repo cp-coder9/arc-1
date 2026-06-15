@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type OccupationReadinessStatus = 'not_started' | 'in_progress' | 'ready' | 'blocked' | 'conditional_approval' | 'approved';
 export type UtilityServiceType = 'water' | 'electricity' | 'gas' | 'sewerage' | 'telecommunications' | 'roads_access' | 'stormwater' | 'refuse';
 
@@ -201,9 +203,9 @@ export async function createOccupationReadinessRecord(input: {
     updatedAt: now,
   };
 
-  await setDoc(doc(db, 'occupation_readiness', record.id), record);
+  await setDoc(getDemoDoc( 'occupation_readiness', record.id), record);
 
-  await updateDoc(doc(db, 'projects', input.projectId), {
+  await updateDoc(getDemoDoc( 'projects', input.projectId), {
     occupationReadiness: {
       status: evaluation.status,
       readyForOccupation: evaluation.ready,
@@ -217,20 +219,20 @@ export async function createOccupationReadinessRecord(input: {
 }
 
 export async function getOccupationReadinessRecord(projectId: string): Promise<OccupationReadinessRecord | null> {
-  const snap = await getDoc(doc(db, 'occupation_readiness', `occ-readiness-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'occupation_readiness', `occ-readiness-${projectId}`));
   if (!snap.exists()) return null;
   return snap.data() as OccupationReadinessRecord;
 }
 
 export async function updateUtilityHandoverItem(recordId: string, item: UtilityHandoverItem): Promise<void> {
-  const snap = await getDoc(doc(db, 'occupation_readiness', recordId));
+  const snap = await getDoc(getDemoDoc( 'occupation_readiness', recordId));
   if (!snap.exists()) throw new Error(`Occupation readiness record ${recordId} not found`);
 
   const record = snap.data() as OccupationReadinessRecord;
   const items = record.utilityHandoverItems.map((u) => (u.id === item.id ? { ...item, updatedAt: new Date().toISOString() } : u));
   const evaluation = evaluateUtilityHandover(items);
 
-  await updateDoc(doc(db, 'occupation_readiness', recordId), {
+  await updateDoc(getDemoDoc( 'occupation_readiness', recordId), {
     utilityHandoverItems: items,
     blockers: [
       ...record.blockers.filter((b) => !b.includes('utility service')),
@@ -253,7 +255,7 @@ export async function recordOccupancyCertificate(projectId: string, certificate:
       statutoryApprovals: existing.statutoryApprovals,
     });
 
-    await updateDoc(doc(db, 'occupation_readiness', existing.id), {
+    await updateDoc(getDemoDoc( 'occupation_readiness', existing.id), {
       occupancyCertificate: certificate,
       status: evaluation.status,
       blockers: evaluation.blockers,

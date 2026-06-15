@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
 const PAYMENT_GUARD_STEPS = [
@@ -33,7 +35,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function projectQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
   if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(100))];
   if (user.role === 'architect' || user.role === 'bep') return [
     query(projects, where('leadProfessionalId', '==', user.uid), limit(100)),
@@ -44,7 +46,7 @@ function projectQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[
 }
 
 function jobQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(100))];
   if (user.role === 'architect' || user.role === 'bep') return [
     query(jobs, where('selectedProfessionalId', '==', user.uid), limit(100)),
@@ -67,13 +69,13 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
     const ledgerMap = new Map<string, LedgerEntry>();
 
     if (!user || user.role === 'admin') {
-      unsubs.push(onSnapshot(query(collection(db, 'ledger'), limit(500)), (snapshot) => {
+      unsubs.push(onSnapshot(query(getDemoCol( 'ledger'), limit(500)), (snapshot) => {
         setLedger(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as LedgerEntry)));
       }, (error) => { console.warn('Admin ledger projection unavailable:', error); setLedger([]); }));
-      unsubs.push(onSnapshot(query(collection(db, 'escrow'), limit(200)), (snapshot) => {
+      unsubs.push(onSnapshot(query(getDemoCol( 'escrow'), limit(200)), (snapshot) => {
         setEscrows(snapshot.docs.map((docSnap) => ({ jobId: docSnap.id, ...docSnap.data() } as EscrowV2)));
       }, (error) => { console.warn('Admin escrow projection unavailable:', error); setEscrows([]); }));
-      unsubs.push(onSnapshot(query(collection(db, 'projects'), limit(200)), (snapshot) => {
+      unsubs.push(onSnapshot(query(getDemoCol( 'projects'), limit(200)), (snapshot) => {
         setProjects(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Project)));
       }, (error) => { console.warn('Admin financial project projection unavailable:', error); setProjects([]); }));
       return () => unsubs.forEach((unsubscribe) => unsubscribe());
@@ -84,8 +86,8 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
       setLedger(sortByRecent(Array.from(ledgerMap.values())));
     };
 
-    unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payerId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payer ledger projection unavailable:', error)));
-    unsubs.push(onSnapshot(query(collection(db, 'ledger'), where('payeeId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payee ledger projection unavailable:', error)));
+    unsubs.push(onSnapshot(query(getDemoCol( 'ledger'), where('payerId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payer ledger projection unavailable:', error)));
+    unsubs.push(onSnapshot(query(getDemoCol( 'ledger'), where('payeeId', '==', user.uid), limit(250)), mergeLedger, (error) => console.warn('Payee ledger projection unavailable:', error)));
 
     const projectQueries = projectQueriesForFinancialUser(user);
     if (projectQueries.length > 0) {
@@ -116,7 +118,7 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
     }
 
     const escrowMap = new Map<string, EscrowV2>();
-    const unsubs = visibleJobIds.slice(0, 25).map((jobId) => onSnapshot(doc(db, 'escrow', jobId), (snapshot) => {
+    const unsubs = visibleJobIds.slice(0, 25).map((jobId) => onSnapshot(getDemoDoc( 'escrow', jobId), (snapshot) => {
       if (snapshot.exists()) escrowMap.set(snapshot.id, { jobId: snapshot.id, ...snapshot.data() } as EscrowV2);
       else escrowMap.delete(jobId);
       setEscrows(sortByRecent(Array.from(escrowMap.values())));

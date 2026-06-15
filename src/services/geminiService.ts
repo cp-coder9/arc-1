@@ -8,6 +8,7 @@ import { auth, db } from "../lib/firebase";
 import { collection, query, where, doc, getDoc, updateDoc, addDoc, getDocs } from "firebase/firestore";
 import {
   Agent,
+
   LLMConfig,
   LLMProvider,
   AIReviewResult,
@@ -26,6 +27,8 @@ import { getAgentKnowledge, webSearchForAgent, addKnowledge, getKnowledgeForAgen
 import { AICategorySchema, FindingSchema, OrchestratorResultSchema, OrchestratorResultV2Schema, SignOffRequirementSchema } from "../lib/schemas";
 import { inferDefaultMode, resolveAgentsForMode } from "./agentSelectionService";
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const MAX_RETRIES = 2;
 const GEMINI_PROXY_URL = "/api/gemini/review";
 
@@ -104,7 +107,7 @@ export const SPECIALIZED_AGENTS: Partial<Agent>[] = [
 
 export async function getLLMConfig(): Promise<LLMConfig> {
   try {
-    const configDoc = await getDoc(doc(db, 'system_settings', 'llm_config'));
+    const configDoc = await getDoc(getDemoDoc( 'system_settings', 'llm_config'));
     if (configDoc.exists()) return configDoc.data() as LLMConfig;
   } catch (error) {
     console.error("Error fetching LLM config:", error);
@@ -183,7 +186,7 @@ export async function callOpenAICompatible(config: LLMConfig, systemInstruction:
 
 export async function logSystemEvent(level: 'info' | 'warning' | 'error' | 'critical', source: string, message: string, metadata?: any) {
   try {
-    await addDoc(collection(db, 'system_logs'), { timestamp: new Date().toISOString(), level, source, message, metadata: metadata || null });
+    await addDoc(getDemoCol( 'system_logs'), { timestamp: new Date().toISOString(), level, source, message, metadata: metadata || null });
   } catch (error) {
     console.error("Failed to log system event:", error);
   }
@@ -261,7 +264,7 @@ export function parseAIResponseV2(text: string = ''): Partial<AIReviewResult> {
 
 export async function seedAgents() {
   try {
-    const agentsRef = collection(db, 'agents');
+    const agentsRef = getDemoCol( 'agents');
     const existingAgents = await getDocs(agentsRef);
     const existingByRole = new Map(existingAgents.docs.map(agentDoc => [agentDoc.data().role, agentDoc]));
 
@@ -281,7 +284,7 @@ export async function seedAgents() {
       });
 
       if (agent.version && current.version !== agent.version && current.systemPrompt === undefined) patch.systemPrompt = agent.systemPrompt;
-      if (Object.keys(patch).length) await updateDoc(doc(db, 'agents', existing.id), patch);
+      if (Object.keys(patch).length) await updateDoc(getDemoDoc( 'agents', existing.id), patch);
     }
   } catch (error) {
     console.error("Error seeding agents:", error);
@@ -290,7 +293,7 @@ export async function seedAgents() {
 
 export async function getAgentConfig(role: string, defaultAgent: Partial<Agent>): Promise<Agent> {
   try {
-    const agentsRef = collection(db, 'agents');
+    const agentsRef = getDemoCol( 'agents');
     const q = query(agentsRef, where('role', '==', role));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
@@ -586,7 +589,7 @@ export async function reviewDrawing(
       }
     } catch {}
 
-    await Promise.all(agentConfigs.concat([coordinationAgent, signOffAgent, orchestratorAgent]).map(agent => agent.id ? updateDoc(doc(db, 'agents', agent.id), { currentActivity: 'Idle', lastActive: new Date().toISOString() }) : Promise.resolve()));
+    await Promise.all(agentConfigs.concat([coordinationAgent, signOffAgent, orchestratorAgent]).map(agent => agent.id ? updateDoc(getDemoDoc( 'agents', agent.id), { currentActivity: 'Idle', lastActive: new Date().toISOString() }) : Promise.resolve()));
 
     const duration = Date.now() - startTime;
     reportProgress(100, 'Orchestrator', `Complete (${Math.round(duration / 1000)}s).`, completed);

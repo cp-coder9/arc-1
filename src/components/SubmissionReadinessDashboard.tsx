@@ -14,6 +14,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
+
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
@@ -48,6 +49,8 @@ import type {
   EvidencePackItem,
 } from '@/types/municipalSubmissionReadiness';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 // ── Helpers ─────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<ReadinessCategory, string> = {
@@ -591,7 +594,7 @@ export default function SubmissionReadinessDashboard({
 
     async function loadProjects() {
       try {
-        const jobsRef = collection(db, 'jobs');
+        const jobsRef = getDemoCol( 'jobs');
         let q;
         if (user.role === 'admin') {
           q = query(jobsRef, ...[].slice.call([] as any));
@@ -614,7 +617,7 @@ export default function SubmissionReadinessDashboard({
         setProjects(projectList);
 
         // Try to also load projects collection
-        const projectsRef = collection(db, 'projects');
+        const projectsRef = getDemoCol( 'projects');
         let pq;
         if (user.role === 'admin') {
           // limit admin to 50

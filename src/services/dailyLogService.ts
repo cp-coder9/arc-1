@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { SiteLog, WeatherCondition } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const SITE_LOGS_COL = 'site_logs';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function siteLogsCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, SITE_LOGS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, SITE_LOGS_COL);
 }
 
 function siteLogDocument(projectId: string, logId: string) {
   if (!logId) throw new Error('logId is required');
-  return doc(db, PROJECTS_COL, projectId, SITE_LOGS_COL, logId);
+  return getDemoDoc( PROJECTS_COL, projectId, SITE_LOGS_COL, logId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {

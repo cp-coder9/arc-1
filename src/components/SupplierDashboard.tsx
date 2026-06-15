@@ -8,6 +8,8 @@ import PackageProcurementWorkspace from './PackageProcurementWorkspace';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type SupplierRecord = ProcurementCommitment | DeliveryEvidenceItem;
 
 function timestampMs(value: unknown): number {
@@ -28,7 +30,7 @@ export default function SupplierDashboard({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     const unsubPackages = onSnapshot(
-      query(collection(db, 'tender_packages'), where('status', '==', 'published'), limit(50)),
+      query(getDemoCol( 'tender_packages'), where('status', '==', 'published'), limit(50)),
       (snapshot) => {
         setPublishedPackages(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as TenderPackage)));
         setLoading(false);
@@ -40,7 +42,7 @@ export default function SupplierDashboard({ user }: { user: UserProfile }) {
       },
     );
     const unsubCommitments = onSnapshot(
-      query(collection(db, 'package_procurement_commitments'), where('actorId', '==', user.uid), limit(50)),
+      query(getDemoCol( 'package_procurement_commitments'), where('actorId', '==', user.uid), limit(50)),
       (snapshot) => setCommitments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProcurementCommitment))),
       (error) => {
         console.warn('Supplier commitment projection unavailable:', error);
@@ -48,7 +50,7 @@ export default function SupplierDashboard({ user }: { user: UserProfile }) {
       },
     );
     const unsubEvidence = onSnapshot(
-      query(collection(db, 'package_delivery_evidence'), where('submittedBy', '==', user.uid), limit(50)),
+      query(getDemoCol( 'package_delivery_evidence'), where('submittedBy', '==', user.uid), limit(50)),
       (snapshot) => setEvidence(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as DeliveryEvidenceItem))),
       (error) => {
         console.warn('Supplier delivery evidence projection unavailable:', error);

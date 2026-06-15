@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   History,
+
   ChevronDown,
   ChevronRight,
   Calculator,
@@ -20,6 +21,8 @@ import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/f
 import { db } from '@/lib/firebase';
 import type { CalculatorRiskStatus } from '@/types/toolboxCalculators';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface ToolRunRecord {
   id: string;
   toolId: string;
@@ -68,19 +71,19 @@ export default function ToolRunHistoryPanel({
       let q;
       if (projectId) {
         q = query(
-          collection(db, 'projects', projectId, 'tool_runs'),
+          getDemoCol( 'projects', projectId, 'tool_runs'),
           orderBy('createdAt', 'desc'),
           limit(maxItems),
         );
       } else if (userId) {
         q = query(
-          collection(db, 'tool_runs'),
+          getDemoCol( 'tool_runs'),
           where('userId', '==', userId),
           orderBy('createdAt', 'desc'),
           limit(maxItems),
         );
       } else {
-        q = query(collection(db, 'tool_runs'), orderBy('createdAt', 'desc'), limit(maxItems));
+        q = query(getDemoCol( 'tool_runs'), orderBy('createdAt', 'desc'), limit(maxItems));
       }
 
       const unsubscribe = onSnapshot(

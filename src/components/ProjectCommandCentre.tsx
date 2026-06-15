@@ -10,6 +10,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type ProjectCommandCentreProps = {
   user: UserProfile;
   onNavigate?: (pageId: string) => void;
@@ -59,7 +61,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function jobQueriesForUser(user: UserProfile) {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
 
   if (user.role === 'client') {
     return [query(jobs, where('clientId', '==', user.uid), limit(25))];
@@ -81,7 +83,7 @@ function jobQueriesForUser(user: UserProfile) {
 }
 
 function tenderQueriesForUser(user: UserProfile) {
-  const tenders = collection(db, 'tender_packages');
+  const tenders = getDemoCol( 'tender_packages');
 
   if (user.role === 'admin') {
     return [{ source: 'admin' as const, q: query(tenders, limit(25)) }];
@@ -99,11 +101,11 @@ function tenderQueriesForUser(user: UserProfile) {
 
 function delegatedTaskQueryForUser(user: UserProfile) {
   if (user.role !== 'freelancer') return null;
-  return query(collection(db, 'delegatedTasks'), where('assigneeId', '==', user.uid), limit(25));
+  return query(getDemoCol( 'delegatedTasks'), where('assigneeId', '==', user.uid), limit(25));
 }
 
 function projectQueriesForUser(user: UserProfile) {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
 
   if (user.role === 'client') {
     return [query(projects, where('clientId', '==', user.uid), limit(25))];

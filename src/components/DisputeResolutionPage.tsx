@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { getSelectedProfessionalId, isSelectedProfessional } from '@/lib/professionalRoleCompatibility';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 function timestampMs(value: unknown): number {
@@ -27,7 +29,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function jobQueriesForUser(user: UserProfile) {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'admin') return [query(jobs, limit(40))];
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(40))];
   if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return [
@@ -39,7 +41,7 @@ function jobQueriesForUser(user: UserProfile) {
 }
 
 function disputeQueriesForUser(user: UserProfile) {
-  const disputes = collection(db, 'disputes');
+  const disputes = getDemoCol( 'disputes');
   if (user.role === 'admin') return [query(disputes, limit(75))];
   return [
     query(disputes, where('filedBy', '==', user.uid), limit(40)),
@@ -119,7 +121,7 @@ export default function DisputeResolutionPage({ user }: { user: UserProfile }) {
     }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'disputes'), {
+      await addDoc(getDemoCol( 'disputes'), {
         jobId: selectedJob.id,
         filedBy: user.uid,
         filedAgainst,

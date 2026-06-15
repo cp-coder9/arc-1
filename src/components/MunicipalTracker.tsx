@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import {
   Building2,
+
   Search,
   RefreshCcw,
   MapPin,
@@ -37,6 +38,8 @@ import { uploadAndTrackFile } from '@/lib/uploadService';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { AnimatePresence } from 'framer-motion';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface MunicipalTrackerProps {
   user: any;
 }
@@ -67,7 +70,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, 'council_submissions'), where('userId', '==', user.uid));
+    const q = query(getDemoCol( 'council_submissions'), where('userId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CouncilSubmission)));
       setLoading(false);
@@ -193,7 +196,7 @@ export default function MunicipalTracker({ user }: MunicipalTrackerProps) {
 
       if (result.success) {
         toast.success(`Extracted Reference: ${result.data.referenceNumber}`);
-        await addDoc(collection(db, 'council_submissions'), {
+        await addDoc(getDemoCol( 'council_submissions'), {
           userId: user.uid,
           municipality: result.data.municipality,
           referenceNumber: result.data.referenceNumber,

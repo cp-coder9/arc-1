@@ -12,6 +12,8 @@ import { Send, X, MessageCircle } from 'lucide-react';
 import { safeFormat } from '../lib/utils';
 import { toast } from 'sonner';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface ChatProps {
   job: Job;
   currentUser: UserProfile;
@@ -28,7 +30,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
   useEffect(() => {
     if (!isOpen || !otherUser) return;
     const q = query(
-      collection(db, 'messages'),
+      getDemoCol( 'messages'),
       where('jobId', '==', job.id),
       orderBy('createdAt', 'asc')
     );
@@ -42,7 +44,7 @@ export function Chat({ job, currentUser, otherUser, isOpen, onClose }: ChatProps
     e.preventDefault();
     if (!newMessage.trim() || !otherUser) return;
     try {
-      await addDoc(collection(db, 'messages'), {
+      await addDoc(getDemoCol( 'messages'), {
         jobId: job.id,
         senderId: currentUser.uid,
         senderRole: currentUser.role as any,

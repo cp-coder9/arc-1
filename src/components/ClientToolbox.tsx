@@ -12,6 +12,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText,
+
   TrendingUp,
   Signature,
   Wallet,
@@ -76,7 +77,7 @@ function BriefCreatorTool({ user, onBriefCreated }: { user: UserProfile; onBrief
   const loadRecentBriefs = async () => {
     try {
       const q = query(
-        collection(db, 'project_briefs'),
+        getDemoCol( 'project_briefs'),
         where('clientId', '==', user.uid),
         orderBy('createdAt', 'desc')
       );
@@ -202,7 +203,7 @@ function ProposalComparisonTool({ user, jobId }: { user: UserProfile; jobId?: st
   const loadProposals = async () => {
     try {
       const q = query(
-        collection(db, 'applications'),
+        getDemoCol( 'applications'),
         where('jobId', '==', jobId),
         where('status', 'in', ['pending', 'accepted'])
       );
@@ -220,12 +221,12 @@ function ProposalComparisonTool({ user, jobId }: { user: UserProfile; jobId?: st
 
   const handleAppointment = async (proposerId: string) => {
     try {
-      await updateDoc(doc(db, 'applications', selectedForAppointment!), {
+      await updateDoc(getDemoDoc( 'applications', selectedForAppointment!), {
         status: 'accepted',
         appointedAt: serverTimestamp(),
       });
       // Create appointment contract record
-      await addDoc(collection(db, 'appointment_contracts'), {
+      await addDoc(getDemoCol( 'appointment_contracts'), {
         jobId,
         clientId: user.uid,
         bepId: proposerId,
@@ -369,7 +370,7 @@ function ProgressReportsTool({ user, activeProjectId }: { user: UserProfile; act
   const loadProjects = async () => {
     try {
       const clientProjects = await getDocs(
-        query(collection(db, 'projects'), where('clientId', '==', user.uid))
+        query(getDemoCol( 'projects'), where('clientId', '==', user.uid))
       );
       setProjects(clientProjects.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any)));
     } catch (error) {
@@ -479,7 +480,7 @@ function ContractSigningTool({ user, activeContractId }: { user: UserProfile; ac
   const loadContracts = async () => {
     try {
       const q = query(
-        collection(db, 'appointment_contracts'),
+        getDemoCol( 'appointment_contracts'),
         where('clientId', '==', user.uid)
       );
       const snapshot = await getDocs(q);
@@ -492,7 +493,7 @@ function ContractSigningTool({ user, activeContractId }: { user: UserProfile; ac
   const handleSign = async (contractId: string) => {
     setSigning(true);
     try {
-      await updateDoc(doc(db, 'appointment_contracts', contractId), {
+      await updateDoc(getDemoDoc( 'appointment_contracts', contractId), {
         status: 'signed',
         signedBy: user.uid,
         signedAt: serverTimestamp(),
@@ -661,7 +662,7 @@ function EscrowPaymentsTool({ user, jobId }: { user: UserProfile; jobId?: string
 
   const loadEscrows = async () => {
     try {
-      const q = query(collection(db, 'escrows'), where('clientId', '==', user.uid));
+      const q = query(getDemoCol( 'escrows'), where('clientId', '==', user.uid));
       const snapshot = await getDocs(q);
       setEscrows(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any)));
     } catch (error) {
@@ -674,7 +675,7 @@ function EscrowPaymentsTool({ user, jobId }: { user: UserProfile; jobId?: string
       // Simulate payment integration - in production, redirect to payment gateway
       toast.success('Processing payment...');
 
-      await updateDoc(doc(db, 'escrows', escrowId), {
+      await updateDoc(getDemoDoc( 'escrows', escrowId), {
         status: 'funded',
         heldAmount: serverTimestamp(),
         fundedAt: serverTimestamp(),
@@ -689,7 +690,7 @@ function EscrowPaymentsTool({ user, jobId }: { user: UserProfile; jobId?: string
 
   const handleReleaseMilestone = async (escrowId: string, milestoneId: string) => {
     try {
-      await updateDoc(doc(db, 'escrows', escrowId, 'milestones', milestoneId), {
+      await updateDoc(getDemoDoc( 'escrows', escrowId, 'milestones', milestoneId), {
         status: 'released',
         releasedAt: serverTimestamp(),
       });
@@ -969,3 +970,5 @@ export default function ClientToolbox({
 
 // Additional icon imports needed for hidden tabs
 import { Search } from 'lucide-react';
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';

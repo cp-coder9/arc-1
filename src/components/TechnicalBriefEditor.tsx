@@ -10,6 +10,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type Opportunity = {
   id: string;
   briefId: string;
@@ -37,7 +39,7 @@ export default function TechnicalBriefEditor({ user }: { user: UserProfile }) {
   });
 
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, 'marketplace_opportunities'), where('status', '==', 'published')), (snapshot) => {
+    const unsub = onSnapshot(query(getDemoCol( 'marketplace_opportunities'), where('status', '==', 'published')), (snapshot) => {
       const records = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Opportunity));
       setOpportunities(records);
       setSelectedId((current) => current || records[0]?.id || '');
@@ -78,11 +80,11 @@ export default function TechnicalBriefEditor({ user }: { user: UserProfile }) {
         createdAt: now,
       };
       const technicalBrief = buildTechnicalBriefRecord(technicalBriefInput);
-      await addDoc(collection(db, 'technical_briefs'), technicalBrief);
+      await addDoc(getDemoCol( 'technical_briefs'), technicalBrief);
 
       const interpretation = buildTechnicalBriefInterpretation({ ...technicalBriefInput, title: selected.title, description: selected.description });
-      await addDoc(collection(db, 'project_briefs', selected.briefId, 'interpretations'), interpretation);
-      await updateDoc(doc(db, 'marketplace_opportunities', selected.id), { technicalBriefStatus: 'ready_for_review', updatedAt: now });
+      await addDoc(getDemoCol( 'project_briefs', selected.briefId, 'interpretations'), interpretation);
+      await updateDoc(getDemoDoc( 'marketplace_opportunities', selected.id), { technicalBriefStatus: 'ready_for_review', updatedAt: now });
       toast.success('Technical brief saved for human review.');
     } catch (error) {
       console.error('Failed to save technical brief:', error);

@@ -10,6 +10,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type QueueRecord = AiReviewQueueItem & {
   id: string;
   decision?: string;
@@ -76,7 +78,7 @@ export default function AdminAIReviewQueue() {
   useEffect(() => {
     setState('loading');
     return onSnapshot(
-      query(collection(db, 'ai_review_queue'), where('status', '==', 'open'), limit(50)),
+      query(getDemoCol( 'ai_review_queue'), where('status', '==', 'open'), limit(50)),
       (snapshot) => {
         const records = sortQueue(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as QueueRecord)));
         setItems(records);
@@ -103,7 +105,7 @@ export default function AdminAIReviewQueue() {
     let cancelled = false;
     Promise.all(actionLogIds.map(async (id) => {
       try {
-        const snap = await getDoc(doc(db, 'ai_action_logs', id));
+        const snap = await getDoc(getDemoDoc( 'ai_action_logs', id));
         return snap.exists() ? [id, { id: snap.id, ...snap.data() } as ActionLogRecord] as const : null;
       } catch (error) {
         console.warn('AI action log detail unavailable:', error);

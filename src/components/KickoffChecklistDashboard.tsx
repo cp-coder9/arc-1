@@ -8,6 +8,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   AlertTriangle,
+
   CheckCircle2,
   Circle,
   Clock,
@@ -19,6 +20,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 // ── Types ───────────────────────────────────────────────────────────────────────
 
 type ChecklistItem = {
@@ -98,7 +101,7 @@ export default function KickoffChecklistDashboard({
 
   // Subscribe to kickoff checklist in Firestore
   useEffect(() => {
-    const kickoffRef = doc(db, 'kickoff_checklists', projectId);
+    const kickoffRef = getDemoDoc( 'kickoff_checklists', projectId);
     const unsub = onSnapshot(
       kickoffRef,
       (snap) => {

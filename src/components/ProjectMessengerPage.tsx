@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 import { messagingService } from '@/services/messagingService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 type MessageScope = {
@@ -36,7 +38,7 @@ function sortByOldest<T extends { createdAt?: unknown }>(items: T[]) {
 }
 
 function jobsForUser(user: UserProfile): Query<DocumentData>[] {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'admin') return [query(jobs, limit(40))];
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(40))];
   if (user.role === 'architect' || user.role === 'bep') return [
@@ -97,7 +99,7 @@ export default function ProjectMessengerPage({ user }: { user: UserProfile }) {
     }
 
     setMessageState('loading');
-    const unsubscribe = onSnapshot(query(collection(db, 'messages'), where('jobId', '==', selectedJob.id), limit(75)), (snapshot) => {
+    const unsubscribe = onSnapshot(query(getDemoCol( 'messages'), where('jobId', '==', selectedJob.id), limit(75)), (snapshot) => {
       setMessages(sortByOldest(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Message))));
       setMessageState('ready');
     }, (error) => {

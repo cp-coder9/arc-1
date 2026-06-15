@@ -1,6 +1,7 @@
 import { db } from '../lib/firebase';
 import {
   collection,
+
   doc,
   getDoc,
   getDocs,
@@ -22,6 +23,8 @@ import {
   Discipline,
 } from '../types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 // ─── Stage Transition Rules ─────────────────────────────────────────────────
 
 export type StageGateEvidenceKey =
@@ -217,7 +220,7 @@ export async function createProject(
   const existingProject = await getProjectByJobId(jobId);
   if (existingProject) return existingProject.id;
 
-  const projectRef = doc(db, PROJECTS_COL, jobId);
+  const projectRef = getDemoDoc( PROJECTS_COL, jobId);
   const now = new Date().toISOString();
 
   const initialHistory: StageHistoryEntry = {
@@ -275,7 +278,7 @@ export async function transitionStage(
   note?: string,
   optionsOrOverride: TransitionStageOptions | boolean = false
 ): Promise<void> {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   const projectSnap = await getDoc(projectRef);
 
   if (!projectSnap.exists()) {
@@ -336,7 +339,7 @@ export async function transitionStage(
 
   // Sync Job.status
   const newJobStatus = stageToJobStatus(targetStage);
-  const jobRef = doc(db, 'jobs', project.jobId);
+  const jobRef = getDemoDoc( 'jobs', project.jobId);
   const jobSnap = await getDoc(jobRef);
   if (jobSnap.exists()) {
     const currentJobStatus = jobSnap.data().status;
@@ -361,7 +364,7 @@ export async function transitionStage(
 export async function getProjectByJobId(
   jobId: string
 ): Promise<Project | null> {
-  const q = query(collection(db, PROJECTS_COL), where('jobId', '==', jobId));
+  const q = query(getDemoCol( PROJECTS_COL), where('jobId', '==', jobId));
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const docSnap = snap.docs[0];
@@ -372,7 +375,7 @@ export async function getProjectByJobId(
  * Get a project by its ID.
  */
 export async function getProject(projectId: string): Promise<Project | null> {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   const snap = await getDoc(projectRef);
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as Project;
@@ -385,7 +388,7 @@ export function subscribeToProject(
   projectId: string,
   callback: (project: Project | null) => void
 ): () => void {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   return onSnapshot(projectRef, (snap) => {
     if (snap.exists()) {
       callback({ id: snap.id, ...snap.data() } as Project);
@@ -402,7 +405,7 @@ export function subscribeToProjectByJobId(
   jobId: string,
   callback: (project: Project | null) => void
 ): () => void {
-  const q = query(collection(db, PROJECTS_COL), where('jobId', '==', jobId));
+  const q = query(getDemoCol( PROJECTS_COL), where('jobId', '==', jobId));
   return onSnapshot(q, (snap) => {
     if (snap.empty) {
       callback(null);
@@ -419,14 +422,14 @@ export function subscribeToProjectByJobId(
 export async function getProjectsForUser(userId: string): Promise<Project[]> {
   // Query by clientId
   const clientQ = query(
-    collection(db, PROJECTS_COL),
+    getDemoCol( PROJECTS_COL),
     where('clientId', '==', userId)
   );
   const clientSnap = await getDocs(clientQ);
 
   // Query by leadArchitectId
   const archQ = query(
-    collection(db, PROJECTS_COL),
+    getDemoCol( PROJECTS_COL),
     where('leadArchitectId', '==', userId)
   );
   const archSnap = await getDocs(archQ);

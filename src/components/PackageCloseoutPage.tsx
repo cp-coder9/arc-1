@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type PackageSnagRecord = SnagItem & { createdAt?: string; updatedAt?: string; createdBy?: string; projectId?: string; jobId?: string; assigneeId?: string };
 type PackageEvidenceRecord = DeliveryEvidenceItem & { packageId: string; projectId?: string; jobId?: string; createdBy?: string; updatedAt?: string };
@@ -57,7 +59,7 @@ function sortByRecent<T>(items: T[]) {
 }
 
 function tenderQueriesForUser(user: UserProfile) {
-  const tenders = collection(db, 'tender_packages');
+  const tenders = getDemoCol( 'tender_packages');
   if (user.role === 'admin') return [query(tenders, limit(50))];
   if (user.role === 'contractor') {
     return [query(tenders, where('status', '==', 'published'), limit(50)), query(tenders, where('awardedContractorId', '==', user.uid), limit(50))];
@@ -135,11 +137,11 @@ export default function PackageCloseoutPage({ user }: { user: UserProfile }) {
     }
 
     const unsubs = [
-      onSnapshot(query(collection(db, 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as PackageSnagRecord)))), (error) => { console.warn('Package close-out snags unavailable:', error); setSnags([]); }),
-      onSnapshot(query(collection(db, 'package_delivery_evidence'), where('packageId', 'in', packageIds)), (snapshot) => setEvidence(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as PackageEvidenceRecord)))), (error) => { console.warn('Package close-out evidence unavailable:', error); setEvidence([]); }),
-      onSnapshot(query(collection(db, 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI)))), (error) => { console.warn('Package close-out RFIs unavailable:', error); setRfis([]); }),
-      onSnapshot(query(collection(db, 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask)))), (error) => { console.warn('Package close-out programme tasks unavailable:', error); setTasks([]); }),
-      onSnapshot(query(collection(db, 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection)))), (error) => { console.warn('Package close-out inspections unavailable:', error); setInspections([]); }),
+      onSnapshot(query(getDemoCol( 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as PackageSnagRecord)))), (error) => { console.warn('Package close-out snags unavailable:', error); setSnags([]); }),
+      onSnapshot(query(getDemoCol( 'package_delivery_evidence'), where('packageId', 'in', packageIds)), (snapshot) => setEvidence(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as PackageEvidenceRecord)))), (error) => { console.warn('Package close-out evidence unavailable:', error); setEvidence([]); }),
+      onSnapshot(query(getDemoCol( 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI)))), (error) => { console.warn('Package close-out RFIs unavailable:', error); setRfis([]); }),
+      onSnapshot(query(getDemoCol( 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask)))), (error) => { console.warn('Package close-out programme tasks unavailable:', error); setTasks([]); }),
+      onSnapshot(query(getDemoCol( 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection)))), (error) => { console.warn('Package close-out inspections unavailable:', error); setInspections([]); }),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [tenders]);
@@ -169,7 +171,7 @@ export default function PackageCloseoutPage({ user }: { user: UserProfile }) {
     setSaving('snag');
     const now = new Date().toISOString();
     try {
-      await addDoc(collection(db, 'package_snags'), {
+      await addDoc(getDemoCol( 'package_snags'), {
         packageId: selectedTender.id,
         projectId: selectedTender.projectId,
         jobId: selectedTender.jobId,
@@ -201,7 +203,7 @@ export default function PackageCloseoutPage({ user }: { user: UserProfile }) {
     setSaving('evidence');
     const now = new Date().toISOString();
     try {
-      await addDoc(collection(db, 'package_delivery_evidence'), {
+      await addDoc(getDemoCol( 'package_delivery_evidence'), {
         packageId: selectedTender.id,
         projectId: selectedTender.projectId,
         jobId: selectedTender.jobId,
@@ -232,7 +234,7 @@ export default function PackageCloseoutPage({ user }: { user: UserProfile }) {
     if (!canUpdateSnag(user, snag)) return;
     setSaving('status');
     try {
-      await updateDoc(doc(db, 'package_snags', snag.id), {
+      await updateDoc(getDemoDoc( 'package_snags', snag.id), {
         status: 'ready_for_inspection',
         updatedAt: new Date().toISOString(),
       });

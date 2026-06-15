@@ -11,6 +11,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type CaptureType = 'rfi' | 'site_instruction' | 'site_log' | 'programme_task' | 'inspection';
 
@@ -52,7 +54,7 @@ function sortByRecent<T>(items: T[]) {
 }
 
 function tenderQueriesForUser(user: UserProfile) {
-  const tenders = collection(db, 'tender_packages');
+  const tenders = getDemoCol( 'tender_packages');
   if (user.role === 'admin') return [query(tenders, limit(50))];
   if (user.role === 'contractor' || user.role === 'subcontractor' || user.role === 'supplier') return [query(tenders, where('status', '==', 'published'), limit(50)), query(tenders, where('awardedContractorId', '==', user.uid), limit(50))];
   return [];
@@ -129,12 +131,12 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
     }
 
     const unsubs = [
-      onSnapshot(query(collection(db, 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI)))), (error) => { console.warn('Package RFIs unavailable:', error); setRfis([]); }),
-      onSnapshot(query(collection(db, 'site_instructions'), where('packageId', 'in', packageIds)), (snapshot) => setSiteInstructions(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInstructionRecord)))), (error) => { console.warn('Package site instructions unavailable:', error); setSiteInstructions([]); }),
-      onSnapshot(query(collection(db, 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog)))), (error) => { console.warn('Package site logs unavailable:', error); setSiteLogs([]); }),
-      onSnapshot(query(collection(db, 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask)))), (error) => { console.warn('Package programme tasks unavailable:', error); setTasks([]); }),
-      onSnapshot(query(collection(db, 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection)))), (error) => { console.warn('Package inspections unavailable:', error); setInspections([]); }),
-      onSnapshot(query(collection(db, 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SnagItem)))), (error) => { console.warn('Package snags unavailable:', error); setSnags([]); }),
+      onSnapshot(query(getDemoCol( 'rfis'), where('packageId', 'in', packageIds)), (snapshot) => setRfis(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as RFI)))), (error) => { console.warn('Package RFIs unavailable:', error); setRfis([]); }),
+      onSnapshot(query(getDemoCol( 'site_instructions'), where('packageId', 'in', packageIds)), (snapshot) => setSiteInstructions(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInstructionRecord)))), (error) => { console.warn('Package site instructions unavailable:', error); setSiteInstructions([]); }),
+      onSnapshot(query(getDemoCol( 'site_logs'), where('packageId', 'in', packageIds)), (snapshot) => setSiteLogs(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteLog)))), (error) => { console.warn('Package site logs unavailable:', error); setSiteLogs([]); }),
+      onSnapshot(query(getDemoCol( 'gantt_tasks'), where('packageId', 'in', packageIds)), (snapshot) => setTasks(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as GanttTask)))), (error) => { console.warn('Package programme tasks unavailable:', error); setTasks([]); }),
+      onSnapshot(query(getDemoCol( 'site_inspections'), where('packageId', 'in', packageIds)), (snapshot) => setInspections(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SiteInspection)))), (error) => { console.warn('Package inspections unavailable:', error); setInspections([]); }),
+      onSnapshot(query(getDemoCol( 'package_snags'), where('packageId', 'in', packageIds)), (snapshot) => setSnags(sortByRecent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as SnagItem)))), (error) => { console.warn('Package snags unavailable:', error); setSnags([]); }),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [tenders]);
@@ -159,7 +161,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
     };
     try {
       if (captureType === 'rfi') {
-        await addDoc(collection(db, 'rfis'), {
+        await addDoc(getDemoCol( 'rfis'), {
           ...common,
           subject: title.trim(),
           question: details.trim() || title.trim(),
@@ -172,7 +174,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
           createdAt: now,
         });
       } else if (captureType === 'site_instruction') {
-        await addDoc(collection(db, 'site_instructions'), {
+        await addDoc(getDemoCol( 'site_instructions'), {
           ...common,
           title: title.trim(),
           instruction: details.trim() || title.trim(),
@@ -186,7 +188,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
           createdAt: now,
         });
       } else if (captureType === 'site_log') {
-        await addDoc(collection(db, 'site_logs'), {
+        await addDoc(getDemoCol( 'site_logs'), {
           ...common,
           date: new Date().toISOString().slice(0, 10),
           weather: 'cloudy',
@@ -198,7 +200,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
           createdAt: now,
         });
       } else if (captureType === 'inspection') {
-        await addDoc(collection(db, 'site_inspections'), {
+        await addDoc(getDemoCol( 'site_inspections'), {
           ...common,
           inspectionType: 'custom',
           date: dueDate,
@@ -212,7 +214,7 @@ export default function PackageConstructionOpsPage({ user }: { user: UserProfile
           createdAt: now,
         });
       } else {
-        await addDoc(collection(db, 'gantt_tasks'), {
+        await addDoc(getDemoCol( 'gantt_tasks'), {
           ...common,
           title: title.trim(),
           phase: 'Package delivery',

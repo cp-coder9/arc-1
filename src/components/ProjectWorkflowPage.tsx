@@ -21,6 +21,8 @@ import PackageCloseoutPage from './PackageCloseoutPage';
 import SiteExecutionDashboard from './SiteExecutionDashboard';
 import { subscribeToMergedQuerySnapshots } from '../lib/firestoreQueryMerge';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type Props = {
   pageId: string;
   user: UserProfile;
@@ -44,7 +46,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function projectQueriesForUser(user: UserProfile): Query<DocumentData>[] {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
   if (user.role === 'client') return [query(projects, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'architect' || user.role === 'bep') {
     return [
@@ -58,7 +60,7 @@ function projectQueriesForUser(user: UserProfile): Query<DocumentData>[] {
 }
 
 function jobQueriesForUser(user: UserProfile): Query<DocumentData>[] {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
   if (user.role === 'architect' || user.role === 'bep') {
     return [

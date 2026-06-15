@@ -9,12 +9,14 @@ import { Star, CheckCircle, XCircle, Trash2, Clock, User, MessageSquare } from '
 import { toast } from 'sonner';
 import { notificationService } from '@/services/notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export default function ReviewManagement() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'));
+    const q = query(getDemoCol( 'reviews'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setReviews(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
       setLoading(false);
@@ -24,9 +26,9 @@ export default function ReviewManagement() {
 
   const handleApprove = async (review: Review) => {
     try {
-      await updateDoc(doc(db, 'reviews', review.id), { status: 'approved' });
+      await updateDoc(getDemoDoc( 'reviews', review.id), { status: 'approved' });
 
-      const userRef = doc(db, 'users', review.toId);
+      const userRef = getDemoDoc( 'users', review.toId);
       const userDoc = await getDoc(userRef);
       if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -61,7 +63,7 @@ export default function ReviewManagement() {
   const handleDelete = async (reviewId: string) => {
     if (!confirm("Are you sure you want to delete this review?")) return;
     try {
-      await deleteDoc(doc(db, 'reviews', reviewId));
+      await deleteDoc(getDemoDoc( 'reviews', reviewId));
       toast.success("Review deleted.");
     } catch (error) {
       toast.error("Failed to delete review.");

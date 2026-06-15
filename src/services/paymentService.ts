@@ -2,6 +2,7 @@ import { db, auth } from '../lib/firebase';
 import { apiFetch as configuredApiFetch, buildApiUrl } from '../lib/apiClient';
 import {
   collection,
+
   query,
   where,
   onSnapshot,
@@ -21,6 +22,8 @@ import { recordTransaction } from './financialLedgerService';
 import { calculateSplitPlatformFee } from './platformFeePolicy';
 import { toast } from 'sonner';
 import * as jsMd5 from 'js-md5';
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 // Handle both ESM and CJS import styles safely
 const md5 = (jsMd5 as any).default || jsMd5;
 
@@ -238,7 +241,7 @@ class PaymentService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await setDoc(doc(db, 'escrow', project.jobId), escrow, { merge: true });
+    await setDoc(getDemoDoc( 'escrow', project.jobId), escrow, { merge: true });
     await recordTransaction({
       projectId: project.id,
       jobId: project.jobId,
@@ -253,26 +256,26 @@ class PaymentService {
   }
 
   async requestStageRelease(projectId: string, stage: ProjectStage): Promise<void> {
-    const projectSnap = await getDoc(doc(db, 'projects', projectId));
+    const projectSnap = await getDoc(getDemoDoc( 'projects', projectId));
     if (!projectSnap.exists()) throw new Error('Project not found');
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-    const escrowSnap = await getDoc(doc(db, 'escrow', project.jobId));
+    const escrowSnap = await getDoc(getDemoDoc( 'escrow', project.jobId));
     if (!escrowSnap.exists()) throw new Error('Escrow not found');
     const escrow = { jobId: escrowSnap.id, ...escrowSnap.data() } as EscrowV2;
     const now = new Date().toISOString();
     const milestones = (escrow.milestones || []).map((milestone) => milestone.stage === stage ? { ...milestone, status: 'release_requested' as const, requestedAt: now } : milestone);
     if (!milestones.some((milestone) => milestone.stage === stage && milestone.status === 'release_requested')) throw new Error('Milestone not found');
-    await updateDoc(doc(db, 'escrow', project.jobId), { milestones, updatedAt: now });
+    await updateDoc(getDemoDoc( 'escrow', project.jobId), { milestones, updatedAt: now });
   }
 
   async approveStageRelease(projectId: string, stage: ProjectStage, adminId: string): Promise<void> {
     const now = new Date().toISOString();
     const result = await runTransaction(db, async (transaction) => {
-      const projectRef = doc(db, 'projects', projectId);
+      const projectRef = getDemoDoc( 'projects', projectId);
       const projectSnap = await transaction.get(projectRef);
       if (!projectSnap.exists()) throw new Error('Project not found');
       const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-      const escrowRef = doc(db, 'escrow', project.jobId);
+      const escrowRef = getDemoDoc( 'escrow', project.jobId);
       const escrowSnap = await transaction.get(escrowRef);
       if (!escrowSnap.exists()) throw new Error('Escrow not found');
       const escrow = { jobId: escrowSnap.id, ...escrowSnap.data() } as EscrowV2;
@@ -305,10 +308,10 @@ class PaymentService {
         escrowMilestoneId: milestone.id,
         createdAt: now,
       };
-      transaction.set(doc(collection(db, 'ledger')), ledgerEntry);
+      transaction.set(doc(getDemoCol( 'ledger')), ledgerEntry);
 
       const invoice = buildMilestoneInvoice(project, milestone, payeeId, now);
-      transaction.set(doc(collection(db, 'invoices')), invoice);
+      transaction.set(doc(getDemoCol( 'invoices')), invoice);
       return { payeeId, amount: milestone.amount, milestoneName: milestone.name, jobId: project.jobId, invoiceNumber: invoice.invoiceNumber };
     });
     await notificationService.notifyPaymentReleased(result.payeeId, result.amount, result.milestoneName, result.jobId);
@@ -317,7 +320,7 @@ class PaymentService {
 
   private async createMilestoneInvoice(project: Project, milestone: EscrowMilestone, architectId: string, createdAt: string): Promise<string> {
     const invoice = buildMilestoneInvoice(project, milestone, architectId, createdAt);
-    const invoiceRef = await addDoc(collection(db, 'invoices'), invoice);
+    const invoiceRef = await addDoc(getDemoCol( 'invoices'), invoice);
     await notificationService.notifyInvoiceSent(project.clientId, invoice.invoiceNumber, invoice.totalAmount, project.jobId);
     return invoiceRef.id;
   }
@@ -445,7 +448,7 @@ async processRefund(
     callback: (payments: Payment[]) => void
   ): () => void {
     const q = query(
-      collection(db, 'payments'),
+      getDemoCol( 'payments'),
       where('jobId', '==', jobId),
       orderBy('createdAt', 'desc')
     );
@@ -469,7 +472,7 @@ async processRefund(
     callback: (escrow: Escrow | null) => void
   ): () => void {
     const unsubscribe = onSnapshot(
-      doc(db, 'escrow', jobId),
+      getDemoDoc( 'escrow', jobId),
       (doc) => {
         if (doc.exists()) {
           callback({ jobId: doc.id, ...doc.data() } as Escrow);
@@ -486,7 +489,7 @@ async processRefund(
    * Get escrow snapshot (one-time fetch)
    */
   async getEscrow(jobId: string): Promise<Escrow | null> {
-    const escrowSnap = await getDoc(doc(db, 'escrow', jobId));
+    const escrowSnap = await getDoc(getDemoDoc( 'escrow', jobId));
     if (escrowSnap.exists()) {
       return { jobId: escrowSnap.id, ...escrowSnap.data() } as Escrow;
     }
@@ -498,7 +501,7 @@ async processRefund(
    */
   async getPlatformEarnings(): Promise<{ totalFees: number; totalTransactions: number }> {
     const q = query(
-      collection(db, 'payments'),
+      getDemoCol( 'payments'),
       where('status', '==', 'completed')
     );
 

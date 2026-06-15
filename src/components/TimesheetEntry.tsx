@@ -11,6 +11,8 @@ import { timesheetService } from '../services/timesheetService';
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface Props {
   user: UserProfile;
   firmId?: string;
@@ -36,7 +38,7 @@ export default function TimesheetEntry({ user, firmId }: Props) {
   useEffect(() => {
     if (!activeFirmId) return;
     const q = query(
-      collection(db, 'timesheets'),
+      getDemoCol( 'timesheets'),
       where('firmId', '==', activeFirmId),
       where('userId', '==', user.uid),
       orderBy('date', 'desc')

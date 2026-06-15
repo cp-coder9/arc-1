@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -16,6 +17,8 @@ import {
 import type { ProfessionalRegistration, RegistrationBody, RegistrationStatus } from '@/types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const REGISTRATIONS_COL = 'registrations';
 
 const VALID_BODIES: RegistrationBody[] = ['SACAP', 'ECSA', 'SACQSP', 'SACLAP', 'SACPCMP'];
@@ -57,7 +60,7 @@ export async function registerProfessional(input: {
 
     const status = computeStatus(input.expiryDate);
     const now = new Date().toISOString();
-    const ref = doc(collection(db, REGISTRATIONS_COL));
+    const ref = doc(getDemoCol( REGISTRATIONS_COL));
     const registration: ProfessionalRegistration = {
       id: ref.id,
       userId: input.userId,
@@ -95,7 +98,7 @@ export async function updateCpdPoints(id: string, cpdPointsEarned: number, actor
   try {
     if (cpdPointsEarned < 0) throw new Error('CPD points earned cannot be negative.');
 
-    const regRef = doc(db, REGISTRATIONS_COL, id);
+    const regRef = getDemoDoc( REGISTRATIONS_COL, id);
     const regSnap = await getDoc(regRef);
     if (!regSnap.exists()) throw new Error('Registration not found.');
 
@@ -122,7 +125,7 @@ export async function updateCpdPoints(id: string, cpdPointsEarned: number, actor
 
 export async function checkRenewalEligibility(id: string): Promise<{ eligible: boolean; blockers: string[]; warnings: string[] }> {
   try {
-    const regSnap = await getDoc(doc(db, REGISTRATIONS_COL, id));
+    const regSnap = await getDoc(getDemoDoc( REGISTRATIONS_COL, id));
     if (!regSnap.exists()) throw new Error('Registration not found.');
 
     const reg = { id: regSnap.id, ...regSnap.data() } as ProfessionalRegistration;
@@ -147,7 +150,7 @@ export async function checkRenewalEligibility(id: string): Promise<{ eligible: b
 
 export async function renewRegistration(id: string, newExpiryDate: string, actorId: string): Promise<void> {
   try {
-    const regRef = doc(db, REGISTRATIONS_COL, id);
+    const regRef = getDemoDoc( REGISTRATIONS_COL, id);
     const regSnap = await getDoc(regRef);
     if (!regSnap.exists()) throw new Error('Registration not found.');
 
@@ -192,7 +195,7 @@ export async function getFirmRegistrations(firmId: string, filters?: { body?: Re
     if (filters?.body) constraints.unshift(where('body', '==', filters.body));
     if (filters?.status) constraints.unshift(where('status', '==', filters.status));
 
-    const q = query(collection(db, REGISTRATIONS_COL), ...constraints);
+    const q = query(getDemoCol( REGISTRATIONS_COL), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessionalRegistration));
   } catch (error) {
@@ -203,7 +206,7 @@ export async function getFirmRegistrations(firmId: string, filters?: { body?: Re
 export async function getUserRegistrations(userId: string, firmId: string): Promise<ProfessionalRegistration[]> {
   try {
     const q = query(
-      collection(db, REGISTRATIONS_COL),
+      getDemoCol( REGISTRATIONS_COL),
       where('userId', '==', userId),
       where('firmId', '==', firmId),
       orderBy('expiryDate', 'asc')
@@ -217,7 +220,7 @@ export async function getUserRegistrations(userId: string, firmId: string): Prom
 
 export async function getRegistration(id: string): Promise<ProfessionalRegistration | null> {
   try {
-    const snap = await getDoc(doc(db, REGISTRATIONS_COL, id));
+    const snap = await getDoc(getDemoDoc( REGISTRATIONS_COL, id));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as ProfessionalRegistration) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${REGISTRATIONS_COL}/${id}`);
@@ -237,7 +240,7 @@ export async function sendRenewalReminders(firmId: string): Promise<number> {
         `Reminder: Your ${reg.body} registration (${reg.registrationNumber}) expires in ${days} days on ${reg.expiryDate}.`,
         { entityId: reg.id, firmId: reg.firmId }
       );
-      await updateDoc(doc(db, REGISTRATIONS_COL, reg.id), { renewalReminderSent: true, updatedAt: new Date().toISOString() });
+      await updateDoc(getDemoDoc( REGISTRATIONS_COL, reg.id), { renewalReminderSent: true, updatedAt: new Date().toISOString() });
       sent++;
     }
     return sent;
@@ -249,7 +252,7 @@ export async function sendRenewalReminders(firmId: string): Promise<number> {
 export async function deleteRegistration(id: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, REGISTRATIONS_COL, id));
+    batch.delete(getDemoDoc( REGISTRATIONS_COL, id));
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${REGISTRATIONS_COL}/${id}`);
@@ -258,7 +261,7 @@ export async function deleteRegistration(id: string): Promise<void> {
 
 export function subscribeToRegistrations(firmId: string, callback: (registrations: ProfessionalRegistration[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, REGISTRATIONS_COL), where('firmId', '==', firmId), orderBy('expiryDate', 'asc')),
+    query(getDemoCol( REGISTRATIONS_COL), where('firmId', '==', firmId), orderBy('expiryDate', 'asc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessionalRegistration))),
     (error) => {
       console.error('Failed to subscribe to registrations:', error);

@@ -2,6 +2,8 @@ import { addDoc, collection, doc, onSnapshot, updateDoc } from 'firebase/firesto
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { Discipline, UserRole } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type DrawingChecklistStatus = 'open' | 'in_progress' | 'complete';
 
 export interface DrawingChecklistItem {
@@ -46,12 +48,12 @@ type FirestoreUnsubscribe = () => void;
 
 function projectChecklistCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, DRAWING_CHECKLISTS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, DRAWING_CHECKLISTS_COL);
 }
 
 function projectChecklistDocument(projectId: string, itemId: string) {
   if (!itemId) throw new Error('itemId is required');
-  return doc(db, PROJECTS_COL, projectId, DRAWING_CHECKLISTS_COL, itemId);
+  return getDemoDoc( PROJECTS_COL, projectId, DRAWING_CHECKLISTS_COL, itemId);
 }
 
 function timestampMs(value: unknown): number {

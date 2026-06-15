@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type DefectCategory = 'patent' | 'latent';
 export type DefectStatus = 'open' | 'in_progress' | 'ready_for_inspection' | 'verified' | 'closed' | 'disputed' | 'transferred_to_liability';
 export type DefectSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -163,7 +165,7 @@ export async function createDefect(input: Omit<DefectItem, 'id' | 'createdAt' | 
     updatedAt: now,
   };
 
-  await setDoc(doc(db, 'defects', defect.id), defect);
+  await setDoc(getDemoDoc( 'defects', defect.id), defect);
   return defect;
 }
 
@@ -176,18 +178,18 @@ export async function updateDefectStatus(defectId: string, status: DefectStatus,
   if (notes) {
     updates.inspectionNotes = notes;
   }
-  await updateDoc(doc(db, 'defects', defectId), updates);
+  await updateDoc(getDemoDoc( 'defects', defectId), updates);
 }
 
 export async function verifyDefect(defectId: string, verification: { verifiedBy: string; evidenceReviewed: boolean; inspectionNotes?: string }): Promise<DefectCloseoutVerification> {
-  const snap = await getDoc(doc(db, 'defects', defectId));
+  const snap = await getDoc(getDemoDoc( 'defects', defectId));
   if (!snap.exists()) throw new Error(`Defect ${defectId} not found`);
 
   const defect = snap.data() as DefectItem;
   const result = verifyDefectCloseout(defect, verification);
 
   const newStatus: DefectStatus = result.status === 'verified' ? 'verified' : result.status === 'disputed' ? 'disputed' : 'open';
-  await updateDoc(doc(db, 'defects', defectId), {
+  await updateDoc(getDemoDoc( 'defects', defectId), {
     status: newStatus,
     inspectionNotes: result.notes,
     updatedAt: new Date().toISOString(),
@@ -198,7 +200,7 @@ export async function verifyDefect(defectId: string, verification: { verifiedBy:
 }
 
 export async function getDefectsForProject(projectId: string): Promise<DefectItem[]> {
-  const q = query(collection(db, 'defects'), where('projectId', '==', projectId));
+  const q = query(getDemoCol( 'defects'), where('projectId', '==', projectId));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as DefectItem);
 }
@@ -217,7 +219,7 @@ export async function closeAllPatentDefects(projectId: string, closedBy: string)
   const batch = writeBatch(db);
   const now = new Date().toISOString();
   for (const defect of patentOpen) {
-    batch.update(doc(db, 'defects', defect.id), { status: 'closed', closedAt: now, closedBy, updatedAt: now });
+    batch.update(getDemoDoc( 'defects', defect.id), { status: 'closed', closedAt: now, closedBy, updatedAt: now });
   }
   await batch.commit();
   return patentOpen.length;

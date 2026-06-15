@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { PaymentBlocker, BlockerSourceType, Severity, NonConformanceReport, SnagItem, InspectionRecord } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const BLOCKERS_COL = 'payment_blockers';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function blockersCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, BLOCKERS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, BLOCKERS_COL);
 }
 
 function blockerDocument(projectId: string, blockerId: string) {
   if (!blockerId) throw new Error('blockerId is required');
-  return doc(db, PROJECTS_COL, projectId, BLOCKERS_COL, blockerId);
+  return getDemoDoc( PROJECTS_COL, projectId, BLOCKERS_COL, blockerId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {

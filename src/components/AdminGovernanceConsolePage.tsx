@@ -6,13 +6,15 @@ import type { UserProfile } from '@/types';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type AdminGovernanceConsolePageProps = { user: UserProfile };
 type GovernanceSignal = { id: string; title: string; description: string; collectionName: string; status?: string; actor?: string; createdAt?: string };
 type GovernanceDataset = { id: string; label: string; description: string; collectionName: string; icon: React.ReactNode; query: Query<DocumentData>; riskStatuses?: string[] };
 
 const RISK_STATUSES = ['blocked', 'disputed', 'failed', 'flagged', 'held', 'overdue', 'pending_review', 'rejected', 'requires_review'];
 
-function datasetQuery(collectionName: string) { return query(collection(db, collectionName), limit(50)); }
+function datasetQuery(collectionName: string) { return query(getDemoCol( collectionName), limit(50)); }
 function valueAsString(value: unknown) {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);

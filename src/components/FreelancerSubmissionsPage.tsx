@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 export default function FreelancerSubmissionsPage({ user }: { user: UserProfile }) {
@@ -39,8 +41,8 @@ export default function FreelancerSubmissionsPage({ user }: { user: UserProfile 
 
   const updateTaskRecords = async (task: JobCard, patch: Record<string, unknown>) => {
     const taskDocId = task.jobTaskId ?? task.id;
-    await updateDoc(doc(db, `jobs/${task.jobId}/tasks`, taskDocId), patch);
-    await updateDoc(doc(db, 'delegatedTasks', taskDocId), patch).catch(() => undefined);
+    await updateDoc(getDemoDoc( `jobs/${task.jobId}/tasks`, taskDocId), patch);
+    await updateDoc(getDemoDoc( 'delegatedTasks', taskDocId), patch).catch(() => undefined);
   };
 
   const updateStatus = async (task: JobCard, status: JobCard['status']) => {
