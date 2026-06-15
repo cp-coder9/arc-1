@@ -91,9 +91,7 @@ import type { ArchitexNavKey } from './navigation/navTypes';
 // Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 import { ArchitexThreeExperience } from './components/ArchitexThreeExperience';
-import { BirdFlocks } from './components/landing/BirdFlocks';
-import { BackgroundNetwork } from './components/landing/BackgroundNetwork';
-import { LoginCard } from './components/landing/LoginCard';
+import BirdFlocks from './components/animations/BirdFlocks';
 
 type LazyImport<T extends ComponentType<any>> = () => Promise<{ default: T }>;
 
@@ -1555,8 +1553,8 @@ function navKeyIcon(key: ArchitexNavKey, size = 18) {
 function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLogin: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [landingTab, setLandingTab] = useState<'home' | 'resources'>('home');
-  const [stage, setStage] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [activationTriggered, setActivationTriggered] = useState(false);
+  const [transitionComplete, setTransitionComplete] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   const goToTab = (tab: 'home' | 'resources') => {
@@ -1567,33 +1565,13 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
   const activateSequence = useCallback(() => {
     if (activationTriggered) return;
     setActivationTriggered(true);
-
-    // Stage 2: Activation (200ms)
-    setStage(2);
-    setTimeout(() => {
-      // Stage 3: Fragmentation (500ms)
-      setStage(3);
-      setTimeout(() => {
-        // Stage 4: Complexity Removal (800ms)
-        setStage(4);
-        setTimeout(() => {
-          // Stage 5: Clarity Emerges (600ms)
-          setStage(5);
-          setTimeout(() => {
-            // Stage 6: OS Revealed (300ms)
-            setStage(6);
-          }, 600);
-        }, 800);
-      }, 500);
-    }, 200);
   }, [activationTriggered]);
 
-  // On reduced motion, skip directly to stage 6
-  useEffect(() => {
-    if (activationTriggered && prefersReducedMotion) {
-      setStage(6);
-    }
-  }, [activationTriggered, prefersReducedMotion]);
+  const handleTransitionComplete = useCallback(() => {
+    setTransitionComplete(true);
+    // Show login after animation
+    onLogin?.();
+  }, [onLogin]);
 
   const navItems = [
     { label: 'Signal', tab: 'home' as const },
@@ -1602,20 +1580,14 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#04302c] text-[#F8FAFC] selection:bg-[#0f6b62] selection:text-[#04302c]">
+      {/* ── BIRD FLOCKS OVERLAY (full-page takeover on activation) ── */}
+      {activationTriggered && (
+        <BirdFlocks onTransitionComplete={handleTransitionComplete} />
+      )}
+
       <div aria-hidden="true" className="fixed inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(15,107,98,0.22),transparent_28%),radial-gradient(circle_at_82%_8%,rgba(120,166,154,0.18),transparent_25%),linear-gradient(180deg,#04302c_0%,#0f6b62_58%,#04302c_100%)]" />
         <div className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(rgba(247,242,232,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(247,242,232,0.55)_1px,transparent_1px)] bg-[size:44px_44px]" />
-        {!prefersReducedMotion && stage === 1 && (
-          <motion.div
-            className="absolute left-1/2 top-20 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full border border-[#0f6b62]/20"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 48, repeat: Infinity, ease: 'linear' }}
-          />
-        )}
-        <BackgroundNetwork
-          stage={stage}
-          prefersReducedMotion={Boolean(prefersReducedMotion)}
-        />
       </div>
 
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#04302c]/80 px-4 py-4 backdrop-blur-2xl sm:px-8 lg:px-16">
@@ -1666,15 +1638,9 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
           <motion.main key="home" initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} transition={{ duration: 0.35 }} className="relative z-10">
             <section className="px-4 pb-12 pt-8 sm:px-8 sm:pb-20 sm:pt-14 lg:px-16">
               <div className="mx-auto grid max-w-7xl items-center gap-12 lg:min-h-[calc(100vh-96px)] lg:grid-cols-[1.04fr_0.96fr]">
-                {/* Hero Text Column — fades out after activation stage 4 */}
+                {/* Hero Text Column */}
                 <motion.div
-                  animate={{
-                    opacity: stage < 4 ? 1 : 0,
-                    y: stage < 4 ? 0 : -12,
-                    scale: stage < 4 ? 1 : 0.98,
-                  }}
-                  transition={{ duration: 0.7, ease: [0.25, 0.4, 0.25, 1] }}
-                  className={stage >= 4 ? 'pointer-events-none' : ''}
+                  className={activationTriggered ? 'opacity-0 transition-opacity duration-700' : ''}
                 >
                   <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-[#F8FAFC]/70 backdrop-blur">
                     <span className="h-2 w-2 rounded-full bg-[#0f6b62] shadow-[0_0_18px_#0f6b62]" />
@@ -1703,46 +1669,14 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                     ].map(([value, label], index) => <SignalMetric key={value} value={value} label={label} index={index} />)}
                   </div>
                 </motion.div>
-
-                {/* Bird Flocks Visualization Column */}
-                <BirdFlocks
-                  stage={stage}
-                  onActivate={activateSequence}
-                  prefersReducedMotion={Boolean(prefersReducedMotion)}
-                  className="mx-auto h-[28rem] w-full max-w-[36rem] sm:h-[34rem] lg:h-[37rem] lg:-translate-y-4"
-                />
               </div>
             </section>
 
-            {/* Login Card Overlay — appears during stages 4-6 */}
-            {stage >= 4 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.8, ease: [0.25, 0.4, 0.25, 1] }}
-                className="fixed inset-0 z-20 flex items-center justify-center px-4"
-                style={{
-                  background: stage >= 5
-                    ? 'rgba(247, 249, 250, 0.97)'
-                    : 'rgba(4, 48, 44, 0.85)',
-                }}
-              >
-                <LoginCard
-                  stage={stage}
-                  onRequestAccess={() => {
-                    if (!activationTriggered) activateSequence();
-                    else onGetStarted();
-                  }}
-                  onLogin={onLogin}
-                />
-              </motion.div>
-            )}
-
-            {/* Sections below hero — hide during transition stages 3-6 */}
+            {/* Sections below hero — hidden during transition */}
             <motion.div
               animate={{
-                opacity: stage < 3 ? 1 : 0,
-                height: stage < 3 ? 'auto' : 0,
+                opacity: activationTriggered ? 0 : 1,
+                height: activationTriggered ? 0 : 'auto',
                 overflow: 'hidden',
               }}
               transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
