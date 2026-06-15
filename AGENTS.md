@@ -275,6 +275,10 @@ CI workflow: `.github/workflows/verification.yml`
 ## Recently Merged
 
 Packs #27 (Pack 8 Finance), #28 (CPD Assessment), #29 (Pack 9 Site Execution) merged 2026-06-14. Builds clean — zero tsc errors.
+Packs 2, 3, 5 (Project Passport, Documents & Drawing, Appointment & Kickoff) implemented 2026-06-14.
+Pack 15 (Analytics & Reporting Engine) implemented 2026-06-15 — 3 new services.
+Packs 11 (Closeout), 13 (Trust/Verification): code already in main, verified.
+arc-b2 platform fee: fully merged via integration.
 
 ### Pack 8 — Finance / Payment / Escrow + Commercial Control
 - New: `src/lib/finance-api-router.ts` — 20+ finance endpoints
@@ -382,6 +386,26 @@ Converts accepted proposals into governed appointments and live project workspac
 | `services/agentRecommendationService.ts` | Kickoff next-action recommendations |
 | `services/auditTrailService.ts` | Immutable audit records for appointment actions |
 | `services/sampleData.ts` | Demo accepted proposal + project facts |
+
+---
+
+### Pack 15 — Analytics & Reporting Engine
+- New: `src/services/analyticsReportingEngine.ts` — core orchestration: computes KPIs across projects, generates versioned reports with history
+- New: `src/services/analyticsExportService.ts` — data export: CSV, JSON, PDF export with tenant isolation and audit trail
+- New: `src/services/alertEngineService.ts` — alert rule evaluation: evaluates KPI thresholds and scheduler rules, cooldown management, deduplication
+- Existing: `src/services/kpiCalculatorService.ts` — 5 KPIs (schedule variance, cost to complete, defect liability, retention, compliance gaps)
+- Existing: `src/services/dashboardService.ts` — role-specific dashboard widget payloads
+- Existing: `src/services/analyticsInboxEventAdapter.ts` — inbox event creation from alerts
+- Existing: `src/services/analyticsProjectRecordAdapter.ts` — record conversion for analytics
+- Zero tsc errors.
+
+### arc-b2 Platform Fee
+- Remote branch `feature/arc-b2-clean` verified: **fully merged into main** via integration. No unique commits remain.
+- Historical local branch `feature/arc-b2-platform-fee-implementation` (Windows) can be deleted.
+
+### Packs 11, 13 — Already In Main
+- **Pack 11 (Closeout, Handover & Occupancy):** closeoutService (331L), handoverPackService (454L), defectsCloseoutService (241L), defectsLiabilityService (402L), practicalCompletionService (316L), occupationReadinessService (295L) — 6 services, 2039 lines total
+- **Pack 13 (Trust, Verification & Compliance):** verificationBadgeService (364L), verificationAgentService (298L), userVerificationService, sacapVerificationService, professionalRegistrationService
 
 ---
 
