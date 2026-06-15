@@ -23,6 +23,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "docs:api-contracts": "node scripts/validate-api-contracts.mjs",
+    "deploy:demo:bundle": "VITE_DEMO_MODE=true npm run deploy:static:bundle",
+    "deploy:demo:smoke": "SMOKE_BASE_URL=https://demo.architex.co.za node scripts/deploy-smoke.mjs",
     "predeploy:check": "node scripts/predeploy-check.mjs",
     "smoke:api": "node scripts/cpanel-api-smoke.mjs",
     "smoke:deploy": "node scripts/deploy-smoke.mjs",
