@@ -1246,7 +1246,7 @@ export interface PipelineProject {
   stage: ProjectStage;
   status: PipelineStatus;
   estimatedValueCents: number;
-  probability: number; // 0-100
+  probability: number;
   expectedCloseDate?: string;
   closedAt?: string;
   closedReason?: string;
@@ -1305,9 +1305,9 @@ export interface TimesheetEntry {
   firmId: string;
   projectId?: string;
   workstage?: ProjectStage;
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  date: string;
+  startTime: string;
+  endTime: string;
   durationMinutes: number;
   description: string;
   billable: TimesheetBillableStatus;
@@ -1364,6 +1364,36 @@ export interface ProfessionalRegistration {
   documents?: { name: string; url: string }[];
   createdAt: string;
   updatedAt?: string;
+}
+
+// Practice Task types
+export type PracticeTaskStatus = 'open' | 'in_progress' | 'completed' | 'cancelled';
+export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface PracticeTask {
+  id: string;
+  title: string;
+  description: string;
+  status: PracticeTaskStatus;
+  priority: PracticeTaskPriority;
+  assignedTo: string;
+  assigneeId?: string;
+  assignedBy?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  projectId?: string;
+  firmId?: string;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface WorkloadSummary {
+  userId: string;
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  byPriority?: Record<PracticeTaskPriority, number>;
 }
 
 // Template Library types
@@ -1437,7 +1467,7 @@ export interface CandidateSupervisionLog {
   updatedAt: string;
 }
 
-// ============== Site Execution Types (Pack 5) ==============
+// ============== Site Execution Types (Pack 9) ==============
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 export type NCRStatus = string;
