@@ -547,7 +547,7 @@ if ($route === '/payment/notify' && $method === 'POST') {
     $data = $_POST ?: architex_json_input();
     $paymentId = (string) ($data['m_payment_id'] ?? $data['custom_str1'] ?? '');
     $receivedSignature = (string) ($data['signature'] ?? '');
-    $passphrase = architex_env('PAYFAST_PASSPHRASE') ?? architex_env('VITE_PAYFAST_PASSPHRASE') ?? '';
+    $passphrase = architex_env('PAYFAST_PASSPHRASE') ?? '';
     $expected = architex_payfast_signature($data, $passphrase);
     $signatureOk = $receivedSignature !== '' && hash_equals($expected, $receivedSignature);
     try {
