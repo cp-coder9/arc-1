@@ -72,8 +72,12 @@ import {
 import { createInboxEvents } from '../services/finance/inboxEventAdapter';
 import { createAuditTrail } from '../services/finance/auditTrailService';
 import { createAgentRecommendations } from '../services/finance/agentRecommendationService';
+import { requireAuth, requireAdmin } from '../lib/roleMiddleware';
 
 const router = express.Router();
+
+// Router-level auth: ALL finance routes require authentication.
+router.use(requireAuth);
 
 // ---------------------------------------------------------------------------
 // Commercial Baseline
@@ -187,6 +191,7 @@ router.post(
 /** PUT /api/projects/:projectId/variations/:variationId/approve */
 router.put(
   '/api/projects/:projectId/variations/:variationId/approve',
+  requireAdmin,
   async (req: Request, res: Response) => {
     try {
       const { baseline, variation } = req.body;
@@ -204,6 +209,7 @@ router.put(
 /** PUT /api/projects/:projectId/variations/:variationId/reject */
 router.put(
   '/api/projects/:projectId/variations/:variationId/reject',
+  requireAdmin,
   async (req: Request, res: Response) => {
     try {
       const { variation, reviewerRole } = req.body;
@@ -221,6 +227,7 @@ router.put(
 /** PUT /api/projects/:projectId/variations/:variationId/reverse */
 router.put(
   '/api/projects/:projectId/variations/:variationId/reverse',
+  requireAdmin,
   async (req: Request, res: Response) => {
     try {
       const { baseline, variation } = req.body;
@@ -321,6 +328,7 @@ router.post(
 /** PUT /api/projects/:projectId/payment-certificates/:certId/revise */
 router.put(
   '/api/projects/:projectId/payment-certificates/:certId/revise',
+  requireAdmin,
   async (req: Request, res: Response) => {
     try {
       const { previousCertificate, claim, baseline, newCertifiedAmount, reviewerRoles } = req.body;
@@ -427,6 +435,7 @@ router.post(
 /** PUT /api/projects/:projectId/release-requests/:releaseId/approve */
 router.put(
   '/api/projects/:projectId/release-requests/:releaseId/approve',
+  requireAdmin,
   async (req: Request, res: Response) => {
     try {
       const { releaseRequest, approverRole, provider } = req.body;
@@ -532,6 +541,7 @@ router.post(
 /** PUT /api/projects/:projectId/retention/:retentionId/release */
 router.put(
   '/api/projects/:projectId/retention/:retentionId/release',
+  requireAdmin,
   async (req: Request, res: Response) => {
     try {
       const { retentionRecord, releaseAmount } = req.body;
