@@ -16,6 +16,7 @@ import {
   orderBy,
   onSnapshot,
   Timestamp,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type {
@@ -273,7 +274,7 @@ export async function getProjectReleaseGates(
   statusFilter?: ReleaseGateStatus,
 ): Promise<(ReleaseGateRecord & { id: string })[]> {
   try {
-    const constraints = [orderBy('createdAt', 'desc')];
+    const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')];
     if (statusFilter) {
       constraints.unshift(where('status', '==', statusFilter));
     }

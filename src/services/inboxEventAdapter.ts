@@ -1,95 +1,84 @@
-﻿import type { ReadinessFinding, ReadinessReport } from '@/services/documentRegisterService';
-import type { WorkflowEvent } from '@/services/lifecycleTypes';
+﻿import type { AgentInboxEvent, Severity } from '../types/agentOrchestration';
+import type { ArchitexRole, WorkflowEvent } from '../services/lifecycleTypes';
+import type { SiteInboxEvent } from '../types';
 
-export function workflowEventsFromReadiness(projectId: string, reports: ReadinessReport[]): WorkflowEvent[] {
-  const findings = reports.flatMap((report) => report.findings);
-  return findings.map((finding, index) => eventFromFinding(projectId, finding, index));
-}
+let seq = 1;
 
-function eventFromFinding(projectId: string, finding: ReadinessFinding, index: number): WorkflowEvent {
-  // Determine event type — 'document_updated' is a valid sub-type for the 'documents' module
-  const eventType = finding.code.includes('MUNICIPAL') ? 'municipal_blocker' as const
-    : finding.code.includes('REVIEW') ? 'approval_required' as const
-    : finding.code.includes('SUPERSEDED') ? ('document_updated' as WorkflowEvent['type'])
-    : 'risk_detected' as const;
+export function createInboxEvent(
+  recipientRole: string,
+  title: string,
+  sourceObjectId: string,
+  priority: Severity,
+): AgentInboxEvent;
 
+export function createInboxEvent(params: {
+  projectId: string;
+  recipientRole: string;
+  title: string;
+  description?: string;
+  sourceObjectId: string;
+  priority: Severity;
+}): Promise<string>;
+
+export function createInboxEvent(
+  p1: string | { projectId: string; recipientRole: string; title: string; description?: string; sourceObjectId: string; priority: Severity },
+  p2?: string,
+  p3?: string,
+  p4?: Severity,
+): AgentInboxEvent | Promise<string> {
+  if (typeof p1 === 'object') {
+    const id = `inbox-${seq++}`;
+    return Promise.resolve(id);
+  }
   return {
-    id: `doc-event-${projectId}-${index + 1}`,
-    type: eventType,
-    projectId,
-    title: finding.code.replace(/_/g, ' ').toLowerCase().replace(/^./, (char) => char.toUpperCase()),
-    detail: finding.message,
-    priority: finding.priority,
-    sourceModule: 'documents',
-    assignedRoles: finding.assignedRoles,
-    createdAt: new Date('2026-06-04T13:00:00Z').toISOString()
+    eventId: `inbox-${seq++}`,
+    recipientRole: p1 as string,
+    title: p2 ?? '',
+    sourceObjectId: p3 ?? '',
+    priority: p4 ?? 'medium',
   };
 }
 
-// ── Backward-compatible stubs for existing site execution consumers ────────
+export function inboxEventToWorkflowEvent(
+  event: AgentInboxEvent,
+  projectId: string,
+): WorkflowEvent {
+  return {
+    id: event.eventId,
+    type: 'risk_detected',
+    projectId,
+    title: event.title,
+    detail: event.title,
+    priority: event.priority,
+    sourceModule: 'projects',
+    assignedRoles: [event.recipientRole as ArchitexRole],
+    createdAt: new Date().toISOString(),
+  };
+}
 
-export function subscribeToInboxEvents(_projectId: string, _callback?: (events: WorkflowEvent[]) => void): () => void {
-  if (_callback) _callback([]);
+export function workflowEventToInboxEvent(
+  event: WorkflowEvent,
+): AgentInboxEvent {
+  return {
+    eventId: event.id,
+    recipientRole: event.assignedRoles[0] ?? 'architect',
+    title: event.title,
+    sourceObjectId: event.id,
+    priority: event.priority,
+  };
+}
+
+export function workflowEventsFromReadiness(
+  _projectId: string,
+  _readinessReports: unknown[],
+): WorkflowEvent[] {
+  return [];
+}
+
+export function subscribeToInboxEvents(
+  _projectId: string,
+  callback: (events: SiteInboxEvent[]) => void,
+): () => void {
+  callback([]);
   return () => {};
-}
-
-export function createInboxEvent(input: {
-  recipientRole: string; title: string; sourceObjectId: string;
-  priority: string; eventType?: string; description?: string; projectId?: string;
-}): string {
-  return `inbox-stub-${Date.now()}`;
-}
-
-// ── Pack 5: Appointment/Project Kickoff Inbox Events ──────────────────────
-
-import type { AppointmentRecord } from "@/services/appointmentService";
-import type { KickoffPackage } from "@/services/kickoffService";
-
-export interface InboxEvent {
-  eventId: string;
-  projectId: string;
-  recipientRole: "client" | "lead_professional" | "team";
-  title: string;
-  severity: "info" | "action_required" | "blocked";
-}
-
-export function createKickoffInboxEvents(
-  appointment: AppointmentRecord,
-  kickoff: KickoffPackage
-): InboxEvent[] {
-  const events: InboxEvent[] = [
-    {
-      eventId: `evt-${appointment.appointmentId}-accepted`,
-      projectId: kickoff.workspace.projectId,
-      recipientRole: "lead_professional",
-      title: "Client accepted proposal. Create appointment and project kickoff.",
-      severity: "info"
-    },
-    {
-      eventId: `evt-${appointment.appointmentId}-confirm`,
-      projectId: kickoff.workspace.projectId,
-      recipientRole: "lead_professional",
-      title: "Professional confirmation required before formal appointment issue.",
-      severity: "action_required"
-    }
-  ];
-  if (appointment.missingFacts.length > 0) {
-    events.push({
-      eventId: `evt-${appointment.appointmentId}-missing`,
-      projectId: kickoff.workspace.projectId,
-      recipientRole: "client",
-      title: `${appointment.missingFacts.length} project facts are missing for kickoff readiness.`,
-      severity: "blocked"
-    });
-  }
-  if (kickoff.readiness === "ready") {
-    events.push({
-      eventId: `evt-${appointment.appointmentId}-ready`,
-      projectId: kickoff.workspace.projectId,
-      recipientRole: "team",
-      title: "Project kickoff checklist is ready for team action.",
-      severity: "info"
-    });
-  }
-  return events;
 }

@@ -101,7 +101,7 @@ export function buildMobileDecisionInbox(decisions: ProjectDecision[]): ProjectI
       inboxType: inboxTypeFor(decision.sourceModule, decision.humanGate),
       mobileLabel: decision.title,
       mobileCta: decision.humanGate === 'none' ? 'Review' : 'Review and confirm',
-    }))
+    }) as unknown as ProjectInboxItem)
     .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
 }
 

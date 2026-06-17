@@ -18,7 +18,7 @@ import type { ArchitexNavKey } from './navTypes';
 const NAV_TO_DASHBOARD: Record<ArchitexNavKey, string[]> = {
   command_centre: ['command'],
   inbox: ['tasks'],
-  projects: ['projects', 'journey', 'programme'],
+  projects: ['projects', 'journey', 'programme', 'passport'],
   toolboxes: ['toolbox', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief'],
   cpd_learning: ['cpd-assessment', 'knowledge'],
   documents: ['documents', 'resource-centre'],

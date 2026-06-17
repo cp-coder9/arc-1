@@ -2,7 +2,7 @@
 // Project and platform analytics, metrics calculation, KPI computation.
 // Aggregates data from across the platform for dashboards and reporting.
 
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, orderBy, limit, Timestamp, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ArchitexRole, Priority, ProjectPhase } from '@/services/lifecycleTypes';
 
@@ -91,17 +91,17 @@ const ANALYTICS_FORMULA_VERSION = 'analytics-v0.2.0';
  */
 export async function calculateProjectHealth(projectId: string): Promise<ProjectHealthScore> {
   // Fetch relevant records for this project
-  const [complianceChecks, rfqs, bidsSnapshot, expiryDocs] = await Promise.all([
+  const settled = await Promise.allSettled([
     getDocs(query(getDemoCol( 'compliance_checks'), where('projectId', '==', projectId))),
     getDocs(query(getDemoCol( 'rfq_packages'), where('projectId', '==', projectId))),
-    getDocs(getDemoCol( 'projects', projectId, 'bids').catch(() => getDocs(query(getDemoCol( 'rfq_packages', '_', 'bids'), where('status', '==', 'submitted'))))),
+    getDocs(getDemoCol( 'projects', projectId, 'bids')) .catch(() => getDocs(query(getDemoCol( 'rfq_packages', '_', 'bids'), where('status', '==', 'submitted')))),
     getDocs(query(getDemoCol( 'document_expiry'), where('projectId', '==', projectId))),
-  ]).catch(() => ({
-    complianceChecks: { docs: [], empty: true },
-    rfqs: { docs: [], empty: true },
-    bidsSnapshot: { docs: [], empty: true },
-    expiryDocs: { docs: [], empty: true },
-  }));
+  ]);
+  const emptyDocs: QueryDocumentSnapshot<DocumentData, DocumentData>[] = [];
+  const complianceChecks = settled[0].status === 'fulfilled' ? settled[0].value : { docs: emptyDocs, empty: true };
+  const rfqs = settled[1].status === 'fulfilled' ? settled[1].value : { docs: emptyDocs, empty: true };
+  const bidsSnapshot = settled[2].status === 'fulfilled' ? settled[2].value : { docs: emptyDocs, empty: true };
+  const expiryDocs = settled[3].status === 'fulfilled' ? settled[3].value : { docs: emptyDocs, empty: true };
 
   // Schedule health (simplified)
   const deadlinePassedItems = rfqs.docs.filter((d) => {
@@ -164,9 +164,9 @@ export async function calculateProjectHealth(projectId: string): Promise<Project
   const existing = await getDocs(existingQ);
 
   if (existing.docs.length > 0) {
-    await updateDoc(getDemoDoc( 'project_health_scores', existing.docs[0].id), health);
+    await updateDoc(getDemoDoc( 'project_health_scores', existing.docs[0].id), health as any);
   } else {
-    await addDoc(healthRef, health);
+    await addDoc(healthRef, health as any);
   }
 
   return health;
@@ -307,7 +307,7 @@ export async function getProjectMetrics(
   projectId: string,
   category?: MetricCategory,
 ): Promise<AnalyticsMetric[]> {
-  const constraints = [where('projectId', '==', projectId)];
+  const constraints: QueryConstraint[] = [where('projectId', '==', projectId)];
   if (category) constraints.push(where('category', '==', category));
   constraints.push(orderBy('calculatedAt', 'desc'));
   constraints.push(limit(100));

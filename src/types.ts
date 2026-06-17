@@ -1366,36 +1366,6 @@ export interface ProfessionalRegistration {
   updatedAt?: string;
 }
 
-// Practice Task types
-export type PracticeTaskStatus = 'open' | 'in_progress' | 'completed' | 'cancelled';
-export type PracticeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
-
-export interface PracticeTask {
-  id: string;
-  title: string;
-  description: string;
-  status: PracticeTaskStatus;
-  priority: PracticeTaskPriority;
-  assignedTo: string;
-  assigneeId?: string;
-  assignedBy?: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  projectId?: string;
-  firmId?: string;
-  dueDate?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface WorkloadSummary {
-  userId: string;
-  totalTasks: number;
-  completedTasks: number;
-  overdueTasks: number;
-  byPriority?: Record<PracticeTaskPriority, number>;
-}
-
 // Template Library types
 export type TemplateCategory = 'appointment' | 'certificate' | 'report' | 'submission' | 'contract' | 'invoice' | 'general';
 
@@ -1667,4 +1637,117 @@ export interface ComplianceScenario {
   title: string;
   nodes: unknown[];
   createdAt: string;
+}
+
+// ── Programme / Site Diary Types (from remote merge) ──────────────────────
+
+export type ProgrammePhaseStatus = 'planned' | 'in_progress' | 'completed' | 'delayed' | 'cancelled';
+export type MilestoneStatus = 'pending' | 'achieved' | 'missed' | 'revised';
+export type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed' | 'on_hold';
+
+export interface ProgrammePhase {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  status: ProgrammePhaseStatus;
+  order: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  phaseId: string;
+  name: string;
+  dueDate: string;
+  status: MilestoneStatus;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProgrammeTask {
+  id: string;
+  projectId: string;
+  phaseId?: string;
+  name: string;
+  description?: string;
+  assignedTo?: string;
+  startDate: string;
+  endDate: string;
+  status: TaskStatus;
+  dependsOn: string[];
+  actualStartDate?: string;
+  progress: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SiteDiaryStatus = 'draft' | 'submitted' | 'reviewed' | 'approved';
+export type SnagResolutionStatus = 'pending' | 'in_progress' | 'resolved' | 'verified_closed' | 'rejected';
+export type OccupancyCertificateStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'issued';
+
+export interface SiteDiaryEntry {
+  id: string;
+  projectId: string;
+  date: string;
+  weather?: string;
+  labourCount?: number;
+  plantCount?: Record<string, number>;
+  notes?: string;
+  activities: string[];
+  issues: string[];
+  staff: string[];
+  status: SiteDiaryStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SnagResolution {
+  id: string;
+  projectId: string;
+  snagId: string;
+  resolution: string;
+  resolvedBy: string;
+  resolvedAt: string;
+  method?: string;
+  evidenceIds: string[];
+  verifiedBy?: string;
+  verifiedAt?: string;
+  status: SnagResolutionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OccupancyCertificate {
+  id: string;
+  projectId: string;
+  certificateNumber: string;
+  issuingAuthority: string;
+  status: OccupancyCertificateStatus;
+  inspectionItems: InspectionChecklistItem[];
+  notes?: string;
+  documentUrl?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InspectionChecklistItem {
+  id: string;
+  inspectionId: string;
+  description: string;
+  passed: boolean;
+  notes?: string;
+  inspectedBy?: string;
+  inspectedAt?: string;
+  comments?: string;
 }

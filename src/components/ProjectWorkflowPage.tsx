@@ -19,6 +19,7 @@ import DisputeResolutionPage from './DisputeResolutionPage';
 import PackageConstructionOpsPage from './PackageConstructionOpsPage';
 import PackageCloseoutPage from './PackageCloseoutPage';
 import SiteExecutionDashboard from './SiteExecutionDashboard';
+import ProjectPassportPage from './ProjectPassportPage';
 import { subscribeToMergedQuerySnapshots } from '../lib/firestoreQueryMerge';
 
 
@@ -159,6 +160,7 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
       )}
       {pageId === 'snagging' && activeProject && <CloseoutWizard projectId={activeProject.id} />}
       {pageId === 'invoicing' && <InvoiceManagement user={user} />}
+      {pageId === 'passport' && <ProjectPassportPage user={user} project={activeProject} />}
     </WorkflowFrame>
   );
 }

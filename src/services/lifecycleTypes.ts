@@ -9,7 +9,9 @@ export type ArchitexRole =
   | 'contractor'
   | 'supplier'
   | 'candidate_professional'
-  | 'admin';
+  | 'admin'
+  | 'platform_admin'
+  | 'site_manager';
 
 export type ProjectPhase =
   | 'onboarding'
@@ -188,4 +190,151 @@ export interface RiskEvaluation {
   riskFactors: RiskFinding[];
   score: number;
   details: string;
+}
+
+// ── Governance / Release Gate Types (from Pack 14) ──────────────────────
+
+export type HumanGate = 'none' | 'review' | 'approval' | 'signature' | 'payment_release' | 'municipal_submission' | 'professional_certification' | 'closeout_acceptance';
+
+export type ArchitexSpineObject = string;
+
+export interface DedicatedAppDefinition {
+  id: string;
+  name: string;
+  version: string;
+  priority: number;
+  allowedRoles: ArchitexRole[];
+  workflows: string[];
+  requiresDeviceOrHostAgent: boolean;
+  requiresOfflineSupport: boolean;
+  spineOutputs: string[];
+  sensitiveGates: HumanGate[];
+}
+
+export interface DedicatedAppWorkflowEvent {
+  id: string;
+  eventId: string;
+  appId: string;
+  type: string;
+  workflow: string;
+  payload: Record<string, unknown>;
+  outputs: ArchitexSpineObject[];
+  humanGate: HumanGate;
+  auditRequired: boolean;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  tenantId: string;
+  projectId: string;
+  actorId: string;
+  createdAt: string;
+  timestamp: string;
+}
+
+export interface GovernanceDecision {
+  status: 'allowed' | 'blocked' | 'requires_human';
+  blockers: string[];
+  warnings: string[];
+  humanGate: HumanGate;
+  auditRequired: boolean;
+  aiMayExecute: boolean;
+}
+
+export interface IntegrationPlan {
+  appId: string;
+  phase: 'foundation' | 'mvp' | 'hardening' | 'scale';
+  backendNeeds: string[];
+  frontendNeeds: string[];
+  nativeNeeds: string[];
+  testNeeds: string[];
+  releaseGateChecks: string[];
+}
+
+// ── Risk / Decision Types (from Pack 14) ─────────────────────────────────
+
+export type SourceModule = 'finance' | 'municipal' | 'messaging' | 'site' | 'closeout' | 'cpd' | 'deployment' | 'api' | 'agent';
+
+export interface ProjectDecision {
+  id: string;
+  projectId: string;
+  title: string;
+  options: string[];
+  selectedOption?: string;
+  decidedBy?: string;
+  decidedAt?: string;
+  status: 'pending' | 'made' | 'superseded';
+  sourceModule: SourceModule;
+  priority: Priority;
+  plainLanguageSummary: string;
+  linkedRecordIds: string[];
+  role: string;
+  humanGate: HumanGate;
+}
+
+export interface ProjectRiskSignal {
+  id: string;
+  sourceModule: SourceModule;
+  category: 'budget' | 'municipal' | 'communication' | 'closeout' | 'cpd' | 'deployment' | 'api' | 'delay';
+  severity: Priority;
+  title: string;
+  detail: string;
+  linkedRecordIds: string[];
+  recommendedIntervention: string;
+  humanGate: HumanGate;
+}
+
+export interface UnifiedProjectOperatingSnapshot {
+  context: ProjectContext;
+  records: ProjectRecordRef[];
+  decisions: ProjectDecision[];
+  inbox: ProjectInboxItem[];
+  risks: ProjectRiskSignal[];
+}
+
+export interface ProjectContext {
+  projectId: string;
+  stage: ProjectPhase;
+  tenantId: string;
+  relevantRecords: string[];
+  recentActivity: string[];
+  tags: string[];
+}
+
+export interface ProjectInboxItem {
+  id: string;
+  itemId: string;
+  projectId: string;
+  title: string;
+  priority: Priority;
+  status: 'open' | 'acknowledged' | 'resolved';
+  sourceObjectId: string;
+  sourceObjectType: string;
+  inboxType: 'message_reply' | 'municipal_action' | 'payment_review' | 'site_issue' | 'closeout_blocker' | 'cpd_reminder' | 'release_gate' | 'agent_recommendation' | 'approval_required' | 'document_request';
+  mobileLabel: string;
+  mobileCta: string;
+  createdAt: string;
+}
+
+export type ProjectRecordRef = string;
+
+// ── Release Gate Types (from Pack 14) ────────────────────────────────────
+
+export interface DeploymentBuildInfo {
+  buildId: string;
+  version: string;
+  commitSha: string;
+  shortCommit: string;
+  branch: string;
+  builtAt: string;
+  status: 'building' | 'passed' | 'failed';
+}
+
+export interface ReleaseGateCheck {
+  key: string;
+  status: 'pass' | 'fail' | 'warn';
+  detail: string;
+}
+
+export interface ReleaseGateResult {
+  status: 'pass' | 'fail' | 'warn';
+  title: string;
+  checks: ReleaseGateCheck[];
 }

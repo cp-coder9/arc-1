@@ -79,7 +79,7 @@ console.log('\n📬 Inbox Events');
 const events = workflowEventsFromReadiness(projectId, readinessReports);
 for (const event of events) {
   console.log(
-    `  [${event.priority}] ${event.eventType} → ${event.recipientRole}`,
+    `  [${event.priority}] ${event.type} → ${event.assignedRoles.join(', ')}`,
   );
 }
 
@@ -87,8 +87,8 @@ for (const event of events) {
 console.log('\n🤖 Agent Recommendations');
 const recommendations = recommendationsFromDocumentState(projectId, readinessReports, events);
 for (const rec of recommendations) {
-  const approval = rec.urgency === 'immediate' ? '🔒 Human approval required' : '✓ Auto-actionable';
-  console.log(`  [${rec.severity}] ${rec.title} — ${approval}`);
+  const approval = rec.requiresHumanApproval ? '🔒 Human approval required' : '✓ Auto-actionable';
+  console.log(`  [${rec.priority}] ${rec.title} — ${approval}`);
 }
 
 // ── 8. Validation ──
@@ -125,7 +125,7 @@ if (events.length === 0) {
   errors.push('FAIL: Readiness findings should emit inbox events.');
 }
 
-const hasApprovalRecs = recommendations.some((r) => r.urgency === 'immediate');
+const hasApprovalRecs = recommendations.some((r) => r.requiresHumanApproval);
 if (!hasApprovalRecs) {
   errors.push('FAIL: Recommendations should include human-approval guardrails.');
 }

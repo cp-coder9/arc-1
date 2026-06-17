@@ -11,6 +11,8 @@ import {
   where,
   onSnapshot,
   arrayUnion,
+  addDoc,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import {
   Project,
@@ -22,9 +24,15 @@ import {
   UserRole,
   Discipline,
 } from '../types';
+import type { RiskFinding, WorkflowEvent } from './lifecycleTypes';
+import { evaluateRisks } from './riskEngine';
 
 
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
+
+const RISK_FINDINGS_COL = 'risk_findings';
+const INBOX_EVENTS_COL = 'inbox_events';
+
 // ─── Stage Transition Rules ─────────────────────────────────────────────────
 
 export type StageGateEvidenceKey =
@@ -135,6 +143,32 @@ export function getStageGateRequirements(targetStage: ProjectStage): StageGateRe
   return STAGE_GATE_REQUIREMENTS[targetStage] || [];
 }
 
+/**
+ * Returns the set of stages visible to a given user role.
+ * Clients see a simplified view; admins/architects see full lifecycle.
+ */
+export function visibleStagesForRole(role: string): ProjectStage[] {
+  if (role === 'client') {
+    return ['intake', 'appointment', 'coordination', 'delivery', 'closeout'];
+  }
+  if (role === 'contractor' || role === 'subcontractor') {
+    return ['tender', 'delivery', 'payments', 'closeout'];
+  }
+  if (role === 'supplier') {
+    return ['tender', 'payments'];
+  }
+  // architects, admins, and all other roles see the full lifecycle
+  return PROJECT_STAGE_ORDER as unknown as ProjectStage[];
+}
+
+/**
+ * Filter an array of stages to those visible for a given role.
+ */
+export function filterStagesByRole(stages: ProjectStage[], role: string): ProjectStage[] {
+  const visible = visibleStagesForRole(role);
+  return stages.filter((s) => visible.includes(s));
+}
+
 export function getMissingStageGateRequirements(
   targetStage: ProjectStage,
   evidence: StageGateEvidence = {},
@@ -172,6 +206,158 @@ export function assertStageGateTransitionAllowed(evaluation: StageGateEvaluation
     (error as Error & { status?: number; missingRequirements?: StageGateRequirement[] }).missingRequirements = evaluation.missingRequirements;
     throw error;
   }
+}
+
+// ─── Risk Detection ──────────────────────────────────────────────────────────
+
+/**
+ * Map a ProjectStage to the closest ProjectPhase for risk engine compatibility.
+ */
+export function stageToPhase(stage: ProjectStage): string {
+  const map: Record<string, string> = {
+    intake: 'onboarding',
+    appointment: 'appointment',
+    coordination: 'design_development',
+    compliance: 'municipal_submission',
+    tender: 'tender_procurement',
+    delivery: 'construction_execution',
+    payments: 'closeout',
+    closeout: 'closeout',
+  };
+  return map[stage] || 'onboarding';
+}
+
+/**
+ * Detect risks relevant to a stage transition.
+ * Wraps evaluateRisks and adds stage-specific risk checks.
+ */
+export function detectTransitionRisks(
+  project: Project,
+  targetStage: ProjectStage,
+  options?: {
+    piInsuranceExpiry?: string;
+    councilSubmissionDate?: string;
+    cpdNonCompliance?: boolean;
+  },
+): RiskFinding[] {
+  const findings: RiskFinding[] = [];
+
+  // Check if key evidence is missing for the target stage
+  const evidence = project.stageGateEvidence || {};
+  const missingGates = getMissingStageGateRequirements(targetStage, evidence);
+  for (const gate of missingGates) {
+    findings.push({
+      code: `STAGE_GATE_${gate.key.toUpperCase()}`,
+      priority: 'high',
+      message: gate.reason,
+      assignedRoles: ['admin', 'architect'],
+    });
+  }
+
+  // 1. Professional indemnity insurance expiry check
+  if (options?.piInsuranceExpiry) {
+    const expiry = new Date(options.piInsuranceExpiry);
+    const now = new Date();
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntilExpiry <= 0) {
+      findings.push({
+        code: 'PI_INSURANCE_EXPIRED',
+        priority: 'critical',
+        message: 'Professional indemnity insurance has expired. Coverage is required before continuing.',
+        assignedRoles: ['admin', 'architect'],
+      });
+    } else if (daysUntilExpiry <= 30) {
+      findings.push({
+        code: 'PI_INSURANCE_EXPIRING_SOON',
+        priority: 'high',
+        message: `Professional indemnity insurance expires in ${daysUntilExpiry} days. Renew before expiration.`,
+        assignedRoles: ['admin', 'architect'],
+      });
+    }
+  }
+
+  // 2. Council submission overdue check
+  if (options?.councilSubmissionDate) {
+    const submissionDate = new Date(options.councilSubmissionDate);
+    const now = new Date();
+    if (submissionDate < now) {
+      findings.push({
+        code: 'COUNCIL_SUBMISSION_OVERDUE',
+        priority: 'high',
+        message: 'Council submission is overdue. This may cause project delays and regulatory non-compliance.',
+        assignedRoles: ['admin', 'architect'],
+      });
+    }
+  }
+
+  // 3. CPD non-compliance check (applies during closeout or payments stages)
+  if (options?.cpdNonCompliance) {
+    findings.push({
+      code: 'CPD_NON_COMPLIANCE',
+      priority: 'medium',
+      message: 'Registered professionals have outstanding CPD requirements. Resolve before project closeout.',
+      assignedRoles: ['admin', 'architect'],
+    });
+  }
+
+  return findings.sort((a, b) => rank(b.priority) - rank(a.priority));
+}
+
+function rank(priority: string): number {
+  return { low: 1, medium: 2, high: 3, critical: 4 }[priority as 'low' | 'medium' | 'high' | 'critical'] || 0;
+}
+
+/**
+ * Persist risk findings to Firestore for a project.
+ */
+export async function persistRiskFindings(
+  projectId: string,
+  findings: RiskFinding[],
+): Promise<void> {
+  const col = getDemoCol( 'projects', projectId, RISK_FINDINGS_COL);
+  const batch = findings.map((finding) =>
+    addDoc(col, {
+      ...finding,
+      projectId,
+      detectedAt: new Date().toISOString(),
+    }),
+  );
+  await Promise.all(batch);
+}
+
+/**
+ * Build inbox events from risk findings for a stage transition.
+ */
+export function buildTransitionInboxEvents(
+  projectId: string,
+  findings: RiskFinding[],
+  targetStage: ProjectStage,
+): WorkflowEvent[] {
+  return findings.map((finding, i) => ({
+    id: `risk-${projectId}-${i + 1}`,
+    type: finding.priority === 'critical' ? 'risk_detected' : 'approval_required',
+    projectId,
+    title: finding.code.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    detail: finding.message,
+    priority: finding.priority,
+    sourceModule: 'projects',
+    assignedRoles: finding.assignedRoles,
+    createdAt: new Date().toISOString(),
+  }));
+}
+
+/**
+ * Persist inbox events to Firestore for a project.
+ */
+export async function persistTransitionInboxEvents(
+  projectId: string,
+  events: WorkflowEvent[],
+): Promise<void> {
+  const col = getDemoCol( 'projects', projectId, INBOX_EVENTS_COL);
+  const batch = events.map((event) =>
+    addDoc(col, { ...event }),
+  );
+  await Promise.all(batch);
 }
 
 /**
@@ -309,6 +495,25 @@ export async function transitionStage(
     ));
   } else if (!canTransition(project.currentStage, targetStage, isAdminOverride)) {
     throw new Error(`Invalid transition: ${project.currentStage} → ${targetStage}`);
+  }
+
+  // Detect and persist risks before allowing transition
+  const riskFindings = detectTransitionRisks(project, targetStage);
+  const hasCriticalRisks = riskFindings.some((r) => r.priority === 'critical');
+  if (hasCriticalRisks && enforceStageGates) {
+    await persistRiskFindings(projectId, riskFindings);
+    const criticalLabels = riskFindings
+      .filter((r) => r.priority === 'critical')
+      .map((r) => r.code)
+      .join(', ');
+    throw new Error(`Stage transition blocked by critical risks: ${criticalLabels}`);
+  }
+
+  // Persist risk findings and generate inbox events
+  if (riskFindings.length > 0) {
+    await persistRiskFindings(projectId, riskFindings);
+    const inboxEvents = buildTransitionInboxEvents(projectId, riskFindings, targetStage);
+    await persistTransitionInboxEvents(projectId, inboxEvents);
   }
 
   const now = new Date().toISOString();
