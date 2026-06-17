@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import ResponsibilityMatrix from './ResponsibilityMatrix';
 import TeamBuilder from './TeamBuilder';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 function timestampMs(value: unknown): number {
@@ -25,7 +27,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function projectQueryForUser(user: UserProfile) {
-  const projects = collection(db, 'projects');
+  const projects = getDemoCol( 'projects');
   if (user.role === 'admin') return query(projects, limit(40));
   return query(projects, where('leadArchitectId', '==', user.uid), limit(40));
 }
@@ -54,7 +56,7 @@ export default function DesignTeamMatrixPage({ user }: { user: UserProfile }) {
       setState('error');
     });
 
-    const unsubProfessionals = onSnapshot(query(collection(db, 'users'), limit(150)), (snapshot) => {
+    const unsubProfessionals = onSnapshot(query(getDemoCol( 'users'), limit(150)), (snapshot) => {
       setProfessionals(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as UserProfile)).filter(isDesignProfessional));
     }, (error) => {
       console.warn('Design team professional directory unavailable:', error);
@@ -74,7 +76,7 @@ export default function DesignTeamMatrixPage({ user }: { user: UserProfile }) {
       setJob(null);
       return undefined;
     }
-    return onSnapshot(doc(db, 'jobs', selectedProject.jobId), (snapshot) => {
+    return onSnapshot(getDemoDoc( 'jobs', selectedProject.jobId), (snapshot) => {
       setJob(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Job) : null);
     }, (error) => {
       console.warn('Design team job context unavailable:', error);

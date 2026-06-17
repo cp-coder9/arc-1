@@ -91,6 +91,7 @@ import type { ArchitexNavKey } from './navigation/navTypes';
 // Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 import { ArchitexThreeExperience } from './components/ArchitexThreeExperience';
+import BirdFlocks from './components/animations/BirdFlocks';
 
 type LazyImport<T extends ComponentType<any>> = () => Promise<{ default: T }>;
 
@@ -296,7 +297,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'templates',
   'registrations',
 ]);
-const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']);
+const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
@@ -1552,6 +1553,8 @@ function navKeyIcon(key: ArchitexNavKey, size = 18) {
 function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLogin: () => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [landingTab, setLandingTab] = useState<'home' | 'resources'>('home');
+  const [activationTriggered, setActivationTriggered] = useState(false);
+  const [transitionComplete, setTransitionComplete] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   const goToTab = (tab: 'home' | 'resources') => {
@@ -1559,6 +1562,16 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
     setIsMobileMenuOpen(false);
   };
 
+  const activateSequence = useCallback(() => {
+    if (activationTriggered) return;
+    setActivationTriggered(true);
+  }, [activationTriggered]);
+
+  const handleTransitionComplete = useCallback(() => {
+    setTransitionComplete(true);
+    // Show login after animation
+    onLogin?.();
+  }, [onLogin]);
 
   const navItems = [
     { label: 'Signal', tab: 'home' as const },
@@ -1567,16 +1580,14 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#04302c] text-[#F8FAFC] selection:bg-[#0f6b62] selection:text-[#04302c]">
+      {/* ── BIRD FLOCKS OVERLAY (full-page takeover on activation) ── */}
+      {activationTriggered && (
+        <BirdFlocks onTransitionComplete={handleTransitionComplete} />
+      )}
+
       <div aria-hidden="true" className="fixed inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(15,107,98,0.22),transparent_28%),radial-gradient(circle_at_82%_8%,rgba(120,166,154,0.18),transparent_25%),linear-gradient(180deg,#04302c_0%,#0f6b62_58%,#04302c_100%)]" />
         <div className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(rgba(247,242,232,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(247,242,232,0.55)_1px,transparent_1px)] bg-[size:44px_44px]" />
-        {!prefersReducedMotion && (
-          <motion.div
-            className="absolute left-1/2 top-20 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full border border-[#0f6b62]/20"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 48, repeat: Infinity, ease: 'linear' }}
-          />
-        )}
       </div>
 
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#04302c]/80 px-4 py-4 backdrop-blur-2xl sm:px-8 lg:px-16">
@@ -1627,7 +1638,10 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
           <motion.main key="home" initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} transition={{ duration: 0.35 }} className="relative z-10">
             <section className="px-4 pb-12 pt-8 sm:px-8 sm:pb-20 sm:pt-14 lg:px-16">
               <div className="mx-auto grid max-w-7xl items-center gap-12 lg:min-h-[calc(100vh-96px)] lg:grid-cols-[1.04fr_0.96fr]">
-                <div>
+                {/* Hero Text Column */}
+                <motion.div
+                  className={activationTriggered ? 'opacity-0 transition-opacity duration-700' : ''}
+                >
                   <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-[#F8FAFC]/70 backdrop-blur">
                     <span className="h-2 w-2 rounded-full bg-[#0f6b62] shadow-[0_0_18px_#0f6b62]" />
                     South Africa's project coordination layer
@@ -1640,8 +1654,8 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                     Architex turns the messy path from brief, team selection, compliance, tenders, site evidence, municipal tracking, payments, and close-out into one governed workspace for clients, architects, BEPs, contractors, suppliers, subcontractors, and freelancers.
                   </motion.p>
                   <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.34 }} className="mt-10 flex flex-col gap-3 sm:flex-row">
-                    <Button onClick={onGetStarted} size="lg" className="h-14 rounded-full bg-[#F8FAFC] px-8 text-base font-black text-[#04302c] shadow-[0_22px_70px_rgba(248,250,252,0.24)] hover:bg-white">
-                      Choose your role <span className="sr-only">Get Started</span><ArrowRight className="ml-2 h-5 w-5" />
+                    <Button onClick={() => { if (!activationTriggered) activateSequence(); else onGetStarted(); }} size="lg" className="h-14 rounded-full bg-[#F8FAFC] px-8 text-base font-black text-[#04302c] shadow-[0_22px_70px_rgba(248,250,252,0.24)] hover:bg-white">
+                      {activationTriggered ? 'Enter workspace' : 'Request Access'} <span className="sr-only">{activationTriggered ? 'Enter' : 'Request'}</span><ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                     <Button onClick={onLogin} size="lg" variant="outline" className="h-14 rounded-full border-white/15 bg-white/5 px-8 text-base font-black text-[#F8FAFC] hover:bg-[#F8FAFC] hover:text-[#04302c]">
                       Enter workspace
@@ -1654,19 +1668,22 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                       ['SA ready', 'SACAP & SANS aware'],
                     ].map(([value, label], index) => <SignalMetric key={value} value={value} label={label} index={index} />)}
                   </div>
-                </div>
-
-                <ArchitexThreeExperience
-                  variant="command-atlas"
-                  prefersReducedMotion={Boolean(prefersReducedMotion)}
-                  className="mx-auto h-[28rem] w-full max-w-[36rem] sm:h-[34rem] lg:h-[37rem] lg:-translate-y-4"
-                />
+                </motion.div>
               </div>
             </section>
 
-            <ProfessionOrbit onGetStarted={onGetStarted} />
-            <ProcessRail />
-            <section className="bg-[#04302c] px-4 py-16 text-[#F8FAFC] sm:px-8 lg:px-16">
+            {/* Sections below hero — hidden during transition */}
+            <motion.div
+              animate={{
+                opacity: activationTriggered ? 0 : 1,
+                height: activationTriggered ? 0 : 'auto',
+                overflow: 'hidden',
+              }}
+              transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
+            >
+              <ProfessionOrbit onGetStarted={onGetStarted} />
+              <ProcessRail />
+              <section className="bg-[#04302c] px-4 py-16 text-[#F8FAFC] sm:px-8 lg:px-16">
               <div className="mx-auto max-w-7xl rounded-[2.4rem] border border-white/10 bg-white/[0.04] p-8 shadow-2xl backdrop-blur md:p-12">
                 <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
                   <div>
@@ -1678,6 +1695,7 @@ function LandingPage({ onGetStarted, onLogin }: { onGetStarted: () => void; onLo
                 </div>
               </div>
             </section>
+            </motion.div>
           </motion.main>
         )}
       </AnimatePresence>

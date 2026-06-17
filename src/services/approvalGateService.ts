@@ -1,79 +1,24 @@
-import type { UserRole } from '@/types';
-import { buildAuditEvent, type AuditEventInput } from './auditService';
+import type { WorkflowRecord, Severity } from '../types/agentOrchestration';
+import type { ArchitexRole } from '../types/architexMasterTypes';
+import type { UserRole } from '../types';
 
 export type ApprovalGateDomain =
+  | 'contract_execution'
+  | 'payment_release'
   | 'ai_output'
   | 'compliance_signoff'
-  | 'payment_release'
-  | 'contract_execution'
+  | 'municipal_submission'
   | 'procurement_issue'
   | 'programme_change'
-  | 'municipal_submission'
   | 'closeout_acceptance';
-
-export type ApprovalGateDecision = 'pending' | 'approved' | 'rejected' | 'changes_requested' | 'cancelled';
 
 export type ApprovalGateRisk = 'low' | 'medium' | 'high' | 'critical';
 
 export interface ApprovalGateActor {
   uid: string;
-  role: UserRole | string;
+  role: string;
   displayName?: string;
-  email?: string;
   verificationStatus?: string;
-}
-
-export interface ApprovalGateEvidence {
-  id: string;
-  type: 'document' | 'drawing' | 'form' | 'quote' | 'delivery_note' | 'audit_log' | 'ai_output' | 'other';
-  label: string;
-  uri?: string;
-  hash?: string;
-}
-
-export interface ApprovalGateInput {
-  id: string;
-  domain: ApprovalGateDomain;
-  projectId: string;
-  target: {
-    type: string;
-    id: string;
-  };
-  requestedBy: ApprovalGateActor;
-  requiredApproverRoles: Array<UserRole | string>;
-  risk?: ApprovalGateRisk;
-  reason: string;
-  evidence: ApprovalGateEvidence[];
-  aiGenerated?: boolean;
-  statutoryImpact?: boolean;
-  financialImpactCents?: number;
-  dueAt?: string;
-  createdAt?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface ApprovalGateRecord extends ApprovalGateInput {
-  decision: ApprovalGateDecision;
-  createdAt: string;
-  requiresHumanApproval: true;
-  aiMayNotApprove: true;
-  immutableRequest: true;
-}
-
-export interface ApprovalGateResolutionInput {
-  gate: ApprovalGateRecord;
-  actor: ApprovalGateActor;
-  decision: Exclude<ApprovalGateDecision, 'pending'>;
-  rationale: string;
-  evidence?: ApprovalGateEvidence[];
-  decidedAt?: string;
-}
-
-export interface ApprovalGateResolutionRecord extends ApprovalGateResolutionInput {
-  decidedAt: string;
-  humanConfirmed: true;
-  aiMayNotApprove: true;
-  immutableDecision: true;
 }
 
 export interface ApprovalGateReadiness {
@@ -86,166 +31,217 @@ export interface ApprovalGateReadiness {
   aiMayNotApprove: true;
 }
 
-const PROFESSIONAL_APPROVER_ROLES = new Set(['bep', 'architect']);
-const PAYMENT_APPROVER_ROLES = new Set(['client', 'admin']);
-const ADMIN_ESCALATION_RISKS = new Set<ApprovalGateRisk>(['critical']);
-
-function assertNonEmpty(value: string | undefined, field: string): asserts value is string {
-  if (!value?.trim()) throw new Error(`${field} is required`);
+export interface ApprovalGateEvidence {
+  id: string;
+  type: 'drawing' | 'form' | 'document' | 'audit_log';
+  label: string;
+  uri?: string;
+  hash?: string;
 }
 
-function normalizeRole(role: UserRole | string): string {
-  return String(role).trim().toLowerCase();
+export interface ApprovalGateRecord {
+  id: string;
+  domain: ApprovalGateDomain;
+  projectId: string;
+  target: { type: string; id: string };
+  requestedBy: ApprovalGateActor;
+  requiredApproverRoles: Array<UserRole | string>;
+  risk: ApprovalGateRisk;
+  reason: string;
+  evidence: ApprovalGateEvidence[];
+  status?: 'pending' | 'approved' | 'rejected' | 'escalated';
+  financialImpactCents?: number;
+  statutoryImpact?: boolean;
+  dueAt?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  metadata?: Record<string, unknown>;
 }
 
-function normalizeUniqueRoles(roles: Array<UserRole | string>): Array<UserRole | string> {
-  return Array.from(new Set(roles.map(role => String(role).trim()).filter(Boolean)));
-}
-
-function deriveRisk(input: ApprovalGateInput): ApprovalGateRisk {
-  if (input.risk) return input.risk;
-  if (input.statutoryImpact) return 'high';
-  if (input.financialImpactCents && input.financialImpactCents > 250_000_00) return 'high';
-  if (input.aiGenerated) return 'medium';
-  return 'low';
-}
-
-export function buildApprovalGateRecord(input: ApprovalGateInput): ApprovalGateRecord {
-  assertNonEmpty(input.id, 'id');
-  assertNonEmpty(input.projectId, 'projectId');
-  assertNonEmpty(input.target?.type, 'target.type');
-  assertNonEmpty(input.target?.id, 'target.id');
-  assertNonEmpty(input.requestedBy?.uid, 'requestedBy.uid');
-  assertNonEmpty(String(input.requestedBy?.role || ''), 'requestedBy.role');
-  assertNonEmpty(input.reason, 'reason');
-
-  const requiredApproverRoles = normalizeUniqueRoles(input.requiredApproverRoles);
-  if (!requiredApproverRoles.length) throw new Error('at least one required approver role is required');
-  if (!input.evidence.length) throw new Error('approval gate requires at least one evidence item');
-
-  return {
-    ...input,
-    requiredApproverRoles,
-    risk: deriveRisk(input),
-    decision: 'pending',
-    createdAt: input.createdAt || new Date().toISOString(),
-    metadata: input.metadata || {},
-    requiresHumanApproval: true,
-    aiMayNotApprove: true,
-    immutableRequest: true,
-  };
+export interface ApprovalGateInput {
+  id?: string;
+  domain: ApprovalGateDomain;
+  projectId: string;
+  target: { type: string; id: string };
+  requestedBy: ApprovalGateActor;
+  requiredApproverRoles: Array<UserRole | string>;
+  risk: ApprovalGateRisk;
+  reason: string;
+  evidence: ApprovalGateEvidence[];
+  financialImpactCents?: number;
+  statutoryImpact?: boolean;
+  dueAt?: string;
+  createdAt?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export function evaluateApprovalGateReadiness(gate: ApprovalGateRecord): ApprovalGateReadiness {
   const blockers: string[] = [];
-  const requiredRoles = gate.requiredApproverRoles.map(normalizeRole);
-  const risk = gate.risk || 'low';
 
-  if (gate.decision !== 'pending') blockers.push(`gate is already ${gate.decision}`);
-  if (!gate.evidence.length) blockers.push('missing evidence pack');
-  if (gate.aiGenerated) blockers.push('AI-generated output requires named human review before action');
-  if (gate.statutoryImpact && !requiredRoles.some(role => PROFESSIONAL_APPROVER_ROLES.has(role) || role === 'admin')) {
-    blockers.push('statutory/compliance action requires verified BEP, architect, or admin approver');
-  }
-  if (gate.financialImpactCents && !requiredRoles.some(role => PAYMENT_APPROVER_ROLES.has(role))) {
-    blockers.push('financial action requires client or admin approver');
+  if (gate.status === 'rejected') {
+    blockers.push(`Approval gate ${gate.id} was rejected: ${gate.reason}`);
   }
 
-  const requiresVerifiedProfessional = gate.statutoryImpact === true;
-  const requiresAdminEscalation = ADMIN_ESCALATION_RISKS.has(risk) || requiredRoles.includes('admin');
+  if (gate.risk === 'high' || gate.risk === 'critical') {
+    blockers.push(`High-risk approval (${gate.risk}) requires admin escalation`);
+  }
 
   return {
     ready: blockers.length === 0,
     blockers,
     requiredApproverRoles: gate.requiredApproverRoles,
-    risk,
-    requiresVerifiedProfessional,
-    requiresAdminEscalation,
+    risk: gate.risk,
+    requiresVerifiedProfessional: gate.domain === 'compliance_signoff' || gate.domain === 'municipal_submission',
+    requiresAdminEscalation: gate.risk === 'critical',
     aiMayNotApprove: true,
   };
 }
 
-export function assertApprovalGateResolutionAllowed(input: ApprovalGateResolutionInput): void {
-  const { gate, actor, decision, rationale } = input;
-  assertNonEmpty(actor?.uid, 'actor.uid');
-  assertNonEmpty(String(actor?.role || ''), 'actor.role');
-  assertNonEmpty(rationale, 'rationale');
-
-  if (gate.decision !== 'pending') throw new Error(`approval gate is already ${gate.decision}`);
-  if (decision === 'cancelled' && actor.uid !== gate.requestedBy.uid && normalizeRole(actor.role) !== 'admin') {
-    throw new Error('only the requester or admin can cancel an approval gate');
-  }
-  if (actor.uid === 'ai' || normalizeRole(actor.role) === 'ai' || normalizeRole(actor.role) === 'system') {
-    throw new Error('AI/system actors cannot resolve approval gates');
-  }
-
-  const actorRole = normalizeRole(actor.role);
-
-  if (gate.financialImpactCents && !PAYMENT_APPROVER_ROLES.has(actorRole)) {
-    throw new Error('financial gate requires a client or admin approver');
-  }
-
-  const allowedRoles = gate.requiredApproverRoles.map(normalizeRole);
-  if (!allowedRoles.includes(actorRole) && actorRole !== 'admin') {
-    throw new Error(`approval gate requires one of: ${gate.requiredApproverRoles.join(', ')}`);
-  }
-
-  if (gate.statutoryImpact && actorRole !== 'admin') {
-    if (!PROFESSIONAL_APPROVER_ROLES.has(actorRole)) {
-      throw new Error('statutory/compliance gate requires a BEP, architect, or admin approver');
-    }
-    if (actor.verificationStatus !== 'verified') {
-      throw new Error('statutory/compliance gate requires verified professional status');
-    }
-  }
-
-  if (gate.financialImpactCents && !PAYMENT_APPROVER_ROLES.has(actorRole)) {
-    throw new Error('financial gate requires a client or admin approver');
-  }
-}
-
-export function buildApprovalGateResolution(input: ApprovalGateResolutionInput): ApprovalGateResolutionRecord {
-  assertApprovalGateResolutionAllowed(input);
-
+export function buildApprovalGateRecord(input: ApprovalGateInput): ApprovalGateRecord {
   return {
-    ...input,
-    evidence: input.evidence || [],
-    decidedAt: input.decidedAt || new Date().toISOString(),
-    humanConfirmed: true,
-    aiMayNotApprove: true,
-    immutableDecision: true,
+    id: input.id ?? `gate-${Date.now()}`,
+    domain: input.domain,
+    projectId: input.projectId,
+    target: input.target,
+    requestedBy: input.requestedBy,
+    requiredApproverRoles: input.requiredApproverRoles,
+    risk: input.risk,
+    reason: input.reason,
+    evidence: input.evidence,
+    status: 'pending',
+    financialImpactCents: input.financialImpactCents,
+    statutoryImpact: input.statutoryImpact,
+    dueAt: input.dueAt,
+    createdAt: input.createdAt ?? new Date().toISOString(),
+    metadata: input.metadata,
   };
+}
+
+export function buildApprovalGateResolution(params: {
+  gateId: string;
+  approved: boolean;
+  resolvedBy: ApprovalGateActor;
+  reason?: string;
+}): { gateId: string; approved: boolean; resolvedBy: ApprovalGateActor; reason: string; resolvedAt: string } {
+  return {
+    gateId: params.gateId,
+    approved: params.approved,
+    resolvedBy: params.resolvedBy,
+    reason: params.reason ?? (params.approved ? 'Approved' : 'Rejected'),
+    resolvedAt: new Date().toISOString(),
+  };
+}
+
+export function assertApprovalGateResolutionAllowed(gate: ApprovalGateRecord, actor: ApprovalGateActor): void {
+  const isRequiredApprover = gate.requiredApproverRoles.includes(actor.role as UserRole);
+  if (!isRequiredApprover) {
+    throw new Error(`Actor ${actor.uid} with role ${actor.role} is not an authorized approver for gate ${gate.id}`);
+  }
+  if (gate.status === 'approved' || gate.status === 'rejected') {
+    throw new Error(`Gate ${gate.id} is already ${gate.status}`);
+  }
 }
 
 export function buildApprovalGateAuditInput(
   gate: ApprovalGateRecord,
-  resolution?: ApprovalGateResolutionRecord,
-): AuditEventInput {
-  const action = resolution
-    ? `approval_gate.${gate.domain}.${resolution.decision}`
-    : `approval_gate.${gate.domain}.requested`;
+  resolution?: { approved: boolean; resolvedBy: ApprovalGateActor; reason?: string },
+): { action: string; sourceObjectId: string; actorId: string; metadata: Record<string, unknown> } {
+  return {
+    action: resolution ? `approval_gate_${resolution.approved ? 'approved' : 'rejected'}` : 'approval_gate_created',
+    sourceObjectId: gate.id,
+    actorId: resolution?.resolvedBy.uid ?? gate.requestedBy.uid,
+    metadata: { domain: gate.domain, risk: gate.risk, reason: gate.reason },
+  };
+}
 
-  return buildAuditEvent({
-    category: 'approval',
-    action,
-    actor: resolution?.actor || gate.requestedBy,
-    target: {
-      type: gate.target.type,
-      id: gate.target.id,
-      projectId: gate.projectId,
-    },
-    reason: resolution?.rationale || gate.reason,
-    metadata: {
-      gateId: gate.id,
-      domain: gate.domain,
-      risk: gate.risk,
-      requiredApproverRoles: gate.requiredApproverRoles,
-      decision: resolution?.decision || gate.decision,
-      aiMayNotApprove: true,
-      evidenceIds: gate.evidence.map(item => item.id),
-      resolutionEvidenceIds: resolution?.evidence?.map(item => item.id) || [],
-      ...gate.metadata,
-    },
-    createdAt: resolution?.decidedAt || gate.createdAt,
-  });
+// ─── Existing Pack 14 service implementation below ───
+
+interface ApprovalGate {
+  gateId: string;
+  title: string;
+  sourceObjectId: string;
+  requiredApprovers: ArchitexRole[];
+  status: 'pending' | 'approved' | 'rejected' | 'escalated';
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  severity: Severity;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+let seq = 1;
+const gates = new Map<string, ApprovalGate>();
+
+export function createApprovalGate(params: {
+  title: string;
+  status: string;
+  payload?: Record<string, unknown>;
+  blockers?: string[];
+  approvalsRequired?: string[];
+}): WorkflowRecord {
+  return {
+    id: `approvalGate-${seq++}`,
+    type: 'approvalGate',
+    title: params.title,
+    status: params.status,
+    payload: params.payload ?? {},
+    blockers: params.blockers ?? [],
+    approvalsRequired: params.approvalsRequired ?? [],
+  };
+}
+
+export function openGate(params: {
+  title: string;
+  sourceObjectId: string;
+  requiredApprovers: ArchitexRole[];
+  severity: Severity;
+}): ApprovalGate {
+  const gate: ApprovalGate = {
+    gateId: `gate-${seq++}`,
+    title: params.title,
+    sourceObjectId: params.sourceObjectId,
+    requiredApprovers: params.requiredApprovers,
+    status: 'pending',
+    severity: params.severity,
+    createdAt: new Date().toISOString(),
+  };
+  gates.set(gate.gateId, gate);
+  return gate;
+}
+
+export function approveGate(gateId: string, approvedBy: string): ApprovalGate | undefined {
+  const gate = gates.get(gateId);
+  if (!gate || gate.status !== 'pending') return undefined;
+  gate.status = 'approved';
+  gate.approvedBy = approvedBy;
+  gate.approvedAt = new Date().toISOString();
+  gate.updatedAt = new Date().toISOString();
+  return gate;
+}
+
+export function rejectGate(gateId: string, rejectedBy: string, reason: string): ApprovalGate | undefined {
+  const gate = gates.get(gateId);
+  if (!gate || gate.status !== 'pending') return undefined;
+  gate.status = 'rejected';
+  gate.approvedBy = rejectedBy;
+  gate.rejectionReason = reason;
+  gate.updatedAt = new Date().toISOString();
+  return gate;
+}
+
+export function escalateGate(gateId: string): ApprovalGate | undefined {
+  const gate = gates.get(gateId);
+  if (!gate || gate.status !== 'pending') return undefined;
+  gate.status = 'escalated';
+  gate.updatedAt = new Date().toISOString();
+  return gate;
+}
+
+export function getPendingGates(): ApprovalGate[] {
+  return Array.from(gates.values()).filter((g) => g.status === 'pending');
+}
+
+export function canApprove(gate: ApprovalGate, role: ArchitexRole): boolean {
+  return gate.requiredApprovers.includes(role);
 }

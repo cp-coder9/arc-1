@@ -12,6 +12,8 @@ import ProfileEditor from './ProfileEditor';
 import { safeFormat } from '@/lib/utils';
 import { Chat } from './Chat';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
   'in-progress': 'bg-accent/10 text-primary border-accent/20',
@@ -102,11 +104,11 @@ function FreelancerJobCard({ task, user }: { task: JobCard, user: UserProfile, k
   useEffect(() => {
     const fetchContext = async () => {
       // Fetch Job info
-      const jobDoc = await getDoc(doc(db, 'jobs', task.jobId));
+      const jobDoc = await getDoc(getDemoDoc( 'jobs', task.jobId));
       if (jobDoc.exists()) setJob({ id: jobDoc.id, ...jobDoc.data() } as Job);
 
       // Fetch Architect info
-      const archDoc = await getDoc(doc(db, 'users', task.architectId));
+      const archDoc = await getDoc(getDemoDoc( 'users', task.architectId));
       if (archDoc.exists()) setArchitect({ uid: archDoc.id, ...archDoc.data() } as UserProfile);
     };
     fetchContext();
@@ -114,7 +116,7 @@ function FreelancerJobCard({ task, user }: { task: JobCard, user: UserProfile, k
 
   const updateStatus = async (newStatus: 'pending' | 'in-progress' | 'completed') => {
     try {
-      const taskRef = doc(db, `jobs/${task.jobId}/tasks`, task.id);
+      const taskRef = getDemoDoc( `jobs/${task.jobId}/tasks`, task.id);
       await updateDoc(taskRef, {
         status: newStatus,
         updatedAt: new Date().toISOString()

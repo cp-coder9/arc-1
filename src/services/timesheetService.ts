@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -17,6 +18,8 @@ import type { TimesheetEntry, TimesheetSummary, TimesheetBillableStatus, FeeReco
 import type { ProjectStage } from '@/types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const TIMESHEETS_COL = 'timesheets';
 
 const VALID_BILLABLE: TimesheetBillableStatus[] = ['billable', 'non_billable', 'internal'];
@@ -65,7 +68,7 @@ export async function logTime(input: {
       : 0;
 
     const now = new Date().toISOString();
-    const ref = doc(collection(db, TIMESHEETS_COL));
+    const ref = doc(getDemoCol( TIMESHEETS_COL));
     const entry: TimesheetEntry = {
       id: ref.id,
       userId: input.userId,
@@ -104,7 +107,7 @@ export async function logTime(input: {
 
 export async function getTimesheetEntry(id: string): Promise<TimesheetEntry | null> {
   try {
-    const snap = await getDoc(doc(db, TIMESHEETS_COL, id));
+    const snap = await getDoc(getDemoDoc( TIMESHEETS_COL, id));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as TimesheetEntry) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TIMESHEETS_COL}/${id}`);
@@ -152,7 +155,7 @@ export async function updateTimesheetEntry(id: string, updates: {
     if (updates.projectId !== undefined) data.projectId = updates.projectId;
     if (updates.tags !== undefined) data.tags = updates.tags;
 
-    await updateDoc(doc(db, TIMESHEETS_COL, id), data);
+    await updateDoc(getDemoDoc( TIMESHEETS_COL, id), data);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${TIMESHEETS_COL}/${id}`);
   }
@@ -176,7 +179,7 @@ export async function getTimesheetEntries(input: {
     if (input.dateFrom) constraints.unshift(where('date', '>=', input.dateFrom));
     if (input.dateTo) constraints.unshift(where('date', '<=', input.dateTo));
 
-    const q = query(collection(db, TIMESHEETS_COL), ...constraints);
+    const q = query(getDemoCol( TIMESHEETS_COL), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TimesheetEntry));
   } catch (error) {
@@ -229,13 +232,11 @@ export async function getTimesheetSummary(input: {
     return {
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
-      firmId: input.firmId,
-      userId: input.userId,
       totalHours: Math.round(totalHours * 100) / 100,
       billableHours: Math.round(billableHours * 100) / 100,
       nonBillableHours: Math.round(nonBillableHours * 100) / 100,
+      internalHours: 0,
       totalValueCents,
-      entries,
       byProject,
       byUser,
     };
@@ -247,25 +248,23 @@ export async function getTimesheetSummary(input: {
 export async function reconcileFees(projectId: string, feeChargedCents: number): Promise<FeeReconciliation[]> {
   try {
     const entries = await getTimesheetEntries({ firmId: '', projectId });
-    const timesheetIds = entries.map((e) => e.id);
     const totalTimeValueCents = entries.reduce((sum, e) => sum + (e.totalValueCents || 0), 0);
     const varianceCents = feeChargedCents - totalTimeValueCents;
-    const firmIds = [...new Set(entries.map((e) => e.firmId))];
-    const firmId = firmIds[0] || '';
-    const now = new Date().toISOString();
+    const variancePercent = feeChargedCents > 0
+      ? Math.round((varianceCents / feeChargedCents) * 10000) / 100
+      : 0;
 
-    const result: FeeReconciliation = {
-      id: `recon_${projectId}_${Date.now()}`,
-      firmId,
+    return entries.map((entry) => ({
+      timesheetEntryId: entry.id,
       projectId,
-      timesheetIds,
-      totalTimeValueCents,
-      proposalValueCents: feeChargedCents,
+      userId: entry.userId,
+      hoursLogged: minutesToHours(entry.durationMinutes),
+      timesheetValueCents: entry.totalValueCents || 0,
+      feeChargedCents,
       varianceCents,
-      createdAt: now,
-    };
-
-    return [result];
+      variancePercent,
+      reconciled: Math.abs(varianceCents) < 100,
+    }));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${TIMESHEETS_COL}/reconcile/${projectId}`);
   }
@@ -276,7 +275,7 @@ export async function markTimesheetInvoiced(ids: string[], invoiceId: string): P
     const batch = writeBatch(db);
     const now = new Date().toISOString();
     for (const id of ids) {
-      batch.update(doc(db, TIMESHEETS_COL, id), { invoiced: true, invoiceId, updatedAt: now });
+      batch.update(getDemoDoc( TIMESHEETS_COL, id), { invoiced: true, invoiceId, updatedAt: now });
     }
     await batch.commit();
   } catch (error) {
@@ -287,7 +286,7 @@ export async function markTimesheetInvoiced(ids: string[], invoiceId: string): P
 export async function deleteTimesheetEntry(id: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, TIMESHEETS_COL, id));
+    batch.delete(getDemoDoc( TIMESHEETS_COL, id));
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${TIMESHEETS_COL}/${id}`);
@@ -296,7 +295,7 @@ export async function deleteTimesheetEntry(id: string): Promise<void> {
 
 export function subscribeToTimesheets(firmId: string, callback: (entries: TimesheetEntry[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, TIMESHEETS_COL), where('firmId', '==', firmId), orderBy('date', 'desc')),
+    query(getDemoCol( TIMESHEETS_COL), where('firmId', '==', firmId), orderBy('date', 'desc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TimesheetEntry))),
     (error) => {
       console.error('Failed to subscribe to timesheets:', error);

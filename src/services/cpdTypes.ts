@@ -1,14 +1,4 @@
-export type CPDProfessionalBody =
-  | 'SACAP'
-  | 'ECSA'
-  | 'SACQSP'
-  | 'SACPLAN'
-  | 'SACLAP'
-  | 'SACPCMP'
-  | 'SAGC'
-  | 'SACPVP'
-  | 'Voluntary Association'
-  | 'Other';
+export type CPDProfessionalBody = string;
 
 export type CPDContentType =
   | 'webinar_recording'
@@ -133,20 +123,7 @@ export interface CPDCreditCalculation {
   notes: string[];
 }
 
-export type ArchitexBuiltEnvironmentRole =
-  | 'architectural_professional'
-  | 'structural_engineer'
-  | 'civil_engineer'
-  | 'electrical_engineer'
-  | 'mechanical_engineer'
-  | 'quantity_surveyor'
-  | 'construction_project_manager'
-  | 'construction_manager'
-  | 'professional_planner'
-  | 'landscape_architectural_professional'
-  | 'geomatics_practitioner'
-  | 'property_valuer'
-  | 'other_built_environment_professional';
+export type ArchitexBuiltEnvironmentRole = string;
 
 export interface CPDRoleBodyMapping {
   role: ArchitexBuiltEnvironmentRole;

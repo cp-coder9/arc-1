@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type DirectoryProfile = {
   uid: string;
@@ -37,9 +39,9 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
   useEffect(() => {
     setState('loading');
     const jobsUnsub = subscribeToMergedQuerySnapshots<Job>([
-      query(collection(db, 'jobs'), where('selectedProfessionalId', '==', user.uid)),
-      query(collection(db, 'jobs'), where('selectedBepId', '==', user.uid)),
-      query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid)),
+      query(getDemoCol( 'jobs'), where('selectedProfessionalId', '==', user.uid)),
+      query(getDemoCol( 'jobs'), where('selectedBepId', '==', user.uid)),
+      query(getDemoCol( 'jobs'), where('selectedArchitectId', '==', user.uid)),
     ], (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job), (loadedJobs) => {
       setJobs(loadedJobs);
       setState('ready');
@@ -47,16 +49,16 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
       console.error('Failed to load BEP jobs:', error);
       setState('error');
     });
-    const freelancersUnsub = onSnapshot(query(collection(db, 'directoryProfiles'), where('role', '==', 'freelancer')), (snapshot) => {
+    const freelancersUnsub = onSnapshot(query(getDemoCol( 'directoryProfiles'), where('role', '==', 'freelancer')), (snapshot) => {
       setFreelancers(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as DirectoryProfile)));
     }, (error) => {
       console.error('Failed to load freelancer directory:', error);
       setState('error');
     });
     const tasksUnsub = subscribeToMergedQuerySnapshots<JobCard>([
-      query(collection(db, 'delegatedTasks'), where('professionalId', '==', user.uid)),
-      query(collection(db, 'delegatedTasks'), where('bepId', '==', user.uid)),
-      query(collection(db, 'delegatedTasks'), where('architectId', '==', user.uid)),
+      query(getDemoCol( 'delegatedTasks'), where('professionalId', '==', user.uid)),
+      query(getDemoCol( 'delegatedTasks'), where('bepId', '==', user.uid)),
+      query(getDemoCol( 'delegatedTasks'), where('architectId', '==', user.uid)),
     ], (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as JobCard), (items) => {
       setTasks(items);
     }, (error) => {
@@ -85,8 +87,8 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
     setFeedback(null);
     try {
       const now = new Date().toISOString();
-      const taskRef = doc(collection(db, `jobs/${selectedJob.id}/tasks`));
-      const delegatedTaskRef = doc(db, 'delegatedTasks', taskRef.id);
+      const taskRef = doc(getDemoCol( `jobs/${selectedJob.id}/tasks`));
+      const delegatedTaskRef = getDemoDoc( 'delegatedTasks', taskRef.id);
       const taskData = {
         id: taskRef.id,
         jobId: selectedJob.id,
@@ -141,9 +143,9 @@ export default function BEPFreelancerJobsPage({ user }: { user: UserProfile }) {
         paymentStatus: decision === 'approved' ? 'ready_for_invoice' : 'not_ready',
         completedAt: decision === 'approved' ? now : null,
       } as const;
-      await updateDoc(doc(db, 'delegatedTasks', task.id), patch);
+      await updateDoc(getDemoDoc( 'delegatedTasks', task.id), patch);
       if (task.jobId) {
-        await updateDoc(doc(db, `jobs/${task.jobId}/tasks`, task.jobTaskId ?? task.id), patch).catch(() => undefined);
+        await updateDoc(getDemoDoc( `jobs/${task.jobId}/tasks`, task.jobTaskId ?? task.id), patch).catch(() => undefined);
       }
       setReviewFeedback((current) => ({ ...current, [task.id]: '' }));
       setFeedback(decision === 'approved' ? 'Deliverable approved for invoice readiness. No payment was released.' : 'Revision request recorded for the freelancer.');

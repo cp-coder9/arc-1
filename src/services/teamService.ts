@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
   doc,
+
   getDoc,
   updateDoc,
   onSnapshot,
@@ -15,6 +16,8 @@ import {
 } from '../types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 
 export type TeamMemberRecord = ProjectTeamMember & {
@@ -52,7 +55,7 @@ function activeOrInvited(member: ProjectTeamMember): boolean {
 }
 
 async function getProjectOrThrow(projectId: string): Promise<Project> {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   const projectSnap = await getDoc(projectRef);
 
   if (!projectSnap.exists()) {
@@ -63,7 +66,7 @@ async function getProjectOrThrow(projectId: string): Promise<Project> {
 }
 
 async function getUserRole(userId: string): Promise<string> {
-  const userSnap = await getDoc(doc(db, 'users', userId));
+  const userSnap = await getDoc(getDemoDoc( 'users', userId));
   if (!userSnap.exists()) return 'freelancer';
   const profile = userSnap.data() as Partial<UserProfile>;
   return profile.role ?? 'freelancer';
@@ -103,7 +106,7 @@ export async function inviteTeamMember(
       ? teamMembers.map((member, index) => index === existingIndex ? { ...member, ...invitation } : member)
       : [...teamMembers, invitation];
 
-    await updateDoc(doc(db, PROJECTS_COL, projectId), {
+    await updateDoc(getDemoDoc( PROJECTS_COL, projectId), {
       teamMembers: updatedTeam,
       updatedAt: now,
     });
@@ -138,7 +141,7 @@ export async function acceptInvitation(projectId: string, userId: string): Promi
 
     if (!accepted) throw new Error(`No pending invitation found for user ${userId}`);
 
-    await updateDoc(doc(db, PROJECTS_COL, projectId), {
+    await updateDoc(getDemoDoc( PROJECTS_COL, projectId), {
       teamMembers: updatedTeam,
       updatedAt: now,
     });
@@ -171,7 +174,7 @@ export async function removeTeamMember(projectId: string, userId: string, remove
       };
     });
 
-    await updateDoc(doc(db, PROJECTS_COL, projectId), {
+    await updateDoc(getDemoDoc( PROJECTS_COL, projectId), {
       teamMembers: updatedTeam,
       updatedAt: now,
     });
@@ -197,7 +200,7 @@ export async function getTeamForProject(projectId: string): Promise<ProjectTeamM
 }
 
 export function subscribeToTeam(projectId: string, cb: (members: ProjectTeamMember[]) => void): () => void {
-  return onSnapshot(doc(db, PROJECTS_COL, projectId), (snapshot) => {
+  return onSnapshot(getDemoDoc( PROJECTS_COL, projectId), (snapshot) => {
     if (!snapshot.exists()) {
       cb([]);
       return;

@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -16,6 +17,8 @@ import {
 import type { InvoiceReadinessCheck } from '@/types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const INVOICE_READINESS_COL = 'invoice_readiness';
 
 export async function checkInvoiceReadiness(input: {
@@ -36,7 +39,7 @@ export async function checkInvoiceReadiness(input: {
 
     // Validate timesheet entries
     for (const tsId of input.timesheetIds) {
-      const tsSnap = await getDoc(doc(db, 'timesheets', tsId));
+      const tsSnap = await getDoc(getDemoDoc( 'timesheets', tsId));
       if (!tsSnap.exists()) {
         blockers.push(`Timesheet entry ${tsId} not found.`);
       } else {
@@ -55,7 +58,7 @@ export async function checkInvoiceReadiness(input: {
     const readyForInvoice = blockers.length === 0 && input.timesheetIds.length > 0;
     const now = new Date().toISOString();
 
-    const ref = doc(collection(db, INVOICE_READINESS_COL));
+    const ref = doc(getDemoCol( INVOICE_READINESS_COL));
     const check: InvoiceReadinessCheck = {
       id: ref.id,
       firmId: input.firmId,
@@ -93,7 +96,7 @@ export async function checkInvoiceReadiness(input: {
 export async function getReadyInvoices(firmId: string): Promise<InvoiceReadinessCheck[]> {
   try {
     const q = query(
-      collection(db, INVOICE_READINESS_COL),
+      getDemoCol( INVOICE_READINESS_COL),
       where('firmId', '==', firmId),
       where('readyForInvoice', '==', true),
       where('invoiced', '==', false),
@@ -108,7 +111,7 @@ export async function getReadyInvoices(firmId: string): Promise<InvoiceReadiness
 
 export async function getInvoiceReadinessCheck(id: string): Promise<InvoiceReadinessCheck | null> {
   try {
-    const snap = await getDoc(doc(db, INVOICE_READINESS_COL, id));
+    const snap = await getDoc(getDemoDoc( INVOICE_READINESS_COL, id));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as InvoiceReadinessCheck) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${INVOICE_READINESS_COL}/${id}`);
@@ -118,7 +121,7 @@ export async function getInvoiceReadinessCheck(id: string): Promise<InvoiceReadi
 export async function getProjectReadinessChecks(firmId: string, projectId: string): Promise<InvoiceReadinessCheck[]> {
   try {
     const q = query(
-      collection(db, INVOICE_READINESS_COL),
+      getDemoCol( INVOICE_READINESS_COL),
       where('firmId', '==', firmId),
       where('projectId', '==', projectId),
       orderBy('checkedAt', 'desc')
@@ -133,7 +136,7 @@ export async function getProjectReadinessChecks(firmId: string, projectId: strin
 export async function markInvoiced(id: string, invoiceId: string): Promise<void> {
   try {
     const now = new Date().toISOString();
-    await updateDoc(doc(db, INVOICE_READINESS_COL, id), {
+    await updateDoc(getDemoDoc( INVOICE_READINESS_COL, id), {
       invoiced: true,
       invoiceId,
       updatedAt: now,
@@ -146,7 +149,7 @@ export async function markInvoiced(id: string, invoiceId: string): Promise<void>
 export async function deleteInvoiceReadinessCheck(id: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, INVOICE_READINESS_COL, id));
+    batch.delete(getDemoDoc( INVOICE_READINESS_COL, id));
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${INVOICE_READINESS_COL}/${id}`);
@@ -155,7 +158,7 @@ export async function deleteInvoiceReadinessCheck(id: string): Promise<void> {
 
 export function subscribeToReadiness(firmId: string, callback: (checks: InvoiceReadinessCheck[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, INVOICE_READINESS_COL), where('firmId', '==', firmId), orderBy('checkedAt', 'desc')),
+    query(getDemoCol( INVOICE_READINESS_COL), where('firmId', '==', firmId), orderBy('checkedAt', 'desc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as InvoiceReadinessCheck))),
     (error) => {
       console.error('Failed to subscribe to invoice readiness:', error);

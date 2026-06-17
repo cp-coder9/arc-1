@@ -1,6 +1,7 @@
 import { db } from '../lib/firebase';
 import {
   collection,
+
   doc,
   getDocs,
   onSnapshot,
@@ -12,6 +13,8 @@ import {
 import { Bid, TenderPackage, UserVerification, VerificationSubjectType } from '../types';
 import { isActiveVerifiedVerification } from './userVerificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const TENDERS_COL = 'tender_packages';
 
 export type CreateTenderPackageData = Omit<TenderPackage, 'id' | 'status' | 'createdAt' | 'updatedAt'> & {
@@ -32,7 +35,7 @@ const TENDER_BID_VERIFICATION_REQUIREMENTS: Array<{ subjectType: VerificationSub
 export async function getActiveTenderBidVerification(contractorId: string): Promise<UserVerification | null> {
   for (const requirement of TENDER_BID_VERIFICATION_REQUIREMENTS) {
     const verificationQuery = query(
-      collection(db, 'user_verifications'),
+      getDemoCol( 'user_verifications'),
       where('userId', '==', contractorId),
       where('subjectType', '==', requirement.subjectType),
       where('status', '==', 'verified'),
@@ -47,7 +50,7 @@ export async function getActiveTenderBidVerification(contractorId: string): Prom
 }
 
 export async function createTenderPackage(data: CreateTenderPackageData): Promise<string> {
-  const tenderRef = doc(collection(db, TENDERS_COL));
+  const tenderRef = doc(getDemoCol( TENDERS_COL));
   const now = new Date().toISOString();
   const tender: TenderPackage = {
     ...data,
@@ -78,7 +81,7 @@ export async function submitBid(tenderId: string, bidData: SubmitBidData): Promi
     throw new Error('Active contractor verification is required before submitting tender bids');
   }
 
-  const bidRef = doc(db, TENDERS_COL, tenderId, 'bids', `contractor_${bidData.contractorId}`);
+  const bidRef = getDemoDoc( TENDERS_COL, tenderId, 'bids', `contractor_${bidData.contractorId}`);
   const now = new Date().toISOString();
   const bid: Bid = {
     ...bidData,
@@ -108,7 +111,7 @@ export async function rejectBid(tenderId: string, bidId: string): Promise<void> 
 
 export async function awardBid(tenderId: string, bid: Bid): Promise<void> {
   const now = new Date().toISOString();
-  await updateDoc(doc(db, TENDERS_COL, tenderId), {
+  await updateDoc(getDemoDoc( TENDERS_COL, tenderId), {
     status: 'awarded',
     awardedBidId: bid.id,
     awardedContractorId: bid.contractorId,
@@ -118,31 +121,31 @@ export async function awardBid(tenderId: string, bid: Bid): Promise<void> {
 }
 
 export async function getTendersByProject(projectId: string): Promise<TenderPackage[]> {
-  const tenderQuery = query(collection(db, TENDERS_COL), where('projectId', '==', projectId));
+  const tenderQuery = query(getDemoCol( TENDERS_COL), where('projectId', '==', projectId));
   const snapshot = await getDocs(tenderQuery);
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as TenderPackage);
 }
 
 export async function getBidsForTender(tenderId: string): Promise<Bid[]> {
-  const snapshot = await getDocs(collection(db, TENDERS_COL, tenderId, 'bids'));
+  const snapshot = await getDocs(getDemoCol( TENDERS_COL, tenderId, 'bids'));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Bid);
 }
 
 export function subscribeToBids(tenderId: string, cb: (bids: Bid[]) => void): () => void {
-  return onSnapshot(collection(db, TENDERS_COL, tenderId, 'bids'), (snapshot) => {
+  return onSnapshot(getDemoCol( TENDERS_COL, tenderId, 'bids'), (snapshot) => {
     cb(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Bid));
   });
 }
 
 async function updateTenderStatus(tenderId: string, status: TenderPackage['status']): Promise<void> {
-  await updateDoc(doc(db, TENDERS_COL, tenderId), {
+  await updateDoc(getDemoDoc( TENDERS_COL, tenderId), {
     status,
     updatedAt: new Date().toISOString(),
   });
 }
 
 async function updateBidStatus(tenderId: string, bidId: string, status: Bid['status']): Promise<void> {
-  await updateDoc(doc(db, TENDERS_COL, tenderId, 'bids', bidId), {
+  await updateDoc(getDemoDoc( TENDERS_COL, tenderId, 'bids', bidId), {
     status,
     updatedAt: new Date().toISOString(),
   });

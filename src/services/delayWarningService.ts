@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { DelayEarlyWarning, DelayWarningCause, DelayWarningStatus } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const DELAY_WARNINGS_COL = 'delay_warnings';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function warningsCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, DELAY_WARNINGS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, DELAY_WARNINGS_COL);
 }
 
 function warningDocument(projectId: string, warningId: string) {
   if (!warningId) throw new Error('warningId is required');
-  return doc(db, PROJECTS_COL, projectId, DELAY_WARNINGS_COL, warningId);
+  return getDemoDoc( PROJECTS_COL, projectId, DELAY_WARNINGS_COL, warningId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {
@@ -99,7 +101,10 @@ export async function closeWarning(
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
-    const update: Record<string, unknown> = { status: 'closed', updatedAt: now };
+    const update: Record<string, unknown> = {
+      status: 'closed',
+      updatedAt: now,
+    };
     if (reviewedBy) {
       update.reviewedBy = reviewedBy;
       update.reviewedAt = now;

@@ -11,6 +11,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type ApplicationWithJob = Application & { job: Job };
 
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
@@ -22,14 +24,14 @@ export default function ClientProposalComparison({ user }: { user: UserProfile }
 
   useEffect(() => {
     const appUnsubs: Array<() => void> = [];
-    const unsubJobs = onSnapshot(query(collection(db, 'jobs'), where('clientId', '==', user.uid)), (snapshot) => {
+    const unsubJobs = onSnapshot(query(getDemoCol( 'jobs'), where('clientId', '==', user.uid)), (snapshot) => {
       appUnsubs.splice(0).forEach((unsub) => unsub());
       const liveJobs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Job));
       setApplications([]);
 
       if (liveJobs.length === 0) setLoading(false);
       liveJobs.forEach((job) => {
-        const unsubApps = onSnapshot(collection(db, `jobs/${job.id}/applications`), (appsSnapshot) => {
+        const unsubApps = onSnapshot(getDemoCol( `jobs/${job.id}/applications`), (appsSnapshot) => {
           setApplications((current) => {
             const withoutJob = current.filter((application) => application.job.id !== job.id);
             const nextForJob = appsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data(), job } as ApplicationWithJob));

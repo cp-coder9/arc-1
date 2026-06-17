@@ -1,7 +1,9 @@
-import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc, limit, runTransaction } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { NonConformanceReport, Severity, NCRStatus } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const NCR_COL = 'ncrs';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function ncrCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, NCR_COL);
+  return getDemoCol( PROJECTS_COL, projectId, NCR_COL);
 }
 
 function ncrDocument(projectId: string, ncrId: string) {
   if (!ncrId) throw new Error('ncrId is required');
-  return doc(db, PROJECTS_COL, projectId, NCR_COL, ncrId);
+  return getDemoDoc( PROJECTS_COL, projectId, NCR_COL, ncrId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {
@@ -145,7 +147,10 @@ export async function reopenNcr(
 ): Promise<void> {
   try {
     const now = new Date().toISOString();
-    await updateDoc(ncrDocument(projectId, ncrId), { status: 'open', updatedAt: now });
+    await updateDoc(ncrDocument(projectId, ncrId), {
+      status: 'open',
+      updatedAt: now,
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${NCR_COL}/${ncrId}`);
   }

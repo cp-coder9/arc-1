@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard, Landmark } from 'lucide-react';
 import {
   Accordion,
+
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
@@ -43,6 +44,8 @@ import AdvanceStageButton from './AdvanceStageButton';
 import FinancialDashboard from './FinancialDashboard';
 import { getSelectedProfessionalId } from '../lib/professionalRoleCompatibility';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROVIDER_CONFIGS = {
   gemini: {
     label: 'Google Gemini',
@@ -316,12 +319,12 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
         ...(isNew ? { createdAt: new Date().toISOString() } : {}),
       };
       if (isNew) {
-        await addDoc(collection(db, 'agents'), payload);
+        await addDoc(getDemoCol( 'agents'), payload);
         onCreated?.();
         toast.success("Agent created");
         return;
       }
-      await updateDoc(doc(db, 'agents', agent.id), payload);
+      await updateDoc(getDemoDoc( 'agents', agent.id), payload);
       setEditing(false);
       toast.success("Agent configuration saved");
     } catch (error) {
@@ -338,7 +341,7 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this agent? This cannot be undone.")) return;
     try {
-      await deleteDoc(doc(db, 'agents', agent.id));
+      await deleteDoc(getDemoDoc( 'agents', agent.id));
       toast.success("Agent deleted");
     } catch (error) {
       toast.error("Failed to delete agent");
@@ -668,14 +671,14 @@ export default function AdminDashboard({
       handleListenerError('submissions')
     );
     const unsubAgents = onSnapshot(
-      query(collection(db, 'agents'), orderBy('name')),
+      query(getDemoCol( 'agents'), orderBy('name')),
       (snapshot) => {
         setAgents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Agent)));
       },
       handleListenerError('agents')
     );
     const unsubJobs = onSnapshot(
-      query(collection(db, 'jobs'), orderBy('createdAt', 'desc'), limit(100)),
+      query(getDemoCol( 'jobs'), orderBy('createdAt', 'desc'), limit(100)),
       (snapshot) => {
         const jobs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Job));
         setAllJobs(jobs);
@@ -684,7 +687,7 @@ export default function AdminDashboard({
       handleListenerError('jobs')
     );
     const unsubLogs = onSnapshot(
-      query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
+      query(getDemoCol( 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
       (snapshot) => {
         const nextLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SystemLog));
         setLogs(nextLogs);
@@ -693,21 +696,21 @@ export default function AdminDashboard({
       handleListenerError('system logs')
     );
     const unsubDisputes = onSnapshot(
-      query(collection(db, 'disputes'), orderBy('createdAt', 'desc'), limit(100)),
+      query(getDemoCol( 'disputes'), orderBy('createdAt', 'desc'), limit(100)),
       (snapshot) => {
         setDisputes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Dispute)));
       },
       handleListenerError('disputes')
     );
     const unsubUsers = onSnapshot(
-      query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)),
+      query(getDemoCol( 'users'), orderBy('createdAt', 'desc'), limit(200)),
       (snapshot) => {
         setAllUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
       },
       handleListenerError('users')
     );
     const unsubProjects = onSnapshot(
-      query(collection(db, 'projects'), limit(200)),
+      query(getDemoCol( 'projects'), limit(200)),
       (snapshot) => {
         const nextProjects: Record<string, Project> = {};
         snapshot.docs.forEach(d => {
@@ -719,14 +722,14 @@ export default function AdminDashboard({
       handleListenerError('projects')
     );
     const unsubFirms = onSnapshot(
-      query(collection(db, 'firms'), limit(200)),
+      query(getDemoCol( 'firms'), limit(200)),
       (snapshot) => {
         setFirms(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Firm)));
       },
       handleListenerError('firms')
     );
     const unsubVerifications = onSnapshot(
-      query(collection(db, 'user_verifications'), limit(250)),
+      query(getDemoCol( 'user_verifications'), limit(250)),
       (snapshot) => {
         setUserVerifications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserVerification)));
       },
@@ -773,7 +776,7 @@ export default function AdminDashboard({
 
   const updateSubmissionStatus = async (submission: Submission, status: Submission['status']) => {
     try {
-      await updateDoc(doc(db, `jobs/${submission.jobId}/submissions`, submission.id), {
+      await updateDoc(getDemoDoc( `jobs/${submission.jobId}/submissions`, submission.id), {
         status,
         adminFeedback: status === 'approved' ? 'Approved by admin review.' : 'Rejected by admin review.',
         updatedAt: new Date().toISOString()
@@ -798,7 +801,7 @@ export default function AdminDashboard({
         files,
         submission.findings || []
       );
-      await updateDoc(doc(db, `jobs/${submission.jobId}/submissions`, submission.id), {
+      await updateDoc(getDemoDoc( `jobs/${submission.jobId}/submissions`, submission.id), {
         status: result.status === 'passed' ? 'ai_passed' : 'ai_failed',
         aiFeedback: result.feedback,
         aiStructuredFeedback: result.categories,
@@ -834,7 +837,7 @@ export default function AdminDashboard({
     }
 
     try {
-      await addDoc(collection(db, 'agents'), {
+      await addDoc(getDemoCol( 'agents'), {
         ...newAgent,
         name,
         role,
@@ -1652,7 +1655,7 @@ function DisputeRow({ dispute }: { dispute: Dispute }) {
 
   const updateDispute = async (status: Dispute['status']) => {
     try {
-      await updateDoc(doc(db, 'disputes', dispute.id), {
+      await updateDoc(getDemoDoc( 'disputes', dispute.id), {
         status,
         adminNotes,
         resolution,

@@ -41,6 +41,8 @@ import SiteLogManager from './SiteLogManager';
 import RFIManager from './RFIManager';
 import CloseoutWizard from './CloseoutWizard';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export default function ArchitectDashboard({ 
   user, 
   activeTab, 
@@ -78,18 +80,18 @@ export default function ArchitectDashboard({
   const pagedApplications = paginateItems<Application>(uniqueApplications, applicationsPage, pageSize);
 
   useEffect(() => {
-    const qJobs = query(collection(db, 'jobs'), where('status', '==', 'open'));
+    const qJobs = query(getDemoCol( 'jobs'), where('status', '==', 'open'));
     const unsubJobs = onSnapshot(qJobs, (snap) => {
       setAvailableJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
       setLoading(false);
     });
 
-    const qMyJobs = query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid));
+    const qMyJobs = query(getDemoCol( 'jobs'), where('selectedArchitectId', '==', user.uid));
     const unsubMyJobs = onSnapshot(qMyJobs, (snap) => {
       setMyJobs(snap.docs.map(d => ({ id: d.id, ...d.data() } as Job)));
     });
 
-    const qReviews = query(collection(db, 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
+    const qReviews = query(getDemoCol( 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
     const unsubReviews = onSnapshot(qReviews, (snap) => {
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
     });
@@ -112,7 +114,7 @@ export default function ArchitectDashboard({
 
     const applicationMap = new Map<string, Application>();
     const unsubscribes = trackedJobs.map((job) => {
-      const q = query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid));
+      const q = query(getDemoCol( `jobs/${job.id}/applications`), where('architectId', '==', user.uid));
       return onSnapshot(q, (snap) => {
         [...applicationMap.keys()]
           .filter(key => applicationMap.get(key)?.jobId === job.id)
@@ -306,7 +308,7 @@ function ActiveProjectCard({ job, user }: { job: Job, user: UserProfile }) {
   useEffect(() => {
     if (job.clientId) {
       const fetchClient = async () => {
-        const clientDoc = await getDoc(doc(db, 'users', job.clientId));
+        const clientDoc = await getDoc(getDemoDoc( 'users', job.clientId));
         if (clientDoc.exists()) setClient({ uid: clientDoc.id, ...clientDoc.data() } as UserProfile);
       };
       fetchClient();
@@ -373,7 +375,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
   const [requirements, setRequirements] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
+    const q = query(getDemoCol( `jobs/${job.id}/tasks`), where('architectId', '==', user.uid));
     const unsub = onSnapshot(q, (snapshot) => {
       setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JobCard)));
     });
@@ -382,7 +384,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
 
   const handleUpdateStatus = async (taskId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, `jobs/${job.id}/tasks`, taskId), {
+      await updateDoc(getDemoDoc( `jobs/${job.id}/tasks`, taskId), {
         status: newStatus,
         completedAt: newStatus === 'completed' ? new Date().toISOString() : null
       });
@@ -395,7 +397,7 @@ function DelegatedTasksList({ job, user }: { job: Job, user: UserProfile }) {
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, `jobs/${job.id}/tasks`), {
+      await addDoc(getDemoCol( `jobs/${job.id}/tasks`), {
         jobId: job.id,
         architectId: user.uid,
         assigneeName,
@@ -488,7 +490,7 @@ function TeamManager({ user, myJobs }: { user: UserProfile, myJobs: Job[] }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', 'in', ['freelancer', 'bep']));
+    const q = query(getDemoCol( 'users'), where('role', 'in', ['freelancer', 'bep']));
     const unsub = onSnapshot(q, (snapshot) => {
       setPros(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
       setLoading(false);
@@ -556,7 +558,7 @@ function CoordinationDashboard({ user, myJobs }: { user: UserProfile, myJobs: Jo
   }, [myJobs, selectedJobId]);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', 'in', ['architect', 'freelancer', 'bep']));
+    const q = query(getDemoCol( 'users'), where('role', 'in', ['architect', 'freelancer', 'bep']));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setProfessionals(snapshot.docs.map((document) => ({ uid: document.id, ...document.data() } as UserProfile)));
     });
@@ -836,7 +838,7 @@ function ApplicationCard({ application }: { application: Application }) {
 
   const handleWithdraw = async () => {
     try {
-      await updateDoc(doc(db, `jobs/${application.jobId}/applications`, application.id), {
+      await updateDoc(getDemoDoc( `jobs/${application.jobId}/applications`, application.id), {
         status: 'withdrawn',
         withdrawnAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -849,7 +851,7 @@ function ApplicationCard({ application }: { application: Application }) {
 
   const handleSaveNotes = async () => {
     try {
-      await updateDoc(doc(db, `jobs/${application.jobId}/applications`, application.id), {
+      await updateDoc(getDemoDoc( `jobs/${application.jobId}/applications`, application.id), {
         notes: localNotes,
         updatedAt: new Date().toISOString()
       });

@@ -14,6 +14,8 @@ import { ScrollArea } from './ui/scroll-area';
 import { uploadAndTrackFile } from '../lib/uploadService';
 import { OptimizedImage } from './ui/optimized-image';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface ProfileEditorProps {
   user: UserProfile;
   trigger?: React.ReactElement;
@@ -51,7 +53,7 @@ export default function ProfileEditor({ user, trigger, isAdminEditing = false }:
   const loadArchitectProfile = async () => {
     setIsLoadingProfile(true);
     try {
-      const profileDoc = await getDoc(doc(db, 'architect_profiles', user.uid));
+      const profileDoc = await getDoc(getDemoDoc( 'architect_profiles', user.uid));
       if (profileDoc.exists()) {
         const data = profileDoc.data() as ArchitectProfile;
         setArchitectProfile(data);
@@ -116,7 +118,7 @@ const handleSave = async (e: React.FormEvent) => {
 
   try {
     // Update User profile
-    const userRef = doc(db, 'users', user.uid);
+    const userRef = getDemoDoc( 'users', user.uid);
     await updateDoc(userRef, {
       displayName,
       bio,
@@ -125,7 +127,7 @@ const handleSave = async (e: React.FormEvent) => {
 
     // Update Architect profile if applicable
     if (isArchitect) {
-      const archProfileRef = doc(db, 'architect_profiles', user.uid);
+      const archProfileRef = getDemoDoc( 'architect_profiles', user.uid);
       const archData: Partial<ArchitectProfile> = {
         userId: user.uid,
         sacapNumber,

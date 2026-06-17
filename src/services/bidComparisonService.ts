@@ -2,6 +2,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Bid, TenderPackage } from '../types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export interface BidComparisonResult {
   report: string;
   scores: Record<string, number>;
@@ -19,13 +21,13 @@ export async function compareBids(tender: TenderPackage, bids: Bid[]): Promise<B
   const report = buildReport(tender, sortedBids, scores);
 
   await Promise.all(
-    sortedBids.map((bid) => updateDoc(doc(db, 'tender_packages', tender.id, 'bids', bid.id), {
+    sortedBids.map((bid) => updateDoc(getDemoDoc( 'tender_packages', tender.id, 'bids', bid.id), {
       aiScore: scores[bid.id],
       aiNotes: notes[bid.id],
       updatedAt: new Date().toISOString(),
     }))
   );
-  await updateDoc(doc(db, 'tender_packages', tender.id), {
+  await updateDoc(getDemoDoc( 'tender_packages', tender.id), {
     status: 'evaluating',
     aiComparisonReport: report,
     updatedAt: new Date().toISOString(),

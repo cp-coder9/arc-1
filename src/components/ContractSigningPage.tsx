@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import KickoffChecklistDashboard from './KickoffChecklistDashboard';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 type AppointmentContract = {
@@ -55,7 +57,7 @@ function money(cents?: number) {
 }
 
 function contractQueriesForUser(user: UserProfile) {
-  const contracts = collection(db, 'appointment_contracts');
+  const contracts = getDemoCol( 'appointment_contracts');
   if (user.role === 'admin') return [query(contracts, limit(50))];
   if (user.role === 'client') return [query(contracts, where('clientId', '==', user.uid), limit(50))];
   if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') return [query(contracts, where('bepId', '==', user.uid), limit(50))];
@@ -118,7 +120,7 @@ export default function ContractSigningPage({ user }: { user: UserProfile }) {
       return undefined;
     }
 
-    const unsubscribe = onSnapshot(doc(db, 'escrow', selectedContract.projectId), (snapshot) => {
+    const unsubscribe = onSnapshot(getDemoDoc( 'escrow', selectedContract.projectId), (snapshot) => {
       setEscrow(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as unknown as EscrowV2) : null);
     }, (error) => {
       console.warn('Contract escrow summary unavailable:', error);

@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type FinalAccountStatus = 'not_started' | 'in_progress' | 'prepared' | 'under_review' | 'approved' | 'disputed' | 'settled' | 'closed';
 export type VariationStatus = 'pending' | 'agreed' | 'disputed' | 'approved' | 'rejected';
 export type ClaimStatus = 'submitted' | 'under_review' | 'agreed' | 'rejected' | 'escalated';
@@ -290,9 +292,9 @@ export async function createFinalAccountRecord(input: {
     updatedAt: now,
   };
 
-  await setDoc(doc(db, 'final_accounts', record.id), record);
+  await setDoc(getDemoDoc( 'final_accounts', record.id), record);
 
-  await updateDoc(doc(db, 'projects', input.projectId), {
+  await updateDoc(getDemoDoc( 'projects', input.projectId), {
     finalAccount: {
       status: evaluation.status,
       finalPaymentReady: evaluation.ready,
@@ -308,13 +310,13 @@ export async function createFinalAccountRecord(input: {
 }
 
 export async function getFinalAccountRecord(projectId: string): Promise<FinalAccountReadinessRecord | null> {
-  const snap = await getDoc(doc(db, 'final_accounts', `final-account-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'final_accounts', `final-account-${projectId}`));
   if (!snap.exists()) return null;
   return snap.data() as FinalAccountReadinessRecord;
 }
 
 export async function approveFinalAccount(projectId: string, approvedBy: string): Promise<FinalAccountReadinessRecord> {
-  const snap = await getDoc(doc(db, 'final_accounts', `final-account-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'final_accounts', `final-account-${projectId}`));
   if (!snap.exists()) throw new Error(`Final account record for project ${projectId} not found`);
 
   const record = snap.data() as FinalAccountReadinessRecord;
@@ -330,8 +332,8 @@ export async function approveFinalAccount(projectId: string, approvedBy: string)
     updatedAt: now,
   };
 
-  await updateDoc(doc(db, 'final_accounts', record.id), updates);
-  await updateDoc(doc(db, 'projects', projectId), {
+  await updateDoc(getDemoDoc( 'final_accounts', record.id), updates);
+  await updateDoc(getDemoDoc( 'projects', projectId), {
     'finalAccount.status': 'approved',
     'finalAccount.approvedBy': approvedBy,
     'finalAccount.approvedAt': now,

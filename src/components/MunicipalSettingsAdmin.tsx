@@ -8,6 +8,8 @@ import { Switch } from './ui/switch';
 import { toast } from 'sonner';
 import { Building2, Save, Loader2, Key } from 'lucide-react';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export default function MunicipalSettingsAdmin() {
   const [settings, setSettings] = useState({
     municipalTrackerEnabled: false,
@@ -21,7 +23,7 @@ export default function MunicipalSettingsAdmin() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const docRef = doc(db, 'system_settings', 'municipal_tracker');
+        const docRef = getDemoDoc( 'system_settings', 'municipal_tracker');
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           setSettings(snap.data() as any);
@@ -38,7 +40,7 @@ export default function MunicipalSettingsAdmin() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'system_settings', 'municipal_tracker'), {
+      await setDoc(getDemoDoc( 'system_settings', 'municipal_tracker'), {
         ...settings,
         updatedAt: new Date().toISOString()
       }, { merge: true });

@@ -13,6 +13,8 @@ import DrawingChecklistTracker from './DrawingChecklistTracker';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
 function timestampMs(value: unknown): number {
@@ -29,7 +31,7 @@ function sortByRecent<T extends { createdAt?: unknown; updatedAt?: unknown }>(it
 }
 
 function jobQueriesForUser(user: UserProfile) {
-  const jobs = collection(db, 'jobs');
+  const jobs = getDemoCol( 'jobs');
   if (user.role === 'admin') return [query(jobs, limit(25))];
   if (user.role === 'client') return [query(jobs, where('clientId', '==', user.uid), limit(25))];
   return [
@@ -59,7 +61,7 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
   }, [user]);
 
   useEffect(() => {
-    const professionalQuery = query(collection(db, 'users'), where('role', 'in', ['architect', 'bep', 'freelancer']), limit(50));
+    const professionalQuery = query(getDemoCol( 'users'), where('role', 'in', ['architect', 'bep', 'freelancer']), limit(50));
     const unsubscribe = onSnapshot(professionalQuery, (snapshot) => {
       setProfessionals(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as UserProfile)));
     }, (error) => console.error('Failed to load design professionals:', error));

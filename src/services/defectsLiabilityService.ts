@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type LiabilityPeriodStatus = 'pending' | 'active' | 'expiring_soon' | 'expired' | 'extended';
 export type DefectReportStatus = 'reported' | 'under_review' | 'accepted_by_contractor' | 'rectification_in_progress' | 'rectified' | 'verified' | 'disputed';
 export type ContractorRecallStatus = 'notified' | 'acknowledged' | 'on_site' | 'completed' | 'no_response' | 'escalated';
@@ -214,11 +216,11 @@ export function buildDefectsLiabilitySummary(period: DefectsLiabilityPeriod, def
 }
 
 export async function persistLiabilityPeriod(period: DefectsLiabilityPeriod): Promise<void> {
-  await setDoc(doc(db, 'defects_liability', period.id), period);
+  await setDoc(getDemoDoc( 'defects_liability', period.id), period);
 }
 
 export async function getLiabilityPeriod(projectId: string): Promise<DefectsLiabilityPeriod | null> {
-  const snap = await getDoc(doc(db, 'defects_liability', `liability-${projectId}`));
+  const snap = await getDoc(getDemoDoc( 'defects_liability', `liability-${projectId}`));
   if (!snap.exists()) return null;
   return snap.data() as DefectsLiabilityPeriod;
 }
@@ -244,7 +246,7 @@ export async function startLiabilityPeriod(input: {
 
   await persistLiabilityPeriod(period);
 
-  await updateDoc(doc(db, 'projects', input.projectId), {
+  await updateDoc(getDemoDoc( 'projects', input.projectId), {
     defectsLiability: {
       periodId: period.id,
       status: period.status,
@@ -288,7 +290,7 @@ export async function reportLiabilityDefect(input: {
     updatedAt: now,
   };
 
-  await setDoc(doc(db, 'liability_defects', report.id), report);
+  await setDoc(getDemoDoc( 'liability_defects', report.id), report);
   return report;
 }
 
@@ -315,24 +317,24 @@ export async function createContractorRecall(input: {
     updatedAt: now,
   };
 
-  await setDoc(doc(db, 'contractor_recalls', recall.id), recall);
+  await setDoc(getDemoDoc( 'contractor_recalls', recall.id), recall);
   return recall;
 }
 
 export async function triggerRetentionRelease(periodId: string, releasedBy: string): Promise<void> {
-  const snap = await getDoc(doc(db, 'defects_liability', periodId));
+  const snap = await getDoc(getDemoDoc( 'defects_liability', periodId));
   if (!snap.exists()) throw new Error(`Liability period ${periodId} not found`);
 
   const period = snap.data() as DefectsLiabilityPeriod;
   const now = new Date().toISOString();
 
-  await updateDoc(doc(db, 'defects_liability', periodId), {
+  await updateDoc(getDemoDoc( 'defects_liability', periodId), {
     retentionReleaseTriggered: true,
     retentionReleaseDate: now,
     updatedAt: now,
   });
 
-  await updateDoc(doc(db, 'projects', period.projectId), {
+  await updateDoc(getDemoDoc( 'projects', period.projectId), {
     'defectsLiability.retentionReleaseTriggered': true,
     'defectsLiability.retentionReleaseDate': now,
     'defectsLiability.retentionReleasedBy': releasedBy,
@@ -353,18 +355,18 @@ export async function extendLiabilityPeriod(projectId: string, extensionMonths: 
     updatedAt: new Date().toISOString(),
   };
 
-  await updateDoc(doc(db, 'defects_liability', period.id), updates);
+  await updateDoc(getDemoDoc( 'defects_liability', period.id), updates);
   return { ...period, ...updates };
 }
 
 export async function getLiabilityDefectsForProject(projectId: string): Promise<LiabilityDefectReport[]> {
-  const q = query(collection(db, 'liability_defects'), where('projectId', '==', projectId));
+  const q = query(getDemoCol( 'liability_defects'), where('projectId', '==', projectId));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as LiabilityDefectReport);
 }
 
 export async function getContractorRecallsForProject(projectId: string): Promise<ContractorRecall[]> {
-  const q = query(collection(db, 'contractor_recalls'), where('projectId', '==', projectId));
+  const q = query(getDemoCol( 'contractor_recalls'), where('projectId', '==', projectId));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ContractorRecall);
 }

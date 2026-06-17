@@ -11,6 +11,8 @@ import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type ApplicationWithJob = Application & { jobId: string };
 type ApplicationDraft = { proposal: string; feeSummary: string; timeline: string; exclusions: string };
 type MarketplaceProfile = UserProfile & { mainSpecialization?: string; portfolioUrl?: string; sacapNumber?: string };
@@ -59,7 +61,7 @@ export default function BEPClientMarketplacePage({ user }: { user: UserProfile }
   useEffect(() => {
     setLoading(true);
     const applicationUnsubs: Array<() => void> = [];
-    const jobsQuery = query(collection(db, 'jobs'), where('status', '==', 'open'), limit(40));
+    const jobsQuery = query(getDemoCol( 'jobs'), where('status', '==', 'open'), limit(40));
     const unsubJobs = onSnapshot(jobsQuery, (snapshot) => {
       applicationUnsubs.splice(0).forEach((unsubscribe) => unsubscribe());
       const liveJobs = sortJobs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Job)));
@@ -70,9 +72,9 @@ export default function BEPClientMarketplacePage({ user }: { user: UserProfile }
       if (liveJobs.length === 0) setLoading(false);
       liveJobs.forEach((job) => {
         const appQueries = [
-          query(collection(db, `jobs/${job.id}/applications`), where('professionalId', '==', user.uid), limit(3)),
-          query(collection(db, `jobs/${job.id}/applications`), where('bepId', '==', user.uid), limit(3)),
-          query(collection(db, `jobs/${job.id}/applications`), where('architectId', '==', user.uid), limit(3)),
+          query(getDemoCol( `jobs/${job.id}/applications`), where('professionalId', '==', user.uid), limit(3)),
+          query(getDemoCol( `jobs/${job.id}/applications`), where('bepId', '==', user.uid), limit(3)),
+          query(getDemoCol( `jobs/${job.id}/applications`), where('architectId', '==', user.uid), limit(3)),
         ];
         const unsubApps = subscribeToMergedQuerySnapshots<ApplicationWithJob>(appQueries, (docSnap) => ({ id: docSnap.id, jobId: job.id, ...docSnap.data() } as ApplicationWithJob), (nextForJob) => {
           setApplications((current) => {
@@ -117,7 +119,7 @@ export default function BEPClientMarketplacePage({ user }: { user: UserProfile }
     try {
       const profile = user as MarketplaceProfile;
       const now = new Date().toISOString();
-      await addDoc(collection(db, `jobs/${selected.job.id}/applications`), {
+      await addDoc(getDemoCol( `jobs/${selected.job.id}/applications`), {
         jobId: selected.job.id,
         professionalId: user.uid,
         bepId: user.uid,

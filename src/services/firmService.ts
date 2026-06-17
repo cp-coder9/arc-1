@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   arrayRemove,
   arrayUnion,
   collection,
@@ -20,6 +21,8 @@ import type { DocumentReference, UpdateData } from 'firebase/firestore';
 import { Firm, FirmInvite, FirmMember, FirmRole, Project, UserProfile } from '@/types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const FIRMS_COL = 'firms';
 const FIRM_INVITES_COL = 'firm_invites';
 
@@ -35,7 +38,7 @@ function assertValidRole(role: FirmRole): void {
 }
 
 async function getFirmMemberRecord(firmId: string, userId: string): Promise<FirmMember | null> {
-  const memberSnap = await getDoc(doc(db, FIRMS_COL, firmId, 'members', userId));
+  const memberSnap = await getDoc(getDemoDoc( FIRMS_COL, firmId, 'members', userId));
   if (!memberSnap.exists()) return null;
   return { id: memberSnap.id, ...memberSnap.data() } as FirmMember;
 }
@@ -49,12 +52,12 @@ async function assertCanManageFirm(firmId: string, actorId: string): Promise<Fir
 }
 
 async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  const userSnap = await getDoc(doc(db, 'users', userId));
+  const userSnap = await getDoc(getDemoDoc( 'users', userId));
   return userSnap.exists() ? ({ uid: userSnap.id, ...userSnap.data() } as UserProfile) : null;
 }
 
 async function appendAuditEvent(firmId: string, actorId: string, type: string, metadata: Record<string, unknown> = {}): Promise<void> {
-  await addDoc(collection(db, FIRMS_COL, firmId, 'audit_events'), {
+  await addDoc(getDemoCol( FIRMS_COL, firmId, 'audit_events'), {
     firmId,
     actorId,
     type,
@@ -70,7 +73,7 @@ export async function createFirm(input: { name: string; ownerId: string; primary
     if (!input.ownerId) throw new Error('Firm owner is required');
 
     const now = new Date().toISOString();
-    const firmRef = doc(collection(db, FIRMS_COL));
+    const firmRef = doc(getDemoCol( FIRMS_COL));
     const ownerProfile = await getUserProfile(input.ownerId);
     const firm: Firm = {
       id: firmRef.id,
@@ -101,8 +104,8 @@ export async function createFirm(input: { name: string; ownerId: string; primary
 
     const batch = writeBatch(db);
     batch.set(firmRef, firm);
-    batch.set(doc(db, FIRMS_COL, firmRef.id, 'members', input.ownerId), ownerMember);
-	    batch.update(doc(db, 'users', input.ownerId), {
+    batch.set(getDemoDoc( FIRMS_COL, firmRef.id, 'members', input.ownerId), ownerMember);
+	    batch.update(getDemoDoc( 'users', input.ownerId), {
 	      primaryFirmId: firmRef.id,
 	      firmMembershipIds: arrayUnion(firmRef.id),
 	      firmRole: 'owner',
@@ -126,7 +129,7 @@ export async function inviteFirmMember(input: { firmId: string; email: string; r
     if (!email) throw new Error('Invite recipient email is required');
 
     const now = new Date().toISOString();
-    const inviteRef = doc(collection(db, FIRM_INVITES_COL));
+    const inviteRef = doc(getDemoCol( FIRM_INVITES_COL));
     const invite: FirmInvite = {
       id: inviteRef.id,
       firmId: input.firmId,
@@ -157,7 +160,7 @@ export async function acceptFirmInvite(inviteId: string, user: Pick<UserProfile,
     const email = normalizeEmail(user.email || '');
 
     const { invite, member } = await runTransaction(db, async (transaction) => {
-      const inviteRef = doc(db, FIRM_INVITES_COL, inviteId);
+      const inviteRef = getDemoDoc( FIRM_INVITES_COL, inviteId);
       const inviteSnap = await transaction.get(inviteRef);
       if (!inviteSnap.exists()) throw new Error('Firm invite not found');
       const currentInvite = { id: inviteSnap.id, ...inviteSnap.data() } as FirmInvite;
@@ -183,9 +186,9 @@ export async function acceptFirmInvite(inviteId: string, user: Pick<UserProfile,
         updatedAt: now,
       };
 
-      transaction.set(doc(db, FIRMS_COL, currentInvite.firmId, 'members', user.uid), acceptedMember);
+      transaction.set(getDemoDoc( FIRMS_COL, currentInvite.firmId, 'members', user.uid), acceptedMember);
       transaction.update(inviteRef, { status: 'accepted', acceptedBy: user.uid, acceptedAt: now, updatedAt: now });
-      transaction.update(doc(db, 'users', user.uid), {
+      transaction.update(getDemoDoc( 'users', user.uid), {
         primaryFirmId: currentInvite.firmId,
         firmMembershipIds: arrayUnion(currentInvite.firmId),
         firmRole: currentInvite.role,
@@ -212,7 +215,7 @@ export async function updateFirmMemberRole(firmId: string, memberId: string, rol
     if (!member || member.status === 'removed') throw new Error('Firm member not found');
     if (member.role === 'owner') throw new Error('Owner role cannot be changed');
     const now = new Date().toISOString();
-    await updateDoc(doc(db, FIRMS_COL, firmId, 'members', memberId), { role, updatedAt: now });
+    await updateDoc(getDemoDoc( FIRMS_COL, firmId, 'members', memberId), { role, updatedAt: now });
     await notificationService.notifyFirmRoleChanged(memberId, firmId, role, actorId);
     await appendAuditEvent(firmId, actorId, 'role_changed', { memberId, role });
   } catch (error) {
@@ -227,7 +230,7 @@ export async function removeFirmMember(firmId: string, memberId: string, actorId
     if (!member || member.status === 'removed') throw new Error('Firm member not found');
     if (member.role === 'owner') throw new Error('Firm owner cannot be removed');
 	    const now = new Date().toISOString();
-	    const userRef = doc(db, 'users', memberId) as DocumentReference<UserProfile>;
+	    const userRef = getDemoDoc( 'users', memberId) as DocumentReference<UserProfile>;
 	    const userProfile = await getDoc(userRef);
     const userUpdates: UpdateData<UserProfile> = {
       firmMembershipIds: arrayRemove(firmId),
@@ -239,8 +242,8 @@ export async function removeFirmMember(firmId: string, memberId: string, actorId
       userUpdates.firmStatus = 'removed';
     }
 	    const batch = writeBatch(db);
-	    batch.update(doc(db, FIRMS_COL, firmId, 'members', memberId), { status: 'removed', removedBy: actorId, removedAt: now, updatedAt: now });
-	    batch.update(doc(db, 'users', memberId), userUpdates);
+	    batch.update(getDemoDoc( FIRMS_COL, firmId, 'members', memberId), { status: 'removed', removedBy: actorId, removedAt: now, updatedAt: now });
+	    batch.update(getDemoDoc( 'users', memberId), userUpdates);
 	    await batch.commit();
 	    await notificationService.notifyFirmMemberRemoved(memberId, firmId, actorId);
 	    await appendAuditEvent(firmId, actorId, 'member_removed', { memberId });
@@ -251,7 +254,7 @@ export async function removeFirmMember(firmId: string, memberId: string, actorId
 
 export async function getFirm(firmId: string): Promise<Firm | null> {
   try {
-    const snap = await getDoc(doc(db, FIRMS_COL, firmId));
+    const snap = await getDoc(getDemoDoc( FIRMS_COL, firmId));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as Firm) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${FIRMS_COL}/${firmId}`);
@@ -260,7 +263,7 @@ export async function getFirm(firmId: string): Promise<Firm | null> {
 
 export async function getFirmMembers(firmId: string): Promise<FirmMember[]> {
   try {
-    const snapshot = await getDocs(query(collection(db, FIRMS_COL, firmId, 'members'), where('status', '!=', 'removed')));
+    const snapshot = await getDocs(query(getDemoCol( FIRMS_COL, firmId, 'members'), where('status', '!=', 'removed')));
     return snapshot.docs.map((memberDoc) => ({ id: memberDoc.id, ...memberDoc.data() } as FirmMember));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${FIRMS_COL}/${firmId}/members`);
@@ -268,7 +271,7 @@ export async function getFirmMembers(firmId: string): Promise<FirmMember[]> {
 }
 
 export function subscribeToFirm(firmId: string, callback: (firm: Firm | null) => void): () => void {
-  return onSnapshot(doc(db, FIRMS_COL, firmId), (snapshot) => {
+  return onSnapshot(getDemoDoc( FIRMS_COL, firmId), (snapshot) => {
     callback(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Firm) : null);
   }, (error) => {
     console.error('Failed to subscribe to firm:', error);
@@ -277,7 +280,7 @@ export function subscribeToFirm(firmId: string, callback: (firm: Firm | null) =>
 }
 
 export function subscribeToFirmMembers(firmId: string, callback: (members: FirmMember[]) => void): () => void {
-  return onSnapshot(collection(db, FIRMS_COL, firmId, 'members'), (snapshot) => {
+  return onSnapshot(getDemoCol( FIRMS_COL, firmId, 'members'), (snapshot) => {
     callback(snapshot.docs.map((memberDoc) => ({ id: memberDoc.id, ...memberDoc.data() } as FirmMember)).filter((member) => member.status !== 'removed'));
   }, (error) => {
     console.error('Failed to subscribe to firm members:', error);
@@ -287,7 +290,7 @@ export function subscribeToFirmMembers(firmId: string, callback: (members: FirmM
 
 export function subscribeToFirmInvites(firmId: string, callback: (invites: FirmInvite[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, FIRM_INVITES_COL), where('firmId', '==', firmId), where('status', '==', 'pending')),
+    query(getDemoCol( FIRM_INVITES_COL), where('firmId', '==', firmId), where('status', '==', 'pending')),
     (snapshot) => callback(snapshot.docs.map((inviteDoc) => ({ id: inviteDoc.id, ...inviteDoc.data() } as FirmInvite))),
     (error) => {
       console.error('Failed to subscribe to firm invites:', error);
@@ -298,7 +301,7 @@ export function subscribeToFirmInvites(firmId: string, callback: (invites: FirmI
 
 export function subscribeToFirmProjects(firmId: string, callback: (projects: Project[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, 'projects'), where('firmId', '==', firmId), where('firmAccessEnabled', '==', true)),
+    query(getDemoCol( 'projects'), where('firmId', '==', firmId), where('firmAccessEnabled', '==', true)),
     (snapshot) => callback(snapshot.docs.map((projectDoc) => ({ id: projectDoc.id, ...projectDoc.data() } as Project))),
     (error) => {
       console.error('Failed to subscribe to firm-linked projects:', error);

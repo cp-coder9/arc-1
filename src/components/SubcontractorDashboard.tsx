@@ -7,6 +7,8 @@ import PackageProcurementWorkspace from './PackageProcurementWorkspace';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export default function SubcontractorDashboard({ user }: { user: UserProfile }) {
   const [publishedPackages, setPublishedPackages] = useState<TenderPackage[]>([]);
   const [myBids, setMyBids] = useState<Bid[]>([]);
@@ -14,7 +16,7 @@ export default function SubcontractorDashboard({ user }: { user: UserProfile }) 
 
   useEffect(() => {
     const unsubPackages = onSnapshot(
-      query(collection(db, 'tender_packages'), where('status', '==', 'published'), limit(50)),
+      query(getDemoCol( 'tender_packages'), where('status', '==', 'published'), limit(50)),
       (snapshot) => {
         setPublishedPackages(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as TenderPackage)));
         setLoading(false);

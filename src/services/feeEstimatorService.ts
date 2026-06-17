@@ -4,6 +4,8 @@ import type { PlatformTransactionFeeBreakdown } from '../types/proposalBuilder';
 import type { Firestore } from 'firebase/firestore';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export type FeeEstimatorRole = 'architect' | 'client' | 'admin';
 export type FeeProjectType = 'residential' | 'commercial' | 'industrial' | 'renovation' | 'interior' | 'landscape';
 export type FeeComplexity = 'low' | 'medium' | 'high';
@@ -304,7 +306,7 @@ async function getFeeEstimatorDb(): Promise<Firestore> {
 export async function loadFeeEstimatorSettings(): Promise<FeeEstimatorSettings> {
   try {
     const db = await getFeeEstimatorDb();
-    const snapshot = await getDoc(doc(db, ...SETTINGS_DOC_PATH));
+    const snapshot = await getDoc(getDemoDoc( ...SETTINGS_DOC_PATH));
     if (!snapshot.exists()) return DEFAULT_FEE_ESTIMATOR_SETTINGS;
     return sanitizeFeeEstimatorSettings(snapshot.data() as Partial<FeeEstimatorSettings>);
   } catch (error) {
@@ -315,7 +317,7 @@ export async function loadFeeEstimatorSettings(): Promise<FeeEstimatorSettings> 
 
 export async function saveFeeEstimatorSettings(settings: FeeEstimatorSettings): Promise<void> {
   const db = await getFeeEstimatorDb();
-  await setDoc(doc(db, ...SETTINGS_DOC_PATH), {
+  await setDoc(getDemoDoc( ...SETTINGS_DOC_PATH), {
     ...sanitizeFeeEstimatorSettings(settings),
     updatedAt: new Date().toISOString(),
   }, { merge: true });

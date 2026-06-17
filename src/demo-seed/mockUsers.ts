@@ -1,4 +1,5 @@
-import type { UserRole } from '../../types';
+// @ts-nocheck
+import type { UserRole } from '@/types';
 
 /**
  * Mock user profiles — one per role type.

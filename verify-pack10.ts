@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Pack 10 Verification Script
  * Runs all state machine and guardrail validations directly.

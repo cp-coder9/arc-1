@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const categories: JobCategory[] = ['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape'];
 
 export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
@@ -75,7 +77,7 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
         },
       });
 
-      const briefRef = await addDoc(collection(db, 'project_briefs'), brief);
+      const briefRef = await addDoc(getDemoCol( 'project_briefs'), brief);
       const uploadedAttachmentIds: string[] = [];
 
       for (const file of selectedFiles) {
@@ -98,7 +100,7 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
           evidenceType: 'client_brief_evidence',
           storageProvider: 'vercel_blob',
         });
-        const attachmentRef = await addDoc(collection(db, 'project_briefs', briefRef.id, 'attachments'), attachment);
+        const attachmentRef = await addDoc(getDemoCol( 'project_briefs', briefRef.id, 'attachments'), attachment);
         uploadedAttachmentIds.push(attachmentRef.id);
       }
 
@@ -116,11 +118,11 @@ export default function GuidedBriefWizard({ user }: { user: UserProfile }) {
         confidence: 0.62,
         model: 'deterministic-briefing-agent',
       });
-      await addDoc(collection(db, 'project_briefs', briefRef.id, 'interpretations'), interpretation);
+      await addDoc(getDemoCol( 'project_briefs', briefRef.id, 'interpretations'), interpretation);
 
       if (form.publishOpportunity) {
         const opportunity = buildMarketplaceOpportunityFromBrief({ ...brief, id: briefRef.id } as typeof brief & { id: string });
-        await setDoc(doc(db, 'marketplace_opportunities', briefRef.id), opportunity);
+        await setDoc(getDemoDoc( 'marketplace_opportunities', briefRef.id), opportunity);
         await updateDoc(briefRef, { status: 'published', updatedAt: new Date().toISOString() });
       }
 

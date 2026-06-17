@@ -2,6 +2,8 @@ import { addDoc, collection, doc, onSnapshot, updateDoc } from 'firebase/firesto
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { Discipline, UserRole } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export const COORDINATION_ITEM_TYPES = [
   'deliverable',
   'dependency',
@@ -77,12 +79,12 @@ const STATUS_RANK: Record<CoordinationStatus, number> = {
 
 function projectCoordinationCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, COORDINATION_ITEMS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, COORDINATION_ITEMS_COL);
 }
 
 function projectCoordinationDocument(projectId: string, itemId: string) {
   if (!itemId) throw new Error('itemId is required');
-  return doc(db, PROJECTS_COL, projectId, COORDINATION_ITEMS_COL, itemId);
+  return getDemoDoc( PROJECTS_COL, projectId, COORDINATION_ITEMS_COL, itemId);
 }
 
 function timestampMs(value: unknown): number {

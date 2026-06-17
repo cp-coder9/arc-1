@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { toast } from 'sonner';
 import { Review } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface RatingSystemProps {
   fromId: string;
   toId: string;
@@ -30,7 +32,7 @@ export default function RatingSystem({ fromId, toId, toName, jobId, type, onSucc
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'reviews'), {
+      await addDoc(getDemoCol( 'reviews'), {
         fromId,
         toId,
         jobId,

@@ -9,6 +9,8 @@ import { Briefcase, Building2, CheckCircle2, Clock, FileText, HardHat, Search, S
 import BidSubmission from './BidSubmission';
 import ContractorBidCalculatorPanel from './ContractorBidCalculatorPanel';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export default function ContractorDashboard({ user }: { user: UserProfile }) {
   const [publishedTenders, setPublishedTenders] = useState<TenderPackage[]>([]);
   const [myBids, setMyBids] = useState<Bid[]>([]);
@@ -18,7 +20,7 @@ export default function ContractorDashboard({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     const unsubscribeTenders = onSnapshot(
-      query(collection(db, 'tender_packages'), where('status', '==', 'published')),
+      query(getDemoCol( 'tender_packages'), where('status', '==', 'published')),
       (snapshot) => {
         setPublishedTenders(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as TenderPackage)));
         setLoading(false);

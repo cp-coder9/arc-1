@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -17,6 +18,8 @@ import {
 import type { PipelineProject, PipelineForecast, PipelineStatus } from '@/types';
 import type { ProjectStage } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PIPELINES_COL = 'pipelines';
 
 function assertValidProbability(probability: number): void {
@@ -51,7 +54,7 @@ export async function addPipelineProject(input: {
     if (input.status) assertValidPipelineStatus(input.status);
 
     const now = new Date().toISOString();
-    const ref = doc(collection(db, PIPELINES_COL));
+    const ref = doc(getDemoCol( PIPELINES_COL));
     const project: PipelineProject = {
       id: ref.id,
       firmId: input.firmId,
@@ -96,7 +99,7 @@ export async function updatePipelineStatus(
     if (updates?.estimatedValueCents !== undefined) data.estimatedValueCents = updates.estimatedValueCents;
     if (updates?.notes !== undefined) data.notes = updates.notes;
 
-    await updateDoc(doc(db, PIPELINES_COL, id), data);
+    await updateDoc(getDemoDoc( PIPELINES_COL, id), data);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${PIPELINES_COL}/${id}`);
   }
@@ -108,7 +111,7 @@ export async function getFirmPipeline(firmId: string, filters?: { stage?: Projec
     if (filters?.stage) constraints.push(where('stage', '==', filters.stage));
     if (filters?.status) constraints.push(where('status', '==', filters.status));
 
-    const q = query(collection(db, PIPELINES_COL), ...constraints);
+    const q = query(getDemoCol( PIPELINES_COL), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PipelineProject));
   } catch (error) {
@@ -119,7 +122,7 @@ export async function getFirmPipeline(firmId: string, filters?: { stage?: Projec
 export async function getPipelineForecast(firmId: string): Promise<PipelineForecast> {
   try {
     const projects = await getFirmPipeline(firmId, { status: 'active' });
-    const byStage = {} as Record<string, { count: number; estimatedValueCents: number; weightedValueCents: number }>;
+    const byStage = {} as Record<string, { count: number; value: number; weighted: number }>;
 
     let totalEstimatedValueCents = 0;
     let weightedForecastCents = 0;
@@ -134,21 +137,16 @@ export async function getPipelineForecast(firmId: string): Promise<PipelineForec
       weightedForecastCents += weighted;
       activeProjectCount++;
 
-      if (!byStage[p.stage]) byStage[p.stage] = { count: 0, estimatedValueCents: 0, weightedValueCents: 0 };
+      if (!byStage[p.stage]) byStage[p.stage] = { count: 0, value: 0, weighted: 0 };
       byStage[p.stage].count++;
-      byStage[p.stage].estimatedValueCents += value;
-      byStage[p.stage].weightedValueCents += weighted;
+      byStage[p.stage].value += value;
+      byStage[p.stage].weighted += weighted;
     }
 
     return {
-      firmId,
-      generatedAt: new Date().toISOString(),
-      totalEstimatedValueCents,
-      weightedForecastCents,
-      activeProjectCount,
-      wonProjectCount,
-      lostProjectCount,
-      byStage,
+      totalValueCents: totalEstimatedValueCents,
+      weightedValueCents: weightedForecastCents,
+      byStage: byStage as Record<ProjectStage, { count: number; value: number; weighted: number }>,
     };
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${PIPELINES_COL}/forecast/${firmId}`);
@@ -157,7 +155,7 @@ export async function getPipelineForecast(firmId: string): Promise<PipelineForec
 
 export async function getPipelineProject(id: string): Promise<PipelineProject | null> {
   try {
-    const snap = await getDoc(doc(db, PIPELINES_COL, id));
+    const snap = await getDoc(getDemoDoc( PIPELINES_COL, id));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as PipelineProject) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${PIPELINES_COL}/${id}`);
@@ -167,7 +165,7 @@ export async function getPipelineProject(id: string): Promise<PipelineProject | 
 export async function deletePipelineProject(id: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, PIPELINES_COL, id));
+    batch.delete(getDemoDoc( PIPELINES_COL, id));
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${PIPELINES_COL}/${id}`);
@@ -176,7 +174,7 @@ export async function deletePipelineProject(id: string): Promise<void> {
 
 export function subscribeToPipeline(firmId: string, callback: (projects: PipelineProject[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, PIPELINES_COL), where('firmId', '==', firmId), orderBy('createdAt', 'desc')),
+    query(getDemoCol( PIPELINES_COL), where('firmId', '==', firmId), orderBy('createdAt', 'desc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PipelineProject))),
     (error) => {
       console.error('Failed to subscribe to pipeline:', error);

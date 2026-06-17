@@ -1,6 +1,7 @@
 import { db } from '../lib/firebase';
 import {
   collection,
+
   doc,
   getDoc,
   getDocs,
@@ -10,6 +11,8 @@ import {
   where,
   onSnapshot,
   arrayUnion,
+  addDoc,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import {
   Project,
@@ -21,6 +24,14 @@ import {
   UserRole,
   Discipline,
 } from '../types';
+import type { RiskFinding, WorkflowEvent } from './lifecycleTypes';
+import { evaluateRisks } from './riskEngine';
+
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
+
+const RISK_FINDINGS_COL = 'risk_findings';
+const INBOX_EVENTS_COL = 'inbox_events';
 
 // ─── Stage Transition Rules ─────────────────────────────────────────────────
 
@@ -132,6 +143,32 @@ export function getStageGateRequirements(targetStage: ProjectStage): StageGateRe
   return STAGE_GATE_REQUIREMENTS[targetStage] || [];
 }
 
+/**
+ * Returns the set of stages visible to a given user role.
+ * Clients see a simplified view; admins/architects see full lifecycle.
+ */
+export function visibleStagesForRole(role: string): ProjectStage[] {
+  if (role === 'client') {
+    return ['intake', 'appointment', 'coordination', 'delivery', 'closeout'];
+  }
+  if (role === 'contractor' || role === 'subcontractor') {
+    return ['tender', 'delivery', 'payments', 'closeout'];
+  }
+  if (role === 'supplier') {
+    return ['tender', 'payments'];
+  }
+  // architects, admins, and all other roles see the full lifecycle
+  return PROJECT_STAGE_ORDER as unknown as ProjectStage[];
+}
+
+/**
+ * Filter an array of stages to those visible for a given role.
+ */
+export function filterStagesByRole(stages: ProjectStage[], role: string): ProjectStage[] {
+  const visible = visibleStagesForRole(role);
+  return stages.filter((s) => visible.includes(s));
+}
+
 export function getMissingStageGateRequirements(
   targetStage: ProjectStage,
   evidence: StageGateEvidence = {},
@@ -169,6 +206,158 @@ export function assertStageGateTransitionAllowed(evaluation: StageGateEvaluation
     (error as Error & { status?: number; missingRequirements?: StageGateRequirement[] }).missingRequirements = evaluation.missingRequirements;
     throw error;
   }
+}
+
+// ─── Risk Detection ──────────────────────────────────────────────────────────
+
+/**
+ * Map a ProjectStage to the closest ProjectPhase for risk engine compatibility.
+ */
+export function stageToPhase(stage: ProjectStage): string {
+  const map: Record<string, string> = {
+    intake: 'onboarding',
+    appointment: 'appointment',
+    coordination: 'design_development',
+    compliance: 'municipal_submission',
+    tender: 'tender_procurement',
+    delivery: 'construction_execution',
+    payments: 'closeout',
+    closeout: 'closeout',
+  };
+  return map[stage] || 'onboarding';
+}
+
+/**
+ * Detect risks relevant to a stage transition.
+ * Wraps evaluateRisks and adds stage-specific risk checks.
+ */
+export function detectTransitionRisks(
+  project: Project,
+  targetStage: ProjectStage,
+  options?: {
+    piInsuranceExpiry?: string;
+    councilSubmissionDate?: string;
+    cpdNonCompliance?: boolean;
+  },
+): RiskFinding[] {
+  const findings: RiskFinding[] = [];
+
+  // Check if key evidence is missing for the target stage
+  const evidence = project.stageGateEvidence || {};
+  const missingGates = getMissingStageGateRequirements(targetStage, evidence);
+  for (const gate of missingGates) {
+    findings.push({
+      code: `STAGE_GATE_${gate.key.toUpperCase()}`,
+      priority: 'high',
+      message: gate.reason,
+      assignedRoles: ['admin', 'architect'],
+    });
+  }
+
+  // 1. Professional indemnity insurance expiry check
+  if (options?.piInsuranceExpiry) {
+    const expiry = new Date(options.piInsuranceExpiry);
+    const now = new Date();
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntilExpiry <= 0) {
+      findings.push({
+        code: 'PI_INSURANCE_EXPIRED',
+        priority: 'critical',
+        message: 'Professional indemnity insurance has expired. Coverage is required before continuing.',
+        assignedRoles: ['admin', 'architect'],
+      });
+    } else if (daysUntilExpiry <= 30) {
+      findings.push({
+        code: 'PI_INSURANCE_EXPIRING_SOON',
+        priority: 'high',
+        message: `Professional indemnity insurance expires in ${daysUntilExpiry} days. Renew before expiration.`,
+        assignedRoles: ['admin', 'architect'],
+      });
+    }
+  }
+
+  // 2. Council submission overdue check
+  if (options?.councilSubmissionDate) {
+    const submissionDate = new Date(options.councilSubmissionDate);
+    const now = new Date();
+    if (submissionDate < now) {
+      findings.push({
+        code: 'COUNCIL_SUBMISSION_OVERDUE',
+        priority: 'high',
+        message: 'Council submission is overdue. This may cause project delays and regulatory non-compliance.',
+        assignedRoles: ['admin', 'architect'],
+      });
+    }
+  }
+
+  // 3. CPD non-compliance check (applies during closeout or payments stages)
+  if (options?.cpdNonCompliance) {
+    findings.push({
+      code: 'CPD_NON_COMPLIANCE',
+      priority: 'medium',
+      message: 'Registered professionals have outstanding CPD requirements. Resolve before project closeout.',
+      assignedRoles: ['admin', 'architect'],
+    });
+  }
+
+  return findings.sort((a, b) => rank(b.priority) - rank(a.priority));
+}
+
+function rank(priority: string): number {
+  return { low: 1, medium: 2, high: 3, critical: 4 }[priority as 'low' | 'medium' | 'high' | 'critical'] || 0;
+}
+
+/**
+ * Persist risk findings to Firestore for a project.
+ */
+export async function persistRiskFindings(
+  projectId: string,
+  findings: RiskFinding[],
+): Promise<void> {
+  const col = getDemoCol( 'projects', projectId, RISK_FINDINGS_COL);
+  const batch = findings.map((finding) =>
+    addDoc(col, {
+      ...finding,
+      projectId,
+      detectedAt: new Date().toISOString(),
+    }),
+  );
+  await Promise.all(batch);
+}
+
+/**
+ * Build inbox events from risk findings for a stage transition.
+ */
+export function buildTransitionInboxEvents(
+  projectId: string,
+  findings: RiskFinding[],
+  targetStage: ProjectStage,
+): WorkflowEvent[] {
+  return findings.map((finding, i) => ({
+    id: `risk-${projectId}-${i + 1}`,
+    type: finding.priority === 'critical' ? 'risk_detected' : 'approval_required',
+    projectId,
+    title: finding.code.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    detail: finding.message,
+    priority: finding.priority,
+    sourceModule: 'projects',
+    assignedRoles: finding.assignedRoles,
+    createdAt: new Date().toISOString(),
+  }));
+}
+
+/**
+ * Persist inbox events to Firestore for a project.
+ */
+export async function persistTransitionInboxEvents(
+  projectId: string,
+  events: WorkflowEvent[],
+): Promise<void> {
+  const col = getDemoCol( 'projects', projectId, INBOX_EVENTS_COL);
+  const batch = events.map((event) =>
+    addDoc(col, { ...event }),
+  );
+  await Promise.all(batch);
 }
 
 /**
@@ -217,7 +406,7 @@ export async function createProject(
   const existingProject = await getProjectByJobId(jobId);
   if (existingProject) return existingProject.id;
 
-  const projectRef = doc(db, PROJECTS_COL, jobId);
+  const projectRef = getDemoDoc( PROJECTS_COL, jobId);
   const now = new Date().toISOString();
 
   const initialHistory: StageHistoryEntry = {
@@ -275,7 +464,7 @@ export async function transitionStage(
   note?: string,
   optionsOrOverride: TransitionStageOptions | boolean = false
 ): Promise<void> {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   const projectSnap = await getDoc(projectRef);
 
   if (!projectSnap.exists()) {
@@ -308,6 +497,25 @@ export async function transitionStage(
     throw new Error(`Invalid transition: ${project.currentStage} → ${targetStage}`);
   }
 
+  // Detect and persist risks before allowing transition
+  const riskFindings = detectTransitionRisks(project, targetStage);
+  const hasCriticalRisks = riskFindings.some((r) => r.priority === 'critical');
+  if (hasCriticalRisks && enforceStageGates) {
+    await persistRiskFindings(projectId, riskFindings);
+    const criticalLabels = riskFindings
+      .filter((r) => r.priority === 'critical')
+      .map((r) => r.code)
+      .join(', ');
+    throw new Error(`Stage transition blocked by critical risks: ${criticalLabels}`);
+  }
+
+  // Persist risk findings and generate inbox events
+  if (riskFindings.length > 0) {
+    await persistRiskFindings(projectId, riskFindings);
+    const inboxEvents = buildTransitionInboxEvents(projectId, riskFindings, targetStage);
+    await persistTransitionInboxEvents(projectId, inboxEvents);
+  }
+
   const now = new Date().toISOString();
 
   // Close out the current stage entry
@@ -336,7 +544,7 @@ export async function transitionStage(
 
   // Sync Job.status
   const newJobStatus = stageToJobStatus(targetStage);
-  const jobRef = doc(db, 'jobs', project.jobId);
+  const jobRef = getDemoDoc( 'jobs', project.jobId);
   const jobSnap = await getDoc(jobRef);
   if (jobSnap.exists()) {
     const currentJobStatus = jobSnap.data().status;
@@ -361,7 +569,7 @@ export async function transitionStage(
 export async function getProjectByJobId(
   jobId: string
 ): Promise<Project | null> {
-  const q = query(collection(db, PROJECTS_COL), where('jobId', '==', jobId));
+  const q = query(getDemoCol( PROJECTS_COL), where('jobId', '==', jobId));
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const docSnap = snap.docs[0];
@@ -372,7 +580,7 @@ export async function getProjectByJobId(
  * Get a project by its ID.
  */
 export async function getProject(projectId: string): Promise<Project | null> {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   const snap = await getDoc(projectRef);
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as Project;
@@ -385,7 +593,7 @@ export function subscribeToProject(
   projectId: string,
   callback: (project: Project | null) => void
 ): () => void {
-  const projectRef = doc(db, PROJECTS_COL, projectId);
+  const projectRef = getDemoDoc( PROJECTS_COL, projectId);
   return onSnapshot(projectRef, (snap) => {
     if (snap.exists()) {
       callback({ id: snap.id, ...snap.data() } as Project);
@@ -402,7 +610,7 @@ export function subscribeToProjectByJobId(
   jobId: string,
   callback: (project: Project | null) => void
 ): () => void {
-  const q = query(collection(db, PROJECTS_COL), where('jobId', '==', jobId));
+  const q = query(getDemoCol( PROJECTS_COL), where('jobId', '==', jobId));
   return onSnapshot(q, (snap) => {
     if (snap.empty) {
       callback(null);
@@ -419,14 +627,14 @@ export function subscribeToProjectByJobId(
 export async function getProjectsForUser(userId: string): Promise<Project[]> {
   // Query by clientId
   const clientQ = query(
-    collection(db, PROJECTS_COL),
+    getDemoCol( PROJECTS_COL),
     where('clientId', '==', userId)
   );
   const clientSnap = await getDocs(clientQ);
 
   // Query by leadArchitectId
   const archQ = query(
-    collection(db, PROJECTS_COL),
+    getDemoCol( PROJECTS_COL),
     where('leadArchitectId', '==', userId)
   );
   const archSnap = await getDocs(archQ);

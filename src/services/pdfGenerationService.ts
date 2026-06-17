@@ -9,6 +9,8 @@ import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firesto
 import { CouncilSubmission, Job, Submission, UserProfile, Invoice } from '../types';
 import { uploadAndTrackFile } from '../lib/uploadService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 export interface SubmissionPackageData {
   job: Job;
   client: UserProfile;
@@ -92,19 +94,19 @@ class PDFGenerationService {
   ): Promise<SubmissionPackageData | null> {
     try {
       // Get council submission
-      const submissionDoc = await getDoc(doc(db, 'council_submissions', councilSubmissionId));
+      const submissionDoc = await getDoc(getDemoDoc( 'council_submissions', councilSubmissionId));
       if (!submissionDoc.exists()) return null;
       
       const councilSubmission = { id: submissionDoc.id, ...submissionDoc.data() } as CouncilSubmission;
       
       // Get job
-      const jobDoc = await getDoc(doc(db, 'jobs', councilSubmission.jobId));
+      const jobDoc = await getDoc(getDemoDoc( 'jobs', councilSubmission.jobId));
       if (!jobDoc.exists()) return null;
       
       const job = { id: jobDoc.id, ...jobDoc.data() } as Job;
       
       // Get client
-      const clientDoc = await getDoc(doc(db, 'users', job.clientId));
+      const clientDoc = await getDoc(getDemoDoc( 'users', job.clientId));
       if (!clientDoc.exists()) return null;
       
       const client = clientDoc.data() as UserProfile;
@@ -112,7 +114,7 @@ class PDFGenerationService {
       // Get architect if selected
       let architect: UserProfile | undefined;
       if (job.selectedArchitectId) {
-        const archDoc = await getDoc(doc(db, 'users', job.selectedArchitectId));
+        const archDoc = await getDoc(getDemoDoc( 'users', job.selectedArchitectId));
         if (archDoc.exists()) {
           architect = archDoc.data() as UserProfile;
         }
@@ -120,7 +122,7 @@ class PDFGenerationService {
       
       // Get approved submissions
       const submissionsQuery = query(
-        collection(db, `jobs/${job.id}/submissions`),
+        getDemoCol( `jobs/${job.id}/submissions`),
         where('status', '==', 'approved')
       );
       const submissionsSnap = await getDocs(submissionsQuery);
@@ -709,7 +711,7 @@ class PDFGenerationService {
     uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
-      const submissionDoc = await getDoc(doc(db, 'submissions', submissionId));
+      const submissionDoc = await getDoc(getDemoDoc( 'submissions', submissionId));
       if (!submissionDoc.exists()) {
         throw new Error('Submission not found');
       }
@@ -804,8 +806,8 @@ class PDFGenerationService {
   ): Promise<{ url: string; fileName: string }> {
     try {
       // Fetch client and architect profiles
-      const clientDoc = await getDoc(doc(db, 'users', invoice.clientId));
-      const architectDoc = await getDoc(doc(db, 'users', invoice.architectId));
+      const clientDoc = await getDoc(getDemoDoc( 'users', invoice.clientId));
+      const architectDoc = await getDoc(getDemoDoc( 'users', invoice.architectId));
       
       const client = clientDoc.exists() ? clientDoc.data() as UserProfile : { displayName: 'Unknown Client', email: '' } as UserProfile;
       const architect = architectDoc.exists() ? architectDoc.data() as UserProfile : { displayName: 'Unknown Architect', email: '' } as UserProfile;
@@ -952,7 +954,7 @@ class PDFGenerationService {
     uploadedBy: string
   ): Promise<{ url: string; fileName: string }> {
     try {
-      const submissionDoc = await getDoc(doc(db, 'submissions', submissionId));
+      const submissionDoc = await getDoc(getDemoDoc( 'submissions', submissionId));
       if (!submissionDoc.exists()) throw new Error('Submission not found');
       const submission = submissionDoc.data() as Submission;
 

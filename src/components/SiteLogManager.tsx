@@ -81,6 +81,7 @@ export default function SiteLogManager({ projectId, jobId, currentUserId, compac
         materialsUsed: materialsUsed.split('\n').map((item) => item.trim()).filter(Boolean),
         issues: issues.split('\n').map((item) => item.trim()).filter(Boolean),
         photos: uploadedPhotos,
+        status: 'draft',
         createdBy: currentUserId,
       });
       toast.success('Site log created');

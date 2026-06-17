@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import {
   LayoutDashboard,
+
   Briefcase,
   Clock,
   CheckCircle2,
@@ -35,6 +36,8 @@ import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import SiteLogManager from './SiteLogManager';
 import BEPToolboxPage from './BEPToolboxPage';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
   'in-progress': 'bg-accent/10 text-primary border-accent/20',
@@ -54,14 +57,14 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
       setAssignedTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JobCard)));
     });
 
-    const qJobs = query(collection(db, 'jobs'), where('status', '==', 'open'));
+    const qJobs = query(getDemoCol( 'jobs'), where('status', '==', 'open'));
     const unsubscribeJobs = onSnapshot(qJobs, (snapshot) => {
       setAvailableJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
       setLoading(false);
     });
 
     const qReviews = query(
-      collection(db, 'reviews'),
+      getDemoCol( 'reviews'),
       where('toId', '==', user.uid),
       where('status', '==', 'approved'),
       orderBy('createdAt', 'desc')
@@ -340,10 +343,10 @@ function BEPJobCard({ task, user }: { task: JobCard, user: UserProfile }) {
 
   useEffect(() => {
     const fetchContext = async () => {
-      const jobDoc = await getDoc(doc(db, 'jobs', task.jobId));
+      const jobDoc = await getDoc(getDemoDoc( 'jobs', task.jobId));
       if (jobDoc.exists()) setJob({ id: jobDoc.id, ...jobDoc.data() } as Job);
 
-      const archDoc = await getDoc(doc(db, 'users', task.architectId));
+      const archDoc = await getDoc(getDemoDoc( 'users', task.architectId));
       if (archDoc.exists()) setArchitect({ uid: archDoc.id, ...archDoc.data() } as UserProfile);
     };
     fetchContext();
@@ -351,7 +354,7 @@ function BEPJobCard({ task, user }: { task: JobCard, user: UserProfile }) {
 
   const updateStatus = async (newStatus: 'pending' | 'in-progress' | 'completed') => {
     try {
-      const taskRef = doc(db, `jobs/${task.jobId}/tasks`, task.id);
+      const taskRef = getDemoDoc( `jobs/${task.jobId}/tasks`, task.id);
       await updateDoc(taskRef, { status: newStatus, updatedAt: new Date().toISOString() });
       toast.success(`Status updated to ${newStatus}`);
     } catch (error) {
@@ -417,7 +420,7 @@ function BEPJobCard({ task, user }: { task: JobCard, user: UserProfile }) {
 function MarketplaceJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const applyForJob = async () => {
     try {
-      await addDoc(collection(db, `jobs/${job.id}/applications`), {
+      await addDoc(getDemoCol( `jobs/${job.id}/applications`), {
         applicantId: user.uid,
         applicantName: user.displayName,
         applicantRole: user.role,

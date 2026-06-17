@@ -14,6 +14,7 @@ import { notificationService } from '../services/notificationService';
 import { MAX_UPLOAD_SIZE_LABEL, uploadAndTrackFile } from '../lib/uploadService';
 import { 
   File, 
+
   FileText, 
   Image as ImageIcon, 
   FileCode, 
@@ -32,6 +33,8 @@ import { safeFormat, cn } from '@/lib/utils';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import { getSelectedProfessionalId } from '@/lib/professionalRoleCompatibility';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface FileManagerProps {
   user: UserProfile;
 }
@@ -97,18 +100,18 @@ export default function FileManager({ user }: FileManagerProps) {
 
     const subscribe = async () => {
       if (user.role === 'admin') {
-        subscribeToFiles(query(collection(db, 'uploaded_files'), orderBy('uploadedAt', 'desc')));
+        subscribeToFiles(query(getDemoCol( 'uploaded_files'), orderBy('uploadedAt', 'desc')));
         return;
       }
 
       // Always show files uploaded by this user.
-      subscribeToFiles(query(collection(db, 'uploaded_files'), where('uploadedBy', '==', user.uid), orderBy('uploadedAt', 'desc')));
+      subscribeToFiles(query(getDemoCol( 'uploaded_files'), where('uploadedBy', '==', user.uid), orderBy('uploadedAt', 'desc')));
 
       // Also show files linked to projects this user participates in. This fixes
       // the File Manager hiding project files uploaded by a client, architect, or
       // admin when the current user did not personally upload the file.
       const jobIds = new Set<string>();
-      const jobsCollection = collection(db, 'jobs');
+      const jobsCollection = getDemoCol( 'jobs');
       const jobQueries: Query[] = user.role === 'client'
         ? [query(jobsCollection, where('clientId', '==', user.uid))]
         : DESIGN_PROFESSIONAL_ROLES.has(user.role)
@@ -130,7 +133,7 @@ export default function FileManager({ user }: FileManagerProps) {
 
       const ids = Array.from(jobIds);
       for (let i = 0; i < ids.length; i += 10) {
-        subscribeToFiles(query(collection(db, 'uploaded_files'), where('jobId', 'in', ids.slice(i, i + 10))));
+        subscribeToFiles(query(getDemoCol( 'uploaded_files'), where('jobId', 'in', ids.slice(i, i + 10))));
       }
 
       if (ids.length === 0) publish();
@@ -201,7 +204,7 @@ export default function FileManager({ user }: FileManagerProps) {
     let submissionRef: Awaited<ReturnType<typeof addDoc>> | null = null;
 
     try {
-      const jobSnap = await getDoc(doc(db, 'jobs', file.jobId));
+      const jobSnap = await getDoc(getDemoDoc( 'jobs', file.jobId));
       if (!jobSnap.exists()) throw new Error(`Job ${file.jobId} could not be found.`);
 
       const job = { id: jobSnap.id, ...jobSnap.data() } as Job;
@@ -214,7 +217,7 @@ export default function FileManager({ user }: FileManagerProps) {
 
       const architectId = selectedProfessionalId || user.uid;
 
-      submissionRef = await addDoc(collection(db, `jobs/${file.jobId}/submissions`), {
+      submissionRef = await addDoc(getDemoCol( `jobs/${file.jobId}/submissions`), {
         jobId: file.jobId,
         architectId,
         drawingUrl: file.url,
@@ -248,7 +251,7 @@ export default function FileManager({ user }: FileManagerProps) {
         throw new Error('Architect comment is required before notifying the client.');
       }
 
-      await updateDoc(doc(db, `jobs/${file.jobId}/submissions`, submissionRef.id), {
+      await updateDoc(getDemoDoc( `jobs/${file.jobId}/submissions`, submissionRef.id), {
         status: aiReview.status === 'passed' ? 'ai_passed' : 'ai_failed',
         aiFeedback: aiReview.feedback,
         aiStructuredFeedback: aiReview.categories,
@@ -288,7 +291,7 @@ export default function FileManager({ user }: FileManagerProps) {
       toast.success('Quick scan complete. Client notification sent.');
     } catch (error: any) {
       if (submissionRef && file.jobId) {
-        await updateDoc(doc(db, `jobs/${file.jobId}/submissions`, submissionRef.id), {
+        await updateDoc(getDemoDoc( `jobs/${file.jobId}/submissions`, submissionRef.id), {
           status: 'ai_failed',
           aiFeedback: error.message || 'Quick scan failed',
         }).catch(() => undefined);

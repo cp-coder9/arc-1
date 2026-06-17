@@ -2,6 +2,7 @@ import { apiFetch } from '../lib/apiClient';
 import { db, auth } from "../lib/firebase";
 import {
   collection,
+
   query,
   where,
   getDocs,
@@ -16,6 +17,8 @@ import {
 } from "firebase/firestore";
 import { AgentKnowledge, KnowledgeStatus } from "../types";
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const KNOWLEDGE_COLLECTION = "agent_knowledge";
 const COPYRIGHT_SAFE_DISCLAIMER = "Summary only — refer to official SANS document for authoritative text.";
 
@@ -23,7 +26,7 @@ export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus
   try {
     // Production agent prompts must request active knowledge only; pending/rejected entries are never authoritative.
     const q = query(
-      collection(db, KNOWLEDGE_COLLECTION),
+      getDemoCol( KNOWLEDGE_COLLECTION),
       where("agentRole", "==", agentId),
       where("status", "==", status)
     );
@@ -45,7 +48,7 @@ export const getAgentKnowledge = async (agentId: string, status: KnowledgeStatus
 export const getAllAgentKnowledge = async (status: KnowledgeStatus = "active"): Promise<AgentKnowledge[]> => {
   try {
     const q = query(
-      collection(db, KNOWLEDGE_COLLECTION),
+      getDemoCol( KNOWLEDGE_COLLECTION),
       where("status", "==", status)
     );
     const snap = await getDocs(q);
@@ -71,7 +74,7 @@ export const getKnowledgeForAgents = async (
   try {
     if (agentRoles.length === 0) return [];
     const q = query(
-      collection(db, KNOWLEDGE_COLLECTION),
+      getDemoCol( KNOWLEDGE_COLLECTION),
       where("agentRole", "in", agentRoles),
       where("status", "==", status)
     );
@@ -94,7 +97,7 @@ export const addKnowledge = async (entry: Omit<AgentKnowledge, "id">): Promise<s
       ? `${COPYRIGHT_SAFE_DISCLAIMER}\n\n${entry.content}`
       : entry.content;
 
-    const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), {
+    const docRef = await addDoc(getDemoCol( KNOWLEDGE_COLLECTION), {
       ...entry,
       content,
       disclaimer: entry.disclaimer || COPYRIGHT_SAFE_DISCLAIMER,
@@ -111,7 +114,7 @@ export const addKnowledge = async (entry: Omit<AgentKnowledge, "id">): Promise<s
 
 export const approveKnowledge = async (entryId: string, adminId: string) => {
   try {
-    await updateDoc(doc(db, KNOWLEDGE_COLLECTION, entryId), {
+    await updateDoc(getDemoDoc( KNOWLEDGE_COLLECTION, entryId), {
       status: "active",
       reviewedBy: adminId,
       reviewedAt: new Date().toISOString(),
@@ -126,7 +129,7 @@ export const approveKnowledge = async (entryId: string, adminId: string) => {
 
 export const rejectKnowledge = async (entryId: string, adminId: string, reason: string) => {
   try {
-    await updateDoc(doc(db, KNOWLEDGE_COLLECTION, entryId), {
+    await updateDoc(getDemoDoc( KNOWLEDGE_COLLECTION, entryId), {
       status: "rejected",
       reviewedBy: adminId,
       reviewedAt: new Date().toISOString(),
@@ -141,7 +144,7 @@ export const rejectKnowledge = async (entryId: string, adminId: string, reason: 
 
 export const updateKnowledge = async (entryId: string, content: string) => {
   try {
-    await updateDoc(doc(db, KNOWLEDGE_COLLECTION, entryId), {
+    await updateDoc(getDemoDoc( KNOWLEDGE_COLLECTION, entryId), {
       content,
       updatedAt: new Date().toISOString()
     });
@@ -153,7 +156,7 @@ export const updateKnowledge = async (entryId: string, content: string) => {
 
 export const deleteKnowledge = async (entryId: string) => {
   try {
-    await deleteDoc(doc(db, KNOWLEDGE_COLLECTION, entryId));
+    await deleteDoc(getDemoDoc( KNOWLEDGE_COLLECTION, entryId));
   } catch (error) {
     console.error("Error deleting knowledge:", error);
     throw error;
@@ -162,7 +165,7 @@ export const deleteKnowledge = async (entryId: string) => {
 
 export const incrementKnowledgeUsage = async (entryId: string) => {
   try {
-    const entryRef = doc(db, KNOWLEDGE_COLLECTION, entryId);
+    const entryRef = getDemoDoc( KNOWLEDGE_COLLECTION, entryId);
     await updateDoc(entryRef, {
       usageCount: increment(1),
       lastUsedAt: new Date().toISOString()

@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type RecordStatus = 'available' | 'allocated' | 'pending_review' | 'approved' | 'inactive';
 
@@ -65,20 +67,20 @@ export default function ContractorStaffPlantPage({ user }: { user: UserProfile }
 
   useEffect(() => {
     setState('loading');
-    const staffUnsub = onSnapshot(query(collection(db, 'contractor_staff_records'), where('contractorId', '==', user.uid)), (snapshot) => {
+    const staffUnsub = onSnapshot(query(getDemoCol( 'contractor_staff_records'), where('contractorId', '==', user.uid)), (snapshot) => {
       setStaff(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as StaffRecord)));
       setState('ready');
     }, (error) => {
       console.error('Failed to load contractor staff records:', error);
       setState('error');
     });
-    const plantUnsub = onSnapshot(query(collection(db, 'contractor_plant_records'), where('contractorId', '==', user.uid)), (snapshot) => {
+    const plantUnsub = onSnapshot(query(getDemoCol( 'contractor_plant_records'), where('contractorId', '==', user.uid)), (snapshot) => {
       setPlant(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as PlantRecord)));
     }, (error) => {
       console.error('Failed to load contractor plant records:', error);
       setState('error');
     });
-    const wagesUnsub = onSnapshot(query(collection(db, 'contractor_wage_records'), where('contractorId', '==', user.uid)), (snapshot) => {
+    const wagesUnsub = onSnapshot(query(getDemoCol( 'contractor_wage_records'), where('contractorId', '==', user.uid)), (snapshot) => {
       setWages(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as WageRecord)));
     }, (error) => {
       console.error('Failed to load contractor wage records:', error);
@@ -103,7 +105,7 @@ export default function ContractorStaffPlantPage({ user }: { user: UserProfile }
     setSaving(true);
     setFeedback(null);
     try {
-      await addDoc(collection(db, 'contractor_staff_records'), {
+      await addDoc(getDemoCol( 'contractor_staff_records'), {
         contractorId: user.uid,
         contractorName: user.displayName || user.email,
         name: staffForm.name.trim(),
@@ -130,7 +132,7 @@ export default function ContractorStaffPlantPage({ user }: { user: UserProfile }
     setSaving(true);
     setFeedback(null);
     try {
-      await addDoc(collection(db, 'contractor_plant_records'), {
+      await addDoc(getDemoCol( 'contractor_plant_records'), {
         contractorId: user.uid,
         contractorName: user.displayName || user.email,
         assetName: plantForm.assetName.trim(),
@@ -157,7 +159,7 @@ export default function ContractorStaffPlantPage({ user }: { user: UserProfile }
     setSaving(true);
     setFeedback(null);
     try {
-      await addDoc(collection(db, 'contractor_wage_records'), {
+      await addDoc(getDemoCol( 'contractor_wage_records'), {
         contractorId: user.uid,
         contractorName: user.displayName || user.email,
         periodStart: wageForm.periodStart,

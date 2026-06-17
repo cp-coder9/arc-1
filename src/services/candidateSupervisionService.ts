@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDoc,
@@ -16,6 +17,8 @@ import {
 import type { CandidateSupervisionLog, SupervisionLogStatus } from '@/types';
 import { notificationService } from './notificationService';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const SUPERVISION_COL = 'supervision_logs';
 
 const VALID_STATUSES: SupervisionLogStatus[] = ['draft', 'submitted', 'reviewed', 'signed_off', 'rejected'];
@@ -43,7 +46,7 @@ export async function createSupervisionLog(input: {
     if (input.hoursLogged < 0) throw new Error('hoursLogged cannot be negative.');
 
     const now = new Date().toISOString();
-    const ref = doc(collection(db, SUPERVISION_COL));
+    const ref = doc(getDemoCol( SUPERVISION_COL));
     const log: CandidateSupervisionLog = {
       id: ref.id,
       candidateId: input.candidateId,
@@ -78,7 +81,7 @@ export async function createSupervisionLog(input: {
 
 export async function submitForReview(logId: string, actorId: string): Promise<void> {
   try {
-    const logRef = doc(db, SUPERVISION_COL, logId);
+    const logRef = getDemoDoc( SUPERVISION_COL, logId);
     const logSnap = await getDoc(logRef);
     if (!logSnap.exists()) throw new Error('Supervision log not found.');
 
@@ -96,7 +99,7 @@ export async function submitForReview(logId: string, actorId: string): Promise<v
 
 export async function reviewLog(logId: string, mentorId: string, mentorNotes?: string): Promise<void> {
   try {
-    const logRef = doc(db, SUPERVISION_COL, logId);
+    const logRef = getDemoDoc( SUPERVISION_COL, logId);
     const logSnap = await getDoc(logRef);
     if (!logSnap.exists()) throw new Error('Supervision log not found.');
 
@@ -113,7 +116,7 @@ export async function reviewLog(logId: string, mentorId: string, mentorNotes?: s
 
 export async function signOffLog(logId: string, mentorId: string): Promise<void> {
   try {
-    const logRef = doc(db, SUPERVISION_COL, logId);
+    const logRef = getDemoDoc( SUPERVISION_COL, logId);
     const logSnap = await getDoc(logRef);
     if (!logSnap.exists()) throw new Error('Supervision log not found.');
 
@@ -130,7 +133,7 @@ export async function signOffLog(logId: string, mentorId: string): Promise<void>
 
 export async function rejectLog(logId: string, mentorId: string, reason: string): Promise<void> {
   try {
-    const logRef = doc(db, SUPERVISION_COL, logId);
+    const logRef = getDemoDoc( SUPERVISION_COL, logId);
     const logSnap = await getDoc(logRef);
     if (!logSnap.exists()) throw new Error('Supervision log not found.');
 
@@ -146,7 +149,7 @@ export async function rejectLog(logId: string, mentorId: string, reason: string)
 
 export async function getSupervisionLog(id: string): Promise<CandidateSupervisionLog | null> {
   try {
-    const snap = await getDoc(doc(db, SUPERVISION_COL, id));
+    const snap = await getDoc(getDemoDoc( SUPERVISION_COL, id));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as CandidateSupervisionLog) : null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, `${SUPERVISION_COL}/${id}`);
@@ -156,7 +159,7 @@ export async function getSupervisionLog(id: string): Promise<CandidateSupervisio
 export async function getCandidateLogs(candidateId: string, firmId: string): Promise<CandidateSupervisionLog[]> {
   try {
     const q = query(
-      collection(db, SUPERVISION_COL),
+      getDemoCol( SUPERVISION_COL),
       where('candidateId', '==', candidateId),
       where('firmId', '==', firmId),
       orderBy('createdAt', 'desc')
@@ -171,7 +174,7 @@ export async function getCandidateLogs(candidateId: string, firmId: string): Pro
 export async function getMentorLogs(mentorId: string, firmId: string): Promise<CandidateSupervisionLog[]> {
   try {
     const q = query(
-      collection(db, SUPERVISION_COL),
+      getDemoCol( SUPERVISION_COL),
       where('mentorId', '==', mentorId),
       where('firmId', '==', firmId),
       orderBy('createdAt', 'desc')
@@ -188,7 +191,7 @@ export async function getFirmSupervisionLogs(firmId: string, filters?: { status?
     const constraints = [where('firmId', '==', firmId), orderBy('createdAt', 'desc')];
     if (filters?.status) constraints.unshift(where('status', '==', filters.status));
 
-    const q = query(collection(db, SUPERVISION_COL), ...constraints);
+    const q = query(getDemoCol( SUPERVISION_COL), ...constraints);
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as CandidateSupervisionLog));
   } catch (error) {
@@ -199,7 +202,7 @@ export async function getFirmSupervisionLogs(firmId: string, filters?: { status?
 export async function deleteSupervisionLog(id: string): Promise<void> {
   try {
     const batch = writeBatch(db);
-    batch.delete(doc(db, SUPERVISION_COL, id));
+    batch.delete(getDemoDoc( SUPERVISION_COL, id));
     await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${SUPERVISION_COL}/${id}`);
@@ -208,7 +211,7 @@ export async function deleteSupervisionLog(id: string): Promise<void> {
 
 export function subscribeToCandidateLogs(candidateId: string, firmId: string, callback: (logs: CandidateSupervisionLog[]) => void): () => void {
   return onSnapshot(
-    query(collection(db, SUPERVISION_COL), where('candidateId', '==', candidateId), where('firmId', '==', firmId), orderBy('createdAt', 'desc')),
+    query(getDemoCol( SUPERVISION_COL), where('candidateId', '==', candidateId), where('firmId', '==', firmId), orderBy('createdAt', 'desc')),
     (snapshot) => callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as CandidateSupervisionLog))),
     (error) => {
       console.error('Failed to subscribe to candidate logs:', error);

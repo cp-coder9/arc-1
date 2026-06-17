@@ -64,7 +64,6 @@ import { getApplicationProfessionalId, withProfessionalJobAliases, withProfessio
 
 import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
 
-
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "";
@@ -7224,6 +7223,60 @@ router.get("/firebase/test", async (_req, res) => {
     });
   }
 })
+
+// ── Pack 2: Project Passport, Risks & Inbox Events API ──────────────────────
+
+// GET /api/projects/:id/passport — Build and return the project passport
+router.get("/projects/:id/passport", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const projectSnap = await adminDb.collection("projects").doc(id).get();
+    if (!projectSnap.exists) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    const project = { id: projectSnap.id, ...projectSnap.data() };
+    res.json({ project });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/projects/:id/risks — Return risk findings for a project
+router.get("/projects/:id/risks", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const risksSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("risk_findings")
+      .orderBy("detectedAt", "desc")
+      .limit(100)
+      .get();
+    const risks = risksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    res.json({ risks });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/projects/:id/inbox-events — Return inbox events for a project
+router.get("/projects/:id/inbox-events", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const eventsSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("inbox_events")
+      .orderBy("createdAt", "desc")
+      .limit(100)
+      .get();
+    const events = eventsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    res.json({ events });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Mount POPIA/PAIA compliance routes
 router.use("/popia", popiaRoutes);

@@ -13,6 +13,8 @@ import { pdfGenerationService } from '../services/pdfGenerationService';
 import { notificationService } from '../services/notificationService';
 import { format } from 'date-fns';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface InvoiceManagementProps {
   user: UserProfile;
 }
@@ -46,10 +48,10 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
   useEffect(() => {
     // Invoices list
     const qInvoices = user.role === 'admin'
-      ? query(collection(db, 'invoices'))
+      ? query(getDemoCol( 'invoices'))
       : user.role === 'architect' 
-        ? query(collection(db, 'invoices'), where('architectId', '==', user.uid))
-        : query(collection(db, 'invoices'), where('clientId', '==', user.uid));
+        ? query(getDemoCol( 'invoices'), where('architectId', '==', user.uid))
+        : query(getDemoCol( 'invoices'), where('clientId', '==', user.uid));
 
     const unsubInvoices = onSnapshot(qInvoices, (snapshot) => {
       setInvoices(sortInvoices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice))));
@@ -63,8 +65,8 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
     // My jobs (to select for new invoice)
     if (user.role === 'architect' || user.role === 'admin') {
       const qJobs = user.role === 'admin'
-        ? query(collection(db, 'jobs'))
-        : query(collection(db, 'jobs'), where('selectedArchitectId', '==', user.uid));
+        ? query(getDemoCol( 'jobs'))
+        : query(getDemoCol( 'jobs'), where('selectedArchitectId', '==', user.uid));
         
       const unsubJobs = onSnapshot(qJobs, (snapshot) => {
         setMyJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
@@ -134,7 +136,7 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
         createdAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(collection(db, 'invoices'), invoiceData);
+      const docRef = await addDoc(getDemoCol( 'invoices'), invoiceData);
       
       toast.success('Invoice created as draft');
       setIsCreateModalOpen(false);
@@ -160,7 +162,7 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
       const { url } = await pdfGenerationService.generateInvoicePDF(invoice, user.uid);
       
       // 2. Update Invoice
-      await updateDoc(doc(db, 'invoices', invoice.id), {
+      await updateDoc(getDemoDoc( 'invoices', invoice.id), {
         status: 'sent',
         pdfUrl: url,
         updatedAt: new Date().toISOString()
@@ -180,7 +182,7 @@ export default function InvoiceManagement({ user }: InvoiceManagementProps) {
 
   const handleMarkAsPaid = async (invoice: Invoice) => {
     try {
-      await updateDoc(doc(db, 'invoices', invoice.id), {
+      await updateDoc(getDemoDoc( 'invoices', invoice.id), {
         status: 'paid',
         paidAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()

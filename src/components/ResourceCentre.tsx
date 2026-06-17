@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type ChecklistItem = { id: string; title: string; discipline?: Discipline | string; municipality?: string; status: 'open' | 'in_progress' | 'complete'; requiredForSubmission?: boolean; createdBy: string; createdAt: string; completedAt?: string };
 
 const DISCIPLINE_OPTIONS = ['architecture', 'structure', 'fire', 'accessibility', 'energy', 'drainage', 'electrical', 'mechanical', 'planning', 'documentation', 'nhbrc', 'coordination'];
@@ -34,14 +36,14 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const unsubKnowledge = onSnapshot(query(collection(db, 'agent_knowledge'), where('status', '==', 'active'), limit(50)), (snapshot) => {
+    const unsubKnowledge = onSnapshot(query(getDemoCol( 'agent_knowledge'), where('status', '==', 'active'), limit(50)), (snapshot) => {
       setKnowledge(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as AgentKnowledge)));
       setLoading(false);
     }, (error) => {
       console.error('Failed to load resource centre knowledge:', error);
       setLoading(false);
     });
-    const unsubChecklists = onSnapshot(query(collection(db, 'resource_checklists'), limit(50)), (snapshot) => {
+    const unsubChecklists = onSnapshot(query(getDemoCol( 'resource_checklists'), limit(50)), (snapshot) => {
       setChecklists(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ChecklistItem)).sort((a, b) => timestampMs(b.createdAt) - timestampMs(a.createdAt)));
     }, (error) => console.error('Failed to load resource checklists:', error));
     return () => { unsubKnowledge(); unsubChecklists(); };
@@ -65,7 +67,7 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'resource_checklists'), {
+      await addDoc(getDemoCol( 'resource_checklists'), {
         title: title.trim(),
         discipline: checklistDiscipline.trim() || undefined,
         municipality: municipality.trim() || undefined,
@@ -84,7 +86,7 @@ export default function ResourceCentre({ user }: { user: UserProfile }) {
   };
 
   const markChecklist = async (item: ChecklistItem, status: ChecklistItem['status']) => {
-    await updateDoc(doc(db, 'resource_checklists', item.id), {
+    await updateDoc(getDemoDoc( 'resource_checklists', item.id), {
       status,
       completedAt: status === 'complete' ? new Date().toISOString() : null,
       updatedAt: new Date().toISOString(),

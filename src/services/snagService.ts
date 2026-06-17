@@ -2,6 +2,8 @@ import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, updateDoc
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import type { SnagItem, SnagStatus, Severity } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const SNAGS_COL = 'snags';
 
@@ -9,12 +11,12 @@ type FirestoreUnsubscribe = () => void;
 
 function snagsCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, SNAGS_COL);
+  return getDemoCol( PROJECTS_COL, projectId, SNAGS_COL);
 }
 
 function snagDocument(projectId: string, snagId: string) {
   if (!snagId) throw new Error('snagId is required');
-  return doc(db, PROJECTS_COL, projectId, SNAGS_COL, snagId);
+  return getDemoDoc( PROJECTS_COL, projectId, SNAGS_COL, snagId);
 }
 
 function withId<T extends { id: string }>(snap: { id: string; data: () => Record<string, unknown> }): T {
@@ -141,7 +143,10 @@ export async function rejectSnag(
 export async function reopenSnag(projectId: string, snagId: string): Promise<void> {
   try {
     const now = new Date().toISOString();
-    await updateDoc(snagDocument(projectId, snagId), { status: 'open', updatedAt: now });
+    await updateDoc(snagDocument(projectId, snagId), {
+      status: 'open',
+      updatedAt: now,
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${SNAGS_COL}/${snagId}`);
   }

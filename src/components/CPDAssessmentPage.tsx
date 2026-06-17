@@ -8,6 +8,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 type CPDAttemptRecord = CPDAttemptResult & { id: string; courseId?: string; createdAt?: string; certificatePending?: boolean };
 
@@ -28,14 +30,14 @@ export default function CPDAssessmentPage({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     setState('loading');
-    const assessmentsUnsub = onSnapshot(query(collection(db, 'cpd_assessments'), orderBy('courseId', 'asc')), (snapshot) => {
+    const assessmentsUnsub = onSnapshot(query(getDemoCol( 'cpd_assessments'), orderBy('courseId', 'asc')), (snapshot) => {
       setAssessments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as CPDAssessment)));
       setState('ready');
     }, (error) => {
       console.error('Failed to load CPD assessments:', error);
       setState('error');
     });
-    const attemptsUnsub = onSnapshot(query(collection(db, 'cpd_attempts'), where('userId', '==', user.uid)), (snapshot) => {
+    const attemptsUnsub = onSnapshot(query(getDemoCol( 'cpd_attempts'), where('userId', '==', user.uid)), (snapshot) => {
       setAttempts(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as CPDAttemptRecord)));
     }, (error) => {
       console.error('Failed to load CPD attempts:', error);
@@ -93,7 +95,7 @@ export default function CPDAssessmentPage({ user }: { user: UserProfile }) {
         answers,
         submittedAt,
       });
-      await addDoc(collection(db, 'cpd_attempts'), {
+      await addDoc(getDemoCol( 'cpd_attempts'), {
         ...result,
         courseId: selectedAssessment.courseId,
         cpdPoints: selectedAssessment.cpdPoints ?? 0,

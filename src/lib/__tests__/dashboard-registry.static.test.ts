@@ -298,7 +298,7 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain("const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));"
     );
     expect(appSource).toContain('const REAL_WORKFLOW_PAGE_IDS = new Set');
-    for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging']) {
+    for (const pageId of ['journey', 'messages', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']) {
       expect(appSource).toContain(`'${pageId}'`);
     }
     expect(workflowSource).toContain("import ProjectMessengerPage from './ProjectMessengerPage';");

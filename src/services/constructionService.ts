@@ -1,6 +1,7 @@
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import {
   addDoc,
+
   collection,
   doc,
   getDocs,
@@ -13,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import type { GanttTask, RFI, SiteInspection, SiteLog } from '@/types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 const PROJECTS_COL = 'projects';
 const GANTT_TASKS_COL = 'gantt_tasks';
 const SITE_LOGS_COL = 'site_logs';
@@ -27,12 +30,12 @@ type NewInspection = Omit<SiteInspection, 'id' | 'createdAt'>;
 
 function projectSubcollection(projectId: string, subcollection: string) {
   if (!projectId) throw new Error('projectId is required');
-  return collection(db, PROJECTS_COL, projectId, subcollection);
+  return getDemoCol( PROJECTS_COL, projectId, subcollection);
 }
 
 function projectDocument(projectId: string, subcollection: string, documentId: string) {
   if (!documentId) throw new Error('documentId is required');
-  return doc(db, PROJECTS_COL, projectId, subcollection, documentId);
+  return getDemoDoc( PROJECTS_COL, projectId, subcollection, documentId);
 }
 
 function withId<T extends { id: string }>(documentSnapshot: { id: string; data: () => Record<string, unknown> }): T {
@@ -134,7 +137,7 @@ export async function createRFI(data: NewRFI): Promise<string> {
   try {
     const now = new Date().toISOString();
     const rfiRef = doc(projectSubcollection(data.projectId, RFIS_COL));
-    const counterRef = doc(db, PROJECTS_COL, data.projectId, '_meta', 'rfi_counter');
+    const counterRef = getDemoDoc( PROJECTS_COL, data.projectId, '_meta', 'rfi_counter');
 
     await runTransaction(db, async (transaction) => {
       const counterSnap = await transaction.get(counterRef);

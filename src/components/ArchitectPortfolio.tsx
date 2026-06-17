@@ -16,6 +16,8 @@ import { ArchitectProfile, Review, UserProfile } from '@/types';
 import { safeFormat } from '@/lib/utils';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 interface ArchitectPortfolioProps {
   architectId: string;
 }
@@ -35,20 +37,20 @@ export function ArchitectPortfolio({ architectId }: ArchitectPortfolioProps) {
       setIsLoading(true);
       
       // Load user profile
-      const userDoc = await getDoc(doc(db, 'users', architectId));
+      const userDoc = await getDoc(getDemoDoc( 'users', architectId));
       if (userDoc.exists()) {
         setUser(userDoc.data() as UserProfile);
       }
 
       // Load architect profile
-      const profileDoc = await getDoc(doc(db, 'architect_profiles', architectId));
+      const profileDoc = await getDoc(getDemoDoc( 'architect_profiles', architectId));
       if (profileDoc.exists()) {
         setProfile(profileDoc.data() as ArchitectProfile);
       }
 
       // Load reviews
       const reviewsQuery = query(
-        collection(db, 'reviews'),
+        getDemoCol( 'reviews'),
         where('toId', '==', architectId),
         where('type', '==', 'client_to_architect')
       );

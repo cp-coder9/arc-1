@@ -8,6 +8,7 @@ import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 import {
   collection,
+
   addDoc,
   query,
   where,
@@ -22,6 +23,8 @@ import {
 } from 'firebase/firestore';
 import { Notification, NotificationPreferences, NotificationType } from '../types';
 
+
+import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 // Notification types with their default channels
 const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: ('in_app' | 'email' | 'push')[] }> = {
   job_application: {
@@ -154,7 +157,7 @@ class NotificationService {
   private unsubscribeFns: Map<string, () => void> = new Map();
 
   private async getUserPreferences(userId: string): Promise<NotificationPreferences> {
-    const userSnap = await getDoc(doc(db, 'users', userId));
+    const userSnap = await getDoc(getDemoDoc( 'users', userId));
     const preferences = userSnap.data()?.notificationPreferences as Partial<NotificationPreferences> | undefined;
     return {
       in_app: preferences?.in_app ?? true,
@@ -191,7 +194,7 @@ class NotificationService {
     };
 
     // Save to Firestore (triggers Cloud Function for email/push)
-    await addDoc(collection(db, 'notifications'), notification);
+    await addDoc(getDemoCol( 'notifications'), notification);
 
     // Also send in-app immediately
     if (channels.includes('in_app')) {
@@ -207,7 +210,7 @@ class NotificationService {
     callback: (notifications: Notification[]) => void
   ): () => void {
     const q = query(
-      collection(db, 'notifications'),
+      getDemoCol( 'notifications'),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc'),
       limit(50)
@@ -229,7 +232,7 @@ class NotificationService {
    * Mark notification as read
    */
   async markAsRead(notificationId: string): Promise<void> {
-    const ref = doc(db, 'notifications', notificationId);
+    const ref = getDemoDoc( 'notifications', notificationId);
     await updateDoc(ref, {
       isRead: true,
       readAt: new Date().toISOString(),
@@ -241,7 +244,7 @@ class NotificationService {
    */
   async markAllAsRead(userId: string): Promise<void> {
     const q = query(
-      collection(db, 'notifications'),
+      getDemoCol( 'notifications'),
       where('userId', '==', userId),
       where('isRead', '==', false)
     );
@@ -264,7 +267,7 @@ class NotificationService {
    */
   async getUnreadCount(userId: string): Promise<number> {
     const q = query(
-      collection(db, 'notifications'),
+      getDemoCol( 'notifications'),
       where('userId', '==', userId),
       where('isRead', '==', false)
     );
