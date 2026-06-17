@@ -2,7 +2,6 @@ import { db, auth } from '../lib/firebase';
 import { apiFetch as configuredApiFetch, buildApiUrl } from '../lib/apiClient';
 import {
   collection,
-
   query,
   where,
   onSnapshot,
@@ -21,22 +20,8 @@ import { notificationService } from './notificationService';
 import { recordTransaction } from './financialLedgerService';
 import { calculateSplitPlatformFee } from './platformFeePolicy';
 import { toast } from 'sonner';
-import * as jsMd5 from 'js-md5';
 
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
-// Handle both ESM and CJS import styles safely
-const md5 = (jsMd5 as any).default || jsMd5;
-
-type PayFastEnv = {
-  VITE_PAYFAST_MERCHANT_ID?: string;
-  VITE_PAYFAST_MERCHANT_KEY?: string;
-  VITE_PAYFAST_PASSPHRASE?: string;
-  VITE_PAYFAST_SANDBOX?: string;
-};
-
-function getPayFastEnv(): PayFastEnv {
-  return typeof process !== 'undefined' ? (process.env as PayFastEnv) : {};
-}
 
 /** Fetch a fresh Firebase ID token for the current user, or throw if not signed in. */
 async function requireIdToken(): Promise<string> {
@@ -60,25 +45,6 @@ async function postApiJson(path: string, body: object): Promise<any> {
   if (!res.ok) throw new Error(data.error || `Server error: ${res.status}`);
   return data;
 }
-
-// Safe env accessor that works in both Vite (browser) and Jest (Node)
-const getEnv = (key: string) => {
-  try { if ((import.meta as any)?.env) return (import.meta as any).env[key]; } catch (e) {}
-  try { if (typeof process !== 'undefined') return process.env[key]; } catch (e) {}
-  return '';
-};
-
-// PayFast configuration
-const payFastEnv = getPayFastEnv();
-const PAYFAST_CONFIG = {
-  merchantId: String(getEnv('VITE_PAYFAST_MERCHANT_ID')),
-  merchantKey: String(getEnv('VITE_PAYFAST_MERCHANT_KEY')),
-  passphrase: String(getEnv('VITE_PAYFAST_PASSPHRASE')),
-  sandbox: getEnv('VITE_PAYFAST_SANDBOX') === 'true',
-  url: getEnv('VITE_PAYFAST_SANDBOX') === 'true'
-    ? 'https://sandbox.payfast.co.za/eng/process'
-    : 'https://www.payfast.co.za/eng/process',
-};
 
 const VAT_PERCENTAGE = 0.15;
 
@@ -166,54 +132,11 @@ class PaymentService {
   }
 
   /**
-   * Generate MD5 hash for PayFast signature
-   */
-  private async generateMD5(input: string): Promise<string> {
-    return md5(input);
-  }
-
-  /**
-   * Generate PayFast signature
-   */
-  private async generateSignature(data: Record<string, string>): Promise<string> {
-    // Sort keys alphabetically
-    const sortedKeys = Object.keys(data).sort();
-    let paramString = '';
-
-    sortedKeys.forEach((key) => {
-      const value = data[key];
-      if (value !== undefined && value !== '') {
-        paramString += `${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}&`;
-      }
-    });
-
-    // Remove trailing &
-    paramString = paramString.slice(0, -1);
-
-    // Add passphrase if configured
-    if (PAYFAST_CONFIG.passphrase) {
-      paramString += `&passphrase=${encodeURIComponent(PAYFAST_CONFIG.passphrase).replace(/%20/g, '+')}`;
-    }
-
-    // Generate MD5 hash
-    return this.generateMD5(paramString);
-  }
-
-  /**
-   * Verify PayFast ITN signature
-   */
-  async verifyITNSignature(pfData: Record<string, string>, signature: string): Promise<boolean> {
-    const expectedSignature = await this.generateSignature(pfData);
-    return expectedSignature === signature;
-  }
-
-
-  /**
-   * Initialize escrow for a job — delegates to server for privileged write.
+   * Initialize escrow for a job — delegates to server for privileged write + PayFast URL generation.
    */
   async initializeEscrow(job: Job, client: UserProfile): Promise<{ paymentUrl: string; paymentId: string }> {
     const data = await postApiJson('/api/payment/escrow/init', { jobId: job.id });
-    const paymentUrl = await this.generatePayFastUrl(data.paymentId, data.totalAmount, job.title, client);
+    const paymentUrl = data.paymentUrl;
     return { paymentUrl, paymentId: data.paymentId };
   }
 
@@ -385,59 +308,21 @@ async processRefund(
  toast.success(`Refund of R${data.refundAmount.toLocaleString()} processed`);
 }
 
-  /**
-   * Generate PayFast payment URL
-   */
-  private async generatePayFastUrl(
-    paymentId: string,
-    amount: number,
-    itemName: string,
-    payer: UserProfile
-  ): Promise<string> {
-    // PayFast requires absolute URLs for redirects. 
-    // We point to our backend routes so the server can handle any quick pre-processing 
-    // and then 302 redirect the user back to the SPA dashboards.
-    const returnUrl = buildApiUrl(`/api/payment/success?payment_id=${encodeURIComponent(paymentId)}`);
-    const cancelUrl = buildApiUrl(`/api/payment/cancel?payment_id=${encodeURIComponent(paymentId)}`);
-    const notifyUrl = buildApiUrl("/api/payment/notify");
-
-    const data: Record<string, string> = {
-      merchant_id: PAYFAST_CONFIG.merchantId as string,
-      merchant_key: PAYFAST_CONFIG.merchantKey as string,
-      return_url: returnUrl,
-      cancel_url: cancelUrl,
-      notify_url: notifyUrl,
-      name_first: (payer.displayName || '').split(' ')[0] || payer.displayName || 'User',
-      name_last: (payer.displayName || '').split(' ').slice(1).join(' ') || '',
-      email_address: payer.email || '',
-      m_payment_id: paymentId,
-      amount: (amount / 100).toFixed(2),
-      item_name: `Escrow: ${itemName.substring(0, 100)}`,
-      item_description: `Payment for architectural services via Architex`,
-      custom_str1: paymentId,
-      custom_str2: payer.uid,
-    };
-
-    // Remove empty values
-    Object.keys(data).forEach(key => {
-      if (data[key] === undefined || data[key] === '') {
-        delete data[key];
-      }
+/** Redirect user to PayFast — server builds signed URL. */
+  async redirectToPayFast(jobId: string): Promise<void> {
+    const token = await requireIdToken();
+    const res = await configuredApiFetch('/api/payment/escrow/init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ jobId }),
     });
-
-    // Generate signature
-    const signature = await this.generateSignature(data);
-
-    // Build URL
-    const params = new URLSearchParams();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined) {
-        params.append(key, value);
-      }
-    });
-    params.append('signature', signature);
-
-    return `${PAYFAST_CONFIG.url}?${params.toString()}`;
+    if (!res.ok) {
+      const err = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Payment initiation failed (${res.status}): ${err}`);
+    }
+    const data = await res.json();
+    if (!data.paymentUrl) throw new Error('Server did not return a payment URL');
+    window.location.href = data.paymentUrl;
   }
 
   /**
