@@ -90,7 +90,6 @@ import type { ArchitexNavKey } from './navigation/navTypes';
 
 // Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
-import { ArchitexThreeExperience } from './components/ArchitexThreeExperience';
 import BirdFlocks from './components/animations/BirdFlocks';
 
 type LazyImport<T extends ComponentType<any>> = () => Promise<{ default: T }>;
