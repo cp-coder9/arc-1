@@ -7278,6 +7278,188 @@ router.get("/projects/:id/inbox-events", async (req, res) => {
   }
 });
 
+// ── Pack 5: Appointment & Project Kickoff API ───────────────────────────────
+
+// GET /api/projects/:id/appointment — Return the appointment record for a project
+router.get("/projects/:id/appointment", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const apptSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("appointments")
+      .orderBy("createdAtIso", "desc")
+      .limit(1)
+      .get();
+    const docs = apptSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    if (!docs.length) {
+      res.status(404).json({ error: "No appointment found for project" });
+      return;
+    }
+    res.json({ appointment: docs[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/appointment — Create appointment from accepted proposal
+router.post("/projects/:id/appointment", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { id } = req.params;
+    const { proposal, projectFacts } = req.body;
+    if (!proposal || !projectFacts) {
+      res.status(400).json({ error: "Proposal and projectFacts are required" });
+      return;
+    }
+    const { createAppointmentFromAcceptedProposal } = await import("../services/appointmentService");
+    const appointment = createAppointmentFromAcceptedProposal({
+      proposal,
+      projectFacts,
+      nowIso: new Date().toISOString(),
+    });
+    await adminDb.collection("projects").doc(id).collection("appointments").doc(appointment.appointmentId).set(appointment);
+    res.status(201).json({ appointment });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH /api/projects/:id/appointment — Confirm or revise an appointment
+router.patch("/projects/:id/appointment", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { id } = req.params;
+    const { action, reason } = req.body;
+    const apptSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("appointments")
+      .orderBy("createdAtIso", "desc")
+      .limit(1)
+      .get();
+    const docs = apptSnap.docs.map((d: any) => ({ ref: d.ref, data: d.data() }));
+    if (!docs.length) {
+      res.status(404).json({ error: "No appointment found for project" });
+      return;
+    }
+    const { ref, data } = docs[0];
+    const { confirmProfessionalAppointment, reviseAppointment } = await import("../services/appointmentService");
+    let updated;
+    const nowIso = new Date().toISOString();
+    if (action === "confirm") {
+      updated = confirmProfessionalAppointment(data, nowIso);
+    } else if (action === "revise") {
+      updated = reviseAppointment(data, reason || "");
+    } else {
+      res.status(400).json({ error: "Action must be 'confirm' or 'revise'" });
+      return;
+    }
+    await ref.update(updated);
+    res.json({ appointment: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/projects/:id/kickoff — Return kickoff workspace
+router.get("/projects/:id/kickoff", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const kickoffSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("kickoff")
+      .orderBy("createdAtIso", "desc")
+      .limit(1)
+      .get();
+    const docs = kickoffSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    if (!docs.length) {
+      res.status(404).json({ error: "No kickoff workspace found for project" });
+      return;
+    }
+    res.json({ kickoff: docs[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/kickoff — Create kickoff workspace from appointment
+router.post("/projects/:id/kickoff", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { id } = req.params;
+    const apptSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("appointments")
+      .orderBy("createdAtIso", "desc")
+      .limit(1)
+      .get();
+    const apptDocs = apptSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    if (!apptDocs.length) {
+      res.status(400).json({ error: "Create an appointment first before setting up kickoff" });
+      return;
+    }
+    const { createKickoffPackage } = await import("../services/kickoffService");
+    const kickoff = createKickoffPackage(apptDocs[0]);
+    await adminDb.collection("projects").doc(id).collection("kickoff").doc(kickoff.workspace.projectId).set(kickoff);
+    res.status(201).json({ kickoff });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/projects/:id/kickoff/checklist — Return kickoff checklist
+router.get("/projects/:id/kickoff/checklist", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const kickoffSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("kickoff")
+      .orderBy("createdAtIso", "desc")
+      .limit(1)
+      .get();
+    const docs = kickoffSnap.docs.map((d: any) => d.data());
+    if (!docs.length) {
+      res.status(404).json({ error: "No kickoff workspace found" });
+      return;
+    }
+    res.json({ checklist: docs[0].checklist ?? [] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/kickoff/checklist/:itemId — Complete a checklist item
+router.post("/projects/:id/kickoff/checklist/:itemId", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { id, itemId } = req.params;
+    const kickoffSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("kickoff")
+      .orderBy("createdAtIso", "desc")
+      .limit(1)
+      .get();
+    const docs = kickoffSnap.docs.map((d: any) => ({ ref: d.ref, data: d.data() }));
+    if (!docs.length) {
+      res.status(404).json({ error: "No kickoff workspace found" });
+      return;
+    }
+    const { ref, data } = docs[0];
+    const updatedChecklist = (data.checklist ?? []).map((item: any) =>
+      item.id === itemId ? { ...item, completed: true } : item
+    );
+    await ref.update({ checklist: updatedChecklist });
+    res.json({ checklist: updatedChecklist });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Mount POPIA/PAIA compliance routes
 router.use("/popia", popiaRoutes);
 
