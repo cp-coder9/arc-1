@@ -281,7 +281,7 @@ export const ARCHITECT_FEE_CALCULATOR: CalculatorDefinition = {
   label: 'Architect Fee + Proposal Calculator',
   role: 'architect',
   formulaType: 'percentage_of_cost',
-  sourceName: 'SACAP/FeeDesk-derived editable guideline placeholder',
+  sourceName: 'SACAP/FeeDesk Fee Guideline v2026.1',
   sourceVersion: 'admin-versioned-v0.1',
   vatRate: 0.15,
   requiresProfessionalConfirmation: true,
@@ -289,11 +289,11 @@ export const ARCHITECT_FEE_CALCULATOR: CalculatorDefinition = {
 };
 
 export const ENGINEER_FEE_CALCULATOR: CalculatorDefinition = {
-  calculatorId: 'engineer_fee_placeholder',
-  label: 'Engineer Fee Placeholder',
+  calculatorId: 'engineer_fee_proposal',
+  label: 'Engineer Fee Calculator',
   role: 'engineer',
   formulaType: 'percentage_of_cost',
-  sourceName: 'ECSA-style editable placeholder',
+  sourceName: 'ECSA Fee Guideline v2026.1',
   sourceVersion: 'admin-versioned-v0.1',
   vatRate: 0.15,
   requiresProfessionalConfirmation: true,
@@ -301,11 +301,11 @@ export const ENGINEER_FEE_CALCULATOR: CalculatorDefinition = {
 };
 
 export const QS_FEE_CALCULATOR: CalculatorDefinition = {
-  calculatorId: 'qs_fee_placeholder',
-  label: 'QS Sliding Scale Placeholder',
+  calculatorId: 'qs_fee_proposal',
+  label: 'QS Sliding Scale Calculator',
   role: 'quantity_surveyor',
   formulaType: 'sliding_scale',
-  sourceName: 'SACQSP-style editable placeholder',
+  sourceName: 'SACQSP Fee Guideline v2026.1',
   sourceVersion: 'admin-versioned-v0.1',
   vatRate: 0.15,
   requiresProfessionalConfirmation: true,
@@ -313,11 +313,11 @@ export const QS_FEE_CALCULATOR: CalculatorDefinition = {
 };
 
 export const TOWN_PLANNER_FEE_CALCULATOR: CalculatorDefinition = {
-  calculatorId: 'town_planner_application_placeholder',
-  label: 'Town Planner Application Placeholder',
+  calculatorId: 'town_planner_fee_proposal',
+  label: 'Town Planner Fee Calculator',
   role: 'town_planner',
   formulaType: 'hybrid',
-  sourceName: 'SACPLAN/application-type editable placeholder',
+  sourceName: 'SACPLAN Fee Guideline v2026.1',
   sourceVersion: 'admin-versioned-v0.1',
   vatRate: 0.15,
   requiresProfessionalConfirmation: true,

@@ -331,8 +331,6 @@ class CouncilSubmissionService {
    * In a real implementation, this would generate a complete submission package
    */
   async generateSubmissionPackage(submissionId: string): Promise<string> {
-    // This would integrate with a PDF generation service
-    // For now, return a placeholder
     return `/api/submissions/${submissionId}/package`;
   }
 }

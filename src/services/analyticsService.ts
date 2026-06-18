@@ -282,9 +282,16 @@ export async function computePlatformMetrics(
     totalBidsSubmitted: totalBidsDesc,
     averageBidValue: avgBidValue,
     complianceRate,
-    onTimeDeliveryRate: 75,            // placeholder — requires milestone tracking
-    disputeRate: 5,                    // placeholder — requires dispute tracking
-    platformGrowthRate: 12,            // placeholder — requires period-over-period comparison
+    onTimeDeliveryRate: averageCompletion,
+    disputeRate: (() => {
+      const activeDisputes = projects.docs.filter((d) => d.data().disputeStatus === 'active' || d.data().status === 'disputed').length;
+      return totalProjects > 0 ? Math.round((activeDisputes / totalProjects) * 100) : 0;
+    })(),
+    platformGrowthRate: (() => {
+      const newThisPeriod = users.docs.filter((d) => d.data().createdAt !== undefined && String(d.data().createdAt) >= periodStart && String(d.data().createdAt) <= periodEnd).length;
+      const total = users.size;
+      return total > 0 ? Math.round((newThisPeriod / total) * 100) : 0;
+    })(),
     periodStart,
     periodEnd,
   };

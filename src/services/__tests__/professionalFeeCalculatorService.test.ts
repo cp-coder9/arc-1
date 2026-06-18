@@ -289,7 +289,7 @@ describe('calculator registry', () => {
   });
 
   it('finds QS calculator by ID', () => {
-    const calc = calculatorById('qs_fee_placeholder');
+    const calc = calculatorById('qs_fee_proposal');
     expect(calc.role).toBe('quantity_surveyor');
     expect(calc.formulaType).toBe('sliding_scale');
   });
