@@ -31,15 +31,39 @@ export function createAuditEntry(params: {
   return record;
 }
 
+/**
+ * Generic audit trail creator for backward compatibility.
+ * Used by municipalSubmissionReadinessService.ts.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createAuditTrail(_complexity: ComplexityAssessment, _readiness: any): SubmissionAuditRecord[] {
+export function createAuditTrail(
+  _complexity: ComplexityAssessment,
+  _readiness: any,
+  projectId?: string
+): SubmissionAuditRecord[] {
+  const now = new Date().toISOString();
+  const baseId = projectId || 'unknown';
   return [
     {
-      id: `audit-submission-${auditLog.length + 1}`,
-      action: `municipal_readiness_assessment:${_complexity.complexity}`,
+      id: `audit-${baseId}-complexity`,
+      action: 'project_complexity_classified',
       actor: 'system',
-      notes: 'Submission readiness assessment completed',
-      timestamp: new Date().toISOString(),
+      notes: 'Project complexity classified for submission readiness.',
+      timestamp: now,
+    },
+    {
+      id: `audit-${baseId}-readiness`,
+      action: 'municipal_readiness_assessed',
+      actor: 'system',
+      notes: 'Municipal submission readiness assessed.',
+      timestamp: now,
+    },
+    {
+      id: `audit-${baseId}-approval`,
+      action: 'human_approval_required',
+      actor: 'system',
+      notes: 'Professional human review required before formal municipal submission.',
+      timestamp: now,
     },
   ];
 }

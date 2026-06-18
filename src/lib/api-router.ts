@@ -7460,6 +7460,60 @@ router.post("/projects/:id/kickoff/checklist/:itemId", async (req, res) => {
   }
 });
 
+// ── Pack 6: Municipal Submission Readiness API ─────────────────────────────
+
+// GET /api/projects/:id/submission-readiness — Return stored readiness assessment
+router.get("/projects/:id/submission-readiness", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const resultSnap = await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("submission_readiness")
+      .orderBy("assessedAt", "desc")
+      .limit(1)
+      .get();
+    const docs = resultSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    if (!docs.length) {
+      res.status(404).json({ error: "No submission readiness assessment found for this project" });
+      return;
+    }
+    res.json({ submissionReadiness: docs[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:id/submission-readiness — Run and persist a fresh assessment
+router.post("/projects/:id/submission-readiness", async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const { id } = req.params;
+    const { projectFacts } = req.body;
+    if (!projectFacts) {
+      res.status(400).json({ error: "projectFacts are required" });
+      return;
+    }
+    const { assessMunicipalSubmissionReadiness, buildScopeFactsFromProject } =
+      await import("../services/municipalSubmissionReadinessService");
+
+    const scopeFacts = buildScopeFactsFromProject({ projectId: id, ...projectFacts });
+    const result = assessMunicipalSubmissionReadiness(scopeFacts);
+
+    const docId = `readiness-${Date.now()}`;
+    await adminDb
+      .collection("projects")
+      .doc(id)
+      .collection("submission_readiness")
+      .doc(docId)
+      .set({ ...result, assessedAt: result.assessedAt, id: docId });
+
+    res.status(201).json({ submissionReadiness: result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Mount POPIA/PAIA compliance routes
 router.use("/popia", popiaRoutes);
 
