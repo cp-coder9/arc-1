@@ -31,50 +31,14 @@ export function createAuditEntry(params: {
   return record;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function createAuditTrail(_complexity: ComplexityAssessment, _readiness: any): SubmissionAuditRecord[] {
-  return [
-    {
-<<<<<<< HEAD
-      id: `audit-submission-${auditLog.length + 1}`,
-      action: `municipal_readiness_assessment:${_complexity.complexity}`,
-      actor: 'system',
-      notes: 'Submission readiness assessment completed',
-      timestamp: new Date().toISOString(),
-=======
-      auditId: `audit-${appointment.appointmentId}-snapshot`,
-      entityId: appointment.appointmentId,
-      action: "accepted_proposal_snapshotted",
-      actor: "system",
-      atIso: nowIso,
-      notes: `Proposal ${appointment.proposalSnapshot.proposalId} revision ${appointment.proposalSnapshot.proposalRevisionId} snapshotted.`
-    },
-    {
-      auditId: `audit-${appointment.appointmentId}-appointment`,
-      entityId: appointment.appointmentId,
-      action: "appointment_created",
-      actor: "system",
-      atIso: nowIso,
-      notes: "Appointment record created from accepted proposal."
-    },
-    {
-      auditId: `audit-${kickoff.workspace.projectId}-workspace`,
-      entityId: kickoff.workspace.projectId,
-      action: "project_workspace_created",
-      actor: "system",
-      atIso: nowIso,
-      notes: `Workspace created with readiness ${kickoff.readiness}.`
-    }
-  ];
-}
-
 /**
  * Generic audit trail creator for backward compatibility.
  * Used by municipalSubmissionReadinessService.ts.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createAuditTrail(
-  _complexity: unknown,
-  _readiness: unknown,
+  _complexity: ComplexityAssessment,
+  _readiness: any,
   projectId?: string
 ): SubmissionAuditRecord[] {
   const now = new Date().toISOString();
