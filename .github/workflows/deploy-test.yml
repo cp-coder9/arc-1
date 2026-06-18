@@ -1,0 +1,57 @@
+name: Deploy test.architex.co.za
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Build and bundle only, skip FTP upload and smoke test'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VITE_API_BASE_URL: 'https://api.architex.co.za'
+
+jobs:
+  deploy-test:
+    name: Build, upload, and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build test bundle
+        run: |
+          npm run build
+          node scripts/build-static-upload-bundle.mjs
+
+      - name: Upload via FTP
+        if: ${{ !inputs.dry-run }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.TEST_ARCHITEX_FTP_SERVER }}
+          username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
+          password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
+          local-dir: release/ftp-upload/
+          server-dir: ${{ secrets.TEST_ARCHITEX_FTP_SERVER_DIR }}
+
+      - name: Smoke test
+        if: ${{ !inputs.dry-run }}
+        run: npm run deploy:test:smoke
