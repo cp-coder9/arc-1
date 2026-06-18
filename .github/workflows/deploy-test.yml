@@ -50,7 +50,7 @@ jobs:
           username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
           password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
           local-dir: release/ftp-upload/
-          server-dir: ${{ secrets.TEST_ARCHITEX_FTP_SERVER_DIR }}
+          server-dir: ${{ format('{0}/', secrets.TEST_ARCHITEX_FTP_SERVER_DIR) }}
 
       - name: Smoke test
         if: ${{ !inputs.dry-run }}
