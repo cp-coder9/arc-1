@@ -1,5 +1,4 @@
 import type { AcceptedProposalSnapshot } from '../types/appointmentKickoff';
-import type { ProposalDraft } from '../types/toolboxTypes';
 
 export const demoAcceptedProposal: AcceptedProposalSnapshot = {
   proposalId: 'prop-architect-001',
@@ -19,25 +18,6 @@ export const demoAcceptedProposal: AcceptedProposalSnapshot = {
   sourceCalculatorVersion: 'sacap-fees-2026-v1.0',
   immutabilityHash: 'a1b2c3d4e5f6',
 };
-
-export const demoAcceptedProposalFromToolbox = (proposal: ProposalDraft, clientId: string): AcceptedProposalSnapshot => ({
-  proposalId: proposal.proposalId,
-  proposalRevisionId: `${proposal.proposalId}-rev1`,
-  acceptedAtIso: new Date().toISOString(),
-  clientAcceptanceId: `client-acceptance-${proposal.proposalId}`,
-  clientId,
-  clientName: proposal.clientName,
-  professionalId: `pro-${proposal.professionalRole}-001`,
-  professionalName: proposal.professionalName,
-  companyName: proposal.professionalName,
-  projectName: `Project ${proposal.projectId}`,
-  scopeSnapshotId: `scope-snapshot-${proposal.proposalId}`,
-  termsSnapshotId: `terms-snapshot-${proposal.proposalId}`,
-  feeSnapshotId: `fee-snapshot-${proposal.proposalId}`,
-  acceptedTotal: { currency: 'ZAR', amount: proposal.calculationResult.total },
-  sourceCalculatorVersion: proposal.calculator.sourceVersion,
-  immutabilityHash: `${proposal.proposalId}-${proposal.calculationResult.total}-${new Date().getTime()}`,
-});
 
 export const demoProjectFacts = {
   propertyDescription: 'Erf 1234, Sandton CBD',
