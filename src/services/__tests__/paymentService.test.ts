@@ -76,7 +76,10 @@ describe('PaymentService Phase 5 stage escrow', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     collectionMock.mockImplementation((_db: unknown, path: string) => ({ type: 'collection', path }));
-    docMock.mockImplementation((_dbOrCollection: unknown, path?: string, id?: string) => ({ type: 'doc', path, id }));
+    docMock.mockImplementation((_dbOrCollection: unknown, p?: string, id?: string) => {
+      const parts = (p || '').split('/');
+      return { type: 'doc', path: parts[0], id: id || parts.slice(1).join('/') };
+    });
     setDocMock.mockResolvedValue(undefined);
     updateDocMock.mockResolvedValue(undefined);
     recordTransactionMock.mockResolvedValue('ledger-1');

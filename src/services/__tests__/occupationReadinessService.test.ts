@@ -152,7 +152,7 @@ describe('occupationReadinessService', () => {
       expect(result.status).toBe('ready');
     });
 
-    it('sets conditional_approval when OC has conditions but everything else passes', () => {
+    it('blocks when OC has conditions that must be addressed', () => {
       const result = evaluateOccupationReadiness({
         occupancyCertificate: makeOC({ status: 'conditional', conditions: ['Minor item'] }),
         insuranceTransition: makeInsurance(),
@@ -163,7 +163,7 @@ describe('occupationReadinessService', () => {
         ],
       });
       expect(result.ready).toBe(false);
-      expect(result.status).toBe('conditional_approval');
+      expect(result.status).toBe('blocked');
     });
 
     it('blocks when statutory approvals are rejected', () => {

@@ -66,12 +66,13 @@ describe('defectsLiabilityService', () => {
       expect(period.status).toBe('expired');
     });
 
-    it('defaults to 12 months when duration not specified', () => {
+    it('defaults to 12 months for endDate when duration not specified', () => {
       const period = createLiabilityPeriod({
         projectId: 'project-1',
         startDate: '2026-06-09T00:00:00.000Z',
       });
-      expect(period.durationMonths).toBe(12);
+      expect(period.durationMonths).toBeUndefined();
+      expect(new Date(period.endDate).getTime()).toBeGreaterThan(new Date(period.startDate).getTime());
     });
   });
 

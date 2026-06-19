@@ -61,7 +61,10 @@ describe('siteExecutionOrchestrator', () => {
     runTransactionMock.mockImplementation(async (_db: unknown, runner: (tx: any) => Promise<void>) => {
       const tx = {
         get: vi.fn().mockImplementation((docRef: any) => {
-          const path = docRef?.path ?? [];
+          const rawPath = docRef?.path ?? [];
+          const path = rawPath.length === 1 && typeof rawPath[0] === 'string'
+            ? rawPath[0].split('/')
+            : rawPath;
           const collection = path[path.length - 2] ?? '';
           // RFI counter doc (under _meta)
           const isCounter = path[path.length - 2] === '_meta';

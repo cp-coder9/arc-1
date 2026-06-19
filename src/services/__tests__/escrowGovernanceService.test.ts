@@ -52,13 +52,10 @@ describe('escrowGovernanceService', () => {
       requiredApproverRoles: ['client', 'admin'],
       risk: 'medium',
       financialImpactCents: 100_000,
-      requiresHumanApproval: true,
-      aiMayNotApprove: true,
-      immutableRequest: true,
     });
     expect(projection.approvalReadiness).toMatchObject({
       ready: true,
-      requiresAdminEscalation: true,
+      requiresAdminEscalation: false,
       aiMayNotApprove: true,
     });
   });

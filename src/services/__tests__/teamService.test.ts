@@ -44,7 +44,10 @@ vi.mock('@/services/notificationService', () => ({
 describe('teamService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    docMock.mockImplementation((_db: unknown, collectionPath: string, id: string) => ({ collection: collectionPath, id }));
+    docMock.mockImplementation((_db: unknown, p: string, id?: string) => {
+      const parts = p.split('/');
+      return { collection: parts[0], id: id || parts.slice(1).join('/') };
+    });
     getDocMock.mockImplementation((ref: { collection: string; id: string }) => {
       if (ref.collection === 'projects') {
         return Promise.resolve({ exists: () => true, id: ref.id, data: () => ({ ...mockProject, id: ref.id }) });

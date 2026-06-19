@@ -7231,6 +7231,7 @@ router.get("/firebase/test", async (_req, res) => {
 // GET /api/projects/:id/passport — Build and return the project passport
 router.get("/projects/:id/passport", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const projectSnap = await adminDb.collection("projects").doc(id).get();
     if (!projectSnap.exists) {
@@ -7247,6 +7248,7 @@ router.get("/projects/:id/passport", async (req, res) => {
 // GET /api/projects/:id/risks — Return risk findings for a project
 router.get("/projects/:id/risks", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const risksSnap = await adminDb
       .collection("projects")
@@ -7265,6 +7267,7 @@ router.get("/projects/:id/risks", async (req, res) => {
 // GET /api/projects/:id/inbox-events — Return inbox events for a project
 router.get("/projects/:id/inbox-events", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const eventsSnap = await adminDb
       .collection("projects")
@@ -7285,6 +7288,7 @@ router.get("/projects/:id/inbox-events", async (req, res) => {
 // GET /api/projects/:id/appointment — Return the appointment record for a project
 router.get("/projects/:id/appointment", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const apptSnap = await adminDb
       .collection("projects")
@@ -7367,6 +7371,7 @@ router.patch("/projects/:id/appointment", async (req, res) => {
 // GET /api/projects/:id/kickoff — Return kickoff workspace
 router.get("/projects/:id/kickoff", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const kickoffSnap = await adminDb
       .collection("projects")
@@ -7415,6 +7420,7 @@ router.post("/projects/:id/kickoff", async (req, res) => {
 // GET /api/projects/:id/kickoff/checklist — Return kickoff checklist
 router.get("/projects/:id/kickoff/checklist", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const kickoffSnap = await adminDb
       .collection("projects")
@@ -7467,6 +7473,7 @@ router.post("/projects/:id/kickoff/checklist/:itemId", async (req, res) => {
 // GET /api/projects/:id/submission-readiness — Return stored readiness assessment
 router.get("/projects/:id/submission-readiness", async (req, res) => {
   try {
+    await verifyAuth(req.headers);
     const { id } = req.params;
     const resultSnap = await adminDb
       .collection("projects")

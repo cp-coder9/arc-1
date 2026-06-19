@@ -130,13 +130,14 @@ describe('evaluateLifecycle', () => {
     expect(result.nextBestActions.length).toBeGreaterThan(0);
   });
 
-  it('reports mayAdvance=true when all required records present', () => {
+  it('reports mayAdvance=false when municipal approval is missing even if required records are present', () => {
     const records = [
       makeRecord({ id: 'r1', recordType: 'site_diary', approval: { status: 'approved', requiredApproverRoles: [] } }),
       makeRecord({ id: 'r2', recordType: 'snag', approval: { status: 'approved', requiredApproverRoles: [] } }),
     ];
     const result = evaluateLifecycle(metadata, records);
-    expect(result.mayAdvance).toBe(true);
+    expect(result.mayAdvance).toBe(false);
+    expect(result.blockers.some((b) => b.includes('municipal approval'))).toBe(true);
   });
 
   it('lead_enquiry has no required records', () => {

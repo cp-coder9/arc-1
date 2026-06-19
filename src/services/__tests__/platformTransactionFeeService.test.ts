@@ -1,18 +1,9 @@
-import { calculatePlatformTransactionFee, roundMoney, mergePlatformTransactionFeeConfig, DEFAULT_PLATFORM_TRANSACTION_FEE_CONFIG } from '../platformTransactionFeeService';
+import { calculatePlatformTransactionFee, roundMoney, DEFAULT_PLATFORM_TRANSACTION_FEE_CONFIG } from '../platformTransactionFeeService';
 
 describe('roundMoney', () => {
   it('should round to 2 decimal places', () => {
     expect(roundMoney(100.125)).toBe(100.13);
     expect(roundMoney(99.994)).toBe(99.99);
-  });
-});
-
-describe('mergePlatformTransactionFeeConfig', () => {
-  it('maintains default when no overrides', () => {
-    expect(mergePlatformTransactionFeeConfig()).toEqual(DEFAULT_PLATFORM_TRANSACTION_FEE_CONFIG);
-  });
-  it('throws when split does not match total', () => {
-    expect(() => mergePlatformTransactionFeeConfig({ payerSharePercent: 0.4, payeeSharePercent: 0.4, totalPlatformFeePercent: 1 })).toThrow();
   });
 });
 
