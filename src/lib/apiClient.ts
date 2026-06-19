@@ -4,8 +4,7 @@ const DEFAULT_TEST_SITE_API_BASE_URL = 'https://api.architex.co.za';
 
 function readConfiguredApiBaseUrl(): string {
   const viteBase = import.meta.env?.VITE_API_BASE_URL;
-  const processBase = typeof process !== 'undefined' ? process.env?.VITE_API_BASE_URL : undefined;
-  return String(viteBase || processBase || '').trim().replace(/\/$/, '');
+  return String(viteBase || '').trim().replace(/\/$/, '');
 }
 
 function readBrowserApiBaseUrl(): string {

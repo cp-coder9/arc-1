@@ -59,7 +59,7 @@ service cloud.firestore {
     }
 
     function isProjectParticipant(jobId) {
-      return isAuthenticated() && (
+      return isAuthenticated() && jobId is string && jobExists(jobId) && (
         getJob(jobId).data.clientId == request.auth.uid ||
         isSelectedProfessionalJob(getJob(jobId).data) ||
         isAdmin()
@@ -171,24 +171,28 @@ service cloud.firestore {
     }
 
     function canManageTenderFor(projectId, jobId) {
-      return isAuthenticated() && projectExists(projectId) && jobExists(jobId) &&
-        getProject(projectId).data.jobId == jobId && (
-          isAdmin() ||
-          getProject(projectId).data.clientId == request.auth.uid ||
-          isLeadProfessionalProject(getProject(projectId).data) ||
-          isProjectTeamMember(getProject(projectId).data) ||
-          getJob(jobId).data.clientId == request.auth.uid ||
-          isSelectedProfessionalJob(getJob(jobId).data)
-        );
+      return isAuthenticated() && (
+        isAdmin() ||
+        (projectExists(projectId) && jobExists(jobId) &&
+          getProject(projectId).data.jobId == jobId && (
+            getProject(projectId).data.clientId == request.auth.uid ||
+            isLeadProfessionalProject(getProject(projectId).data) ||
+            isProjectTeamMember(getProject(projectId).data) ||
+            getJob(jobId).data.clientId == request.auth.uid ||
+            isSelectedProfessionalJob(getJob(jobId).data)
+          )
+        )
+      );
     }
 
     function isTenderParticipant(tenderData) {
-      return canManageTenderFor(tenderData.projectId, tenderData.jobId);
+      return tenderData.projectId is string && tenderData.jobId is string &&
+        canManageTenderFor(tenderData.projectId, tenderData.jobId);
     }
 
     function isEligibleContractorForTender(tenderData) {
       return isAuthenticated() && tenderData.status == 'published' && !isTenderParticipant(tenderData) && (
-        hasRole('contractor') || hasRole('subcontractor') || hasRole('supplier')
+        getUserData() != null && getUserData().role in ['contractor', 'subcontractor', 'supplier']
       );
     }
 
@@ -1106,17 +1110,15 @@ service cloud.firestore {
 
 // Messages collection
  match /messages/{messageId} {
- allow read: if isAuthenticated() && (
+ allow read: if isAuthenticated() && resource.data.jobId is string && (
  resource.data.senderId == request.auth.uid ||
- getJob(resource.data.jobId).data.clientId == request.auth.uid ||
- isSelectedProfessionalJob(getJob(resource.data.jobId).data)
+ isProjectParticipant(resource.data.jobId)
  );
- allow create: if isAuthenticated() && (
+ allow create: if isAuthenticated() && resource.data.jobId is string && (
  request.resource.data.senderId == request.auth.uid &&
- (getJob(request.resource.data.jobId).data.clientId == request.auth.uid ||
- isSelectedProfessionalJob(getJob(request.resource.data.jobId).data))
+ isProjectParticipant(request.resource.data.jobId)
  );
- allow update: if isAuthenticated() && resource.data.senderId != request.auth.uid && (getJob(resource.data.jobId).data.clientId == request.auth.uid || getJob(resource.data.jobId).data.selectedArchitectId == request.auth.uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+ allow update: if isAuthenticated() && resource.data.jobId is string && resource.data.senderId != request.auth.uid && isProjectParticipant(resource.data.jobId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
  allow delete: if false;
  }
 

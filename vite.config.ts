@@ -25,9 +25,11 @@ export default defineConfig(({ mode }) => {
          },
        },
      ],
-     define: {
-       // No sensitive environment variables exposed to client
-     },
+      define: {
+        'process.env.NODE_ENV': JSON.stringify(mode),
+        'process.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL || ''),
+        'process.env.VITE_DEMO_MODE': JSON.stringify(process.env.VITE_DEMO_MODE || ''),
+      },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -40,6 +42,7 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       entries: ['index.html'],
+      include: ['framer-motion'],
     },
     build: {
       // Increase chunk size warning limit – some agent bundles are large
