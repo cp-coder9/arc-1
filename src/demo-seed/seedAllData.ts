@@ -142,8 +142,8 @@ export async function seedUserSandbox(uid: string, force: boolean = false) {
   }
 }
 
-// CLI entry point
-if (require.main === module) {
+// CLI entry point (guarded for browser bundle safety)
+if (typeof require !== 'undefined' && require.main === module) {
   const args = process.argv.slice(2);
   const uidArg = args.find(a => a.startsWith('--uid='));
   const force = args.includes('--force');
