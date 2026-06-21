@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "arc-1-harness": {
+      "type": "local",
+      "command": [
+        "node",
+        "arc-1-harness/bin/cli.js",
+        "mcp",
+        "start"
+      ],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "rm *": "deny",
+      "git push *": "deny"
+    },
+    "webfetch": "ask"
+  }
+}
