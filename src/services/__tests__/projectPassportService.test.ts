@@ -19,7 +19,7 @@ function makeRecord(
   return {
     tenantId: 't1',
     projectId: 'p1',
-    phase: 'construction_execution',
+    phase: 'lead_enquiry',
     moduleKey: 'site_execution',
     recordType: 'site_diary',
     title: 'Test Record',

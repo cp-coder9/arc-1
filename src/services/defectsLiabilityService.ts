@@ -84,7 +84,7 @@ export function createLiabilityPeriod(input: {
   projectId: string;
   jobId?: string;
   startDate: string;
-  durationMonths: number;
+  durationMonths?: number;
   contractorId?: string;
   contractorName?: string;
   conditions?: string[];
@@ -108,7 +108,7 @@ export function createLiabilityPeriod(input: {
     jobId: input.jobId,
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
-    durationMonths: input.durationMonths,
+    durationMonths: input.durationMonths ?? 12,
     status,
     retentionReleaseTriggered: false,
     contractorId: input.contractorId,

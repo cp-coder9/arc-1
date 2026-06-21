@@ -8,7 +8,7 @@ process.env.AGENT_API_KEY = 'agent-secret';
 process.env.BLOB_READ_WRITE_TOKEN = 'blob-token';
 process.env.VITE_PAYFAST_MERCHANT_ID = '10000100';
 process.env.VITE_PAYFAST_MERCHANT_KEY = 'merchant-key';
-process.env.VITE_PAYFAST_SANDBOX = 'true';
+process.env.PAYFAST_SANDBOX = 'true';
 process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 process.env.APP_BASE_URL = 'https://architex.test';
 

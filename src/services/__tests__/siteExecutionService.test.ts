@@ -45,11 +45,12 @@ describe('siteExecutionOrchestrator', () => {
 
     collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
     docMock.mockImplementation((_dbOrRef: any, ...path: string[]) => {
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
       if (_dbOrRef?.type === 'collection') {
         const id = `generated-doc-${++mockDocCounter}`;
         return { type: 'doc', path: [..._dbOrRef.path, id], id };
       }
-      return { type: 'doc', path, id: path[path.length - 1] };
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
     });
     addDocMock.mockImplementation((_col: any) => Promise.resolve({ id: `add-doc-${++mockDocCounter}` }));
     updateDocMock.mockResolvedValue(undefined);
@@ -61,7 +62,8 @@ describe('siteExecutionOrchestrator', () => {
     runTransactionMock.mockImplementation(async (_db: unknown, runner: (tx: any) => Promise<void>) => {
       const tx = {
         get: vi.fn().mockImplementation((docRef: any) => {
-          const path = docRef?.path ?? [];
+          const rawPath = docRef?.path ?? [];
+          const path = rawPath.length === 1 && rawPath[0].includes('/') ? rawPath[0].split('/') : rawPath;
           const collection = path[path.length - 2] ?? '';
           // RFI counter doc (under _meta)
           const isCounter = path[path.length - 2] === '_meta';

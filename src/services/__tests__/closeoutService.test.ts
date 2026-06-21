@@ -20,8 +20,14 @@ const whereMock = vi.mocked(firestore.where) as any;
 describe('closeoutService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    docMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'doc', path }));
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
+    docMock.mockImplementation((_db: unknown, ...path: string[]) => {
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
+    });
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => {
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
+      return { type: 'collection', path: segments };
+    });
     queryMock.mockImplementation((ref: unknown, ...constraints: unknown[]) => ({ ref, constraints }));
     whereMock.mockImplementation((field: string, op: string, value: unknown) => ({ field, op, value }));
     setDocMock.mockResolvedValue(undefined);
@@ -197,11 +203,11 @@ describe('closeoutService', () => {
     await archiveProject('project-1');
 
     expect(transactionUpdate).toHaveBeenCalledWith(
-      { type: 'doc', path: ['projects', 'project-1'] },
+      expect.objectContaining({ type: 'doc', path: ['projects', 'project-1'] }),
       expect.objectContaining({ archived: true, currentStage: 'closeout', stageHistory: expect.arrayContaining([expect.objectContaining({ stage: 'closeout', actorId: 'client-1' })]) })
     );
     expect(transactionUpdate).toHaveBeenCalledWith(
-      { type: 'doc', path: ['jobs', 'job-1'] },
+      expect.objectContaining({ type: 'doc', path: ['jobs', 'job-1'] }),
       expect.objectContaining({ status: 'completed' })
     );
   });

@@ -17,8 +17,8 @@ describe('LLM Config Path Consistency', () => {
  jest.clearAllMocks();
  });
 
- it('getLLMConfig reads from system_settings/llm_config', async () => {
- await getLLMConfig();
- expect(doc).toHaveBeenCalledWith(expect.anything(), 'system_settings', 'llm_config');
- });
+  it('getLLMConfig reads from system_settings/llm_config', async () => {
+  await getLLMConfig();
+  expect(doc).toHaveBeenCalledWith(expect.anything(), 'system_settings/llm_config');
+  });
 });

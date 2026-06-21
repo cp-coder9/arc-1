@@ -76,13 +76,18 @@ describe('PaymentService Phase 5 stage escrow', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     collectionMock.mockImplementation((_db: unknown, path: string) => ({ type: 'collection', path }));
-    docMock.mockImplementation((_dbOrCollection: unknown, path?: string, id?: string) => ({ type: 'doc', path, id }));
+    docMock.mockImplementation((_dbOrCollection: unknown, path?: string, id?: string) => {
+      const segments = path && path.includes('/') ? path.split('/') : [path].filter(Boolean);
+      const idFromPath = segments.length > 1 ? segments[segments.length - 1] : id ?? segments[0];
+      return { type: 'doc', path, id: idFromPath };
+    });
     setDocMock.mockResolvedValue(undefined);
     updateDocMock.mockResolvedValue(undefined);
     recordTransactionMock.mockResolvedValue('ledger-1');
     getDocMock.mockImplementation(async (ref: any) => {
-      if (ref.path === 'projects') return snap('project-1', project as unknown as Record<string, unknown>);
-      if (ref.path === 'escrow') return snap('job-1', escrow as Record<string, unknown>);
+      const path = ref.path ?? '';
+      if (path.startsWith('projects/') || path === 'projects') return snap('project-1', project as unknown as Record<string, unknown>);
+      if (path.startsWith('escrow/') || path === 'escrow') return snap('job-1', escrow as Record<string, unknown>);
       return { id: 'missing', exists: () => false, data: () => ({}) };
     });
     paymentService = (await import('../paymentService')).paymentService;
@@ -104,7 +109,7 @@ describe('PaymentService Phase 5 stage escrow', () => {
     await paymentService.initializeStageEscrow(project, 100000);
 
     expect(setDocMock).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'escrow', id: 'job-1' }),
+      expect.objectContaining({ id: 'job-1' }),
       expect.objectContaining({ linkedProjectId: 'project-1', totalAmount: 100000, heldAmount: 100000 }),
       { merge: true }
     );
@@ -133,7 +138,7 @@ describe('PaymentService Phase 5 stage escrow', () => {
   it('approveStageRelease rejects non-requested milestone release', async () => {
     const notRequestedEscrow = { ...escrow, milestones: escrow.milestones.map((milestone) => milestone.stage === 'compliance' ? { ...milestone, status: 'funded' } : milestone) };
     runTransactionMock.mockImplementation(async (_db: unknown, callback: (transaction: any) => Promise<unknown>) => callback({
-      get: vi.fn(async (ref: any) => ref.path === 'projects'
+      get: vi.fn(async (ref: any) => (ref.path ?? '').startsWith('projects/')
         ? snap('project-1', project as unknown as Record<string, unknown>)
         : snap('job-1', notRequestedEscrow as Record<string, unknown>)),
       set: vi.fn(),
@@ -146,7 +151,7 @@ describe('PaymentService Phase 5 stage escrow', () => {
 
   it('approveStageRelease atomically writes escrow update, ledger entry, invoice, and VAT-inclusive totals', async () => {
     const transaction = { get: vi.fn(), set: vi.fn(), update: vi.fn(), delete: vi.fn() };
-    transaction.get.mockImplementation(async (ref: any) => ref.path === 'projects'
+    transaction.get.mockImplementation(async (ref: any) => (ref.path ?? '').startsWith('projects/')
       ? snap('project-1', project as unknown as Record<string, unknown>)
       : snap('job-1', escrow as Record<string, unknown>));
     runTransactionMock.mockImplementation(async (_db: unknown, callback: (tx: any) => Promise<unknown>) => callback(transaction));
@@ -155,7 +160,7 @@ describe('PaymentService Phase 5 stage escrow', () => {
 
     expect(runTransactionMock).toHaveBeenCalledTimes(1);
     expect(transaction.update).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'escrow', id: 'job-1' }),
+      expect.objectContaining({ id: 'job-1' }),
       expect.objectContaining({ releasedAmount: 25000, heldAmount: 75000, status: 'partially_released' })
     );
     expect(transaction.set).toHaveBeenCalledTimes(2);

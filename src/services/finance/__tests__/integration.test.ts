@@ -64,10 +64,11 @@ describe('Finance Commercial Control — Full Workflow Integration', () => {
     expect(baseline.approvedVariationsTotal.amount).toBe(85_000);
   });
 
-  // Step 3: Build payment schedule
-  let schedule = buildPaymentSchedule(baseline);
+  // Step 3: Build payment schedule (lazy — baseline is populated in Step 1 test)
+  let schedule: ReturnType<typeof buildPaymentSchedule>;
 
   it('Step 3: builds payment schedule from baseline', () => {
+    schedule = buildPaymentSchedule(baseline);
     expect(schedule).toHaveLength(5);
     const nextDue = findNextPaymentDue(schedule);
     expect(nextDue).toBeTruthy();

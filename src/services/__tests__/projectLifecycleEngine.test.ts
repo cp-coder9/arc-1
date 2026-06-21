@@ -132,10 +132,13 @@ describe('evaluateLifecycle', () => {
 
   it('reports mayAdvance=true when all required records present', () => {
     const records = [
-      makeRecord({ id: 'r1', recordType: 'site_diary', approval: { status: 'approved', requiredApproverRoles: [] } }),
-      makeRecord({ id: 'r2', recordType: 'snag', approval: { status: 'approved', requiredApproverRoles: [] } }),
+      makeRecord({ id: 'r1', recordType: 'drawing_revision', approval: { status: 'approved', requiredApproverRoles: [] } }),
+      makeRecord({ id: 'r2', recordType: 'document', approval: { status: 'approved', requiredApproverRoles: [] } }),
     ];
-    const result = evaluateLifecycle(metadata, records);
+    const result = evaluateLifecycle(
+      { ...metadata, currentPhase: 'design_coordination' },
+      records,
+    );
     expect(result.mayAdvance).toBe(true);
   });
 

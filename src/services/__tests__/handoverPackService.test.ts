@@ -153,6 +153,7 @@ describe('handoverPackService', () => {
           { id: 'd1', projectId: 'p1', title: 'Final Account', type: 'compliance_certificate' as any, category: 'final_account', status: 'approved', url: 'https://files/fa.pdf', version: 1, createdAt: '', updatedAt: '' },
           { id: 'd2', projectId: 'p1', title: 'Electrical COC', type: 'compliance_certificate' as any, category: 'compliance_certificate', status: 'issued', url: 'https://files/coc.pdf', version: 1, createdAt: '', updatedAt: '' },
           { id: 'd3', projectId: 'p1', title: 'Waterproofing warranty', type: 'warranty' as any, category: 'manufacturer_warranty', status: 'approved', url: 'https://files/warranty.pdf', version: 1, createdAt: '', updatedAt: '' },
+          { id: 'd4', projectId: 'p1', title: 'Safety Data Sheet', type: 'other' as any, category: 'safety_sheet', status: 'approved', url: 'https://files/safety.pdf', version: 1, createdAt: '', updatedAt: '' },
         ],
         asBuiltDrawings: [
           { id: 'ab1', projectId: 'p1', title: 'As-built plan', drawingNumber: 'A-101', revision: 'C', status: 'approved', createdAt: '', updatedAt: '' },

@@ -97,7 +97,7 @@ export interface ReadinessFinding {
 }
 
 export interface ReadinessReport {
-  checkName: 'municipal_submission' | 'tender_pack' | 'construction_issue' | 'closeout_pack';
+  checkName: 'municipal_submission' | 'tender_pack' | 'construction_issue' | 'closeout_pack' | 'approval_letter' | 'warranty';
   ready: boolean;
   findings: ReadinessFinding[];
 }

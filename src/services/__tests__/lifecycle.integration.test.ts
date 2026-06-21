@@ -27,7 +27,10 @@ const missingSnap = (id: string) => ({ id, exists: () => false, data: () => ({})
 describe('Phase 6 lifecycle integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    docMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'doc', path, id: path[path.length - 1] }));
+    docMock.mockImplementation((_db: unknown, ...path: string[]) => {
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
+    });
     updateDocMock.mockResolvedValue(undefined);
   });
 

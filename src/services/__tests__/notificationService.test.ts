@@ -9,7 +9,11 @@ import * as firestore from 'firebase/firestore';
 
 const mockAddDoc = jest.fn<(...args: any[]) => Promise<{ id: string }>>(() => Promise.resolve({ id: 'new-notification-id' }));
 const mockCollection = jest.fn<(...args: any[]) => { path: string }>((_db: any, path: string) => ({ path }));
-const mockDoc = jest.fn<(...args: any[]) => { path: string; id: string }>((_db: any, path: string, id: string) => ({ path, id }));
+const mockDoc = jest.fn<(...args: any[]) => { path: string; id: string }>((_db: any, ...args: any[]) => {
+  const path = args.length === 1 ? args[0].split('/').slice(0, -1).join('/') : args[0];
+  const id = args.length === 1 ? args[0].split('/').pop()! : args[1];
+  return { path, id };
+});
 const mockUpdateDoc = jest.fn<(...args: any[]) => Promise<void>>(() => Promise.resolve());
 const mockQuery = jest.fn<(...args: any[]) => { args: any[] }>((...args: any[]) => ({ args }));
 const mockWhere = jest.fn<(...args: any[]) => { args: any[] }>((...args: any[]) => ({ args }));

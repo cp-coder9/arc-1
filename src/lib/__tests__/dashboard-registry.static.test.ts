@@ -75,6 +75,7 @@ describe('canonical dashboard page registry', () => {
       ['command', 'Command Centre'],
       ['profile', 'Profile Editor'],
       ['toolbox', 'Project Toolbox'],
+      ['toolset-review', 'Toolset Review'],
       ['journey', 'Project Journey'],
       ['tasks', 'Tasks & Approvals'],
       ['messages', 'Project Messenger'],
@@ -84,6 +85,7 @@ describe('canonical dashboard page registry', () => {
       ['contracts', 'Contracts & Signing'],
       ['escrow', 'Escrow Service'],
       ['ai', 'AI Co-Pilot'],
+      ['compliance', 'SANS Codified Compliance'],
     ] as const;
 
     for (const [id, label] of sharedPages) {
@@ -137,7 +139,7 @@ describe('canonical dashboard page registry', () => {
 
 
   it('pins the full role navigation matrix for every canonical role and page', () => {
-    const sharedPageIds = ['command', 'profile', 'toolbox', 'toolset-review', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai'];
+    const sharedPageIds = ['command', 'profile', 'toolbox', 'toolset-review', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai', 'compliance'];
     const expectedPagesByRole: Record<string, string[]> = {
       client: [...sharedPageIds, 'client-intake', 'client-proposals', 'directory-search', 'municipal-tracker', 'submission-readiness', 'client-progress', 'drawing-register'],
       bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations'],
@@ -150,7 +152,7 @@ describe('canonical dashboard page registry', () => {
     };
 
     const allPageIds = extractPageIds();
-    expect(allPageIds).toHaveLength(44);
+    expect(allPageIds).toHaveLength(45);
 
     for (const role of canonicalRoles) {
       const actualPagesForRole = allPageIds.filter((pageId) => entryIncludesRole(findPageEntry(pageId), role));
@@ -319,29 +321,29 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain(`'bep-marketplace'`);
     expect(appSource).toContain(`'bep-team'`);
 
-    expect(bepMarketplaceSource).toContain("collection(db, 'jobs')");
+    expect(bepMarketplaceSource).toContain("getDemoCol( 'jobs')");
     expect(bepMarketplaceSource).toContain("where('status', '==', 'open')");
-    expect(bepMarketplaceSource).toContain("collection(db, `jobs/${selected.job.id}/applications`)");
+    expect(bepMarketplaceSource).toContain("getDemoCol( `jobs/${job.id}/applications`)");
     expect(bepMarketplaceSource).toContain('architectId: user.uid');
     expect(bepMarketplaceSource).not.toContain('orderBy(');
 
-    expect(designTeamMatrixSource).toContain("collection(db, 'projects')");
+    expect(designTeamMatrixSource).toContain("getDemoCol( 'projects')");
     expect(designTeamMatrixSource).toContain("where('leadArchitectId', '==', user.uid)");
-    expect(designTeamMatrixSource).toContain("collection(db, 'users')");
+    expect(designTeamMatrixSource).toContain("getDemoCol( 'users')");
     expect(designTeamMatrixSource).toContain('<ResponsibilityMatrix');
     expect(designTeamMatrixSource).toContain('<TeamBuilder');
     expect(designTeamMatrixSource).not.toContain('orderBy(');
   });
 
   it('backs shared messenger, contract, and dispute tools with live Firestore records only', () => {
-    expect(projectMessengerSource).toContain("collection(db, 'messages')");
+    expect(projectMessengerSource).toContain("getDemoCol( 'messages')");
     expect(projectMessengerSource).toContain('where(\'jobId\'');
     expect(projectMessengerSource).toContain('messagingService.sendMessage');
-    expect(messagingServiceSource).toContain('addDoc(collection(db, \'messages\')');
+    expect(messagingServiceSource).toContain('addDoc(getDemoCol( \'messages\')');
     expect(projectMessengerSource).not.toContain('orderBy(');
 
-    expect(contractSigningSource).toContain("collection(db, 'appointment_contracts')");
-    expect(contractSigningSource).toContain("doc(db, 'escrow'");
+    expect(contractSigningSource).toContain("getDemoCol( 'appointment_contracts')");
+    expect(contractSigningSource).toContain("getDemoDoc( 'escrow'");
     expect(contractSigningSource).toContain('This page does not execute signatures or payments');
     expect(contractSigningSource).toContain('Human signing guard');
     expect(contractSigningSource).toContain('Request signature disabled');
@@ -354,7 +356,7 @@ describe('canonical dashboard page registry', () => {
     expect(financialDashboardSource).toContain('Provider submission disabled');
     expect(financialDashboardSource).not.toContain('addDoc(');
 
-    expect(disputeResolutionSource).toContain("collection(db, 'disputes')");
+    expect(disputeResolutionSource).toContain("getDemoCol( 'disputes')");
     expect(disputeResolutionSource).toContain('filedBy');
     expect(disputeResolutionSource).toContain('filedAgainst');
     expect(disputeResolutionSource).toContain('status: \'open\'');
@@ -366,12 +368,12 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("pageId === 'construction' && ['contractor', 'subcontractor', 'supplier', 'admin'].includes(user.role)");
     expect(workflowSource).toContain('return <PackageConstructionOpsPage user={user} />;');
     for (const collection of ["'rfis'", "'site_instructions'", "'site_logs'", "'gantt_tasks'", "'site_inspections'", "'package_snags'"]) {
-      expect(packageConstructionSource).toContain(`collection(db, ${collection})`);
+      expect(packageConstructionSource).toContain(`getDemoCol( ${collection})`);
     }
     expect(packageConstructionSource).toContain("where('packageId', 'in', packageIds)");
-    expect(packageConstructionSource).toContain('addDoc(collection(db, \'rfis\')');
-    expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_instructions\')');
-    expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_inspections\')');
+    expect(packageConstructionSource).toContain('addDoc(getDemoCol( \'rfis\')');
+    expect(packageConstructionSource).toContain('addDoc(getDemoCol( \'site_instructions\')');
+    expect(packageConstructionSource).toContain('addDoc(getDemoCol( \'site_inspections\')');
     expect(packageConstructionSource).toContain('humanReviewRequired: true');
     expect(packageConstructionSource).toContain('costImpactStatus');
     expect(packageConstructionSource).toContain('programmeImpactStatus');
@@ -380,8 +382,8 @@ describe('canonical dashboard page registry', () => {
     expect(packageConstructionSource).toContain("captureType === 'inspection'");
     expect(packageConstructionSource).toContain('Inspection / sign-off');
     expect(packageConstructionSource).toContain('do not auto-certify work');
-    expect(packageConstructionSource).toContain('addDoc(collection(db, \'site_logs\')');
-    expect(packageConstructionSource).toContain('addDoc(collection(db, \'gantt_tasks\')');
+    expect(packageConstructionSource).toContain('addDoc(getDemoCol( \'site_logs\')');
+    expect(packageConstructionSource).toContain('addDoc(getDemoCol( \'gantt_tasks\')');
   });
 
   it('upgrades programme builder with baseline, forecast, dependency, and human-review controls', () => {
@@ -403,8 +405,8 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain('return <PackageCloseoutPage user={user} />;');
     expect(workflowSource).toContain("pageId === 'invoicing' && <InvoiceManagement user={user} />");
 
-    expect(packageCloseoutSource).toContain("collection(db, 'package_snags')");
-    expect(packageCloseoutSource).toContain("collection(db, 'package_delivery_evidence')");
+    expect(packageCloseoutSource).toContain("getDemoCol( 'package_snags')");
+    expect(packageCloseoutSource).toContain("getDemoCol( 'package_delivery_evidence')");
     expect(packageCloseoutSource).toContain('evaluatePackageReadiness');
     expect(packageCloseoutSource).toContain("status: 'submitted'");
     expect(packageCloseoutSource).toContain('humanReviewRequired: true');
@@ -414,9 +416,9 @@ describe('canonical dashboard page registry', () => {
   it('routes admin AI co-pilot to the production AI output review queue', () => {
     expect(aiCoPilotSource).toContain("import AdminAIReviewQueue from './AdminAIReviewQueue';");
     expect(aiCoPilotSource).toContain('<AdminAIReviewQueue />');
-    expect(adminAIReviewQueueSource).toContain("collection(db, 'ai_review_queue')");
+    expect(adminAIReviewQueueSource).toContain("getDemoCol( 'ai_review_queue')");
     expect(adminAIReviewQueueSource).toContain("where('status', '==', 'open')");
-    expect(adminAIReviewQueueSource).toContain("doc(db, 'ai_action_logs'");
+    expect(adminAIReviewQueueSource).toContain("getDemoDoc( 'ai_action_logs'");
     expect(adminAIReviewQueueSource).toContain('/api/admin/ai-review/${selectedItem.id}/resolve');
     expect(adminAIReviewQueueSource).toContain('humanSignOff');
     expect(adminAIReviewQueueSource).not.toContain('orderBy(');
@@ -439,10 +441,10 @@ describe('canonical dashboard page registry', () => {
     expect(drawingRegisterSource).toContain("where('leadBepId', '==', user.uid)");
     expect(drawingRegisterSource).toContain("where('leadArchitectId', '==', user.uid)");
     expect(drawingRegisterSource).toContain('mergeProjectSnapshots');
-    expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'documents')");
+    expect(drawingRegisterSource).toContain("getDemoCol( 'projects', selectedProject.id, 'documents')");
     expect(drawingRegisterSource).toContain("collection(documentRef, 'versions')");
-    expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'transmittals')");
-    expect(drawingRegisterSource).toContain("collection(db, 'projects', selectedProject.id, 'coordination_items')");
+    expect(drawingRegisterSource).toContain("getDemoCol( 'projects', selectedProject.id, 'transmittals')");
+    expect(drawingRegisterSource).toContain("getDemoCol( 'projects', selectedProject.id, 'coordination_items')");
     expect(drawingRegisterSource).toContain('External delivery, statutory approval, and legal sign-off remain human-confirmed');
     expect(drawingRegisterSource).not.toContain('orderBy(');
   });
@@ -459,7 +461,7 @@ describe('canonical dashboard page registry', () => {
     );
     expect(appSource).toContain(`activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />`);
     expect(appSource).toContain(`'bep-freelancers'`);
-    expect(bepFreelancerJobsSource).toContain("const delegatedTaskRef = doc(db, 'delegatedTasks', taskRef.id)");
+    expect(bepFreelancerJobsSource).toContain("const delegatedTaskRef = getDemoDoc( 'delegatedTasks', taskRef.id)");
     expect(bepFreelancerJobsSource).toContain('batch.set(delegatedTaskRef, taskData)');
     expect(bepFreelancerJobsSource).toContain('jobTaskId: taskRef.id');
     expect(bepFreelancerJobsSource).toContain('Approve for invoice readiness');
@@ -493,13 +495,13 @@ describe('canonical dashboard page registry', () => {
     expect(packageWorkspaceSource).toContain('Package claims, delivery and warranties');
     expect(packageWorkspaceSource).toContain('Drawing-to-BoM Extractor');
     expect(packageWorkspaceSource).toContain('Supplier API Catalogue');
-    expect(packageWorkspaceSource).toContain("query(collection(db, 'directoryProfiles'), where('role', '==', 'supplier')");
+    expect(packageWorkspaceSource).toContain("getDemoCol( 'directoryProfiles'), where('role', '==', 'supplier'");
     expect(packageWorkspaceSource).toContain("source: 'package-procurement-workspace'");
     expect(packageWorkspaceSource).toContain('roleEvidenceOptions');
     expect(packageWorkspaceSource).toContain('payment_claim');
     expect(packageWorkspaceSource).toContain('warranty');
     expect(packageWorkspaceSource).toContain('payment_claim_evidence');
-    expect(packageWorkspaceSource).toContain("addDoc(collection(db, 'package_delivery_evidence')");
+    expect(packageWorkspaceSource).toContain("addDoc(getDemoCol( 'package_delivery_evidence')");
     expect(packageWorkspaceSource).toContain('humanReviewRequired: true');
     expect(bidSubmissionSource).toContain('submitBid(selectedTenderId');
     expect(bidSubmissionSource).toContain('Upload bid attachments');
@@ -539,7 +541,7 @@ describe('canonical dashboard page registry', () => {
     expect(freelancerSubmissionsSource).toContain('Submit for BEP review');
     expect(freelancerSubmissionsSource).toContain("submissionStatus: 'submitted'");
     expect(freelancerSubmissionsSource).toContain("paymentStatus: 'review_pending'");
-    expect(freelancerSubmissionsSource).toContain("updateDoc(doc(db, 'delegatedTasks'");
+    expect(freelancerSubmissionsSource).toContain("getDemoDoc( 'delegatedTasks', taskDocId)");
   });
 
   it('routes freelancer assigned work to the production freelancer dashboard', () => {

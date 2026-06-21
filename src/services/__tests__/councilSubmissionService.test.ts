@@ -9,7 +9,11 @@ import type { Job, UserProfile, CouncilSubmission } from '@/types';
 
 const mockAddDoc = jest.fn(() => Promise.resolve({ id: 'new-submission-id' }));
 const mockCollection = jest.fn((_db: unknown, path: string) => ({ path }));
-const mockDoc = jest.fn((_db: unknown, path: string, id: string) => ({ path, id }));
+const mockDoc = jest.fn((_db: unknown, ...args: any[]) => {
+  const path = args.length === 1 ? args[0].split('/').slice(0, -1).join('/') : args[0];
+  const id = args.length === 1 ? args[0].split('/').pop()! : args[1];
+  return { path, id };
+});
 const mockUpdateDoc = jest.fn(() => Promise.resolve());
 const mockQuery = jest.fn((...args: unknown[]) => ({ args }));
 const mockWhere = jest.fn((...args: unknown[]) => ({ args }));

@@ -34,10 +34,11 @@ vi.mock('@/lib/firebase', () => ({
 describe('dailyLogService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => { const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path; return { type: 'collection', path: segments }; });
     docMock.mockImplementation((_dbOrRef: any, ...path: string[]) => {
-      if (_dbOrRef?.type === 'collection') return { type: 'doc', path: [..._dbOrRef.path, 'generated-id'], id: 'generated-id' };
-      return { type: 'doc', path, id: path[path.length - 1] };
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
+      if (_dbOrRef?.type === 'collection') return { type: 'doc', path: [..._dbOrRef.path, segments[segments.length - 1]], id: segments[segments.length - 1] };
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
     });
     addDocMock.mockResolvedValue({ id: 'log-new-001' });
     updateDocMock.mockResolvedValue(undefined);

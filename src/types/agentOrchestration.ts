@@ -44,6 +44,8 @@ export interface AuditRecord {
   action: string;
   sourceObjectId: string;
   createdAt: string;
+  immutable?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AgentOutput {

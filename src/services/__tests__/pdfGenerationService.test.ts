@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const uploadAndTrackFileMock = vi.hoisted(() => vi.fn());
 const getDocMock = vi.hoisted(() => vi.fn());
 const getDocsMock = vi.hoisted(() => vi.fn());
-const docMock = vi.hoisted(() => vi.fn((_: unknown, collectionPath: string, id?: string) => ({ collectionPath, id })));
+const docMock = vi.hoisted(() => vi.fn((_: unknown, ...args: any[]) => {
+  const collectionPath = args.length === 1 ? args[0].split('/').slice(0, -1).join('/') : args[0];
+  const id = args.length === 1 ? args[0].split('/').pop()! : args[1];
+  return { collectionPath, id };
+}));
 const collectionMock = vi.hoisted(() => vi.fn((_: unknown, path: string) => ({ path })));
 const queryMock = vi.hoisted(() => vi.fn((collectionRef: unknown, ...constraints: unknown[]) => ({ collectionRef, constraints })));
 const whereMock = vi.hoisted(() => vi.fn((field: string, op: string, value: unknown) => ({ field, op, value })));

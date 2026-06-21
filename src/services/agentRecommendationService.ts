@@ -123,3 +123,180 @@ export function recommendNextActions(
   }
   return recommendations;
 }
+
+// ── Recommendation State ────────────────────────────────────────────────────
+
+let recSeq = 0;
+
+export function resetRecommendationState(): void {
+  recSeq = 0;
+}
+
+export interface AgentRecommendationEnvelope {
+  agentKey: string;
+  title: string;
+  rationale: string;
+  sourceObjectId: string;
+  severity: string;
+  recommendedAction: string;
+  urgency: string;
+  category: string;
+  moduleKey: string;
+  recommendationId: string;
+  createdAt: string;
+}
+
+export function buildAgentRecommendation(params: {
+  agentKey: string;
+  title: string;
+  rationale: string;
+  sourceObjectId: string;
+  severity: string;
+  recommendedAction: string;
+  urgency: string;
+  category: string;
+}): AgentRecommendationEnvelope {
+  recSeq++;
+  return {
+    agentKey: params.agentKey,
+    title: params.title,
+    rationale: params.rationale,
+    sourceObjectId: params.sourceObjectId,
+    severity: params.severity,
+    recommendedAction: params.recommendedAction,
+    urgency: params.urgency,
+    category: params.category,
+    moduleKey: 'trust_verification_compliance',
+    recommendationId: `agent-rec-trust-${Date.now()}-${recSeq}`,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function recommend(
+  agentKey: string,
+  fallbackTitle: string,
+  records: Array<{ id: string; title: string; blockers: string[] }>,
+): AgentRecommendationEnvelope[] {
+  const blocked = records.filter((r) => r.blockers.length > 0);
+  if (blocked.length > 0) {
+    return blocked.map((r) =>
+      buildAgentRecommendation({
+        agentKey,
+        title: `${r.title}: ${r.blockers.join(', ')}`,
+        rationale: r.blockers.join('; '),
+        sourceObjectId: r.id,
+        severity: 'high',
+        recommendedAction: 'Resolve blockers',
+        urgency: 'this_week',
+        category: 'compliance_fix',
+      }),
+    );
+  }
+  return [
+    buildAgentRecommendation({
+      agentKey,
+      title: fallbackTitle,
+      rationale: 'All records are compliant',
+      sourceObjectId: 'all',
+      severity: 'low',
+      recommendedAction: 'None required',
+      urgency: 'none',
+      category: 'advisory',
+    }),
+  ];
+}
+
+export function generateComplianceRecommendations(params: {
+  registrations?: Array<{ id?: string; userId?: string; status?: string; expiryDate?: string; professionalBody?: string }>;
+  documents?: Array<{ id?: string; entityId?: string; expiresAt?: string; title?: string }>;
+  insurance?: Array<{ id?: string; entityId?: string; coverageAmountCents?: number; expiresAt?: string; professionalBody?: string }>;
+  compliance?: Array<{ id?: string; entityId?: string; checks?: Array<{ checkType: string; status: string }> }>;
+  risks?: Array<{ id?: string; entityId?: string; triggers?: Array<{ triggerType: string; source: string; detail: string }> }>;
+}): AgentRecommendationEnvelope[] {
+  const recs: AgentRecommendationEnvelope[] = [];
+
+  for (const reg of params.registrations ?? []) {
+    if (reg.status === 'active' && reg.expiryDate && new Date(reg.expiryDate) > new Date()) continue;
+    recs.push(
+      buildAgentRecommendation({
+        agentKey: 'compliance_agent',
+        title: `${reg.professionalBody ?? 'Professional'} registration needs renewal`,
+        rationale: `Registration ${reg.id ?? reg.userId ?? ''} is ${reg.status ?? 'expired'}`,
+        sourceObjectId: reg.id ?? reg.userId ?? '',
+        severity: 'high',
+        recommendedAction: 'Renew registration',
+        urgency: 'this_week',
+        category: 'registration_renewal',
+      }),
+    );
+  }
+
+  for (const doc of params.documents ?? []) {
+    if (doc.expiresAt && new Date(doc.expiresAt) > new Date()) continue;
+    recs.push(
+      buildAgentRecommendation({
+        agentKey: 'compliance_agent',
+        title: `${doc.title ?? 'Document'} needs renewal`,
+        rationale: `Document ${doc.id ?? doc.entityId ?? ''} is expired or expiring`,
+        sourceObjectId: doc.id ?? doc.entityId ?? '',
+        severity: 'medium',
+        recommendedAction: 'Upload renewed document',
+        urgency: 'this_month',
+        category: 'document_renewal',
+      }),
+    );
+  }
+
+  for (const ins of params.insurance ?? []) {
+    if (ins.coverageAmountCents != null && ins.coverageAmountCents >= 5_000_000_00) continue;
+    recs.push(
+      buildAgentRecommendation({
+        agentKey: 'compliance_agent',
+        title: `Insurance coverage gap for ${ins.professionalBody ?? ins.entityId ?? ''}`,
+        rationale: `Coverage of R${((ins.coverageAmountCents ?? 0) / 100).toLocaleString()} is below recommended minimum`,
+        sourceObjectId: ins.id ?? ins.entityId ?? '',
+        severity: 'high',
+        recommendedAction: 'Increase coverage',
+        urgency: 'this_week',
+        category: 'coverage_gap',
+      }),
+    );
+  }
+
+  for (const comp of params.compliance ?? []) {
+    const failedChecks = (comp.checks ?? []).filter((c) => c.status === 'non_compliant');
+    for (const check of failedChecks) {
+      recs.push(
+        buildAgentRecommendation({
+          agentKey: 'compliance_agent',
+          title: `Compliance issue: ${check.checkType}`,
+          rationale: `${check.checkType} is non-compliant for ${comp.entityId ?? comp.id ?? ''}`,
+          sourceObjectId: comp.id ?? comp.entityId ?? '',
+          severity: 'high',
+          recommendedAction: `Resolve ${check.checkType}`,
+          urgency: 'this_week',
+          category: 'compliance_fix',
+        }),
+      );
+    }
+  }
+
+  for (const risk of params.risks ?? []) {
+    for (const trigger of risk.triggers ?? []) {
+      recs.push(
+        buildAgentRecommendation({
+          agentKey: 'compliance_agent',
+          title: `Risk: ${trigger.detail}`,
+          rationale: `${trigger.triggerType} from ${trigger.source}`,
+          sourceObjectId: risk.id ?? risk.entityId ?? '',
+          severity: 'high',
+          recommendedAction: 'Mitigate risk',
+          urgency: 'this_week',
+          category: 'risk_mitigation',
+        }),
+      );
+    }
+  }
+
+  return recs;
+}

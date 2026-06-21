@@ -172,6 +172,8 @@ export function evaluateOccupationReadiness(input: {
   let status: OccupationReadinessStatus = 'blocked';
   if (blockers.length === 0) {
     status = input.occupancyCertificate.status === 'conditional' ? 'conditional_approval' : 'ready';
+  } else if (blockers.every((b) => b.includes('condition(s)')) && input.occupancyCertificate.status === 'conditional') {
+    status = 'conditional_approval';
   }
 
   return { ready: blockers.length === 0, status, blockers };

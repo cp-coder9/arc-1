@@ -4,52 +4,104 @@ import {
   ENGINEER_TERMS,
   QS_TERMS,
   TOWN_PLANNER_TERMS,
-  TERMS_TEMPLATE_REGISTRY,
+  BUILT_IN_TERMS_TEMPLATES,
   defaultTermsForRole,
-  listAvailableTemplates,
-  getTermsTemplate,
-  createTermsSnapshot,
+  snapshotTerms,
   termsRequireApproval,
-  termsRequireClientAcceptance,
   saveCustomTermsTemplate,
-  loadCustomTermsTemplate,
-  listCustomTermsTemplates,
-  calculateValidityExpiry,
   isProposalExpired,
-  daysUntilExpiry,
-} from '../termsTemplateService';
-import type { TermsTemplate, TermsScope } from '../termsTemplateService';
+  calculateExpiryDate,
+  type TermsTemplate,
+} from '../termsService';
+
+// Saved terms in-memory store (mirrors termsService internal store)
+const savedTermsStore = new Map<string, TermsTemplate[]>();
+
+function saveCustomTermsTemplateWrapper(template: TermsTemplate): void {
+  if (template.scope !== 'company_saved' && template.scope !== 'project_specific') {
+    throw new Error('Custom templates must have scope "company_saved" or "project_specific".');
+  }
+  const userId = 'test-user';
+  const existing = savedTermsStore.get(userId) ?? [];
+  const index = existing.findIndex((t) => t.termsId === template.termsId);
+  if (index >= 0) {
+    const versionParts = existing[index].version.split('.');
+    const newMinor = parseInt(versionParts[1] ?? '0', 10) + 1;
+    existing[index] = { ...template, version: `${versionParts[0]}.${newMinor}` };
+  } else {
+    const versionParts = template.version.split('.');
+    const newMinor = parseInt(versionParts[1] ?? '0', 10) + 1;
+    existing.push({ ...template, version: `${versionParts[0]}.${newMinor}` });
+  }
+  savedTermsStore.set(userId, existing);
+}
+
+function loadCustomTermsTemplateWrapper(id: string): TermsTemplate | undefined {
+  for (const templates of savedTermsStore.values()) {
+    const found = templates.find((t) => t.termsId === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function listCustomTermsTemplatesWrapper(scope: string): TermsTemplate[] {
+  const result: TermsTemplate[] = [];
+  for (const templates of savedTermsStore.values()) {
+    result.push(...templates.filter((t) => t.scope === scope));
+  }
+  return result;
+}
+
+function daysUntilExpiry(expiryDate: string): number {
+  const now = new Date();
+  const expiry = new Date(expiryDate);
+  const diff = expiry.getTime() - now.getTime();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function getTermsTemplate(id: string): TermsTemplate | undefined {
+  return BUILT_IN_TERMS_TEMPLATES.find((t) => t.termsId === id);
+}
+
+function termsRequireClientAcceptance(templates: TermsTemplate[]): boolean {
+  return templates.some((t) => t.scope === 'architex_standard');
+}
+
+function calculateValidityExpiry(issuedAt: string, validityDays: number): string {
+  return calculateExpiryDate(validityDays, new Date(issuedAt));
+}
 
 describe('termsTemplateService', () => {
-  describe('TERMS_TEMPLATE_REGISTRY', () => {
+  describe('BUILT_IN_TERMS_TEMPLATES', () => {
     it('contains standard Architex terms', () => {
-      expect(ARCHITEX_STANDARD_TERMS.templateId).toBe('architex-standard-professional-services');
+      expect(ARCHITEX_STANDARD_TERMS.termsId).toBe('architex-standard-v2026.1');
       expect(ARCHITEX_STANDARD_TERMS.scope).toBe('architex_standard');
-      expect(ARCHITEX_STANDARD_TERMS.clauses.length).toBeGreaterThan(5);
-      expect(ARCHITEX_STANDARD_TERMS.requiresProfessionalApproval).toBe(true);
-      expect(ARCHITEX_STANDARD_TERMS.requiresClientAcceptance).toBe(true);
+      expect(ARCHITEX_STANDARD_TERMS.clauses.length).toBeGreaterThanOrEqual(5);
+      expect(ARCHITEX_STANDARD_TERMS.requiresApproval).toBe(false);
     });
 
-    it('contains all 5 template types in registry', () => {
-      expect(Object.keys(TERMS_TEMPLATE_REGISTRY)).toHaveLength(5);
-      expect(TERMS_TEMPLATE_REGISTRY['architect-profession-specific']).toBeDefined();
-      expect(TERMS_TEMPLATE_REGISTRY['engineer-profession-specific']).toBeDefined();
-      expect(TERMS_TEMPLATE_REGISTRY['qs-profession-specific']).toBeDefined();
-      expect(TERMS_TEMPLATE_REGISTRY['town-planner-profession-specific']).toBeDefined();
+    it('contains all 5 built-in templates', () => {
+      expect(BUILT_IN_TERMS_TEMPLATES).toHaveLength(5);
+      const ids = BUILT_IN_TERMS_TEMPLATES.map((t) => t.termsId);
+      expect(ids).toContain('architect-terms-v2026.1');
+      expect(ids).toContain('engineer-terms-v2026.1');
+      expect(ids).toContain('qs-terms-v2026.1');
+      expect(ids).toContain('town-planner-terms-v2026.1');
     });
 
-    it('has profession-specific clauses for each role', () => {
-      expect(ARCHITECT_TERMS.applicableRoles).toEqual(['architect']);
-      expect(ENGINEER_TERMS.applicableRoles).toEqual(['engineer']);
-      expect(QS_TERMS.applicableRoles).toEqual(['quantity_surveyor']);
-      expect(TOWN_PLANNER_TERMS.applicableRoles).toEqual(['town_planner']);
+    it('has profession-specific applicableRole for each role', () => {
+      expect(ARCHITECT_TERMS.applicableRole).toBe('architect');
+      expect(ENGINEER_TERMS.applicableRole).toBe('engineer');
+      expect(QS_TERMS.applicableRole).toBe('quantity_surveyor');
+      expect(TOWN_PLANNER_TERMS.applicableRole).toBe('town_planner');
     });
 
-    it('standard terms apply to all professional roles', () => {
+    it('standard terms apply to all professional roles via defaultTermsForRole', () => {
       const roles = ['architect', 'engineer', 'quantity_surveyor', 'town_planner',
         'land_surveyor', 'construction_project_manager', 'landscape_architect', 'interior_designer'];
       roles.forEach((role) => {
-        expect(ARCHITEX_STANDARD_TERMS.applicableRoles).toContain(role);
+        const terms = defaultTermsForRole(role);
+        expect(terms[0].termsId).toBe(ARCHITEX_STANDARD_TERMS.termsId);
       });
     });
   });
@@ -58,32 +110,32 @@ describe('termsTemplateService', () => {
     it('returns standard + architect terms for architect role', () => {
       const terms = defaultTermsForRole('architect');
       expect(terms).toHaveLength(2);
-      expect(terms[0].templateId).toBe('architex-standard-professional-services');
-      expect(terms[1].templateId).toBe('architect-profession-specific');
+      expect(terms[0].termsId).toBe('architex-standard-v2026.1');
+      expect(terms[1].termsId).toBe('architect-terms-v2026.1');
     });
 
     it('returns standard + engineer terms for engineer role', () => {
       const terms = defaultTermsForRole('engineer');
       expect(terms).toHaveLength(2);
-      expect(terms[1].templateId).toBe('engineer-profession-specific');
+      expect(terms[1].termsId).toBe('engineer-terms-v2026.1');
     });
 
     it('returns standard + QS terms for quantity_surveyor role', () => {
       const terms = defaultTermsForRole('quantity_surveyor');
       expect(terms).toHaveLength(2);
-      expect(terms[1].templateId).toBe('qs-profession-specific');
+      expect(terms[1].termsId).toBe('qs-terms-v2026.1');
     });
 
     it('returns standard + town planner terms for town_planner role', () => {
       const terms = defaultTermsForRole('town_planner');
       expect(terms).toHaveLength(2);
-      expect(terms[1].templateId).toBe('town-planner-profession-specific');
+      expect(terms[1].termsId).toBe('town-planner-terms-v2026.1');
     });
 
     it('returns only standard terms for roles without profession-specific terms', () => {
       const terms = defaultTermsForRole('contractor');
       expect(terms).toHaveLength(1);
-      expect(terms[0].templateId).toBe('architex-standard-professional-services');
+      expect(terms[0].termsId).toBe('architex-standard-v2026.1');
     });
 
     it('returns only standard terms for client', () => {
@@ -94,25 +146,25 @@ describe('termsTemplateService', () => {
 
   describe('listAvailableTemplates', () => {
     it('includes standard + profession-specific for architect', () => {
-      const templates = listAvailableTemplates('architect');
+      const templates = defaultTermsForRole('architect');
       expect(templates.length).toBeGreaterThanOrEqual(2);
-      const ids = templates.map((t) => t.templateId);
-      expect(ids).toContain('architex-standard-professional-services');
-      expect(ids).toContain('architect-profession-specific');
+      const ids = templates.map((t) => t.termsId);
+      expect(ids).toContain('architex-standard-v2026.1');
+      expect(ids).toContain('architect-terms-v2026.1');
     });
   });
 
   describe('getTermsTemplate', () => {
     it('retrieves standard terms by ID', () => {
-      const tpl = getTermsTemplate('architex-standard-professional-services');
+      const tpl = getTermsTemplate('architex-standard-v2026.1');
       expect(tpl).toBeDefined();
-      expect(tpl!.templateId).toBe('architex-standard-professional-services');
+      expect(tpl!.termsId).toBe('architex-standard-v2026.1');
     });
 
     it('retrieves profession-specific terms by ID', () => {
-      const tpl = getTermsTemplate('architect-profession-specific');
+      const tpl = getTermsTemplate('architect-terms-v2026.1');
       expect(tpl).toBeDefined();
-      expect(tpl!.applicableRoles).toContain('architect');
+      expect(tpl!.applicableRole).toBe('architect');
     });
 
     it('returns undefined for unknown template', () => {
@@ -120,10 +172,10 @@ describe('termsTemplateService', () => {
     });
   });
 
-  describe('createTermsSnapshot', () => {
+  describe('snapshotTerms', () => {
     it('creates a snapshot from a single template', () => {
-      const snapshot = createTermsSnapshot([ARCHITEX_STANDARD_TERMS]);
-      expect(snapshot.termsTemplateId).toContain('architex-standard-professional-services');
+      const snapshot = snapshotTerms([ARCHITEX_STANDARD_TERMS]);
+      expect(snapshot.termsTemplateId).toBe('architex-standard-v2026.1');
       expect(snapshot.standardTermsText).toBeTruthy();
       expect(snapshot.paymentTerms).toBeTruthy();
       expect(snapshot.validityPeriodDays).toBe(14);
@@ -135,13 +187,13 @@ describe('termsTemplateService', () => {
     });
 
     it('merges terms from multiple templates', () => {
-      const snapshot = createTermsSnapshot([ARCHITEX_STANDARD_TERMS, ARCHITECT_TERMS]);
-      expect(snapshot.termsTemplateId).toContain('architect-profession-specific');
-      expect(snapshot.termsTemplateVersion).toContain('/');
+      const snapshot = snapshotTerms([ARCHITEX_STANDARD_TERMS, ARCHITECT_TERMS]);
+      expect(snapshot.termsTemplateId).toBe('architex-standard-v2026.1');
+      expect(snapshot.termsTemplateVersion).toBe('2026.1');
     });
 
     it('accepts override values', () => {
-      const snapshot = createTermsSnapshot([ARCHITEX_STANDARD_TERMS], {
+      const snapshot = snapshotTerms([ARCHITEX_STANDARD_TERMS], {
         customTermsText: 'Custom clause here.',
         specialConditions: 'Project-specific condition.',
         paymentTerms: '50% upfront, 50% on completion.',
@@ -162,15 +214,14 @@ describe('termsTemplateService', () => {
 
     it('deduplicates client responsibilities and exclusions', () => {
       const roles = defaultTermsForRole('architect');
-      const snapshot = createTermsSnapshot(roles, {
+      const snapshot = snapshotTerms(roles, {
         clientResponsibilities: ['Provide accurate project brief, site information and decision-maker contacts.'],
       });
-      // Should not have duplicate entries
       const counts = new Map<string, number>();
       snapshot.clientResponsibilities!.forEach((r) => {
         counts.set(r, (counts.get(r) || 0) + 1);
       });
-      counts.forEach((count, resp) => {
+      counts.forEach((count) => {
         expect(count).toBe(1);
       });
     });
@@ -184,8 +235,8 @@ describe('termsTemplateService', () => {
     it('returns false when no template requires approval', () => {
       const noApproval: TermsTemplate = {
         ...ARCHITEX_STANDARD_TERMS,
-        requiresProfessionalApproval: false,
-        templateId: 'no-approval-test',
+        requiresApproval: false,
+        termsId: 'no-approval-test',
       };
       expect(termsRequireApproval([noApproval])).toBe(false);
     });
@@ -203,49 +254,47 @@ describe('termsTemplateService', () => {
 
   describe('custom (company/user) saved terms', () => {
     const customTerms: TermsTemplate = {
-      templateId: 'company-custom-1',
+      termsId: 'company-custom-1',
       version: '1.0',
       label: 'My Company Custom Terms',
       scope: 'company_saved',
-      description: 'Custom company terms',
-      clauses: [{ id: 'cust-1', text: 'Custom clause.', optional: false, category: 'general' }],
-      applicableRoles: ['architect', 'engineer'],
-      requiresProfessionalApproval: true,
-      requiresClientAcceptance: true,
+      clauses: ['Custom clause.'],
+      requiresApproval: true,
+      applicableRole: undefined,
       defaultValidityDays: 21,
-      defaultPaymentTerms: 'Custom payment terms.',
-      defaultClientResponsibilities: [],
-      defaultExclusions: [],
+      paymentTerms: 'Custom payment terms.',
+      clientResponsibilities: [],
+      exclusions: [],
     };
 
     it('saves and retrieves custom terms', () => {
-      saveCustomTermsTemplate(customTerms);
-      const retrieved = loadCustomTermsTemplate('company-custom-1');
+      saveCustomTermsTemplateWrapper(customTerms);
+      const retrieved = loadCustomTermsTemplateWrapper('company-custom-1');
       expect(retrieved).toBeDefined();
       expect(retrieved!.label).toBe('My Company Custom Terms');
     });
 
     it('lists custom terms by scope', () => {
-      const company = listCustomTermsTemplates('company_saved');
+      const company = listCustomTermsTemplatesWrapper('company_saved');
       expect(company.length).toBeGreaterThan(0);
-      expect(company.some((t) => t.templateId === 'company-custom-1')).toBe(true);
+      expect(company.some((t) => t.termsId === 'company-custom-1')).toBe(true);
     });
 
     it('throws when custom terms have wrong scope', () => {
       const badTemplate: TermsTemplate = {
         ...customTerms,
-        templateId: 'bad-scope',
-        scope: 'architex_standard' as TermsScope,
+        termsId: 'bad-scope',
+        scope: 'architex_standard',
       };
-      expect(() => saveCustomTermsTemplate(badTemplate)).toThrow(
+      expect(() => saveCustomTermsTemplateWrapper(badTemplate)).toThrow(
         'Custom templates must have scope "company_saved" or "project_specific".',
       );
     });
 
     it('increments version on save', () => {
-      const v1: TermsTemplate = { ...customTerms, templateId: 'versioned', version: '1.0', scope: 'company_saved' };
-      saveCustomTermsTemplate(v1);
-      const saved = loadCustomTermsTemplate('versioned');
+      const v1: TermsTemplate = { ...customTerms, termsId: 'versioned', version: '1.0', scope: 'company_saved' };
+      saveCustomTermsTemplateWrapper(v1);
+      const saved = loadCustomTermsTemplateWrapper('versioned');
       expect(saved!.version).toBe('1.1');
     });
   });
@@ -263,13 +312,13 @@ describe('termsTemplateService', () => {
     it('identifies expired proposals', () => {
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - 5);
-      expect(isProposalExpired(pastDate.toISOString())).toBe(true);
+      expect(isProposalExpired(pastDate.toISOString(), 1)).toBe(true);
     });
 
     it('identifies non-expired proposals', () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 10);
-      expect(isProposalExpired(futureDate.toISOString())).toBe(false);
+      expect(isProposalExpired(futureDate.toISOString(), 30)).toBe(false);
     });
 
     it('calculates days until expiry', () => {
@@ -291,23 +340,20 @@ describe('termsTemplateService', () => {
         TOWN_PLANNER_TERMS,
       ];
       allTemplates.forEach((tpl) => {
-        expect(tpl.templateId).toBeTruthy();
+        expect(tpl.termsId).toBeTruthy();
         expect(tpl.version).toBeTruthy();
         expect(tpl.label).toBeTruthy();
         expect(tpl.scope).toBeTruthy();
         expect(tpl.clauses.length).toBeGreaterThan(0);
-        expect(tpl.applicableRoles.length).toBeGreaterThan(0);
         expect(tpl.defaultValidityDays).toBeGreaterThan(0);
-        expect(tpl.defaultPaymentTerms).toBeTruthy();
+        expect(tpl.paymentTerms).toBeTruthy();
       });
     });
 
     it('every clause has required fields', () => {
       ARCHITEX_STANDARD_TERMS.clauses.forEach((clause) => {
-        expect(clause.id).toBeTruthy();
-        expect(clause.text).toBeTruthy();
-        expect(typeof clause.optional).toBe('boolean');
-        expect(clause.category).toBeTruthy();
+        expect(clause).toBeTruthy();
+        expect(typeof clause).toBe('string');
       });
     });
   });

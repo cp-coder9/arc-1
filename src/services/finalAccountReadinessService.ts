@@ -160,7 +160,7 @@ export function reconcileRetention(input: {
     {
       trigger: 'defects_liability_expiry',
       percentage: 50,
-      amount: Math.round(totalRetentionAmount * 50 * 100) / 100,
+      amount: Math.round(totalRetentionAmount * 0.5 * 100) / 100,
       released: input.releaseTriggersMet.includes('defects_liability_expiry'),
     },
     {

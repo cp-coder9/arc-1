@@ -3,16 +3,42 @@ import type { ComplexityAssessment, SubmissionAuditRecord } from '../types/munic
 
 const auditLog: AuditRecord[] = [];
 
-export function audit(ctx: BaseContext, action: string, sourceObjectId: string): AuditRecord {
+export function audit(ctx: BaseContext, action: string, sourceObjectId: string, metadata?: Record<string, unknown>): AuditRecord {
   const record: AuditRecord = {
     auditId: `audit-${auditLog.length + 1}`,
     actorId: ctx.userId,
     action,
     sourceObjectId,
     createdAt: ctx.now,
+    immutable: true,
+    ...(metadata ? { metadata } : {}),
   };
   auditLog.push(record);
   return record;
+}
+
+export function getAuditRecords(filters?: { actorId?: string; action?: string; sourceObjectId?: string; since?: string; limit?: number }): AuditRecord[] {
+  let results = [...auditLog];
+  if (filters?.actorId) results = results.filter((r) => r.actorId === filters.actorId);
+  if (filters?.action) results = results.filter((r) => r.action.includes(filters.action!));
+  if (filters?.sourceObjectId) results = results.filter((r) => r.sourceObjectId === filters.sourceObjectId);
+  if (filters?.since) results = results.filter((r) => r.createdAt >= filters.since!);
+  if (filters?.limit) results = results.slice(0, filters.limit);
+  return results;
+}
+
+export function assertAuditImmutableUpdateAttempt(changedKeys: string[]): void {
+  if (changedKeys.length > 0) {
+    throw new Error(`immutable audit records cannot be updated. Attempted to change: ${changedKeys.join(', ')}`);
+  }
+}
+
+export function exportAuditRecords(): AuditRecord[] {
+  return [...auditLog];
+}
+
+export function resetAuditState(): void {
+  auditLog.length = 0;
 }
 
 export function createAuditEntry(params: {

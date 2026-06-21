@@ -29,6 +29,9 @@ export function createProjectPassportBaseline(
   if (!appointment.projectFacts.landUseOrZoningKnown) {
     complianceContext.push("Land-use/zoning not yet confirmed; route to missing-information workflow.");
   }
+  if (appointment.missingFacts && appointment.missingFacts.length > 0) {
+    complianceContext.push("missing fact: " + appointment.missingFacts.join("; "));
+  }
   return {
     passportId: `passport-${workspace.projectId}`,
     projectId: workspace.projectId,

@@ -28,8 +28,8 @@ vi.mock('@/lib/firebase', () => ({
 describe('constructionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
-    docMock.mockImplementation((_dbOrCollection: any, ...path: string[]) => ({ type: 'doc', path, id: path[path.length - 1] || 'generated-id' }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => { const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path; return { type: 'collection', path: segments }; });
+    docMock.mockImplementation((_dbOrCollection: any, ...path: string[]) => { const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path; return { type: 'doc', path: segments, id: segments[segments.length - 1] || 'generated-id' }; });
     addDocMock.mockResolvedValue({ id: 'new-doc-id' });
     updateDocMock.mockResolvedValue(undefined);
     orderByMock.mockImplementation((field: string, direction: string) => ({ field, direction }));
@@ -83,8 +83,9 @@ describe('constructionService', () => {
 
   it('creates RFIs with transaction-backed sequential numbering', async () => {
     docMock.mockImplementation((dbOrCollection: any, ...path: string[]) => {
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
       if (dbOrCollection?.type === 'collection') return { type: 'doc', path: [...dbOrCollection.path, 'generated-rfi-id'], id: 'generated-rfi-id' };
-      return { type: 'doc', path, id: path[path.length - 1] };
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
     });
     runTransactionMock.mockImplementation(async (_db: unknown, runner: (tx: any) => Promise<void>) => {
       const tx = {

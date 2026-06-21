@@ -7,6 +7,8 @@
  */
 import type { FinancePartyRole, MoneyAmount, PaymentClaim } from './types';
 
+let _claimCounter = 0;
+
 /**
  * Submit a new payment claim.
  * Claims link to a specific milestone and optionally to one or more variations.
@@ -20,7 +22,7 @@ export function submitPaymentClaim(input: {
   description?: string;
 }): PaymentClaim {
   return {
-    claimId: `claim-${input.linkedMilestoneId}-${Date.now()}`,
+    claimId: `claim-${input.linkedMilestoneId}-${Date.now()}-${++_claimCounter}`,
     claimantRole: input.claimantRole,
     claimedAmount: input.claimedAmount,
     linkedMilestoneId: input.linkedMilestoneId,

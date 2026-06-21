@@ -17,8 +17,13 @@ describe('tenderService', () => {
     vi.clearAllMocks();
     collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
     docMock.mockImplementation((dbOrCollection: any, ...path: string[]) => {
-      if (dbOrCollection?.type === 'collection') return { type: 'doc', path: [...dbOrCollection.path, 'generated-id'], id: 'generated-id' };
-      return { type: 'doc', path, id: path[path.length - 1] };
+      const segments = path.length === 1 && path[0].includes('/') ? path[0].split('/') : path;
+      if (segments.length === 0) {
+        const ref = dbOrCollection?.type === 'collection' ? dbOrCollection : { path: [] };
+        return { type: 'doc', path: [...ref.path, 'generated-id'], id: 'generated-id' };
+      }
+      if (dbOrCollection?.type === 'collection') return { type: 'doc', path: [...dbOrCollection.path, segments[segments.length - 1]], id: segments[segments.length - 1] };
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
     });
     queryMock.mockImplementation((ref: unknown, ...constraints: unknown[]) => ({ ref, constraints }));
     whereMock.mockImplementation((field: string, op: string, value: unknown) => ({ field, op, value }));

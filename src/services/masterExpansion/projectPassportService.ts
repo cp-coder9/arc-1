@@ -168,9 +168,10 @@ export function calculateApprovalStatus(
   if (hasApproved) return 'approved';
 
   const hasPending = approvalRecords.some((r) =>
-    ['pending_review', 'draft'].includes(r.approval.status),
+    r.approval.status === 'pending_review',
   );
-  return hasPending ? 'pending' : 'missing';
+  if (hasPending) return 'pending';
+  return 'missing';
 }
 
 /**
