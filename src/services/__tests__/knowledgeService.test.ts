@@ -31,7 +31,10 @@ describe('knowledgeService', () => {
     collectionMock.mockImplementation((_db: unknown, path: string) => ({ path }));
     queryMock.mockImplementation((base: unknown, ...constraints: unknown[]) => ({ base, constraints }));
     whereMock.mockImplementation((field: string, op: string, value: unknown) => ({ field, op, value }));
-    docMock.mockImplementation((_db: unknown, path: string, id: string) => ({ path, id }));
+    docMock.mockImplementation((_db: unknown, p: string, id?: string) => {
+      const parts = p.split('/');
+      return { path: parts[0], id: id || parts.slice(1).join('/') };
+    });
     addDocMock.mockResolvedValue({ id: 'knowledge-new' });
     updateDocMock.mockResolvedValue(undefined);
     deleteDocMock.mockResolvedValue(undefined);

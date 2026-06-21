@@ -25,6 +25,7 @@ import { calculateRetention, createRetentionRecord, releaseRetention } from '../
 import { sampleAward, sampleProviders } from '../sampleData';
 import type {
   CommercialBaseline,
+  PaymentMilestone,
   VariationRequest,
   PaymentClaim,
   PaymentCertificate,
@@ -35,6 +36,7 @@ import type {
 describe('Finance Commercial Control — Full Workflow Integration', () => {
   // Step 1: Create commercial baseline from award
   let baseline: CommercialBaseline;
+  let schedule: PaymentMilestone[];
   let provider: FinancialProvider;
 
   it('Step 1: creates commercial baseline from award', () => {
@@ -64,10 +66,8 @@ describe('Finance Commercial Control — Full Workflow Integration', () => {
     expect(baseline.approvedVariationsTotal.amount).toBe(85_000);
   });
 
-  // Step 3: Build payment schedule
-  let schedule = buildPaymentSchedule(baseline);
-
   it('Step 3: builds payment schedule from baseline', () => {
+    schedule = buildPaymentSchedule(baseline);
     expect(schedule).toHaveLength(5);
     const nextDue = findNextPaymentDue(schedule);
     expect(nextDue).toBeTruthy();

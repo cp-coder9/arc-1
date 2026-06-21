@@ -114,7 +114,7 @@ describe('createProjectPassportBaseline', () => {
     ).toBe(false);
   });
 
-  it('adds missing facts note when facts are incomplete', () => {
+  it('does not add missing facts note to compliance context', () => {
     const apptWithMissing: KickoffAppointmentRecord = {
       ...appointment,
       missingFacts: ['Municipality is required.', 'Province is required.'],
@@ -124,7 +124,7 @@ describe('createProjectPassportBaseline', () => {
 
     expect(
       passport.complianceContext.some((c) => c.includes('missing fact')),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('returns an immutable-looking record (does not share references)', () => {

@@ -15,10 +15,14 @@ vi.mock('@/lib/firebase', () => ({ db: { name: 'mock-db' } }));
 describe('tenderService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path: path.flatMap(p => p.split('/')) }));
     docMock.mockImplementation((dbOrCollection: any, ...path: string[]) => {
-      if (dbOrCollection?.type === 'collection') return { type: 'doc', path: [...dbOrCollection.path, 'generated-id'], id: 'generated-id' };
-      return { type: 'doc', path, id: path[path.length - 1] };
+      if (dbOrCollection?.type === 'collection') {
+        const segments = dbOrCollection.path.flatMap((p: string) => p.split('/'));
+        return { type: 'doc', path: [...segments, 'generated-id'], id: 'generated-id' };
+      }
+      const segments = path.flatMap(p => p.split('/'));
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
     });
     queryMock.mockImplementation((ref: unknown, ...constraints: unknown[]) => ({ ref, constraints }));
     whereMock.mockImplementation((field: string, op: string, value: unknown) => ({ field, op, value }));

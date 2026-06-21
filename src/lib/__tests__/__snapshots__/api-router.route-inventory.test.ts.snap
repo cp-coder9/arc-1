@@ -830,5 +830,77 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
     "domain": "platform",
     "method": "get",
   },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/passport",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/risks",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/inbox-events",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/appointment",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/appointment",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/appointment",
+    "domain": "projects",
+    "method": "patch",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/kickoff",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/kickoff",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/kickoff/checklist",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/kickoff/checklist/:itemId",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/submission-readiness",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/projects/:id/submission-readiness",
+    "domain": "projects",
+    "method": "post",
+  },
 ]
 `;

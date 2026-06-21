@@ -35,7 +35,7 @@ describe('bidComparisonService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     docMock.mockImplementation((_db: unknown, ...pathSegments: unknown[]) => {
-      const path = pathSegments.map(String);
+      const path = pathSegments.flatMap(p => String(p).split('/'));
       return { type: 'doc', path, id: path[path.length - 1] };
     });
     updateDocMock.mockResolvedValue(undefined);

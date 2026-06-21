@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "generator": "0.1.0",
+  "template": "vertical:coding",
+  "template_version": "0.0.0",
+  "vars": {
+    "name": "arc-1-harness",
+    "description": "Architex platform harness for OpenCode",
+    "host": "opencode"
+  },
+  "hosts": [
+    "opencode"
+  ],
+  "files": {
+    ".claude/commands/doctor.md": "2f1475fa0ed34729cb2ed9d6cecf29e99781da0a56afef133361e3ff0a17bb52",
+    ".claude/commands/review-diff.md": "2ab52f01487bfe67335f4de5193d7a6fb0f72f646411114613d8fa5da071ef2b",
+    ".claude/skills/plan-change/SKILL.md": "84e1c44ca264b999ebf80cd8fa0e5ebf554275bbd8023b1530ad053a44482e30",
+    "bin/cli.js": "ef6f4dc039a6f7b3f8b01916c25b3469a42059a4e0c345ae0f5b2076f0ba6aac",
+    "CLAUDE.md": "c24b906345f0adacbc094d00c81fc3f38beab819089b39a5fa3abc8d3ac6ebd8",
+    "package.json": "08f95bf8e9cd33fad6ce9c6229862bca1e114ffad99ee69f632af62c3fde64f0",
+    "README.md": "f5bf3fdeb4ba6df013b250d59eca642c70625be97bf63f292ad6dc3f6353edce",
+    "src/agents/architect.ts": "132344fb45374b3bac3365f3a8fdbcb5343c3f43b3026076979fd94306855a42",
+    "src/agents/implementer.ts": "83a99784bf22d237d71761958f6f9c84928a58328b3f07716b44ae6dc516e293",
+    "src/agents/reviewer.ts": "d3e9bbe0350ba74134133b209b5f5b0b51153836cbefcf290d860348705f0a10",
+    "src/agents/test-writer.ts": "28fdc11842e998019acac78260c5c666b0a7d9de4d7ba47a2de4c393852f2620",
+    "src/init.ts": "62082d6c78c57a6cbcaafe597f75155162b966ce25e5ce1d600091ef608eb75a",
+    "tsconfig.json": "8b4e730a1aa39162ac574455d7a98e1881f5313ca80ffe503b9652dcf0c76b9d",
+    "__tests__/smoke.test.ts": "d8c9dd0444f9d2bc33f272c5ecf2fe14f28886b413d634f5ff079097f7926154",
+    ".opencode/opencode.json": "95bce29ad26bd674707d364152e732360c1ad5146920904662764043c4988ab3",
+    "install.md": "47d0928815925c4b0514405a752ba544d75330bcc809d03ae247ec5d602a9fdd",
+    "LICENSE": "cb9930318f62a48003899ccf8ab2d0dbc9d6f04b5cb98f768f055b7a285dd640",
+    ".claude/skills/evolve/SKILL.md": "59ecaa7795469bbe6e7785ee0cc05ba173541573e45c3dafacc1dbc332130a1d"
+  },
+  "generated_at": "2026-06-21T17:10:04.969Z",
+  "meta": {
+    "surface": "cli"
+  }
+}

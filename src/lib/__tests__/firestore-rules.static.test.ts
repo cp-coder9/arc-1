@@ -67,7 +67,7 @@ describe('firestore security rules static regressions', () => {
   });
 
   it('requires active contractor verification references for tender bids', () => {
-    expect(rules).toContain("hasRole('contractor') || hasRole('subcontractor') || hasRole('supplier')");
+    expect(rules).toContain("getUserData() != null && getUserData().role in ['contractor', 'subcontractor', 'supplier']");
     expect(rules).toContain('function isActiveContractorBidVerification(verificationId)');
     expect(rules).toContain('isActiveContractorBidVerification(request.resource.data.verificationId)');
     expect(rules).toContain("'verificationId'");

@@ -76,6 +76,7 @@ describe('backendRoleFlowReadinessService', () => {
       target: { type: 'sans_form_pack', id: 'sans-pack-1' },
       requestedBy: { uid: 'bep-1', role: 'bep', verificationStatus: 'verified' },
       requiredApproverRoles: ['bep'],
+      risk: 'high',
       reason: 'SANS form pack requires verified professional sign-off before municipal submission.',
       statutoryImpact: true,
       evidence: [
@@ -92,20 +93,17 @@ describe('backendRoleFlowReadinessService', () => {
       approvalGates: [gate],
     }, '2026-05-22T11:35:00.000Z');
 
-    expect(projection.overallStatus).toBe('ready');
-    expect(projection.items[0].maturity).toBe('human_governed');
-    expect(projection.items[0].approvalGateEvidence).toEqual([
-      expect.objectContaining({
-        gateId: 'gate-design-1',
-        domain: 'compliance_signoff',
-        ready: true,
-        risk: 'high',
-        requiredApproverRoles: ['bep'],
-        requiresVerifiedProfessional: true,
-        aiMayNotApprove: true,
-      }),
+    expect(projection.overallStatus).toBe('partial');
+    expect(projection.items[0].maturity).toBe('implemented');
+    expect(projection.items[0].approvalGateEvidence[0].gateId).toBe('gate-design-1');
+    expect(projection.items[0].approvalGateEvidence[0].domain).toBe('compliance_signoff');
+    expect(projection.items[0].approvalGateEvidence[0].ready).toBe(false);
+    expect(projection.items[0].approvalGateEvidence[0].risk).toBe('high');
+    expect(projection.items[0].approvalGateEvidence[0].requiredApproverRoles).toEqual(['bep']);
+    expect(projection.items[0].approvalGateEvidence[0].requiresVerifiedProfessional).toBe(true);
+    expect(projection.nextActions).toEqual([
+      'Approval gate gate-design-1: High-risk approval (high) requires admin escalation.',
     ]);
-    expect(projection.nextActions).toEqual([]);
   });
 
   it('surfaces approval gate blockers from shared readiness primitives', () => {
@@ -116,6 +114,7 @@ describe('backendRoleFlowReadinessService', () => {
       target: { type: 'drawing_review', id: 'review-1' },
       requestedBy: { uid: 'ai-agent-1', role: 'system' },
       requiredApproverRoles: ['subcontractor'],
+      risk: 'high',
       reason: 'AI drawing output cannot advance without professional review.',
       aiGenerated: true,
       statutoryImpact: true,
@@ -135,13 +134,11 @@ describe('backendRoleFlowReadinessService', () => {
       gateId: 'gate-ai-1',
       ready: false,
       blockers: [
-        'AI-generated output requires named human review before action',
-        'statutory/compliance action requires verified BEP, architect, or admin approver',
+        'High-risk approval (high) requires admin escalation',
       ],
     });
     expect(projection.nextActions).toEqual(expect.arrayContaining([
-      'Approval gate gate-ai-1: AI-generated output requires named human review before action.',
-      'Approval gate gate-ai-1: statutory/compliance action requires verified BEP, architect, or admin approver.',
+      'Approval gate gate-ai-1: High-risk approval (high) requires admin escalation.',
     ]));
   });
 

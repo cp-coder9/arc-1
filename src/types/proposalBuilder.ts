@@ -180,7 +180,11 @@ export interface CashflowAgentEvent {
     | 'release_approved'
     | 'release_disputed'
     | 'release_completed'
-    | 'ledger_reconciled';
+    | 'ledger_reconciled'
+    | 'terms_review_required'
+    | 'proposal_ready_for_review'
+    | 'proposal_expiring'
+    | 'risk_detected';
   actor: 'user' | 'proposal_agent' | 'terms_agent' | 'escrow_agent' | 'invoice_agent' | 'payment_agent' | 'reconciliation_agent' | 'dispute_agent' | 'acceptance_agent';
   projectId?: string;
   proposalId?: string;

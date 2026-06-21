@@ -17,6 +17,8 @@ import type {
 } from './types';
 import { incorporateVariationIntoBaseline, removeVariationFromBaseline } from './commercialBaselineService';
 
+let variationIdCounter = 0;
+
 /** Valid transitions from each variation status */
 const VALID_TRANSITIONS: Record<VariationStatus, VariationStatus[]> = {
   draft: ['submitted'],
@@ -41,7 +43,7 @@ export function createVariationRequest(input: {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  const uniqueId = `var-${slug}-${Date.now()}`;
+  const uniqueId = `var-${slug}-${Date.now()}-${++variationIdCounter}`;
   return {
     variationId: uniqueId,
     description: input.description,

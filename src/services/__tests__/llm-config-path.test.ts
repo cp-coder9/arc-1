@@ -19,6 +19,6 @@ describe('LLM Config Path Consistency', () => {
 
  it('getLLMConfig reads from system_settings/llm_config', async () => {
  await getLLMConfig();
- expect(doc).toHaveBeenCalledWith(expect.anything(), 'system_settings', 'llm_config');
+  expect(doc).toHaveBeenCalledWith(expect.anything(), 'system_settings/llm_config');
  });
 });

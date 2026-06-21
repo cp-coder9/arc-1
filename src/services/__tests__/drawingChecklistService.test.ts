@@ -20,8 +20,11 @@ vi.mock('@/lib/firebase', () => ({
 describe('drawingChecklistService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
-    docMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'doc', path, id: path[path.length - 1] }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path: path.flatMap(p => p.split('/')) }));
+    docMock.mockImplementation((_db: unknown, ...path: string[]) => {
+      const segments = path.flatMap(p => p.split('/'));
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
+    });
     addDocMock.mockResolvedValue({ id: 'checklist-1' });
     updateDocMock.mockResolvedValue(undefined);
   });
@@ -48,7 +51,7 @@ describe('drawingChecklistService', () => {
     const { subscribeToDrawingChecklists } = await import('../drawingChecklistService');
 
     expect(subscribeToDrawingChecklists('project-1', callback)).toBe(unsubscribe);
-    expect(collectionMock).toHaveBeenCalledWith(expect.anything(), 'projects', 'project-1', 'drawing_checklists');
+    expect(collectionMock).toHaveBeenCalledWith(expect.anything(), 'projects/project-1/drawing_checklists');
     expect(callback).toHaveBeenCalledWith([expect.objectContaining({ id: 'item-1', title: 'Site plan' })]);
   });
 
