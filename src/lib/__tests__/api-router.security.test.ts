@@ -10,6 +10,7 @@ process.env.VITE_PAYFAST_MERCHANT_ID = '10000100';
 process.env.VITE_PAYFAST_MERCHANT_KEY = 'merchant-key';
 process.env.VITE_PAYFAST_SANDBOX = 'true';
 process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
+process.env.PAYFAST_SANDBOX = 'true';
 process.env.APP_BASE_URL = 'https://architex.test';
 
 type StoredDoc = Record<string, any>;

@@ -20,8 +20,8 @@ const whereMock = vi.mocked(firestore.where) as any;
 describe('closeoutService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    docMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'doc', path }));
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
+    docMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'doc', path: path.flatMap(p => p.split('/')) }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path: path.flatMap(p => p.split('/')) }));
     queryMock.mockImplementation((ref: unknown, ...constraints: unknown[]) => ({ ref, constraints }));
     whereMock.mockImplementation((field: string, op: string, value: unknown) => ({ field, op, value }));
     setDocMock.mockResolvedValue(undefined);

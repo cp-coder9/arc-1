@@ -20,8 +20,11 @@ vi.mock('@/lib/firebase', () => ({
 describe('coordinationRegisterService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
-    docMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'doc', path, id: path[path.length - 1] }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path: path.flatMap(p => p.split('/')) }));
+    docMock.mockImplementation((_db: unknown, ...path: string[]) => {
+      const segments = path.flatMap(p => p.split('/'));
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
+    });
     addDocMock.mockResolvedValue({ id: 'coordination-1' });
     updateDocMock.mockResolvedValue(undefined);
   });
@@ -50,7 +53,7 @@ describe('coordinationRegisterService', () => {
     const { subscribeToCoordinationItems } = await import('../coordinationRegisterService');
 
     expect(subscribeToCoordinationItems('project-1', callback)).toBe(unsubscribe);
-    expect(collectionMock).toHaveBeenCalledWith(expect.anything(), 'projects', 'project-1', 'coordination_items');
+    expect(collectionMock).toHaveBeenCalledWith(expect.anything(), 'projects/project-1/coordination_items');
     expect(callback).toHaveBeenCalledWith([expect.objectContaining({ id: 'coordination-1', title: 'Clarify slab edge' })]);
   });
 

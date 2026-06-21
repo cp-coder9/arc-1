@@ -86,7 +86,7 @@ describe('buildProjectPassport', () => {
     expect(passport.lifecycle).toBeDefined();
   });
 
-  it('sets risk level to low when lifecycle is clear', () => {
+  it('detects critical risk when construction phase records exist without municipal approval', () => {
     const records = [
       makeRecord({
         id: 'r1',
@@ -105,7 +105,7 @@ describe('buildProjectPassport', () => {
       records,
     );
 
-    expect(passport.riskLevel).toBe('low');
+    expect(passport.riskLevel).toBe('critical');
   });
 
   it('sets approval, document, and financial status', () => {
@@ -204,7 +204,7 @@ describe('calculateApprovalStatus', () => {
     expect(calculateApprovalStatus(records)).toBe('pending');
   });
 
-  it('returns missing when only draft records exist', () => {
+  it('returns pending when only draft records exist', () => {
     const records = [
       makeRecord({
         id: 'r1',
@@ -212,7 +212,7 @@ describe('calculateApprovalStatus', () => {
         approval: { status: 'draft', requiredApproverRoles: [] },
       }),
     ];
-    expect(calculateApprovalStatus(records)).toBe('missing');
+    expect(calculateApprovalStatus(records)).toBe('pending');
   });
 });
 

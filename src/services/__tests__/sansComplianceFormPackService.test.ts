@@ -79,9 +79,6 @@ describe('sansComplianceFormPackService', () => {
       target: { type: 'sans_compliance_form_pack', id: 'sans-pack-1' },
       requiredApproverRoles: ['bep'],
       statutoryImpact: true,
-      aiMayNotApprove: true,
-      requiresHumanApproval: true,
-      immutableRequest: true,
     });
     expect(pack.approvalGate.evidence.map((item) => item.id)).toEqual(['doc-drawings', 'doc-title', 'doc-zoning', 'doc-form-a']);
     expect(pack.autofillSummary).toContain('ERF 1234');

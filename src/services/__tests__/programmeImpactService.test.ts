@@ -31,10 +31,14 @@ vi.mock('@/lib/firebase', () => ({
 describe('programmeImpactService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path }));
+    collectionMock.mockImplementation((_db: unknown, ...path: string[]) => ({ type: 'collection', path: path.flatMap(p => p.split('/')) }));
     docMock.mockImplementation((_dbOrRef: any, ...path: string[]) => {
-      if (_dbOrRef?.type === 'collection') return { type: 'doc', path: [..._dbOrRef.path, 'generated-id'], id: 'generated-id' };
-      return { type: 'doc', path, id: path[path.length - 1] };
+      if (_dbOrRef?.type === 'collection') {
+        const segments = _dbOrRef.path.flatMap((p: string) => p.split('/'));
+        return { type: 'doc', path: [...segments, 'generated-id'], id: 'generated-id' };
+      }
+      const segments = path.flatMap(p => p.split('/'));
+      return { type: 'doc', path: segments, id: segments[segments.length - 1] };
     });
     addDocMock.mockResolvedValue({ id: 'impact-new-001' });
     updateDocMock.mockResolvedValue(undefined);

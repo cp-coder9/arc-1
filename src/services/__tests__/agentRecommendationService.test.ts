@@ -1,111 +1,136 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  buildAgentRecommendation,
-  recommend,
-  generateComplianceRecommendations,
-  resetRecommendationState,
+  recommendationsFromDocumentState,
+  subscribeToRecommendations,
+  generateFieldRecommendations,
+  recommendNextActions,
 } from '../agentRecommendationService';
-import { buildProfessionalRegistration } from '../professionalRegistrationService';
-import { buildCompanyDocument } from '../companyDocumentService';
-import { buildInsuranceCompliance } from '../insuranceComplianceService';
-import { buildContractorCompliance } from '../contractorSupplierComplianceService';
-import { evaluateComplianceRisk, buildRiskTrigger } from '../complianceRiskService';
+import type { ReadinessReport, ReadinessFinding } from '../documentRegisterService';
+import type { WorkflowEvent } from '../lifecycleTypes';
+import type { AppointmentRecord } from '../appointmentService';
+import type { KickoffPackage } from '../kickoffService';
 
-describe('agentRecommendationService — trust_verification_compliance', () => {
-  beforeEach(() => resetRecommendationState());
-
-  it('builds an agent recommendation with correct envelope', () => {
-    const rec = buildAgentRecommendation({
-      agentKey: 'test_agent',
-      title: 'Test Recommendation',
-      rationale: 'Test rationale',
-      sourceObjectId: 'obj-1',
-      severity: 'high',
-      recommendedAction: 'Take action',
-      urgency: 'this_week',
-      category: 'compliance_fix',
+describe('agentRecommendationService', () => {
+  describe('recommendationsFromDocumentState', () => {
+    it('generates recommendations from readiness reports with blockers', () => {
+      const reports: ReadinessReport[] = [
+        {
+          checkName: 'municipal_submission',
+          ready: false,
+          findings: [{ code: 'MUNICIPAL_FORM_NOT_READY', priority: 'high', message: 'Form not ready', assignedRoles: ['architect'] }],
+        },
+      ];
+      const events: WorkflowEvent[] = [];
+      const recs = recommendationsFromDocumentState('proj-1', reports, events);
+      expect(recs.length).toBeGreaterThan(0);
+      expect(recs.some((r) => r.title.includes('municipal_submission'))).toBe(true);
     });
 
-    expect(rec.agentKey).toBe('test_agent');
-    expect(rec.severity).toBe('high');
-    expect(rec.moduleKey).toBe('trust_verification_compliance');
-    expect(rec.recommendationId).toMatch(/agent-rec-trust-/);
-    expect(rec.createdAt).toBeTruthy();
+    it('includes event-based recommendations for high priority events', () => {
+      const reports: ReadinessReport[] = [];
+      const events: WorkflowEvent[] = [
+        { id: 'evt-1', type: 'risk_detected', projectId: 'proj-1', title: 'Risk', detail: 'Critical issue', priority: 'critical', sourceModule: 'projects', assignedRoles: ['architect'], createdAt: new Date().toISOString() },
+      ];
+      const recs = recommendationsFromDocumentState('proj-1', reports, events);
+      expect(recs.some((r) => r.id === 'rec-event-evt-1')).toBe(true);
+      expect(recs.some((r) => r.requiresHumanApproval)).toBe(true);
+    });
+
+    it('returns empty array when no blockers or events', () => {
+      const recs = recommendationsFromDocumentState('proj-1', [], []);
+      expect(recs).toHaveLength(0);
+    });
   });
 
-  it('legacy recommend() generates recommendations for blocked records', () => {
-    const records = [
-      { id: 'r-1', title: 'Record 1', blockers: ['Missing approval'] },
-      { id: 'r-2', title: 'Record 2', blockers: [] },
-    ];
+  describe('recommendNextActions', () => {
+    it('returns kickoff-related recommendations', () => {
+      const appointment: AppointmentRecord = {
+        appointmentId: 'appt-1',
+        proposalSnapshot: { projectName: 'Test', clientId: 'c-1', professionalId: 'p-1', feeAmount: 100000, platformFee: { payerPlatformFee: 500, payeePlatformFee: 500 }, escrowMilestones: [] },
+        projectFacts: { municipality: 'City', province: 'GP', professionalBody: 'SACAP', professionalRegistrationNumber: 'REG-001', landUseOrZoningKnown: true },
+        status: 'confirmed',
+        revision: 1,
+        createdAtIso: new Date().toISOString(),
+        requiresHumanApprovalBeforeFormalIssue: true,
+        missingFacts: [],
+      };
+      const kickoff: KickoffPackage = {
+        workspace: { projectId: 'proj-1', appointmentId: 'appt-1', projectName: 'Test', clientId: 'c-1', professionalId: 'p-1', phase: 'appointment_confirmed' as const, roles: [] },
+        passport: { passportId: 'pp-1', projectId: 'proj-1', appointmentId: 'appt-1', facts: {} as any, complianceContext: [] },
+        checklist: [],
+        initialTasks: [{ id: 't-1', title: 'Initial task', phase: 'appointment' as const, ownerRole: 'architect' }],
+        readiness: 'ready',
+      };
+      const recs = recommendNextActions(appointment, kickoff);
+      expect(recs.length).toBeGreaterThanOrEqual(3);
+      expect(recs.some((r) => r.id === 'rec-human-approve-appointment-letter')).toBe(true);
+    });
 
-    const recs = recommend('test_agent', 'Fallback Title', records);
-    expect(recs).toHaveLength(1);
-    expect(recs[0].title).toContain('Record 1');
-    expect(recs[0].severity).toBe('high');
+    it('adds missing facts recommendation when facts are missing', () => {
+      const appointment: AppointmentRecord = {
+        appointmentId: 'appt-2',
+        proposalSnapshot: { projectName: 'Test', clientId: 'c-1', professionalId: 'p-1', feeAmount: 100000, platformFee: { payerPlatformFee: 500, payeePlatformFee: 500 }, escrowMilestones: [] },
+        projectFacts: { municipality: '', province: '', professionalBody: '', professionalRegistrationNumber: '', landUseOrZoningKnown: false },
+        status: 'confirmed',
+        revision: 1,
+        createdAtIso: new Date().toISOString(),
+        requiresHumanApprovalBeforeFormalIssue: false,
+        missingFacts: ['Municipality is required', 'Province is required'],
+      };
+      const kickoff: KickoffPackage = {
+        workspace: { projectId: 'proj-2', appointmentId: 'appt-2', projectName: 'Test', clientId: 'c-1', professionalId: 'p-1', phase: 'appointment_confirmed', roles: [] },
+        passport: { projectId: 'proj-2', complianceContext: [], projectPhase: 'appointment' },
+        checklist: [],
+        initialTasks: [],
+        readiness: { allRequiredFactsPresent: false, missingFacts: ['Municipality is required', 'Province is required'], hasAppointmentLetter: false, professionalConfirmed: true },
+      };
+      const recs = recommendNextActions(appointment, kickoff);
+      expect(recs.some((r) => r.id === 'rec-request-missing-facts')).toBe(true);
+    });
+
+    it('adds zoning check when land use not known', () => {
+      const appointment: AppointmentRecord = {
+        appointmentId: 'appt-3',
+        proposalSnapshot: { projectName: 'Test', clientId: 'c-1', professionalId: 'p-1', feeAmount: 100000, platformFee: { payerPlatformFee: 500, payeePlatformFee: 500 }, escrowMilestones: [] },
+        projectFacts: { municipality: 'City', province: 'GP', professionalBody: 'SACAP', professionalRegistrationNumber: 'REG-001', landUseOrZoningKnown: false },
+        status: 'confirmed',
+        revision: 1,
+        createdAtIso: new Date().toISOString(),
+        requiresHumanApprovalBeforeFormalIssue: false,
+        missingFacts: [],
+      };
+      const kickoff: KickoffPackage = {
+        workspace: { projectId: 'proj-3', appointmentId: 'appt-3', projectName: 'Test', clientId: 'c-1', professionalId: 'p-1', phase: 'appointment_confirmed', roles: [] },
+        passport: { projectId: 'proj-3', complianceContext: [], projectPhase: 'appointment' },
+        checklist: [],
+        initialTasks: [],
+        readiness: { allRequiredFactsPresent: true, missingFacts: [], hasAppointmentLetter: false, professionalConfirmed: true },
+      };
+      const recs = recommendNextActions(appointment, kickoff);
+      expect(recs.some((r) => r.id === 'rec-check-zoning')).toBe(true);
+    });
   });
 
-  it('legacy recommend() returns advisory when no blockers', () => {
-    const records = [{ id: 'r-1', title: 'Clean Record', blockers: [] }];
-    const recs = recommend('test_agent', 'All Clear', records);
-    expect(recs).toHaveLength(1);
-    expect(recs[0].severity).toBe('low');
-    expect(recs[0].title).toBe('All Clear');
+  describe('subscribeToRecommendations', () => {
+    it('returns an unsubscribe function', () => {
+      const unsubscribe = subscribeToRecommendations('proj-1');
+      expect(typeof unsubscribe).toBe('function');
+    });
+
+    it('calls callback with empty array', () => {
+      let called = false;
+      subscribeToRecommendations('proj-1', (recs) => {
+        called = true;
+        expect(recs).toEqual([]);
+      });
+      expect(called).toBe(true);
+    });
   });
 
-  it('generateComplianceRecommendations handles all entity types', () => {
-    const reg = buildProfessionalRegistration({
-      userId: 'u-1', professionalBody: 'SACAP', registrationNumber: 'SACAP-EXPIRED',
-      category: 'Professional Architect', expiryDate: '2025-01-01T00:00:00.000Z',
+  describe('generateFieldRecommendations', () => {
+    it('returns empty array for any input', () => {
+      const recs = generateFieldRecommendations({ someField: 'value' });
+      expect(recs).toEqual([]);
     });
-    const doc = buildCompanyDocument({
-      entityId: 'c-1', entityType: 'company', documentType: 'tax_clearance',
-      title: 'Tax Clearance', documentUrl: 'https://example.com/doc.pdf',
-      expiresAt: '2025-01-01T00:00:00.000Z',
-    });
-    const ins = buildInsuranceCompliance({
-      entityId: 'p-1', entityType: 'professional', professionalBody: 'ECSA',
-      provider: 'ABC Insurers', policyNumber: 'POL-001',
-      coverageAmountCents: 1_000_000_00, // Below ECSA minimum
-      issuedAt: '2026-01-01T00:00:00.000Z', expiresAt: '2027-01-01T00:00:00.000Z',
-      certificateUrl: 'https://example.com/cert.pdf',
-    });
-    const comp = buildContractorCompliance({
-      entityId: 'contractor-1', entityType: 'contractor',
-      checks: [
-        { checkType: 'health_safety_file', status: 'non_compliant' },
-      ],
-    });
-    const risk = evaluateComplianceRisk({
-      entityId: 'e-1', entityType: 'professional',
-      triggers: [buildRiskTrigger('expired_registration', 'SACAP-EXPIRED', 'Registration expired')],
-    });
-
-    const recs = generateComplianceRecommendations({
-      registrations: [reg],
-      documents: [doc],
-      insurance: [ins],
-      compliance: [comp],
-      risks: [risk],
-    });
-
-    expect(recs.length).toBeGreaterThan(0);
-    // Should have recommendations for each category
-    expect(recs.some((r) => r.category === 'registration_renewal')).toBe(true);
-    expect(recs.some((r) => r.category === 'document_renewal')).toBe(true);
-    expect(recs.some((r) => r.category === 'coverage_gap')).toBe(true);
-    expect(recs.some((r) => r.category === 'compliance_fix')).toBe(true);
-    expect(recs.some((r) => r.category === 'risk_mitigation')).toBe(true);
-  });
-
-  it('generateComplianceRecommendations skips items that do not need action', () => {
-    const reg = buildProfessionalRegistration({
-      userId: 'u-1', professionalBody: 'SACAP', registrationNumber: 'SACAP-ACTIVE',
-      category: 'Professional Architect', expiryDate: '2027-12-31T00:00:00.000Z',
-      status: 'active',
-    });
-    const recs = generateComplianceRecommendations({ registrations: [reg] });
-    // Active registration far from expiry should not generate recommendations
-    expect(recs).toHaveLength(0);
   });
 });

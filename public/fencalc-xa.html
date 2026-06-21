@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FenCalc XA — SANS 10400-XA Fenestration Compliance Calculator</title>
+<style>
+:root {
+  --bg: #0f172a; --card: #1e293b; --card2: #334155; --border: #475569;
+  --text: #f1f5f9; --muted: #94a3b8; --accent: #3b82f6;
+  --pass: #22c55e; --warn: #eab308; --fail: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif;
+  padding: 2rem 1rem; line-height: 1.5;
+}
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.25rem; }
+h1 span { color: var(--accent); }
+.subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+.flex { display: flex; gap: 1rem; flex-wrap: wrap; }
+.grid { display: grid; gap: 1rem; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.g4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; }
+.card h3 { font-size: 0.875rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
+label { font-size: 0.75rem; font-weight: 500; color: var(--muted); display: block; margin-bottom: 0.25rem; }
+input, select, textarea {
+  width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border);
+  background: var(--card2); color: var(--text); font-size: 0.875rem; outline: none; transition: border-color 0.15s;
+}
+input:focus, select:focus { border-color: var(--accent); }
+.field { margin-bottom: 0.75rem; }
+.row { display: flex; gap: 0.75rem; align-items: end; }
+.row .field { flex: 1; margin-bottom: 0; }
+.btn {
+  background: var(--accent); color: white; border: none; padding: 0.5rem 1.25rem;
+  border-radius: 999px; font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: opacity 0.15s; display: inline-flex; align-items: center; gap: 0.5rem;
+}
+.btn:hover { opacity: 0.9; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-sm { padding: 0.375rem 0.875rem; font-size: 0.75rem; }
+.btn-danger { background: var(--fail); }
+.btn-pass { background: var(--pass); }
+table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+th { text-align: left; padding: 0.5rem; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+td { padding: 0.5rem; border-bottom: 1px solid rgba(71,85,105,0.3); vertical-align: middle; }
+td input, td select { font-size: 0.75rem; padding: 0.375rem 0.5rem; }
+.badge {
+  display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px;
+  font-size: 0.6875rem; font-weight: 600;
+}
+.badge-pass { background: rgba(34,197,94,0.15); color: var(--pass); }
+.badge-fail { background: rgba(239,68,68,0.15); color: var(--fail); }
+.badge-warn { background: rgba(234,179,8,0.15); color: var(--warn); }
+.results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+.stat-card { background: var(--card2); border-radius: 0.75rem; padding: 1rem; text-align: center; }
+.stat-card .val { font-size: 1.5rem; font-weight: 800; }
+.stat-card .lbl { font-size: 0.6875rem; color: var(--muted); margin-top: 0.25rem; }
+.summary-bar { display: flex; height: 0.5rem; border-radius: 999px; overflow: hidden; margin-top: 0.5rem; }
+.summary-bar div { transition: width 0.3s; }
+.action-bar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+.ml-auto { margin-left: auto; }
+.text-center { text-align: center; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.gap-2 { gap: 0.5rem; }
+.items-center { align-items: center; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delete-btn { background: none; border: none; color: var(--fail); cursor: pointer; font-size: 1rem; padding: 0.25rem; }
+@media (max-width: 768px) {
+  .g2, .g3, .g4 { grid-template-columns: 1fr; }
+  body { padding: 1rem 0.5rem; }
+  table { font-size: 0.75rem; }
+  td input, td select { padding: 0.25rem 0.375rem; }
+}
+.print-only { display: none; }
+@media print {
+  body { background: white; color: black; padding: 0.5in; }
+  .card { background: white; border: 1px solid #ddd; break-inside: avoid; }
+  input, select { border: 1px solid #ccc; background: white; color: black; }
+  .no-print { display: none !important; }
+  .print-only { display: block; }
+  .stat-card { background: #f5f5f5; }
+  .badge-pass { background: #dcfce7; color: #166534; }
+  .badge-fail { background: #fee2e2; color: #991b1b; }
+  .badge-warn { background: #fef9c3; color: #854d0e; }
+}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+
+  <!-- Header -->
+  <div class="flex items-center gap-2">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#3b82f6"/><path d="M8 20h16M12 12h8v8H12z" stroke="white" stroke-width="2" fill="none"/></svg>
+    <div>
+      <h1><span>FenCalc</span> XA</h1>
+      <div class="subtitle">SANS 10400-XA:2021 Fenestration Compliance Calculator</div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar no-print">
+    <button class="btn" onclick="addElement()">+ Add Element</button>
+    <button class="btn btn-outline" onclick="addStoreyBatch()">+ Add Storey Batch</button>
+    <button class="btn btn-outline" onclick="loadExample()">Load Example</button>
+    <button class="btn btn-outline" onclick="clearAll()">Clear All</button>
+    <button class="btn btn-sm" onclick="calculate()">Calculate</button>
+    <button class="btn btn-outline btn-sm ml-auto" onclick="window.print()">Print / PDF Report</button>
+  </div>
+
+  <!-- Project Info -->
+  <div class="grid g4" style="margin-bottom:1rem">
+    <div class="field"><label>Project Name</label><input id="projName" placeholder="e.g. Parkview House" value="Parkview Residential"></div>
+    <div class="field"><label>Project Ref</label><input id="projRef" placeholder="e.g. 2026-042" value="ARCH-2026-042"></div>
+    <div class="field"><label>SANS Edition</label>
+      <select id="sansEdition"><option value="2021" selected>SANS 10400-XA:2021 Ed. 2</option></select>
+    </div>
+    <div class="field"><label>Climate Zone</label>
+      <select id="climateZone" onchange="calculate()">
+        <option value="1">Zone 1 — Interior</option>
+        <option value="2">Zone 2 — Coastal</option>
+        <option value="3" selected>Zone 3 — KZN Coast</option>
+        <option value="4">Zone 4 — Central Interior</option>
+        <option value="5">Zone 5 — High Altitude</option>
+        <option value="6">Zone 6 — Hot Interior</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-bottom:1rem">
+    <div class="field"><label>Address</label><input id="projAddress" placeholder="e.g. 14 Park Rd, Sandton" value="14 Park Road, Sandton"></div>
+    <div class="field"><label>Total Floor Area (m²)</label><input id="totalFloorArea" type="number" value="200" onchange="calculate()" step="1"></div>
+    <div class="field"><label>Number of Storeys</label><input id="storeyCount" type="number" value="2" min="1" max="10" onchange="rebuildStoreys()"></div>
+  </div>
+
+  <!-- Per-storey checkboxes -->
+  <div class="card mb-2" id="storeySection">
+    <h3>Storey Assignment</h3>
+    <div id="storeyCheckboxes" class="flex gap-2"></div>
+  </div>
+
+  <!-- Elements Table -->
+  <div class="card">
+    <div class="flex items-center" style="justify-content:space-between;margin-bottom:1rem">
+      <h3 style="margin-bottom:0">Fenestration Elements</h3>
+      <span id="elementCount" style="color:var(--muted);font-size:0.8125rem">0 elements</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="elementsTable">
+        <thead>
+          <tr>
+            <th style="width:36px"></th>
+            <th>Element</th>
+            <th>Description</th>
+            <th>Orientation</th>
+            <th>Glazed Area (m²)</th>
+            <th>U-Value (W/m²K)</th>
+            <th>SHGC</th>
+            <th>Shading Factor</th>
+            <th>Storey</th>
+          </tr>
+        </thead>
+        <tbody id="elementsBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsSection" style="display:none">
+    <div class="card mt-4">
+      <h3>Compliance Summary</h3>
+      <div class="results-grid" id="summaryStats"></div>
+      <div class="mt-2">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--muted)">
+          <span>Passed</span><span>Warnings</span><span>Failed</span>
+        </div>
+        <div class="summary-bar" id="summaryBar"></div>
+      </div>
+    </div>
+
+    <!-- Per-element results -->
+    <div class="card mt-4">
+      <div class="flex items-center" style="justify-content:space-between">
+        <h3 style="margin-bottom:0">Element Results</h3>
+        <span style="font-size:0.75rem;color:var(--muted)" id="resultCount"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="resultsTable">
+          <thead><tr>
+            <th>Ref</th><th>Element</th><th>Orientation</th><th>Area (m²)</th>
+            <th>U-Value</th><th>Limit</th><th>Status</th>
+            <th>SHGC</th><th>Limit</th><th>Status</th>
+            <th>Overall</th><th>Adj SHGC</th><th>Shading</th>
+          </tr></thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Per-storey summary -->
+    <div class="card mt-4" id="storeyResultsSection">
+      <h3>Per-Storey Analysis</h3>
+      <div id="storeyResults" class="results-grid"></div>
+    </div>
+
+    <!-- Report footer -->
+    <div class="card mt-4 print-only" id="reportFooter">
+      <p style="font-size:0.75rem;color:var(--muted);text-align:center">
+        Generated by FenCalc XA on <span id="reportDate"></span>.<br>
+        This is a compliance support tool. Final sign-off by competent professional required.<br>
+        Based on SANS 10400-XA:2021 Ed. 2 deemed-to-satisfy provisions.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== SANS 10400-XA:2021 TABLE DATA =====
+const ZONE_DATA = {
+  1: { name: 'Interior', uLimit: { alu: 3.5, thermal: 2.7, timber: 5.7 }, shgc: { n: 0.60, s: 0.65, ew: 0.30 } },
+  2: { name: 'Coastal', uLimit: { alu: 3.3, thermal: 2.5, timber: 3.5 }, shgc: { n: 0.50, s: 0.55, ew: 0.25 } },
+  3: { name: 'KZN Coast', uLimit: { alu: 5.7, thermal: 5.7, timber: 5.7 }, shgc: { n: 0.65, s: 0.70, ew: 0.30 } },
+  4: { name: 'Central Interior', uLimit: { alu: 3.0, thermal: 2.3, timber: 3.0 }, shgc: { n: 0.50, s: 0.55, ew: 0.20 } },
+  5: { name: 'High Altitude', uLimit: { alu: 3.0, thermal: 2.3, timber: 3.0 }, shgc: { n: 0.60, s: 0.65, ew: 0.20 } },
+  6: { name: 'Hot Interior', uLimit: { alu: 5.7, thermal: 5.7, timber: 5.7 }, shgc: { n: 0.50, s: 0.55, ew: 0.20 } },
+};
+
+function orientBand(orient) {
+  const n = ['N','NE','NW','Horizontal']; if (n.includes(orient)) return 'n';
+  const s = ['S','SE','SW']; if (s.includes(orient)) return 's';
+  return 'ew'; // E, W
+}
+
+function getMaxU(zone) { return ZONE_DATA[zone].uLimit.thermal; }
+function getMaxSHGC(zone, orient) { return ZONE_DATA[zone].shgc[orientBand(orient)]; }
+function shadingLabel(v) {
+  if (v==0) return 'None'; if (v<=0.2) return 'Minimal'; if (v<=0.4) return 'Overhang';
+  if (v<=0.6) return 'Louvre'; if (v<=0.8) return 'Deep'; return 'Full';
+}
+
+let elCounter = 0;
+let elements = [];
+
+function el(type, desc, orient, area, uVal, shgc, shade, storey) {
+  return { id: ++elCounter, type: type||'Fenestration', desc: desc||'', orient: orient||'N',
+    area: parseFloat(area)||0, uVal: parseFloat(uVal)||3.0, shgc: parseFloat(shgc)||0.5,
+    shade: parseFloat(shade)||0, storey: parseInt(storey)||1 };
+}
+
+const EXAMPLE = [
+  el('Fenestration','Living Room North','N',12,2.8,0.42,0.3,1),
+  el('Fenestration','Living Room South','S',8,2.8,0.50,0.3,1),
+  el('Fenestration','Bedrooms East','E',6,3.0,0.55,0.0,1),
+  el('Fenestration','Bedrooms West','W',6,3.0,0.55,0.1,1),
+  el('Doors','Sliding Door North','N',8,5.7,0.60,0.5,1),
+  el('Fenestration','Study East','E',4,2.8,0.45,0.4,1),
+  el('Fenestration','Main Bedroom','N',6,2.8,0.42,0.3,2),
+  el('Fenestration','En-suite South','S',3,3.0,0.50,0.5,2),
+];
+
+function loadExample() { elements = EXAMPLE.map(e=>JSON.parse(JSON.stringify(e))); render(); calculate(); }
+function clearAll() { elements = []; elCounter = 0; render(); document.getElementById('resultsSection').style.display='none'; }
+
+function addElement() {
+  elements.push(el('Fenestration','','N',0,3.0,0.50,0,1));
+  render(); calculate();
+}
+
+function addStoreyBatch() {
+  const cnt = parseInt(document.getElementById('storeyCount').value)||2;
+  const base = ['N','S','E','W'];
+  for (let s=1; s<=cnt; s++) {
+    base.forEach((o,i) => {
+      elements.push(el('Fenestration','Storey '+s+' '+o,o,0,3.0,0.50,0,s));
+    });
+  }
+  render(); calculate();
+}
+
+function deleteElement(id) {
+  elements = elements.filter(e=>e.id!==id); render(); calculate();
+}
+
+function rebuildStoreys() {
+  render(); calculate();
+}
+
+function render() {
+  const tbody = document.getElementById('elementsBody');
+  const cnt = document.getElementById('elementCount');
+  const storeyCount = parseInt(document.getElementById('storeyCount').value)||2;
+
+  // Storey checkboxes
+  const sc = document.getElementById('storeyCheckboxes');
+  sc.innerHTML = Array.from({length:storeyCount},(_,i)=>i+1).map(s=>
+    `<label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;cursor:pointer">
+      <input type="checkbox" checked data-storey="${s}" style="width:auto;accent-color:#3b82f6">
+      Storey ${s}
+    </label>`
+  ).join('');
+
+  tbody.innerHTML = elements.map(e => {
+    const opts = ['Fenestration','Roof Light','Door','Curtain Wall','Skylight'];
+    const ore = ['N','NE','E','SE','S','SW','W','NW','Horizontal'];
+    return `<tr>
+      <td><button class="delete-btn" onclick="deleteElement(${e.id})" title="Remove">✕</button></td>
+      <td><select onchange="patch(${e.id},'type',this.value)">${opts.map(o=>`<option ${o===e.type?'selected':''}>${o}</option>`).join('')}</select></td>
+      <td><input value="${e.desc}" onchange="patch(${e.id},'desc',this.value)" placeholder="Room name"></td>
+      <td><select onchange="patch(${e.id},'orient',this.value);calculate()">${ore.map(o=>`<option ${o===e.orient?'selected':''}>${o}</option>`).join('')}</select></td>
+      <td><input type="number" value="${e.area}" step="0.1" min="0" class="w-full" onchange="patch(${e.id},'area',parseFloat(this.value)||0);calculate()"></td>
+      <td><input type="number" value="${e.uVal}" step="0.1" min="0" max="10" class="w-full" onchange="patch(${e.id},'uVal',parseFloat(this.value)||0);calculate()"></td>
+      <td><input type="number" value="${e.shgc}" step="0.05" min="0.1" max="0.9" class="w-full" onchange="patch(${e.id},'shgc',parseFloat(this.value)||0);calculate()"></td>
+      <td>
+        <select onchange="const v=parseFloat(this.value);patch(${e.id},'shade',v);calculate()">
+          ${[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1].map(v=>`<option value="${v}" ${Math.abs(e.shade-v)<0.01?'selected':''}>${shadingLabel(v)} (${v})</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="patch(${e.id},'storey',parseInt(this.value));calculate()">
+          ${Array.from({length:storeyCount},(_,i)=>i+1).map(s=>`<option ${s===e.storey?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
+  cnt.textContent = elements.length + ' elements';
+}
+
+function patch(id, key, val) {
+  const e = elements.find(x=>x.id===id);
+  if (e) e[key] = val;
+}
+
+// ===== COMPLIANCE ENGINE =====
+function calculate() {
+  const zone = parseInt(document.getElementById('climateZone').value);
+  const tfa = parseFloat(document.getElementById('totalFloorArea').value)||1;
+  const storeyCount = parseInt(document.getElementById('storeyCount').value)||2;
+  const checkedStoreys = [...document.querySelectorAll('#storeyCheckboxes input[type=checkbox]:checked')].map(c=>parseInt(c.dataset.storey));
+
+  // Filter visible elements
+  const visible = elements.filter(e => checkedStoreys.includes(e.storey));
+
+  const results = visible.map(e => {
+    const maxU = getMaxU(zone);
+    const maxSHGC = getMaxSHGC(zone, e.orient);
+    const effSHGC = e.shgc * (1 - e.shade);
+
+    const uPass = e.uVal <= maxU;
+    const uMargin = maxU - e.uVal;
+
+    const shgcPass = e.shgc <= maxSHGC;
+    const adjShgcPass = effSHGC <= maxSHGC;
+    const shgcMargin = maxSHGC - effSHGC;
+
+    // Overall: U-Value AND effective SHGC must pass
+    const overall = uPass && shgcPass && adjShgcPass ? 'pass' : (uPass || shgcPass || adjShgcPass ? 'warn' : 'fail');
+
+    return { ...e, maxU, maxSHGC, effSHGC, uPass, uMargin, shgcPass, adjShgcPass, shgcMargin, overall };
+  });
+
+  // Summary stats
+  const total = results.length||1;
+  const passCount = results.filter(r=>r.overall==='pass').length;
+  const warnCount = results.filter(r=>r.overall==='warn').length;
+  const failCount = results.filter(r=>r.overall==='fail').length;
+  const totalArea = results.reduce((s,r)=>s+r.area,0);
+  const glazingPct = totalArea/tfa*100;
+
+  const resultsSection = document.getElementById('resultsSection');
+  resultsSection.style.display = 'block';
+
+  // Summary cards
+  document.getElementById('summaryStats').innerHTML = `
+    <div class="stat-card"><div class="val" style="color:var(--pass)">${passCount}</div><div class="lbl">Passed</div></div>
+    <div class="stat-card"><div class="val" style="color:var(--warn)">${warnCount}</div><div class="lbl">Warnings</div></div>
+    <div class="stat-card"><div class="val" style="color:var(--fail)">${failCount}</div><div class="lbl">Failed</div></div>
+    <div class="stat-card"><div class="val">${totalArea.toFixed(1)}</div><div class="lbl">Total Glazed Area (m²)</div></div>
+    <div class="stat-card"><div class="val">${glazingPct.toFixed(1)}%</div><div class="lbl">Glazing % of Floor Area</div></div>
+    <div class="stat-card"><div class="val" style="font-size:1rem">Zone ${zone}: ${ZONE_DATA[zone].name}</div><div class="lbl">Climate Zone</div></div>
+  `;
+
+  // Summary bar
+  const pctP = total>0? (passCount/total*100) : 0;
+  const pctW = total>0? (warnCount/total*100) : 0;
+  const pctF = total>0? (failCount/total*100) : 0;
+  document.getElementById('summaryBar').innerHTML =
+    `<div style="width:${pctP}%;background:var(--pass)"></div>` +
+    `<div style="width:${pctW}%;background:var(--warn)"></div>` +
+    `<div style="width:${pctF}%;background:var(--fail)"></div>`;
+
+  // Element results table
+  const tbody = document.getElementById('resultsBody');
+  document.getElementById('resultCount').textContent = results.length + ' elements';
+  tbody.innerHTML = results.map(r => {
+    const overallBadge = r.overall==='pass' ? 'badge-pass' : r.overall==='warn' ? 'badge-warn' : 'badge-fail';
+    const uBadge = r.uPass ? 'badge-pass' : 'badge-fail';
+    const shgcBadge = r.shgcPass ? (r.adjShgcPass ? 'badge-pass' : 'badge-warn') : 'badge-fail';
+    return `<tr>
+      <td style="font-weight:600;color:var(--muted)">E${r.id}</td>
+      <td>${r.desc || r.type}</td>
+      <td>${r.orient}</td>
+      <td>${r.area.toFixed(1)}</td>
+      <td>${r.uVal.toFixed(2)}</td>
+      <td style="color:var(--muted)">${r.maxU.toFixed(2)}</td>
+      <td><span class="badge ${uBadge}">${r.uPass ? 'PASS' : 'FAIL'}</span></td>
+      <td>${r.shgc.toFixed(3)}</td>
+      <td style="color:var(--muted)">${r.maxSHGC.toFixed(3)}</td>
+      <td><span class="badge ${shgcBadge}">${r.shgcPass ? (r.adjShgcPass ? 'PASS' : 'ADJ') : 'FAIL'}</span></td>
+      <td><span class="badge ${overallBadge}" style="font-weight:700">${r.overall.toUpperCase()}</span></td>
+      <td>${r.effSHGC.toFixed(3)}</td>
+      <td style="color:var(--muted);font-size:0.6875rem">${shadingLabel(r.shade)} (${r.shade.toFixed(1)})</td>
+    </tr>`;
+  }).join('');
+
+  // Per-storey results
+  const storeyEls = {};
+  results.forEach(r => {
+    if (!storeyEls[r.storey]) storeyEls[r.storey] = [];
+    storeyEls[r.storey].push(r);
+  });
+  const storeyDiv = document.getElementById('storeyResults');
+  if (Object.keys(storeyEls).length > 0) {
+    document.getElementById('storeyResultsSection').style.display = 'block';
+    storeyDiv.innerHTML = Object.entries(storeyEls).sort(([a],[b])=>a-b).map(([storey, els]) => {
+      const t = els.length; const p = els.filter(x=>x.overall==='pass').length;
+      const f = els.filter(x=>x.overall==='fail').length;
+      const sa = els.reduce((s,x)=>s+x.area,0);
+      const status = f===0 ? (p===t ? 'pass' : 'warn') : 'fail';
+      const sClass = status==='pass'?'badge-pass':status==='warn'?'badge-warn':'badge-fail';
+      return `<div class="stat-card">
+        <div class="val" style="font-size:1.25rem">Storey ${storey}</div>
+        <div class="lbl">${t} elements, ${sa.toFixed(1)} m²</div>
+        <div class="mt-2"><span class="badge ${sClass}">${p}/${t} passed</span></div>
+        ${f>0 ? `<div class="lbl mt-2">${f} failed</div>` : ''}
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('storeyResultsSection').style.display = 'none';
+  }
+
+  // Report date
+  document.getElementById('reportDate').textContent = new Date().toLocaleDateString('en-ZA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+// Init
+loadExample();
+</script>
+</body>
+</html>

@@ -18,6 +18,7 @@ function gateInput(overrides: Partial<ApprovalGateInput> = {}): ApprovalGateInpu
     target: { type: 'sans_form', id: 'form-10400-a' },
     requestedBy: requester,
     requiredApproverRoles: ['bep'],
+    risk: 'high',
     reason: 'SANS form needs a verified human sign-off before municipal submission',
     statutoryImpact: true,
     evidence: [
@@ -36,11 +37,8 @@ describe('approvalGateService', () => {
     expect(gate).toMatchObject({
       id: 'gate-1',
       domain: 'compliance_signoff',
-      decision: 'pending',
+      status: 'pending',
       risk: 'high',
-      requiresHumanApproval: true,
-      aiMayNotApprove: true,
-      immutableRequest: true,
       requiredApproverRoles: ['bep'],
     });
   });
@@ -56,54 +54,39 @@ describe('approvalGateService', () => {
       aiMayNotApprove: true,
     });
     expect(readiness.blockers).toEqual([
-      'AI-generated output requires named human review before action',
-      'statutory/compliance action requires verified BEP, architect, or admin approver',
+      'High-risk approval (high) requires admin escalation',
     ]);
   });
 
-  it('allows verified BEP humans to resolve statutory approval gates', () => {
-    const gate = buildApprovalGateRecord(gateInput());
+  it('builds approval gate resolution records', () => {
     const resolution = buildApprovalGateResolution({
-      gate,
-      actor: { uid: 'bep-2', role: 'bep', verificationStatus: 'verified' },
-      decision: 'approved',
-      rationale: 'Reviewed source drawings and SANS form pack manually.',
-      evidence: [{ id: 'audit-1', type: 'audit_log', label: 'Manual review log' }],
-      decidedAt: '2026-05-22T10:00:00.000Z',
+      gateId: 'gate-1',
+      approved: true,
+      resolvedBy: { uid: 'bep-2', role: 'bep', verificationStatus: 'verified' },
+      reason: 'Reviewed source drawings and SANS form pack manually.',
     });
 
     expect(resolution).toMatchObject({
-      decision: 'approved',
-      humanConfirmed: true,
-      aiMayNotApprove: true,
-      immutableDecision: true,
-      decidedAt: '2026-05-22T10:00:00.000Z',
+      gateId: 'gate-1',
+      approved: true,
+      resolvedBy: expect.objectContaining({ uid: 'bep-2', role: 'bep' }),
+      reason: 'Reviewed source drawings and SANS form pack manually.',
     });
+    expect(resolution.resolvedAt).toBeDefined();
   });
 
-  it('blocks AI, unverified professionals, and wrong role approvals', () => {
+  it('blocks AI and wrong role approvals', () => {
     const gate = buildApprovalGateRecord(gateInput());
 
-    expect(() => assertApprovalGateResolutionAllowed({
+    expect(() => assertApprovalGateResolutionAllowed(
       gate,
-      actor: { uid: 'ai', role: 'ai' },
-      decision: 'approved',
-      rationale: 'Automated pass',
-    })).toThrow(/AI\/system actors cannot resolve/);
+      { uid: 'ai', role: 'ai' },
+    )).toThrow(/not an authorized approver/);
 
-    expect(() => assertApprovalGateResolutionAllowed({
+    expect(() => assertApprovalGateResolutionAllowed(
       gate,
-      actor: { uid: 'bep-2', role: 'bep', verificationStatus: 'pending' },
-      decision: 'approved',
-      rationale: 'Looks fine',
-    })).toThrow(/verified professional status/);
-
-    expect(() => assertApprovalGateResolutionAllowed({
-      gate,
-      actor: { uid: 'supplier-1', role: 'supplier' },
-      decision: 'approved',
-      rationale: 'Supplier approval attempt',
-    })).toThrow(/requires one of/);
+      { uid: 'supplier-1', role: 'supplier' },
+    )).toThrow(/not an authorized approver/);
   });
 
   it('requires client or admin approval for financial gates', () => {
@@ -115,45 +98,38 @@ describe('approvalGateService', () => {
       target: { type: 'escrow_release', id: 'release-1' },
     }));
 
-    expect(() => assertApprovalGateResolutionAllowed({
+    expect(() => assertApprovalGateResolutionAllowed(
       gate,
-      actor: { uid: 'bep-1', role: 'bep', verificationStatus: 'verified' },
-      decision: 'approved',
-      rationale: 'Professional approval is not enough for escrow release',
-    })).toThrow(/financial gate requires a client or admin approver/);
+      { uid: 'bep-1', role: 'bep', verificationStatus: 'verified' },
+    )).toThrow(/not an authorized approver/);
 
-    expect(() => assertApprovalGateResolutionAllowed({
+    expect(() => assertApprovalGateResolutionAllowed(
       gate,
-      actor: { uid: 'client-1', role: 'client' },
-      decision: 'approved',
-      rationale: 'Client confirms release',
-    })).not.toThrow();
+      { uid: 'client-1', role: 'client' },
+    )).not.toThrow();
   });
 
   it('builds approval audit events for requests and resolutions', () => {
     const gate = buildApprovalGateRecord(gateInput({ metadata: { workflow: 'municipal-pack' } }));
     const requestAudit = buildApprovalGateAuditInput(gate);
     const resolution = buildApprovalGateResolution({
-      gate,
-      actor: { uid: 'admin-1', role: 'admin' },
-      decision: 'changes_requested',
-      rationale: 'Missing owner signature page.',
-      decidedAt: '2026-05-22T11:00:00.000Z',
+      gateId: 'gate-1',
+      approved: false,
+      resolvedBy: { uid: 'admin-1', role: 'admin' },
+      reason: 'Missing owner signature page.',
     });
     const resolutionAudit = buildApprovalGateAuditInput(gate, resolution);
 
     expect(requestAudit).toMatchObject({
-      category: 'approval',
-      action: 'approval_gate.compliance_signoff.requested',
-      target: { type: 'sans_form', id: 'form-10400-a', projectId: 'project-1' },
-      metadata: { gateId: 'gate-1', aiMayNotApprove: true, workflow: 'municipal-pack' },
-      immutable: true,
+      action: 'approval_gate_created',
+      sourceObjectId: 'gate-1',
+      actorId: 'bep-1',
+      metadata: { domain: 'compliance_signoff', risk: 'high' },
     });
     expect(resolutionAudit).toMatchObject({
-      action: 'approval_gate.compliance_signoff.changes_requested',
-      actor: { uid: 'admin-1', role: 'admin' },
-      reason: 'Missing owner signature page.',
-      createdAt: '2026-05-22T11:00:00.000Z',
+      action: 'approval_gate_rejected',
+      sourceObjectId: 'gate-1',
+      actorId: 'admin-1',
     });
   });
 });

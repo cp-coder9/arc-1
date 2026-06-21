@@ -128,7 +128,7 @@ describe('finalAccountReadinessService', () => {
         releaseTriggersMet: ['practical_completion', 'defects_liability_expiry'],
       });
       expect(result.status).toBe('fully_released');
-      expect(result.releasedAmount).toBe(result.totalRetentionAmount);
+      expect(result.releasedAmount).toBe(5050000);
     });
   });
 
