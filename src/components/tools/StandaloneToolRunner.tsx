@@ -58,6 +58,41 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Energy Certificate — dedicated SANS 10400-XA compliance form
+    if (tool.id === 'energy_certificate') {
+      const climateZones = [
+        { value: '1', label: 'Zone 1 — Coastal Interior' },
+        { value: '2', label: 'Zone 2 — Karoo / Highveld' },
+        { value: '3', label: 'Zone 3 — KZN Coast' },
+        { value: '4', label: 'Zone 4 — Gauteng / Inland' },
+        { value: '5', label: 'Zone 5 — Cape Peninsula' },
+        { value: '6', label: 'Zone 6 — Mpumalanga / Bushveld' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Generate a SANS 10400-XA energy usage certificate. Enter building envelope and system data to calculate energy demand and compliance.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Climate Zone" type="select" value={String(input.climateZone ?? '')} onChange={v => set('climateZone', v)} options={climateZones} />
+            <FormField label="Building Type" type="select" value={String(input.buildingType ?? '')} onChange={v => set('buildingType', v)} options={[{ value: 'residential_single', label: 'Single Residential' }, { value: 'residential_group', label: 'Group Residential' }, { value: 'office', label: 'Office / Commercial' }, { value: 'retail', label: 'Retail' }, { value: 'industrial', label: 'Industrial' }]} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Total Floor Area (m²)" type="number" value={String(input.floorArea ?? '')} onChange={v => set('floorArea', Number(v))} placeholder="e.g. 250" />
+            <FormField label="Glazed Area (m²)" type="number" value={String(input.glazedArea ?? '')} onChange={v => set('glazedArea', Number(v))} placeholder="e.g. 45" />
+            <FormField label="Roof Area (m²)" type="number" value={String(input.roofArea ?? '')} onChange={v => set('roofArea', Number(v))} placeholder="e.g. 120" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Wall U-Value (W/m²K)" type="number" value={String(input.wallU ?? '')} onChange={v => set('wallU', Number(v))} placeholder="e.g. 0.6" />
+            <FormField label="Roof U-Value (W/m²K)" type="number" value={String(input.roofU ?? '')} onChange={v => set('roofU', Number(v))} placeholder="e.g. 0.35" />
+            <FormField label="Glazing U-Value (W/m²K)" type="number" value={String(input.glazingU ?? '')} onChange={v => set('glazingU', Number(v))} placeholder="e.g. 2.7" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Water Heating" type="select" value={String(input.waterHeating ?? '')} onChange={v => set('waterHeating', v)} options={[{ value: 'solar', label: 'Solar Heater' }, { value: 'heatpump', label: 'Heat Pump' }, { value: 'gas', label: 'Gas' }, { value: 'electric', label: 'Electric Geyser' }, { value: 'integrated', label: 'Integrated System' }]} />
+            <FormField label="PV System (kWp)" type="number" value={String(input.pvKw ?? '')} onChange={v => set('pvKw', Number(v))} placeholder="e.g. 3.5" />
+            <FormField label="Shading Factor" type="number" value={String(input.shadingFactor ?? '')} onChange={v => set('shadingFactor', Number(v))} placeholder="e.g. 0.8" />
+          </div>
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +341,48 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'energy_certificate': {
+          const floorArea = Number(input.floorArea || 0)
+          const glazedArea = Number(input.glazedArea || 0)
+          const roofArea = Number(input.roofArea || 0)
+          const wallU = Number(input.wallU || 0.6)
+          const roofU = Number(input.roofU || 0.35)
+          const glazingU = Number(input.glazingU || 2.7)
+          const pvKw = Number(input.pvKw || 0)
+          const shading = Number(input.shadingFactor || 0.8)
+          const zone = String(input.climateZone || '4')
+          const water = String(input.waterHeating || 'electric')
+          const bldgType = String(input.buildingType || 'residential_single')
+
+          // Simplified SANS 10400-XA energy demand calculation
+          const wallArea = floorArea * 0.4 // approx external wall area ratio
+          const wallLoss = wallArea * wallU * 15 // temp diff ~15°C
+          const roofLoss = roofArea * roofU * 15
+          const glazingLoss = glazedArea * glazingU * 15
+          const totalLoss = wallLoss + roofLoss + glazingLoss
+          const pvOffset = pvKw * 1.5 * 4.5 // kWh/m²/yr avg insolation
+
+          // Zone-based demand target (approximate kWh/m²/yr)
+          const demandTargets: Record<string, number> = {
+            '1': 80, '2': 85, '3': 75, '4': 90, '5': 70, '6': 95,
+          }
+          const targetDemand = demandTargets[zone] || 90
+          const annualDemand = Math.round(totalLoss * 0.1) // convert to approx kWh/m²/yr
+          const netDemand = Math.max(0, annualDemand - pvOffset)
+          const compliant = netDemand <= targetDemand ? 'Compliant' : 'Non-compliant'
+
+          result.climateZone = `Zone ${zone}`
+          result.buildingType = bldgType
+          result.floorArea = floorArea
+          result.annualEnergyDemand = `${annualDemand.toFixed(1)} kWh/m²/yr`
+          result.netEnergyDemand = `${netDemand.toFixed(1)} kWh/m²/yr`
+          result.targetDemand = `${targetDemand} kWh/m²/yr`
+          result.complianceStatus = compliant
+          result.pvContribution = pvKw > 0 ? `${pvOffset.toFixed(1)} kWh/yr offset` : 'None'
+          result.waterHeatingType = water
+          result.certificateRef = `EC-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +496,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'energy_certificate') return 'Generate Certificate'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
