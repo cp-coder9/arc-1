@@ -58,6 +58,19 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // AI Review Queue — manage AI-driven compliance review queue
+    if (tool.id === 'ai_review_queue') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Manage the AI compliance review queue. Review AI-generated findings, approve or escalate items.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Review Category" type="select" value={String(input.arCategory ?? '')} onChange={v => set('arCategory', v)} options={[{ value: 'drawing', label: 'Drawing Compliance' }, { value: 'document', label: 'Document Review' }, { value: 'compliance', label: 'SANS Compliance' }, { value: 'structural', label: 'Structural Check' }]} />
+            <FormField label="Status Filter" type="select" value={String(input.arStatus ?? '')} onChange={v => set('arStatus', v)} options={[{ value: 'pending', label: 'Pending Review' }, { value: 'approved', label: 'Approved' }, { value: 'flagged', label: 'Flagged' }, { value: 'escalated', label: 'Escalated' }]} />
+          </div>
+          <FormField label="Reviewer Notes" type="textarea" value={String(input.arNotes ?? '')} onChange={v => set('arNotes', v)} placeholder="Notes on AI review findings, decisions made..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +319,15 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'ai_review_queue': {
+          result.category = input.arCategory || 'drawing'
+          result.statusFilter = input.arStatus || 'pending'
+          result.reviewerNotes = input.arNotes || ''
+          result.itemsInQueue = 0
+          result.runDate = new Date().toISOString().split('T')[0]
+          result.reference = `AIQ-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +441,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'ai_review_queue') return 'Review Queue'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
