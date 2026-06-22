@@ -58,6 +58,40 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Stage Gate Review — dedicated project stage-gate decision log
+    if (tool.id === 'stage_gate_review') {
+      const stageOptions = [
+        { value: 'brief', label: 'Stage 1 — Brief & Diagnostic' },
+        { value: 'appoint', label: 'Stage 2 — Appoint' },
+        { value: 'design', label: 'Stage 3 — Design' },
+        { value: 'comply', label: 'Stage 4 — Comply' },
+        { value: 'procure', label: 'Stage 5 — Procure' },
+        { value: 'build', label: 'Stage 6 — Build' },
+        { value: 'pay', label: 'Stage 7 — Pay' },
+        { value: 'closeout', label: 'Stage 8 — Close-out' },
+      ]
+      const decisionOptions = [
+        { value: 'approved', label: 'Approved — Proceed to next stage' },
+        { value: 'conditional', label: 'Conditional — Proceed with conditions' },
+        { value: 'rework', label: 'Rework Required — Revise and resubmit' },
+        { value: 'rejected', label: 'Rejected — Cannot proceed' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Record a stage gate review decision. Each project stage requires a formal review before proceeding to the next.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Project Name" type="text" value={String(input.sgProjectName ?? '')} onChange={v => set('sgProjectName', v)} placeholder="e.g. Pinewood Estate" />
+            <FormField label="Review Stage" type="select" value={String(input.sgStage ?? '')} onChange={v => set('sgStage', v)} options={stageOptions} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Decision" type="select" value={String(input.sgDecision ?? '')} onChange={v => set('sgDecision', v)} options={decisionOptions} />
+            <FormField label="Reviewer Name" type="text" value={String(input.sgReviewer ?? '')} onChange={v => set('sgReviewer', v)} placeholder="e.g. John Architect" />
+          </div>
+          <FormField label="Review Notes" type="textarea" value={String(input.sgNotes ?? '')} onChange={v => set('sgNotes', v)} placeholder="Key findings, conditions, and recommendations from this review..." />
+          <FormField label="Conditions / Action Items" type="textarea" value={String(input.sgConditions ?? '')} onChange={v => set('sgConditions', v)} placeholder="Specific conditions that must be met before proceeding..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +340,18 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'stage_gate_review': {
+          result.projectName = input.sgProjectName || ''
+          result.stage = input.sgStage || ''
+          result.decision = input.sgDecision || ''
+          result.reviewer = input.sgReviewer || ''
+          result.reviewNotes = input.sgNotes || ''
+          result.conditions = input.sgConditions || ''
+          result.decisionDate = new Date().toISOString().split('T')[0]
+          result.stageLabel = input.sgStage === 'brief' ? 'Stage 1 — Brief' : input.sgStage === 'appoint' ? 'Stage 2 — Appoint' : input.sgStage === 'design' ? 'Stage 3 — Design' : input.sgStage === 'comply' ? 'Stage 4 — Comply' : input.sgStage === 'procure' ? 'Stage 5 — Procure' : input.sgStage === 'build' ? 'Stage 6 — Build' : input.sgStage === 'pay' ? 'Stage 7 — Pay' : input.sgStage === 'closeout' ? 'Stage 8 — Close-out' : ''
+          result.reference = `SG-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +465,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'stage_gate_review') return 'Record Decision'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
