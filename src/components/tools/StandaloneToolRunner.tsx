@@ -58,6 +58,21 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Platform Settings — configure platform-wide settings
+    if (tool.id === 'platform_settings') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Configure platform-wide settings including branding, email, integrations, and security policies.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Setting Category" type="select" value={String(input.psCategory ?? '')} onChange={v => set('psCategory', v)} options={[{ value: 'branding', label: 'Branding / White-label' }, { value: 'email', label: 'Email Templates' }, { value: 'integrations', label: 'Third-party Integrations' }, { value: 'security', label: 'Security Policies' }, { value: 'notifications', label: 'Notification Rules' }]} />
+            <FormField label="Action" type="select" value={String(input.psAction ?? '')} onChange={v => set('psAction', v)} options={[{ value: 'view', label: 'View Current' }, { value: 'update', label: 'Update Setting' }, { value: 'reset', label: 'Reset to Default' }]} />
+          </div>
+          <FormField label="Setting Key / Name" type="text" value={String(input.psKey ?? '')} onChange={v => set('psKey', v)} placeholder="e.g. platform_name, smtp_host" />
+          <FormField label="New Value" type="text" value={String(input.psValue ?? '')} onChange={v => set('psValue', v)} placeholder="New setting value" />
+          <FormField label="Change Reason" type="textarea" value={String(input.psReason ?? '')} onChange={v => set('psReason', v)} placeholder="Why this setting is being changed..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +321,17 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'platform_settings': {
+          result.category = input.psCategory || 'branding'
+          result.action = input.psAction || 'view'
+          result.settingKey = input.psKey || ''
+          result.newValue = input.psValue || ''
+          result.changeReason = input.psReason || ''
+          result.updatedBy = 'Platform Admin'
+          result.updatedDate = new Date().toISOString().split('T')[0]
+          result.reference = `CONFIG-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +445,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'platform_settings') return 'Update Settings'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
