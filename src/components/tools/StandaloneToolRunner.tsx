@@ -58,6 +58,41 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Fire Compliance Checklist — dedicated SANS 10400-T compliance checklist
+    if (tool.id === 'fire_compliance_check') {
+      const checklistItems = [
+        { id: 'escape_routes', label: 'Escape Routes — 2 independent routes from each storey' },
+        { id: 'travel_dist', label: 'Travel Distance — ≤45 m sprinklered, ≤30 m unsprinklered' },
+        { id: 'fire_doors', label: 'Fire Doors — 30/60/90 min FRR as required' },
+        { id: 'compartmentation', label: 'Compartmentation — Fire walls separate occupancies' },
+        { id: 'smoke_vent', label: 'Smoke Ventilation — Natural or mechanical per SANS 10400-T' },
+        { id: 'fire_hydrants', label: 'Fire Hydrants — Within 90 m of all points' },
+        { id: 'extinguishers', label: 'Fire Extinguishers — Suitable class & rating per floor' },
+        { id: 'detection', label: 'Detection System — Smoke/heat detectors as required' },
+        { id: 'emergency_lighting', label: 'Emergency Lighting — Illuminates escape routes' },
+        { id: 'signage', label: 'Fire Signage — Exit signs, fire equipment signs' },
+        { id: 'access', label: 'Fire Service Access — Vehicle access within 15 m' },
+        { id: 'structure', label: 'Structural Fire Resistance — Main structure FRR compliant' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">SANS 10400-T compliance checklist for fire safety design. Mark each item as compliant or non-compliant.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Project Name" type="text" value={String(input.fcProjectName ?? '')} onChange={v => set('fcProjectName', v)} placeholder="e.g. Pinewood Estate" />
+            <FormField label="Inspected By" type="text" value={String(input.fcInspector ?? '')} onChange={v => set('fcInspector', v)} placeholder="e.g. Jane Fire Engineer" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {checklistItems.map(item => (
+              <div key={item.id} className="flex items-start gap-3 border rounded-lg p-3">
+                <input type="checkbox" checked={Boolean((input as Record<string, unknown>)[`fc_${item.id}`])} onChange={e => set(`fc_${item.id}`, e.target.checked)} className="h-4 w-4 mt-0.5" />
+                <label className="text-sm cursor-pointer">{item.label}</label>
+              </div>
+            ))}
+          </div>
+          <FormField label="Notes / Corrective Actions" type="textarea" value={String(input.fcNotes ?? '')} onChange={v => set('fcNotes', v)} placeholder="Actions required for non-compliant items..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +341,44 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'fire_compliance_check': {
+          const items = [
+            { id: 'escape_routes', label: 'Escape Routes' },
+            { id: 'travel_dist', label: 'Travel Distance' },
+            { id: 'fire_doors', label: 'Fire Doors' },
+            { id: 'compartmentation', label: 'Compartmentation' },
+            { id: 'smoke_vent', label: 'Smoke Ventilation' },
+            { id: 'fire_hydrants', label: 'Fire Hydrants' },
+            { id: 'extinguishers', label: 'Fire Extinguishers' },
+            { id: 'detection', label: 'Detection System' },
+            { id: 'emergency_lighting', label: 'Emergency Lighting' },
+            { id: 'signage', label: 'Fire Signage' },
+            { id: 'access', label: 'Fire Service Access' },
+            { id: 'structure', label: 'Structural Fire Resistance' },
+          ]
+          const passed: string[] = []
+          const failed: string[] = []
+          for (const item of items) {
+            if (Boolean((input as Record<string, unknown>)[`fc_${item.id}`])) {
+              passed.push(item.label)
+            } else {
+              failed.push(item.label)
+            }
+          }
+          const total = items.length
+          const score = Math.round((passed.length / total) * 100)
+          result.projectName = input.fcProjectName || ''
+          result.inspector = input.fcInspector || ''
+          result.passedItems = passed.length
+          result.failedItems = failed.length
+          result.totalChecks = total
+          result.complianceScore = `${score}%`
+          result.status = score >= 90 ? 'Compliant' : score >= 70 ? 'Conditional' : 'Non-Compliant'
+          result.failedList = failed.join(', ') || 'None'
+          result.notes = input.fcNotes || ''
+          result.reference = `FC-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +492,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'fire_compliance_check') return 'Run Fire Checklist'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
