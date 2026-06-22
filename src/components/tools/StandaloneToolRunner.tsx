@@ -58,6 +58,31 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // User Verification Console — verify user credentials and registrations
+    if (tool.id === 'user_verification_console') {
+      const bodyOptions = [
+        { value: 'sacap', label: 'SACAP (Architect)' },
+        { value: 'ecsa', label: 'ECSA (Engineer)' },
+        { value: 'sacqsp', label: 'SACQSP (Quantity Surveyor)' },
+        { value: 'sacplan', label: 'SACPLAN (Town Planner)' },
+        { value: 'sava', label: 'SAVA (Valuer)' },
+        { value: 'sagc', label: 'SAGC (Geoscientist)' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Verify professional registration credentials and approve user verification requests.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="User Name" type="text" value={String(input.uvUserName ?? '')} onChange={v => set('uvUserName', v)} placeholder="e.g. Jane Smith" />
+            <FormField label="Professional Body" type="select" value={String(input.uvBody ?? '')} onChange={v => set('uvBody', v)} options={bodyOptions} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Registration Number" type="text" value={String(input.uvRegNumber ?? '')} onChange={v => set('uvRegNumber', v)} placeholder="e.g. 12345" />
+            <FormField label="Verification Status" type="select" value={String(input.uvStatus ?? '')} onChange={v => set('uvStatus', v)} options={[{ value: 'pending', label: 'Pending' }, { value: 'verified', label: 'Verified' }, { value: 'rejected', label: 'Rejected' }, { value: 'expired', label: 'Expired' }]} />
+          </div>
+          <FormField label="Verification Notes" type="textarea" value={String(input.uvNotes ?? '')} onChange={v => set('uvNotes', v)} placeholder="Documents checked, findings, next steps..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +331,17 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'user_verification_console': {
+          result.userName = input.uvUserName || ''
+          result.professionalBody = input.uvBody || ''
+          result.registrationNumber = input.uvRegNumber || ''
+          result.verificationStatus = input.uvStatus || 'pending'
+          result.verificationNotes = input.uvNotes || ''
+          result.verifiedBy = 'Platform Admin'
+          result.verificationDate = new Date().toISOString().split('T')[0]
+          result.reference = `VER-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +455,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'user_verification_console') return 'Verify User'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
