@@ -93,8 +93,8 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
     const trade = user.professionalLabel?.toLowerCase() || '';
     const region = user.region?.toLowerCase() || '';
 
-    if (job.category.toLowerCase().includes(trade)) score += 50;
-    if (job.description.toLowerCase().includes(trade)) score += 30;
+    if (job.category?.toLowerCase().includes(trade)) score += 50;
+    if (job.description?.toLowerCase().includes(trade)) score += 30;
     if (job.location?.toLowerCase().includes(region)) score += 20;
 
     return { ...job, matchScore: score };
