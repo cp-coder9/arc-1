@@ -58,6 +58,23 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Fee / Tariff Table Editor — manage platform fee tables
+    if (tool.id === 'fee_tariff_editor') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Edit platform fee and tariff tables. Configure fee scales, categories, and thresholds.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Tariff Category" type="select" value={String(input.teCategory ?? '')} onChange={v => set('teCategory', v)} options={[{ value: 'professional', label: 'Professional Fees' }, { value: 'platform', label: 'Platform Fees' }, { value: 'statutory', label: 'Statutory / Municipal' }, { value: 'subscription', label: 'Subscription Tiers' }]} />
+            <FormField label="Action" type="select" value={String(input.teAction ?? '')} onChange={v => set('teAction', v)} options={[{ value: 'view', label: 'View Current Table' }, { value: 'update', label: 'Update Rates' }, { value: 'add', label: 'Add New Entry' }, { value: 'remove', label: 'Remove Entry' }]} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Fee Code / Reference" type="text" value={String(input.teCode ?? '')} onChange={v => set('teCode', v)} placeholder="e.g. FEE-ARCH-001" />
+            <FormField label="New Rate Value" type="number" value={String(input.teRate ?? '')} onChange={v => set('teRate', Number(v))} placeholder="e.g. 8.5" />
+          </div>
+          <FormField label="Description / Change Notes" type="textarea" value={String(input.teNotes ?? '')} onChange={v => set('teNotes', v)} placeholder="Reason for change, scope of update..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +323,16 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'fee_tariff_editor': {
+          result.category = input.teCategory || 'professional'
+          result.action = input.teAction || 'view'
+          result.feeCode = input.teCode || ''
+          result.newRate = Number(input.teRate || 0)
+          result.changeNotes = input.teNotes || ''
+          result.effectiveDate = new Date().toISOString().split('T')[0]
+          result.reference = `TARIFF-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +446,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'fee_tariff_editor') return 'Update Tariff'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
