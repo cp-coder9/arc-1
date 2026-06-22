@@ -47,7 +47,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'toolboxes',
     label: 'Toolboxes',
     description: 'Role-specific professional tools, not a flat list.',
-    roles: ['architect', 'admin', 'freelancer', 'contractor'],
+    roles: ['architect', 'admin', 'freelancer', 'contractor', 'bep', 'subcontractor', 'supplier', 'client', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
       { key: 'design_compliance', label: 'Design & Compliance', description: 'NBR/SANS/municipal/drawing checks.', supportsContextualMessaging: true },
