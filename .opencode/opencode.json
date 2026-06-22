@@ -13,12 +13,12 @@
     }
   },
   "permission": {
-    "edit": "ask",
+    "edit": "allow",
     "bash": {
-      "*": "ask",
+      "*": "allow",
       "rm *": "deny",
-      "git push *": "deny"
+      "git push *": "allow"
     },
-    "webfetch": "ask"
+    "webfetch": "allow"
   }
 }
