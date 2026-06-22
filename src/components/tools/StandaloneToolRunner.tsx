@@ -306,6 +306,15 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'payment_dashboard': {
+          result.claimRef = String(input.claimRef || 'N/A')
+          result.claimAmount = Number(input.claimAmount || 0)
+          result.period = String(input.period || 'N/A')
+          result.description = String(input.paymentDescription || '')
+          result.reference = `PAY-DASH-${Date.now().toString(36).toUpperCase()}`
+          result.status = 'viewed'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +428,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'payment_dashboard') return 'View Dashboard'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
