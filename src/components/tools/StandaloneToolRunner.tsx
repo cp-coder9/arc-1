@@ -58,6 +58,39 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // H&S Compliance Checklist — dedicated form replacing site diary fields
+    if (tool.id === 'hs_compliance') {
+      const checklistItems = [
+        { id: 'induction', label: 'Site Induction Complete' },
+        { id: 'ppe', label: 'PPE Compliant (all workers)' },
+        { id: 'scaffold', label: 'Scaffold Inspection Tag Valid' },
+        { id: 'excavation', label: 'Excavation Shoring in Place' },
+        { id: 'electrical', label: 'Electrical Cables / DB Boards Safe' },
+        { id: 'fire_ext', label: 'Fire Extinguisher In Date' },
+        { id: 'first_aid', label: 'First Aid Kit Stocked' },
+        { id: 'permits', label: 'Valid Permits (Hot Work / Confined Space / Lift)' },
+        { id: 'welfare', label: 'Welfare Facilities (Ablution / Clean Water)' },
+        { id: 'signage', label: 'Safety Signage Posted' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Daily H&S compliance checklist per OHS Act and Construction Regulations. Mark items as pass or fail.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Inspector Name" type="text" value={String(input.inspectorName ?? '')} onChange={v => set('inspectorName', v)} placeholder="e.g. Sipho Nkosi" />
+            <FormField label="Date" type="date" value={String(input.checkDate ?? '')} onChange={v => set('checkDate', v)} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {checklistItems.map(item => (
+              <div key={item.id} className="flex items-center gap-3 border rounded-lg p-3">
+                <input type="checkbox" checked={Boolean((input as Record<string, unknown>)[`hs_${item.id}`])} onChange={e => set(`hs_${item.id}`, e.target.checked)} className="h-4 w-4" />
+                <label className="text-sm cursor-pointer flex-1">{item.label}</label>
+              </div>
+            ))}
+          </div>
+          <FormField label="Comments / Action Items" type="textarea" value={String(input.hsComments ?? '')} onChange={v => set('hsComments', v)} placeholder="Any issues found, corrective actions taken..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +339,43 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'hs_compliance': {
+          const items = [
+            { id: 'induction', label: 'Site Induction' },
+            { id: 'ppe', label: 'PPE Compliance' },
+            { id: 'scaffold', label: 'Scaffold Safety' },
+            { id: 'excavation', label: 'Excavation Shoring' },
+            { id: 'electrical', label: 'Electrical Safety' },
+            { id: 'fire_ext', label: 'Fire Extinguisher' },
+            { id: 'first_aid', label: 'First Aid' },
+            { id: 'permits', label: 'Valid Permits' },
+            { id: 'welfare', label: 'Welfare Facilities' },
+            { id: 'signage', label: 'Safety Signage' },
+          ]
+          const passed: string[] = []
+          const failed: string[] = []
+          for (const item of items) {
+            if (Boolean((input as Record<string, unknown>)[`hs_${item.id}`])) {
+              passed.push(item.label)
+            } else {
+              failed.push(item.label)
+            }
+          }
+          const total = items.length
+          const score = Math.round((passed.length / total) * 100)
+          result.inspector = input.inspectorName || 'Unspecified'
+          result.checkDate = input.checkDate || new Date().toISOString().split('T')[0]
+          result.passedItems = passed.join(', ') || 'None'
+          result.failedItems = failed.join(', ') || 'None'
+          result.passCount = passed.length
+          result.failCount = failed.length
+          result.totalChecks = total
+          result.complianceScore = score
+          result.status = score >= 80 ? 'Pass' : score >= 50 ? 'Conditional Pass' : 'Fail'
+          result.comments = input.hsComments || ''
+          result.reference = `HS-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +489,8 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'hs_compliance') return 'Run H&S Check'
+    if (tool.id === 'xa_compliance_calc') return 'Check Compliance'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
