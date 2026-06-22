@@ -50,9 +50,9 @@ jobs:
           username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
           password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
           server-dir: ${{ secrets.TEST_ARCHITEX_FTP_SERVER_DIR }}
-          local-dir: release/ftp-upload
+          local-dir: release/ftp-upload/
           state-name: deploy-state-${{ github.run_id }}.json
-          verbose: true
+          log-level: verbose
 
       - name: Smoke test
         if: ${{ !inputs.dry-run }}
