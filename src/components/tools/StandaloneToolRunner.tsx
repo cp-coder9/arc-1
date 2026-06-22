@@ -58,6 +58,28 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Staff CPD Tracker — dedicated firm-level CPD compliance form
+    if (tool.id === 'staff_cpd_tracker') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Track CPD compliance across firm staff. Enter team member details and status to generate a compliance report.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Staff Member Name" type="text" value={String(input.staffName ?? '')} onChange={v => set('staffName', v)} placeholder="e.g. Jane Smith" />
+            <FormField label="Professional Body" type="select" value={String(input.staffBody ?? '')} onChange={v => set('staffBody', v)} options={[{ value: 'sacap', label: 'SACAP' }, { value: 'ecsa', label: 'ECSA' }, { value: 'sacqsp', label: 'SACQSP' }, { value: 'sacplan', label: 'SACPLAN' }]} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Registration Number" type="text" value={String(input.staffRegNumber ?? '')} onChange={v => set('staffRegNumber', v)} placeholder="e.g. 12345" />
+            <FormField label="CPD Cycle Year" type="number" value={String(input.cpdCycleYear ?? '')} onChange={v => set('cpdCycleYear', Number(v))} placeholder="e.g. 2026" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Category 1 Credits (Ethics)" type="number" value={String(input.cat1Credits ?? '')} onChange={v => set('cat1Credits', Number(v))} placeholder="0" />
+            <FormField label="Category 2 Credits (Technical)" type="number" value={String(input.cat2Credits ?? '')} onChange={v => set('cat2Credits', Number(v))} placeholder="0" />
+            <FormField label="Category 3 Credits (Management)" type="number" value={String(input.cat3Credits ?? '')} onChange={v => set('cat3Credits', Number(v))} placeholder="0" />
+          </div>
+          <FormField label="Notes / Outstanding Actions" type="textarea" value={String(input.cpdNotes ?? '')} onChange={v => set('cpdNotes', v)} placeholder="Any actions needed for compliance..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +328,43 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'staff_cpd_tracker': {
+          const cat1 = Number(input.cat1Credits || 0)
+          const cat2 = Number(input.cat2Credits || 0)
+          const cat3 = Number(input.cat3Credits || 0)
+          const body = String(input.staffBody || 'sacap')
+          const total = cat1 + cat2 + cat3
+
+          // Minimum per category (simplified SACAP rules)
+          const minCat1 = 3
+          const minCat2 = 12
+          const minCat3 = 2
+          const annualRequired = body === 'sacap' ? 25 : body === 'ecsa' ? 30 : body === 'sacqsp' ? 20 : 25
+
+          const cat1Ok = cat1 >= minCat1
+          const cat2Ok = cat2 >= minCat2
+          const cat3Ok = cat3 >= minCat3
+          const totalOk = total >= annualRequired
+          const compliant = [cat1Ok, cat2Ok, cat3Ok, totalOk].every(Boolean)
+
+          result.staffName = input.staffName || ''
+          result.professionalBody = body
+          result.registrationNumber = input.staffRegNumber || ''
+          result.cycleYear = Number(input.cpdCycleYear || new Date().getFullYear())
+          result.cat1Credits = cat1
+          result.cat2Credits = cat2
+          result.cat3Credits = cat3
+          result.totalCredits = total
+          result.annualRequired = annualRequired
+          result.cat1Compliant = cat1Ok ? `Yes (${cat1} ≥ ${minCat1})` : `No (${cat1} < ${minCat1})`
+          result.cat2Compliant = cat2Ok ? `Yes (${cat2} ≥ ${minCat2})` : `No (${cat2} < ${minCat2})`
+          result.cat3Compliant = cat3Ok ? `Yes (${cat3} ≥ ${minCat3})` : `No (${cat3} < ${minCat3})`
+          result.totalCompliant = totalOk ? `Yes (${total} ≥ ${annualRequired})` : `Shortfall of ${annualRequired - total}`
+          result.overallStatus = compliant ? 'Compliant' : 'Non-Compliant'
+          result.notes = input.cpdNotes || ''
+          result.reference = `CPD-TRK-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +478,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'staff_cpd_tracker') return 'Check Compliance'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
