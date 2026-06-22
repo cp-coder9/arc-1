@@ -306,6 +306,47 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'soft_cost_estimator': {
+          const constrValue = Number(input.constructionValue || 0)
+          const projType = String(input.projectType || 'residential')
+          const category = String(input.category || 'architect')
+          const complexity = Number(input.complexity || 1.0)
+
+          // Professional fee percentages (simplified SAIA/SACAP scales)
+          const feePcts: Record<string, Record<string, number>> = {
+            architect: { residential: 0.08, commercial: 0.065, industrial: 0.06, renovation: 0.10 },
+            engineer: { residential: 0.05, commercial: 0.045, industrial: 0.04, renovation: 0.06 },
+            qs: { residential: 0.025, commercial: 0.02, industrial: 0.02, renovation: 0.03 },
+            planner: { residential: 0.015, commercial: 0.012, industrial: 0.01, renovation: 0.02 },
+          }
+          const basePct = (feePcts[category]?.[projType] || 0.065) * complexity
+          const professionalFee = Math.round(constrValue * basePct)
+
+          // Soft costs as percentage of construction
+          const statutory = Math.round(constrValue * 0.015)   // planning, building control
+          const geotech = Math.round(constrValue * 0.005)     // geotechnical
+          const enviro = Math.round(constrValue * 0.003)      // environmental
+          const legal = Math.round(constrValue * 0.008)       // legal
+          const finance = Math.round(constrValue * 0.02)      // finance costs
+          const contingency = Math.round(constrValue * 0.05)  // 5% contingency
+          const totalSoft = professionalFee + statutory + geotech + enviro + legal + finance + contingency
+
+          result.constructionValue = constrValue
+          result.projectType = projType
+          result.professionalCategory = category
+          result.complexityFactor = complexity
+          result.feePercentage = `${(basePct * 100).toFixed(1)}%`
+          result.professionalFee = professionalFee
+          result.statutoryFees = statutory
+          result.geotechnical = geotech
+          result.environmental = enviro
+          result.legalFees = legal
+          result.financeCosts = finance
+          result.contingency = contingency
+          result.totalSoftCosts = totalSoft
+          result.currency = 'ZAR'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +460,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'soft_cost_estimator') return 'Estimate Soft Costs'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
