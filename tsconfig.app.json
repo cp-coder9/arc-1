@@ -9,6 +9,7 @@
     "src/test/**",
     "e2e/**",
     "dist/**",
-    "release/**"
+    "release/**",
+    "arc-1-harness/**"
   ]
 }
