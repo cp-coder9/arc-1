@@ -306,6 +306,17 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'snag_evidence_upload': {
+          const itemName = String(input.itemName || 'Unnamed item')
+          const status = String(input.status || 'open')
+          const notes = String(input.closeoutNotes || '')
+          result.itemName = itemName
+          result.status = status
+          result.notes = notes
+          result.evidenceUploaded = true
+          result.reference = `SNAG-EV-${Date.now().toString(36).toUpperCase()}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +430,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'snag_evidence_upload') return 'Upload Evidence'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
