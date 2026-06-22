@@ -58,6 +58,25 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // RFI Response — dedicated form for responding to RFIs
+    if (tool.id === 'rfi_response') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Respond to an RFI or site instruction. Reference the original RFI and provide the response, including any attachments or supporting documents.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="RFI Reference Number" type="text" value={String(input.rfiRef ?? '')} onChange={v => set('rfiRef', v)} placeholder="e.g. RFI-20260622-0001" />
+            <FormField label="Responded By" type="text" value={String(input.respondedBy ?? '')} onChange={v => set('respondedBy', v)} placeholder="e.g. John Architect" />
+          </div>
+          <FormField label="RFI Question / Query" type="textarea" value={String(input.originalQuery ?? '')} onChange={v => set('originalQuery', v)} placeholder="Original RFI query text..." />
+          <FormField label="Response" type="textarea" value={String(input.responseText ?? '')} onChange={v => set('responseText', v)} placeholder="Detailed response to the query..." />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Response Type" type="select" value={String(input.responseType ?? '')} onChange={v => set('responseType', v)} options={[{ value: 'information', label: 'For Information' }, { value: 'approval', label: 'Approved' }, { value: 'revision', label: 'Revise & Resubmit' }, { value: 'rejected', label: 'Rejected' }, { value: 'deferred', label: 'Deferred' }]} />
+            <FormField label="Response Date" type="date" value={String(input.responseDate ?? '')} onChange={v => set('responseDate', v)} />
+          </div>
+          <FormField label="Attachments / Supporting Docs" type="text" value={String(input.attachments ?? '')} onChange={v => set('attachments', v)} placeholder="e.g. Sketch A-101 Rev B, Structural Calc Note 3" />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +325,21 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'rfi_response': {
+          const now = new Date()
+          const dateStr = now.toISOString().split('T')[0].replace(/-/g, '')
+          const seq = Math.floor(Math.random() * 9000 + 1000)
+          result.responseId = `RFI-RSP-${dateStr}-${seq}`
+          result.rfiReference = input.rfiRef || 'Not specified'
+          result.respondedBy = input.respondedBy || 'Unspecified'
+          result.originalQuery = input.originalQuery || ''
+          result.responseText = input.responseText || ''
+          result.responseType = input.responseType || 'information'
+          result.responseDate = input.responseDate || dateStr
+          result.attachments = input.attachments || ''
+          result.status = 'submitted'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +453,8 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'rfi_response') return 'Submit Response'
+    if (tool.id === 'xa_compliance_calc') return 'Check Compliance'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
