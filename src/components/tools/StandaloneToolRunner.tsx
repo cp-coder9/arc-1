@@ -58,6 +58,41 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Zoning Compliance Check — dedicated zoning scheme verification form
+    if (tool.id === 'zoning_check') {
+      const zoneCategories = [
+        { value: 'residential1', label: 'Residential 1 (Single)' },
+        { value: 'residential2', label: 'Residential 2 (Group Housing)' },
+        { value: 'residential3', label: 'Residential 3 (Density)' },
+        { value: 'business1', label: 'Business 1 (Retail)' },
+        { value: 'business2', label: 'Business 2 (Office)' },
+        { value: 'industrial1', label: 'Industrial 1 (Light)' },
+        { value: 'industrial2', label: 'Industrial 2 (General)' },
+        { value: 'agricultural', label: 'Agricultural' },
+        { value: 'community1', label: 'Community 1 (Public)' },
+        { value: 'open_space1', label: 'Open Space 1 (Parks)' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Check proposed development against municipal zoning scheme requirements. Enter erf details and proposed development parameters.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Erf / Stand Number" type="text" value={String(input.zonErfNumber ?? '')} onChange={v => set('zonErfNumber', v)} placeholder="e.g. 1234" />
+            <FormField label="Current Zoning" type="select" value={String(input.zoneCategory ?? '')} onChange={v => set('zoneCategory', v)} options={zoneCategories} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Site Area (m²)" type="number" value={String(input.siteArea ?? '')} onChange={v => set('siteArea', Number(v))} placeholder="e.g. 850" />
+            <FormField label="Proposed Coverage (m²)" type="number" value={String(input.proposedCoverage ?? '')} onChange={v => set('proposedCoverage', Number(v))} placeholder="e.g. 340" />
+            <FormField label="Proposed FAR" type="number" value={String(input.proposedFAR ?? '')} onChange={v => set('proposedFAR', Number(v))} placeholder="e.g. 0.8" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Proposed Height (m)" type="number" value={String(input.proposedHeight ?? '')} onChange={v => set('proposedHeight', Number(v))} placeholder="e.g. 12" />
+            <FormField label="Proposed Storeys" type="number" value={String(input.proposedStoreys ?? '')} onChange={v => set('proposedStoreys', Number(v))} placeholder="e.g. 3" />
+            <FormField label="Number of Units" type="number" value={String(input.proposedUnits ?? '')} onChange={v => set('proposedUnits', Number(v))} placeholder="e.g. 6" />
+          </div>
+          <FormField label="Additional Notes / Variance Requests" type="textarea" value={String(input.zonNotes ?? '')} onChange={v => set('zonNotes', v)} placeholder="Any special consent or departure applications..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +341,50 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'zoning_check': {
+          const siteArea = Number(input.siteArea || 0)
+          const coverage = Number(input.proposedCoverage || 0)
+          const far = Number(input.proposedFAR || 0)
+          const height = Number(input.proposedHeight || 0)
+          const storeys = Number(input.proposedStoreys || 0)
+          const units = Number(input.proposedUnits || 0)
+
+          // Typical zoning limits (simplified — varies by municipality)
+          const zoneLimits: Record<string, { coveragePct: number; maxFar: number; maxHeight: number; maxStoreys: number }> = {
+            residential1: { coveragePct: 40, maxFar: 0.4, maxHeight: 10, maxStoreys: 2 },
+            residential2: { coveragePct: 50, maxFar: 0.8, maxHeight: 12, maxStoreys: 3 },
+            residential3: { coveragePct: 60, maxFar: 1.5, maxHeight: 15, maxStoreys: 4 },
+            business1: { coveragePct: 75, maxFar: 2.5, maxHeight: 20, maxStoreys: 5 },
+            business2: { coveragePct: 80, maxFar: 3.0, maxHeight: 25, maxStoreys: 6 },
+            industrial1: { coveragePct: 60, maxFar: 1.5, maxHeight: 15, maxStoreys: 3 },
+            industrial2: { coveragePct: 70, maxFar: 2.0, maxHeight: 20, maxStoreys: 4 },
+            agricultural: { coveragePct: 10, maxFar: 0.1, maxHeight: 8, maxStoreys: 1 },
+            community1: { coveragePct: 50, maxFar: 1.0, maxHeight: 12, maxStoreys: 3 },
+            open_space1: { coveragePct: 5, maxFar: 0.05, maxHeight: 5, maxStoreys: 1 },
+          }
+          const zone = String(input.zoneCategory || 'residential1')
+          const limits = zoneLimits[zone] || zoneLimits.residential1
+
+          const maxCoverage = siteArea * (limits.coveragePct / 100)
+          const coverageOk = coverage <= maxCoverage
+          const coveragePct = siteArea > 0 ? (coverage / siteArea) * 100 : 0
+          const farOk = far <= limits.maxFar
+          const heightOk = height <= limits.maxHeight
+          const storeysOk = storeys <= limits.maxStoreys
+
+          result.erfNumber = input.zonErfNumber || ''
+          result.zoneCategory = zone
+          result.siteArea = siteArea
+          result.coveragePct = `${coveragePct.toFixed(1)}% (limit ${limits.coveragePct}%)`
+          result.coverageCompliant = coverageOk ? 'Compliant' : `Exceeds by ${(coverage - maxCoverage).toFixed(0)} m²`
+          result.farCompliant = farOk ? 'Compliant' : `Exceeds by ${(far - limits.maxFar).toFixed(2)}`
+          result.heightCompliant = heightOk ? 'Compliant' : `Exceeds by ${(height - limits.maxHeight).toFixed(1)} m`
+          result.storeysCompliant = storeysOk ? 'Compliant' : `Exceeds by ${storeys - limits.maxStoreys}`
+          result.overallCompliance = [coverageOk, farOk, heightOk, storeysOk].every(Boolean) ? 'All Compliant' : 'Variance Required'
+          result.notes = input.zonNotes || ''
+          result.reference = `ZON-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +498,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'zoning_check') return 'Run Zoning Check'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
