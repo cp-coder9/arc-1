@@ -58,6 +58,23 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Payment Rate Config — configure professional fee rates
+    if (tool.id === 'payment_rate_config') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Configure professional fee rates and payment parameters for the platform.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Professional Category" type="select" value={String(input.rcCategory ?? '')} onChange={v => set('rcCategory', v)} options={[{ value: 'architect', label: 'Architect' }, { value: 'engineer', label: 'Engineer' }, { value: 'qs', label: 'Quantity Surveyor' }, { value: 'planner', label: 'Town Planner' }]} />
+            <FormField label="Rate Type" type="select" value={String(input.rcRateType ?? '')} onChange={v => set('rcRateType', v)} options={[{ value: 'percentage', label: 'Percentage of Construction' }, { value: 'hourly', label: 'Hourly Rate' }, { value: 'fixed', label: 'Fixed Fee' }]} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Rate Value" type="number" value={String(input.rcRateValue ?? '')} onChange={v => set('rcRateValue', Number(v))} placeholder="e.g. 8.5 for 8.5%" />
+            <FormField label="Effective Date" type="date" value={String(input.rcEffectiveDate ?? '')} onChange={v => set('rcEffectiveDate', v)} />
+          </div>
+          <FormField label="Notes / Conditions" type="textarea" value={String(input.rcNotes ?? '')} onChange={v => set('rcNotes', v)} placeholder="Conditions, minimum fees, or special terms..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +323,16 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'payment_rate_config': {
+          result.category = input.rcCategory || 'architect'
+          result.rateType = input.rcRateType || 'percentage'
+          result.rateValue = Number(input.rcRateValue || 0)
+          result.effectiveDate = input.rcEffectiveDate || ''
+          result.notes = input.rcNotes || ''
+          result.status = 'draft'
+          result.reference = `RATE-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +446,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'payment_rate_config') return 'Save Rate Config'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
