@@ -306,6 +306,17 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'cad_upload_check': {
+          const drawingTitle = String(input.drawingTitle || 'Untitled')
+          const drawingNumber = String(input.drawingNumber || 'N/A')
+          const notes = String(input.drawingNotes || '')
+          result.drawingTitle = drawingTitle
+          result.drawingNumber = drawingNumber
+          result.notes = notes
+          result.cadValid = true
+          result.reference = `CAD-CHK-${Date.now().toString(36).toUpperCase()}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +430,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'cad_upload_check') return 'Check CAD File'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
