@@ -306,6 +306,18 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'deliverable_submission': {
+          const task = String(input.taskName || 'Unnamed task')
+          const hours = Number(input.freelancerHours || 0)
+          const rate = Number(input.freelancerRate || 0)
+          const status = String(input.freelancerStatus || 'in_progress')
+          result.task = task
+          result.hours = hours
+          result.rate = rate
+          result.status = status
+          result.reference = `DEL-${Date.now().toString(36).toUpperCase()}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +431,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'deliverable_submission') return 'Submit Deliverable'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
