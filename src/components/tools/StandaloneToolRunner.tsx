@@ -58,6 +58,24 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Valuation Certificate — dedicated QS valuation form
+    if (tool.id === 'valuation_cert') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Prepare a payment valuation certificate. Enter contract and progress data to calculate the certified and net payable amounts.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Contract Sum (R)" type="number" value={String(input.contractSum ?? '')} onChange={v => set('contractSum', Number(v))} placeholder="e.g. 5000000" />
+            <FormField label="Previous Certified (R)" type="number" value={String(input.previousCertified ?? '')} onChange={v => set('previousCertified', Number(v))} placeholder="e.g. 2500000" />
+            <FormField label="Works Completed (R)" type="number" value={String(input.worksCompleted ?? '')} onChange={v => set('worksCompleted', Number(v))} placeholder="e.g. 750000" />
+            <FormField label="Materials on Site (R)" type="number" value={String(input.materialsOnSite ?? '')} onChange={v => set('materialsOnSite', Number(v))} placeholder="e.g. 150000" />
+            <FormField label="Retention %" type="number" value={String(input.retentionPercent ?? '')} onChange={v => set('retentionPercent', Number(v))} placeholder="5" />
+            <FormField label="VAT %" type="number" value={String(input.vatPercent ?? '')} onChange={v => set('vatPercent', Number(v))} placeholder="15" />
+            <FormField label="Nominated Subcontractors (R)" type="number" value={String(input.nominatedSubcons ?? '')} onChange={v => set('nominatedSubcons', Number(v))} placeholder="0" />
+            <FormField label="Contingencies (R)" type="number" value={String(input.contingencies ?? '')} onChange={v => set('contingencies', Number(v))} placeholder="0" />
+          </div>
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +324,35 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'valuation_cert': {
+          const contract = Number(input.contractSum || 0)
+          const prevCert = Number(input.previousCertified || 0)
+          const works = Number(input.worksCompleted || 0)
+          const materials = Number(input.materialsOnSite || 0)
+          const retentionPct = Number(input.retentionPercent || 5)
+          const vatPct = Number(input.vatPercent || 15)
+          const nominated = Number(input.nominatedSubcons || 0)
+          const contingencies = Number(input.contingencies || 0)
+          const grossEarned = works + materials + nominated + contingencies
+          const retention = grossEarned * (retentionPct / 100)
+          const amountCertified = grossEarned - retention
+          const vat = amountCertified * (vatPct / 100)
+          const netPayable = amountCertified + vat
+          result.contractSum = contract
+          result.previousCertified = prevCert
+          result.worksCompleted = works
+          result.materialsOnSite = materials
+          result.grossEarned = grossEarned
+          result.retentionDeducted = Math.round(retention)
+          result.amountCertified = Math.round(amountCertified)
+          result.vatAmount = Math.round(vat)
+          result.netPayable = Math.round(netPayable)
+          result.remainingContract = contract - prevCert
+          result.currency = 'ZAR'
+          result.status = 'draft'
+          result.certificateNumber = `VC-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +466,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'valuation_cert') return 'Generate Valuation'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
