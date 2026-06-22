@@ -306,6 +306,15 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'boq_takeoff': {
+          const total = boqItems.reduce((sum, item) => sum + (Number(item.qty) * Number(item.rate)), 0)
+          result.items = boqItems.filter(i => i.description).length
+          result.totalEstimated = Math.round(total)
+          result.currency = 'ZAR'
+          result.reference = `BOQ-${Date.now().toString(36).toUpperCase()}`
+          result.status = 'draft'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +428,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'boq_takeoff') return 'Generate Takeoff'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
