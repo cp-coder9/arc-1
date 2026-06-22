@@ -58,6 +58,41 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // CPD Assessment — dedicated standalone CPD form
+    if (tool.id === 'cpd_standalone') {
+      const bodyOptions = [
+        { value: 'sacap', label: 'SACAP (Architect)' },
+        { value: 'ecsa', label: 'ECSA (Engineer)' },
+        { value: 'sacqsp', label: 'SACQSP (Quantity Surveyor)' },
+        { value: 'sacplan', label: 'SACPLAN (Town Planner)' },
+        { value: 'sagc', label: 'SAGC (Geoscientist)' },
+        { value: 'sava', label: 'SAVA (Valuer)' },
+        { value: 'plato', label: 'PLATO (Architectural Technologist)' },
+      ]
+      const catOptions = [
+        { value: 'ethics', label: 'Category 1 — Ethics & Professional Practice' },
+        { value: 'technical', label: 'Category 2 — Technical Knowledge' },
+        { value: 'management', label: 'Category 3 — Practice Management' },
+        { value: 'specialist', label: 'Category 4 — Specialist / Elective' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Record a CPD activity or take an assessment. Enter activity details to calculate CPD credits earned.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Professional Body" type="select" value={String(input.cpdBody ?? '')} onChange={v => set('cpdBody', v)} options={bodyOptions} />
+            <FormField label="Activity Type" type="select" value={String(input.cpdCategory ?? '')} onChange={v => set('cpdCategory', v)} options={catOptions} />
+          </div>
+          <FormField label="Activity Title" type="text" value={String(input.activityTitle ?? '')} onChange={v => set('activityTitle', v)} placeholder="e.g. SANS 10400-XA Workshop" />
+          <FormField label="Activity Description" type="textarea" value={String(input.activityDescription ?? '')} onChange={v => set('activityDescription', v)} placeholder="Describe the CPD activity, including learning outcomes..." />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Duration (hours)" type="number" value={String(input.cpdHours ?? '')} onChange={v => set('cpdHours', Number(v))} placeholder="e.g. 3" />
+            <FormField label="Provider Name" type="text" value={String(input.providerName ?? '')} onChange={v => set('providerName', v)} placeholder="e.g. SAIA" />
+            <FormField label="Date Completed" type="date" value={String(input.cpdDate ?? '')} onChange={v => set('cpdDate', v)} />
+          </div>
+          <FormField label="Certificate / Evidence Reference" type="text" value={String(input.cpdEvidence ?? '')} onChange={v => set('cpdEvidence', v)} placeholder="Certificate number or upload reference" />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +341,30 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'cpd_standalone': {
+          const hours = Number(input.cpdHours || 0)
+          const category = String(input.cpdCategory || 'technical')
+          const body = String(input.cpdBody || 'sacap')
+
+          // CPD credits: 1 credit per hour (varies by body, simplified)
+          const credits = hours
+          const annualLimit = body === 'sacap' ? 25 : body === 'ecsa' ? 30 : body === 'sacqsp' ? 20 : 25
+
+          result.professionalBody = body
+          result.activityType = category
+          result.activityTitle = input.activityTitle || 'Untitled Activity'
+          result.activityDescription = input.activityDescription || ''
+          result.durationHours = hours
+          result.creditsEarned = credits
+          result.provider = input.providerName || ''
+          result.dateCompleted = input.cpdDate || new Date().toISOString().split('T')[0]
+          result.evidenceRef = input.cpdEvidence || ''
+          result.creditsTowardsAnnual = `${credits} of ${annualLimit} required`
+          result.categoryLabel = category === 'ethics' ? 'Category 1 — Ethics' : category === 'technical' ? 'Category 2 — Technical' : category === 'management' ? 'Category 3 — Management' : 'Category 4 — Specialist'
+          result.status = 'submitted'
+          result.reference = `CPD-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(Math.random() * 900 + 100)}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +478,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'cpd_standalone') return 'Record CPD Activity'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
