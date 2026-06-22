@@ -306,6 +306,19 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'doc_control_issue': {
+          const docTitle = String(input.docTitle || 'Untitled')
+          const revision = String(input.revision || 'D01')
+          const recipient = String(input.recipient || 'Unspecified')
+          const issuePurpose = String(input.issuePurpose || 'for_approval')
+          result.docTitle = docTitle
+          result.revision = revision
+          result.recipient = recipient
+          result.issuePurpose = issuePurpose
+          result.reference = `ISSUE-${Date.now().toString(36).toUpperCase()}`
+          result.status = 'generated'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +432,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'doc_control_issue') return 'Generate Issue Sheet'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
