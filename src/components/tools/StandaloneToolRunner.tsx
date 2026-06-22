@@ -58,6 +58,35 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Proposal Comparison — dedicated BEP proposal comparison form
+    if (tool.id === 'proposal_comparison') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Compare BEP proposals side by side. Enter proposal details and scoring criteria to rank submissions.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Project Name" type="text" value={String(input.pcProjectName ?? '')} onChange={v => set('pcProjectName', v)} placeholder="e.g. Pinewood Estate" />
+            <FormField label="Number of Proposals" type="number" value={String(input.numProposals ?? '')} onChange={v => set('numProposals', Number(v))} placeholder="e.g. 3" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Proposal A — Firm Name" type="text" value={String(input.proposalA ?? '')} onChange={v => set('proposalA', v)} placeholder="e.g. Arch Firm 1" />
+            <FormField label="Proposal A — Fee (R)" type="number" value={String(input.feeA ?? '')} onChange={v => set('feeA', Number(v))} placeholder="e.g. 450000" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Proposal B — Firm Name" type="text" value={String(input.proposalB ?? '')} onChange={v => set('proposalB', v)} placeholder="e.g. Arch Firm 2" />
+            <FormField label="Proposal B — Fee (R)" type="number" value={String(input.feeB ?? '')} onChange={v => set('feeB', Number(v))} placeholder="e.g. 520000" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Proposal C — Firm Name" type="text" value={String(input.proposalC ?? '')} onChange={v => set('proposalC', v)} placeholder="Optional" />
+            <FormField label="Proposal C — Fee (R)" type="number" value={String(input.feeC ?? '')} onChange={v => set('feeC', Number(v))} placeholder="Optional" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Proposal A Score (1-10)" type="number" value={String(input.scoreA ?? '')} onChange={v => set('scoreA', Number(v))} placeholder="e.g. 8" />
+            <FormField label="Proposal B Score (1-10)" type="number" value={String(input.scoreB ?? '')} onChange={v => set('scoreB', Number(v))} placeholder="e.g. 7" />
+            <FormField label="Proposal C Score (1-10)" type="number" value={String(input.scoreC ?? '')} onChange={v => set('scoreC', Number(v))} placeholder="Optional" />
+          </div>
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +335,47 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'proposal_comparison': {
+          const feeA = Number(input.feeA || 0)
+          const feeB = Number(input.feeB || 0)
+          const feeC = Number(input.feeC || 0)
+          const scoreA = Number(input.scoreA || 0)
+          const scoreB = Number(input.scoreB || 0)
+          const scoreC = Number(input.scoreC || 0)
+          const nameA = String(input.proposalA || 'Proposal A')
+          const nameB = String(input.proposalB || 'Proposal B')
+          const nameC = String(input.proposalC || '')
+
+          const proposals: Array<{ name: string; fee: number; score: number; id: string; valueIndex?: number }> = [
+            { name: nameA, fee: feeA, score: scoreA, id: 'A' },
+            { name: nameB, fee: feeB, score: scoreB, id: 'B' },
+          ]
+          if (nameC) proposals.push({ name: nameC, fee: feeC, score: scoreC, id: 'C' })
+
+          // Value score: normalised fee + quality score (50/50 weighting)
+          const maxFee = Math.max(...proposals.map(p => p.fee), 1)
+          const maxScore = 10
+          for (const p of proposals) {
+            const feeNorm = maxFee > 0 ? 1 - (p.fee / maxFee) : 0
+            const scoreNorm = p.score / maxScore
+            p.valueIndex = Math.round(((feeNorm * 0.5) + (scoreNorm * 0.5)) * 100)
+          }
+
+          const ranked = [...proposals].sort((a, b) => (b.valueIndex || 0) - (a.valueIndex || 0))
+
+          result.projectName = input.pcProjectName || ''
+          result.numProposals = proposals.length
+          result.proposals = proposals.map(p => ({
+            name: p.name,
+            fee: p.fee,
+            score: p.score,
+            valueIndex: p.valueIndex,
+          }))
+          result.ranking = ranked.map((p, i) => `#${i + 1} ${p.name} (Value: ${p.valueIndex}%)`).join(' | ')
+          result.recommended = ranked[0]?.name || ''
+          result.reference = `BEP-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +489,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'proposal_comparison') return 'Compare Proposals'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
