@@ -58,6 +58,47 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Fire Rational Design — dedicated SANS 10400-T compliance form
+    if (tool.id === 'fire_rational_design') {
+      const occupancyTypes = [
+        { value: 'residential', label: 'Residential (ES1)' },
+        { value: 'hotel', label: 'Hotel / Guest House (ES2)' },
+        { value: 'office', label: 'Office (ES3)' },
+        { value: 'shop', label: 'Shop / Retail (ES4)' },
+        { value: 'factory', label: 'Factory / Industrial (ES5)' },
+        { value: 'place_of_assembly', label: 'Place of Assembly (ES6)' },
+        { value: 'educational', label: 'Educational (ES7)' },
+        { value: 'healthcare', label: 'Healthcare (ES8)' },
+        { value: 'storage', label: 'Storage (ES9)' },
+      ]
+      const frrOptions = [
+        { value: '30', label: '30 min' },
+        { value: '60', label: '60 min' },
+        { value: '90', label: '90 min' },
+        { value: '120', label: '120 min' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Document a rational fire design per SANS 10400-T. Enter occupancy, building geometry, and fire protection data.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Occupancy Type" type="select" value={String(input.occupancyType ?? '')} onChange={v => set('occupancyType', v)} options={occupancyTypes} />
+            <FormField label="Building Height (m)" type="number" value={String(input.buildingHeight ?? '')} onChange={v => set('buildingHeight', Number(v))} placeholder="e.g. 12" />
+            <FormField label="Number of Storeys" type="number" value={String(input.numStoreys ?? '')} onChange={v => set('numStoreys', Number(v))} placeholder="e.g. 3" />
+            <FormField label="Floor Area / Compartment (m²)" type="number" value={String(input.compartmentArea ?? '')} onChange={v => set('compartmentArea', Number(v))} placeholder="e.g. 500" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Fire Resistance Rating" type="select" value={String(input.frr ?? '')} onChange={v => set('frr', v)} options={frrOptions} />
+            <FormField label="Escape Route Width (m)" type="number" value={String(input.escapeWidth ?? '')} onChange={v => set('escapeWidth', Number(v))} placeholder="e.g. 1.2" />
+            <FormField label="Travel Distance (m)" type="number" value={String(input.travelDistance ?? '')} onChange={v => set('travelDistance', Number(v))} placeholder="e.g. 30" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Fire Detection" type="select" value={String(input.detectionType ?? '')} onChange={v => set('detectionType', v)} options={[{ value: 'none', label: 'None' }, { value: 'smoke', label: 'Smoke Detectors' }, { value: 'heat', label: 'Heat Detectors' }, { value: 'multi', label: 'Multi-Sensor' }]} />
+            <FormField label="Sprinklers" type="select" value={String(input.hasSprinklers ?? '')} onChange={v => set('hasSprinklers', v)} options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes' }]} />
+            <FormField label="Fire Hydrants" type="select" value={String(input.hasHydrants ?? '')} onChange={v => set('hasHydrants', v)} options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes' }]} />
+          </div>
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +347,44 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'fire_rational_design': {
+          const height = Number(input.buildingHeight || 0)
+          const area = Number(input.compartmentArea || 0)
+          const travel = Number(input.travelDistance || 30)
+          const escapeWidth = Number(input.escapeWidth || 1.2)
+          const frrMin = Number(input.frr || 60)
+          const storeys = Number(input.numStoreys || 1)
+          const occupancy = String(input.occupancyType || 'residential')
+
+          // SANS 10400-T compliance checks
+          const travelCompliant = travel <= 45 ? 'Compliant' : travel <= 60 ? 'Conditional' : 'Non-compliant'
+          const escapeWidthCompliant = escapeWidth >= 0.9 ? 'Compliant' : 'Non-compliant'
+          const sprinklers = String(input.hasSprinklers || 'no')
+          const detection = String(input.detectionType || 'none')
+
+          let frrRequired: number
+          if (height > 28) frrRequired = 120
+          else if (height > 15) frrRequired = 90
+          else if (height > 8) frrRequired = 60
+          else frrRequired = 30
+
+          const frrCompliant = frrMin >= frrRequired ? 'Compliant' : 'Non-compliant'
+
+          result.occupancyType = occupancy
+          result.buildingHeight = height
+          result.numStoreys = storeys
+          result.compartmentArea = area
+          result.frrProvided = `${frrMin} min`
+          result.frrRequired = `${frrRequired} min`
+          result.frrCompliant = frrCompliant
+          result.travelDistance = `${travel} m — ${travelCompliant}`
+          result.escapeWidthCompliant = escapeWidthCompliant
+          result.hasSprinklers = sprinklers
+          result.detectionType = detection
+          result.mustComplyWithSANS10400T = true
+          result.designReference = `RD-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +498,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'fire_rational_design') return 'Run Fire Check'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
