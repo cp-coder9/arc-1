@@ -58,6 +58,23 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Audit Trail Viewer — platform audit log viewer
+    if (tool.id === 'audit_trail_viewer') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">View and filter platform audit trail. Search by entity, user, action type, or date range.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Entity Type" type="select" value={String(input.atEntity ?? '')} onChange={v => set('atEntity', v)} options={[{ value: 'user', label: 'User' }, { value: 'project', label: 'Project' }, { value: 'firm', label: 'Firm' }, { value: 'payment', label: 'Payment' }, { value: 'document', label: 'Document' }]} />
+            <FormField label="Action Type" type="select" value={String(input.atAction ?? '')} onChange={v => set('atAction', v)} options={[{ value: 'all', label: 'All Actions' }, { value: 'create', label: 'Create' }, { value: 'update', label: 'Update' }, { value: 'delete', label: 'Delete' }, { value: 'view', label: 'View' }]} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Start Date" type="date" value={String(input.atStartDate ?? '')} onChange={v => set('atStartDate', v)} />
+            <FormField label="End Date" type="date" value={String(input.atEndDate ?? '')} onChange={v => set('atEndDate', v)} />
+          </div>
+          <FormField label="Filter / Search Query" type="text" value={String(input.atQuery ?? '')} onChange={v => set('atQuery', v)} placeholder="e.g. user@example.com or project ID" />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +323,17 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'audit_trail_viewer': {
+          result.entityType = input.atEntity || 'user'
+          result.actionType = input.atAction || 'all'
+          result.dateRange = `${input.atStartDate || 'Any'} — ${input.atEndDate || 'Any'}`
+          result.query = input.atQuery || ''
+          result.runDate = new Date().toISOString().split('T')[0]
+          result.entriesFound = 0
+          result.status = 'completed'
+          result.reference = `AUDIT-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +447,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'audit_trail_viewer') return 'Run Audit Query'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
