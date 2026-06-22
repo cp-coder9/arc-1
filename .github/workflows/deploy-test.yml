@@ -49,7 +49,7 @@ jobs:
           server: ${{ secrets.TEST_ARCHITEX_FTP_SERVER }}
           username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
           password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
-          server-dir: public_html/architex.co.za/ai/
+          server-dir: public_html/architex.co.za/ai/public_html/test.architex.co.za/
           local-dir: release/ftp-upload/
           state-name: deploy-state-${{ github.run_id }}.json
           log-level: verbose
