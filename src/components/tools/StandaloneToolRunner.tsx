@@ -58,6 +58,27 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Snag Creator — dedicated form (not site diary)
+    if (tool.id === 'snag_creator') {
+      const severities = [{ value: 'critical', label: 'Critical' }, { value: 'major', label: 'Major' }, { value: 'minor', label: 'Minor' }]
+      const snagCategories = [{ value: 'architectural', label: 'Architectural' }, { value: 'structural', label: 'Structural' }, { value: 'mep', label: 'MEP' }, { value: 'finishes', label: 'Finishes' }, { value: 'external', label: 'External' }]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Create a snag / punch list entry with location, description, severity, and responsible party.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Location / Area" type="text" value={String(input.location ?? '')} onChange={v => set('location', v)} placeholder="e.g. Bedroom 2 — North Wall" />
+            <FormField label="Responsible Party" type="text" value={String(input.responsibleParty ?? '')} onChange={v => set('responsibleParty', v)} placeholder="e.g. John's Plastering" />
+          </div>
+          <FormField label="Description" type="textarea" value={String(input.snagDescription ?? '')} onChange={v => set('snagDescription', v)} placeholder="Describe the defect or incomplete work..." />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Severity" type="select" value={String(input.severity ?? '')} onChange={v => set('severity', v)} options={severities} />
+            <FormField label="Category" type="select" value={String(input.snagCategory ?? '')} onChange={v => set('snagCategory', v)} options={snagCategories} />
+            <FormField label="Due Date" type="date" value={String(input.dueDate ?? '')} onChange={v => set('dueDate', v)} />
+          </div>
+          <FormField label="Status" type="select" value={String(input.snagStatus ?? '')} onChange={v => set('snagStatus', v)} options={[{ value: 'open', label: 'Open' }, { value: 'in_progress', label: 'In Progress' }, { value: 'completed', label: 'Completed' }, { value: 'verified', label: 'Verified Closed' }]} />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +327,22 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'snag_creator': {
+          const now = new Date()
+          const dateStr = now.toISOString().split('T')[0].replace(/-/g, '')
+          const seq = Math.floor(Math.random() * 9000 + 1000)
+          const severityColors: Record<string, string> = { critical: 'red', major: 'amber', minor: 'blue' }
+          result.snagId = `SNAG-${dateStr}-${seq}`
+          result.location = input.location || 'Unspecified'
+          result.description = input.snagDescription || ''
+          result.severity = input.severity || 'minor'
+          result.severityColor = severityColors[String(input.severity)] || 'blue'
+          result.category = input.snagCategory || 'architectural'
+          result.responsibleParty = input.responsibleParty || 'Unassigned'
+          result.dueDate = input.dueDate || 'Not set'
+          result.status = input.snagStatus || 'open'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +456,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'snag_creator') return 'Create Snag'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
