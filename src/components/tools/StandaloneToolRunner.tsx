@@ -97,6 +97,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
               <FormField label="Assembly Name" type="text" value={String(input.assembly ?? '')} onChange={v => set('assembly', v)} placeholder="e.g. Roof — tile + insulation" />
               <FormField label="Energy Zone" type="select" value={String(input.energyZone ?? '')} onChange={v => set('energyZone', v)} options={[{ value: '1', label: 'Zone 1' }, { value: '2', label: 'Zone 2' }, { value: '3', label: 'Zone 3' }, { value: '4', label: 'Zone 4' }, { value: '5', label: 'Zone 5' }, { value: '6', label: 'Zone 6' }]} />
               <FormField label="Required R-Value" type="number" value={String(input.requiredRValue ?? '')} onChange={v => set('requiredRValue', Number(v))} placeholder="e.g. 3.7" />
+            <FormField label="Provided / Calculated R-Value" type="number" value={String(input.providedRValue ?? '')} onChange={v => set('providedRValue', Number(v))} placeholder="e.g. 4.2" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">Use manufacturer R-values. The calculator sums all layer R-values and reports the shortfall.</p>
           </div>
@@ -319,12 +320,33 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
           break
         }
         case 'rvalue_calc': {
-          const area = Number(input.area || 0)
-          const rValue = Number(input.resultValue || 3.7)
-          result.area = area
-          result.rValue = rValue
-          result.uValue = area > 0 ? Math.round((1 / rValue) * 1000) / 1000 : 0
-          result.compliant = rValue >= 3.7 ? 'Pass - meets SANS 10400-XA minimum' : 'Review needed'
+          const zone = String(input.energyZone || '4')
+          const providedR = Number(input.providedRValue || 0)
+
+          // Zone minimum R-values per SANS 10400-XA
+          const zoneMinR: Record<string, { wall: number; roof: number }> = {
+            '1': { wall: 1.0, roof: 2.0 },
+            '2': { wall: 1.0, roof: 2.5 },
+            '3': { wall: 1.0, roof: 2.5 },
+            '4': { wall: 1.5, roof: 3.7 },
+            '5': { wall: 1.5, roof: 3.7 },
+            '6': { wall: 2.0, roof: 4.5 },
+          }
+          const assemblyName = String(input.assembly || 'Unnamed Assembly')
+          const mins = zoneMinR[zone] || zoneMinR['4']
+          result.assembly = assemblyName
+          result.energyZone = `Zone ${zone}`
+          result.requiredRValue = input.requiredRValue || 0
+          result.providedRValue = providedR
+          result.requiredWallMin = mins.wall
+          result.requiredRoofMin = mins.roof
+          const meetsRoof = providedR >= mins.roof
+          const meetsWall = providedR >= mins.wall
+          result.meetsWallMin = meetsWall ? `Yes (provided ${providedR} ≥ ${mins.wall})` : `No (provided ${providedR} < ${mins.wall})`
+          result.meetsRoofMin = meetsRoof ? `Yes (provided ${providedR} ≥ ${mins.roof})` : `No (provided ${providedR} < ${mins.roof})`
+          result.uValueEquivalent = providedR > 0 ? (1 / providedR).toFixed(3) : 'N/A'
+          result.shortfall = providedR > 0 ? Math.max(0, mins.roof - providedR).toFixed(2) : 'N/A'
+          result.compliant = meetsRoof || meetsWall ? 'Pass' : 'Review needed'
           break
         }
         default: {
