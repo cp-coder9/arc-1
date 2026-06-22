@@ -58,6 +58,33 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // XA Energy Compliance Calculator — whole-building SANS 10400-XA
+    if (tool.id === 'xa_compliance_calc') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Comprehensive SANS 10400-XA whole-building energy compliance check. Enter building envelope and system details.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Province" type="select" value={String(input.province ?? '')} onChange={v => set('province', v)} options={[{ value: 'gp', label: 'Gauteng' }, { value: 'wc', label: 'Western Cape' }, { value: 'kzn', label: 'KwaZulu-Natal' }, { value: 'ec', label: 'Eastern Cape' }, { value: 'fs', label: 'Free State' }, { value: 'mp', label: 'Mpumalanga' }, { value: 'lp', label: 'Limpopo' }, { value: 'nw', label: 'North West' }, { value: 'nc', label: 'Northern Cape' }]} />
+            <FormField label="Building Type" type="select" value={String(input.buildingType ?? '')} onChange={v => set('buildingType', v)} options={[{ value: 'residential', label: 'Residential' }, { value: 'office', label: 'Office' }, { value: 'retail', label: 'Retail' }, { value: 'educational', label: 'Educational' }, { value: 'industrial', label: 'Industrial' }]} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Total Floor Area (m²)" type="number" value={String(input.floorArea ?? '')} onChange={v => set('floorArea', Number(v))} placeholder="e.g. 350" />
+            <FormField label="External Wall Area (m²)" type="number" value={String(input.externalWallArea ?? '')} onChange={v => set('externalWallArea', Number(v))} placeholder="e.g. 180" />
+            <FormField label="Roof Area (m²)" type="number" value={String(input.roofArea ?? '')} onChange={v => set('roofArea', Number(v))} placeholder="e.g. 140" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Glazed Area (m²)" type="number" value={String(input.glazedArea ?? '')} onChange={v => set('glazedArea', Number(v))} placeholder="e.g. 45" />
+            <FormField label="Wall Insulation R-Value" type="number" value={String(input.wallInsulationR ?? '')} onChange={v => set('wallInsulationR', Number(v))} placeholder="e.g. 1.5" />
+            <FormField label="Roof Insulation R-Value" type="number" value={String(input.roofInsulationR ?? '')} onChange={v => set('roofInsulationR', Number(v))} placeholder="e.g. 3.7" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Avg Glazing U-Value" type="number" value={String(input.glazingU ?? '')} onChange={v => set('glazingU', Number(v))} placeholder="e.g. 2.0" />
+            <FormField label="Water Heating" type="select" value={String(input.waterHeating ?? '')} onChange={v => set('waterHeating', v)} options={[{ value: 'solar', label: 'Solar' }, { value: 'heatpump', label: 'Heat Pump' }, { value: 'gas', label: 'Gas' }, { value: 'electric', label: 'Electric' }]} />
+            <FormField label="HVAC System" type="select" value={String(input.hvacSystem ?? '')} onChange={v => set('hvacSystem', v)} options={[{ value: 'none', label: 'None / Natural' }, { value: 'split', label: 'Split Units' }, { value: 'central', label: 'Central HVAC' }, { value: 'vrf', label: 'VRF' }]} />
+          </div>
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +333,56 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'xa_compliance_calc': {
+          const floorArea = Number(input.floorArea || 0)
+          const wallArea = Number(input.externalWallArea || 0)
+          const roofArea = Number(input.roofArea || 0)
+          const glazedArea = Number(input.glazedArea || 0)
+          const wallR = Number(input.wallInsulationR || 0)
+          const roofR = Number(input.roofInsulationR || 0)
+          const glazingU = Number(input.glazingU || 2.7)
+          const province = String(input.province || 'gp')
+          const hvac = String(input.hvacSystem || 'none')
+          const water = String(input.waterHeating || 'electric')
+
+          // Zone map by province
+          const zoneMap: Record<string, string> = { gp: '4', wc: '5', kzn: '3', ec: '1', fs: '4', mp: '6', lp: '1', nw: '2', nc: '2' }
+          const zone = zoneMap[province] || '4'
+
+          // Required R-values per zone (SANS 10400-XA Table 1)
+          const reqRValues: Record<string, { wall: number; roof: number }> = {
+            '1': { wall: 1.0, roof: 2.0 },
+            '2': { wall: 1.0, roof: 2.5 },
+            '3': { wall: 1.0, roof: 2.5 },
+            '4': { wall: 1.5, roof: 3.7 },
+            '5': { wall: 1.5, roof: 3.7 },
+            '6': { wall: 2.0, roof: 4.5 },
+          }
+          const req = reqRValues[zone] || { wall: 1.5, roof: 3.7 }
+          const wallCompliant = wallR >= req.wall ? 'Compliant' : 'Non-compliant'
+          const roofCompliant = roofR >= req.roof ? 'Compliant' : 'Non-compliant'
+
+          // Fenestration: glazed area must not exceed 15% of floor for residential
+          const glazingPct = floorArea > 0 ? (glazedArea / floorArea) * 100 : 0
+          const glazingCompliant = glazingPct <= 15 ? 'Compliant' : 'Non-compliant'
+          const glazingULimit = zone <= '3' ? 3.5 : 2.7
+          const glazingUCompliant = glazingU <= glazingULimit ? 'Compliant' : 'Non-compliant'
+
+          // HVAC + water check
+          const hvacCompliant = hvac !== 'central' || glazingUCompliant === 'Compliant' ? 'Review' : 'Requires efficiency calc'
+          const waterCompliant = water !== 'electric' || roofCompliant === 'Compliant' ? 'Compliant' : 'Review'
+
+          result.energyZone = `Zone ${zone}`
+          result.wallInsulationCompliant = wallCompliant
+          result.roofInsulationCompliant = roofCompliant
+          result.glazingAreaRatio = `${glazingPct.toFixed(1)}% (limit 15%) — ${glazingCompliant}`
+          result.glazingUCompliant = glazingUCompliant
+          result.hvacReview = hvacCompliant
+          result.waterHeatingCompliant = waterCompliant
+          result.glassPercentage = glazingPct.toFixed(1)
+          result.complianceReference = `XA-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +496,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'xa_compliance_calc') return 'Check Compliance'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
