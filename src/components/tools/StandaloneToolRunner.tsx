@@ -58,6 +58,38 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // SANS Forms Autofill — dedicated form for SANS compliance document prep
+    if (tool.id === 'sans_forms') {
+      const formTypes = [
+        { value: 'form1', label: 'Form 1 — Building Plan Application' },
+        { value: 'form2', label: 'Form 2 — Certificate of Occupancy' },
+        { value: 'form3', label: 'Form 3 — Structural Compliance' },
+        { value: 'form4', label: 'Form 4 — Fire Compliance' },
+        { value: 'sans10400_xa', label: 'SANS 10400-XA Energy Compliance' },
+        { value: 'sans10400_k', label: 'SANS 10400-K Walls Compliance' },
+        { value: 'sans10400_n', label: 'SANS 10400-N Fenestration' },
+        { value: 'sans10400_w', label: 'SANS 10400-W Water Supply' },
+      ]
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Autofill SANS compliance forms for municipal submissions. Select form type and enter building details.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Form Type" type="select" value={String(input.formType ?? '')} onChange={v => set('formType', v)} options={formTypes} />
+            <FormField label="Project Name" type="text" value={String(input.formProjectName ?? '')} onChange={v => set('formProjectName', v)} placeholder="e.g. Pinewood Estate" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Erf / Stand Number" type="text" value={String(input.erfNumber ?? '')} onChange={v => set('erfNumber', v)} placeholder="e.g. 1234" />
+            <FormField label="Municipality" type="text" value={String(input.municipalityName ?? '')} onChange={v => set('municipalityName', v)} placeholder="e.g. City of Cape Town" />
+            <FormField label="Applicant Name" type="text" value={String(input.applicantName ?? '')} onChange={v => set('applicantName', v)} placeholder="e.g. Jane Doe" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Building Type" type="select" value={String(input.formBuildingType ?? '')} onChange={v => set('formBuildingType', v)} options={[{ value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' }, { value: 'industrial', label: 'Industrial' }, { value: 'mixed', label: 'Mixed Use' }]} />
+            <FormField label="Competent Person Name" type="text" value={String(input.competentPerson ?? '')} onChange={v => set('competentPerson', v)} placeholder="e.g. John Architect (SACAP Reg)" />
+          </div>
+          <FormField label="Notes / Special Conditions" type="textarea" value={String(input.formNotes ?? '')} onChange={v => set('formNotes', v)} placeholder="Any special conditions or notes relevant to this submission..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +338,23 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'sans_forms': {
+          const now = new Date()
+          const dateStr = now.toISOString().split('T')[0]
+          const formType = String(input.formType || 'form1')
+          result.formType = formType
+          result.projectName = input.formProjectName || 'Unspecified'
+          result.erfNumber = input.erfNumber || ''
+          result.municipality = input.municipalityName || ''
+          result.applicant = input.applicantName || ''
+          result.buildingType = input.formBuildingType || 'residential'
+          result.competentPerson = input.competentPerson || ''
+          result.notes = input.formNotes || ''
+          result.submissionDate = dateStr
+          result.formReference = `SANS-${formType.toUpperCase()}-${dateStr.replace(/-/g, '')}`
+          result.status = 'draft'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +468,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'sans_forms') return 'Prepare Form'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
