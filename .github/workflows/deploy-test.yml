@@ -42,6 +42,14 @@ jobs:
           npm run build
           node scripts/build-static-upload-bundle.mjs
 
+      - name: Clear stale FTP sync state
+        if: ${{ !inputs.dry-run }}
+        run: |
+          lftp -u "${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}","${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}" \
+            "${{ secrets.TEST_ARCHITEX_FTP_SERVER }}" \
+            -e "rm -f ${{ secrets.TEST_ARCHITEX_FTP_SERVER_DIR }}/ftp-deploy-sync-state.json; quit" 2>&1 || \
+            echo "No stale state to clear or lftp not available"
+
       - name: Upload via FTP
         if: ${{ !inputs.dry-run }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
