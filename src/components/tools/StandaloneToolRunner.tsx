@@ -58,6 +58,28 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Feasibility / Budget Estimator — dedicated project feasibility form
+    if (tool.id === 'feasibility_estimator') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Assess project feasibility and generate a budget estimate. Enter land, construction, and expected revenue parameters.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Project Type" type="select" value={String(input.projectType ?? '')} onChange={v => set('projectType', v)} options={[{ value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' }, { value: 'industrial', label: 'Industrial' }, { value: 'mixed', label: 'Mixed Use' }]} />
+            <FormField label="Land / Site Cost (R)" type="number" value={String(input.landCost ?? '')} onChange={v => set('landCost', Number(v))} placeholder="e.g. 1500000" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Construction Cost (R)" type="number" value={String(input.constructionCost ?? '')} onChange={v => set('constructionCost', Number(v))} placeholder="e.g. 5000000" />
+            <FormField label="Professional Fees (R)" type="number" value={String(input.professionalFees ?? '')} onChange={v => set('professionalFees', Number(v))} placeholder="e.g. 400000" />
+            <FormField label="Statutory / Council (R)" type="number" value={String(input.statutoryCosts ?? '')} onChange={v => set('statutoryCosts', Number(v))} placeholder="e.g. 150000" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Expected Revenue / GDV (R)" type="number" value={String(input.expectedRevenue ?? '')} onChange={v => set('expectedRevenue', Number(v))} placeholder="e.g. 9500000" />
+            <FormField label="Contingency (%)" type="number" value={String(input.contingencyPct ?? '')} onChange={v => set('contingencyPct', Number(v))} placeholder="e.g. 5" />
+          </div>
+          <FormField label="Notes / Assumptions" type="textarea" value={String(input.feasNotes ?? '')} onChange={v => set('feasNotes', v)} placeholder="Key assumptions for this feasibility assessment..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +328,40 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'feasibility_estimator': {
+          const land = Number(input.landCost || 0)
+          const construction = Number(input.constructionCost || 0)
+          const fees = Number(input.professionalFees || 0)
+          const statutory = Number(input.statutoryCosts || 0)
+          const revenue = Number(input.expectedRevenue || 0)
+          const contingencyPct = Number(input.contingencyPct || 5)
+          const projType = String(input.projectType || 'residential')
+
+          const contingency = Math.round(construction * (contingencyPct / 100))
+          const totalProjectCost = land + construction + fees + statutory + contingency
+          const netRevenue = revenue - totalProjectCost
+          const profitMargin = totalProjectCost > 0 ? (netRevenue / totalProjectCost) * 100 : 0
+          const costPerM2 = construction > 0 && Number(input.floorArea || 0) > 0
+            ? Math.round(construction / Number(input.floorArea || 1))
+            : 'N/A (no floor area)'
+
+          result.projectType = projType
+          result.landCost = land
+          result.constructionCost = construction
+          result.professionalFees = fees
+          result.statutoryCosts = statutory
+          result.contingency = contingency
+          result.contingencyRate = `${contingencyPct}%`
+          result.totalProjectCost = totalProjectCost
+          result.expectedRevenue = revenue
+          result.netRevenue = netRevenue
+          result.profitMargin = profitMargin.toFixed(1) + '%'
+          result.viability = netRevenue > 0 ? 'Feasible' : netRevenue === 0 ? 'Break-even' : 'Not Feasible'
+          result.currency = 'ZAR'
+          result.notes = input.feasNotes || ''
+          result.reference = `FEAS-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +475,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'feasibility_estimator') return 'Assess Feasibility'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
