@@ -306,6 +306,29 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'fenestration_calc': {
+          const wallArea = Number(input.wallAreaM2 || 0)
+          const glazedArea = Number(input.glazedAreaM2 || 0)
+          const glazingRatio = wallArea > 0 ? Math.round((glazedArea / wallArea) * 10000) / 100 : 0
+          const orientation = String(input.orientation || 'N')
+          const buildingType = String(input.buildingType || 'residential')
+          const energyZone = String(input.energyZone || '1')
+          const avgUValue = Number(input.averageUValue || 0)
+          const avgSHGC = Number(input.averageSHGC || 0)
+          const shading = Number(input.shadingFactor || 0)
+          result.glazingRatioPercent = glazingRatio
+          result.requiredVentilationM2 = Math.round(glazedArea * 0.05 * 100) / 100
+          result.requiredLightingM2 = Math.round(glazedArea * 0.10 * 100) / 100
+          result.orientation = orientation
+          result.buildingType = buildingType
+          result.energyZone = `Zone ${energyZone}`
+          result.averageUValue = avgUValue
+          result.averageSHGC = avgSHGC
+          result.shadingFactor = shading
+          result.compliant = glazingRatio <= 15 || 'Review SANS 10400-N requirements'
+          result.reference = `FEN-${Date.now().toString(36).toUpperCase()}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +442,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'fenestration_calc') return 'Calculate Compliance'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
