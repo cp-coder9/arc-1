@@ -58,6 +58,20 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Admin Governance Console — platform administration tools
+    if (tool.id === 'admin_governance') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Platform governance and administration console. Manage settings, review system status, and configure platform rules.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Action Type" type="select" value={String(input.govAction ?? '')} onChange={v => set('govAction', v)} options={[{ value: 'review', label: 'Review Platform Settings' }, { value: 'audit', label: 'Run System Audit' }, { value: 'config', label: 'Update Configuration' }, { value: 'report', label: 'Generate Governance Report' }]} />
+            <FormField label="Scope" type="select" value={String(input.govScope ?? '')} onChange={v => set('govScope', v)} options={[{ value: 'platform', label: 'Entire Platform' }, { value: 'firm', label: 'Specific Firm' }, { value: 'user', label: 'Specific User' }]} />
+          </div>
+          <FormField label="Target Entity" type="text" value={String(input.govTarget ?? '')} onChange={v => set('govTarget', v)} placeholder="Firm ID, user email, or 'all'" />
+          <FormField label="Description / Instructions" type="textarea" value={String(input.govDescription ?? '')} onChange={v => set('govDescription', v)} placeholder="Describe the admin action to perform..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +320,16 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'admin_governance': {
+          result.action = input.govAction || 'review'
+          result.scope = input.govScope || 'platform'
+          result.target = input.govTarget || ''
+          result.description = input.govDescription || ''
+          result.runDate = new Date().toISOString().split('T')[0]
+          result.status = 'completed'
+          result.reference = `GOV-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +443,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'admin_governance') return 'Run Governance Action'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
