@@ -42,23 +42,47 @@ jobs:
           npm run build
           node scripts/build-static-upload-bundle.mjs
 
-      - name: Clear stale FTP sync state
+      - name: Upload via FTP (Python)
         if: ${{ !inputs.dry-run }}
+        shell: python
+        env:
+          FTP_SERVER: ${{ secrets.TEST_ARCHITEX_FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.TEST_ARCHITEX_FTP_SERVER_DIR }}
+          LOCAL_DIR: release/ftp-upload
         run: |
-          lftp -u "${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}","${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}" \
-            "${{ secrets.TEST_ARCHITEX_FTP_SERVER }}" \
-            -e "rm -f ${{ secrets.TEST_ARCHITEX_FTP_SERVER_DIR }}/ftp-deploy-sync-state.json; quit" 2>&1 || \
-            echo "No stale state to clear or lftp not available"
-
-      - name: Upload via FTP
-        if: ${{ !inputs.dry-run }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.TEST_ARCHITEX_FTP_SERVER }}
-          username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
-          password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
-          local-dir: release/ftp-upload/
-          server-dir: ${{ format('{0}/', secrets.TEST_ARCHITEX_FTP_SERVER_DIR) }}
+          import ftplib, os, sys
+          server = os.environ['FTP_SERVER']
+          username = os.environ['FTP_USERNAME']
+          password = os.environ['FTP_PASSWORD']
+          server_dir = os.environ['FTP_SERVER_DIR']
+          local_dir = os.environ['LOCAL_DIR']
+          print(f'Connecting to {server}...')
+          ftp = ftplib.FTP(server)
+          ftp.login(username, password)
+          ftp.cwd(server_dir)
+          uploaded = 0
+          for root, dirs, files in os.walk(local_dir):
+            rel = os.path.relpath(root, local_dir)
+            if rel == '.':
+              rel = ''
+            if rel and rel not in dirs:
+              ftp.mkd(rel)
+              print(f'  mkdir {rel}')
+            for f in files:
+              local_path = os.path.join(root, f)
+              remote_path = os.path.join(rel, f) if rel else f
+              remote_dir = os.path.dirname(remote_path)
+              if remote_dir:
+                try: ftp.cwd(server_dir); ftp.cwd(remote_dir)
+                except: ftp.mkd(remote_dir); ftp.cwd(server_dir); ftp.cwd(remote_dir)
+                finally: ftp.cwd(server_dir)
+              with open(local_path, 'rb') as fh:
+                ftp.storbinary(f'STOR {remote_path}', fh)
+              uploaded += 1
+          ftp.quit()
+          print(f'Uploaded {uploaded} files to {server}:{server_dir}')
 
       - name: Smoke test
         if: ${{ !inputs.dry-run }}
