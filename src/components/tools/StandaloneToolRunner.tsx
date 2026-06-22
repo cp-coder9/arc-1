@@ -1218,19 +1218,6 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
           break
         }
 
-        case 'fee_calculator': {
-          const cv = Number(input.constructionValue || 0)
-          const complexity = Number(input.complexity || 1.0)
-          const rates: Record<string, number> = { architect: 0.085, engineer: 0.075, qs: 0.035, planner: 0.02 }
-          const rate = rates[String(input.category || 'architect')] || 0.085
-          const fee = cv * rate * complexity
-          result.fee = Math.round(fee)
-          result.rate = rate
-          result.currency = 'ZAR'
-          result.breakdown = { baseFee: Math.round(cv * rate), complexityMultiplier: complexity, adjustedFee: Math.round(fee) }
-          break
-        }
-
         case 'fee_tariff_editor': {
           result.category = input.teCategory || 'professional'
           result.action = input.teAction || 'view'
