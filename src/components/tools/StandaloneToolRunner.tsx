@@ -306,6 +306,20 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'workforce_timesheet': {
+          const workerName = String(input.workerName || 'Unnamed')
+          const trade = String(input.trade || 'General')
+          const hours = Number(input.hours || 0)
+          const hourlyRate = Number(input.hourlyRate || 0)
+          result.workerName = workerName
+          result.trade = trade
+          result.hours = hours
+          result.hourlyRate = hourlyRate
+          result.totalPay = hours * hourlyRate
+          result.reference = `TS-${Date.now().toString(36).toUpperCase()}`
+          result.status = 'calculated'
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +433,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'workforce_timesheet') return 'Calculate Total'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
