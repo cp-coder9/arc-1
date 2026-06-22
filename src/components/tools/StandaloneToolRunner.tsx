@@ -58,6 +58,30 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }, [calcContext, tool.tags])
 
   const renderInputFields = () => {
+    // Material Procurement — dedicated order list with line items
+    if (tool.id === 'material_procurement') {
+      return (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Create a material procurement order list. Add line items with quantities, units, and estimated costs.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Supplier Name" type="text" value={String(input.mpSupplier ?? '')} onChange={v => set('mpSupplier', v)} placeholder="e.g. Builders Warehouse" />
+            <FormField label="Delivery Date" type="date" value={String(input.mpDeliveryDate ?? '')} onChange={v => set('mpDeliveryDate', v)} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Material Line Items</p>
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} className="grid grid-cols-4 gap-3">
+                <input type="text" className="rounded-xl border p-2 text-sm" placeholder={`Item ${i + 1}`} value={String((input as Record<string, string>)[`mp_item${i}`] ?? '')} onChange={e => set(`mp_item${i}` as string, e.target.value)} />
+                <input type="number" className="rounded-xl border p-2 text-sm" placeholder="Qty" value={String((input as Record<string, string>)[`mp_qty${i}`] ?? '')} onChange={e => set(`mp_qty${i}` as string, e.target.value)} />
+                <select className="rounded-xl border p-2 text-sm" value={String((input as Record<string, string>)[`mp_unit${i}`] ?? '')} onChange={e => set(`mp_unit${i}` as string, e.target.value)}><option>ea</option><option>m</option><option>m²</option><option>m³</option><option>kg</option><option>L</option></select>
+                <input type="number" className="rounded-xl border p-2 text-sm" placeholder="Est. Cost" value={String((input as Record<string, string>)[`mp_cost${i}`] ?? '')} onChange={e => set(`mp_cost${i}` as string, e.target.value)} />
+              </div>
+            ))}
+          </div>
+          <FormField label="Notes" type="textarea" value={String(input.mpNotes ?? '')} onChange={v => set('mpNotes', v)} placeholder="Delivery instructions, payment terms..." />
+        </div>
+      )
+    }
     switch (tool.category) {
       case 'fee_calculator':
         return (
@@ -306,6 +330,29 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
     // Tool-specific calculations (only if calculator didn't produce output)
     if (Object.keys(result).length === 0) {
       switch (tool.id) {
+        case 'material_procurement': {
+          let total = 0
+          const items: string[] = []
+          for (let i = 0; i < 5; i++) {
+            const name = String((input as Record<string, string>)[`mp_item${i}`] || '')
+            const qty = Number((input as Record<string, string>)[`mp_qty${i}`] || 0)
+            const cost = Number((input as Record<string, string>)[`mp_cost${i}`] || 0)
+            if (name) {
+              const lineTotal = qty * cost
+              total += lineTotal
+              items.push(`${name} x${qty} = R${lineTotal.toFixed(0)}`)
+            }
+          }
+          result.supplier = input.mpSupplier || ''
+          result.deliveryDate = input.mpDeliveryDate || ''
+          result.items = items.length ? items.join('; ') : 'No items added'
+          result.itemCount = items.length
+          result.totalEstimated = Math.round(total)
+          result.currency = 'ZAR'
+          result.notes = input.mpNotes || ''
+          result.reference = `PO-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`
+          break
+        }
         case 'fee_calculator': {
           const cv = Number(input.constructionValue || 0)
           const complexity = Number(input.complexity || 1.0)
@@ -419,6 +466,7 @@ export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, o
   }
 
   const buttonLabel = () => {
+    if (tool.id === 'material_procurement') return 'Create Order List'
     switch (tool.category) {
       case 'fee_calculator': return 'Calculate Fee'
       case 'compliance': return 'Check Compliance'
