@@ -366,8 +366,8 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
         />
       ) : (
         <>
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <Card className="rounded-[2rem] overflow-hidden glass-panel">
+        <CardHeader className="glass-header">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
               <Badge variant="secondary" className="uppercase tracking-widest">{config.title}</Badge>
@@ -382,13 +382,13 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
         <CardContent className="p-6 space-y-5">
           <div className="space-y-5" data-testid={`toolbox-actions-${user.role}`}>
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-2" data-testid={`toolbox-responsibilities-${user.role}`}>
-              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="rounded-2xl p-4 glass-card">
                 <h3 className="font-heading text-lg font-black tracking-[-0.03em] text-foreground">Role responsibilities</h3>
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                   {config.primaryResponsibilities.map((responsibility) => <li key={responsibility}>• {responsibility}</li>)}
                 </ul>
               </div>
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
+              <div className="rounded-2xl p-4 glass-card border-amber-200 bg-amber-50/70">
                 <h3 className="font-heading text-lg font-black tracking-[-0.03em] text-foreground">Handoff boundaries</h3>
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                   {config.handoffBoundaries.map((boundary) => <li key={boundary}>• {boundary}</li>)}
@@ -396,7 +396,7 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
               </div>
             </section>
             {config.toolGroups.map((group) => (
-              <section key={group.id} className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm" data-testid={`toolbox-group-${user.role}-${group.id}`}>
+              <section key={group.id} className="rounded-2xl p-4 glass-section" data-testid={`toolbox-group-${user.role}-${group.id}`}>
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="font-heading text-lg font-black tracking-[-0.03em] text-foreground">{group.label}</h3>
@@ -406,7 +406,7 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                   {group.tools.map((tool) => (
-                    <div key={tool.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                    <div key={tool.label} className="rounded-2xl p-4 glass-tile">
                       <h4 className="font-bold text-foreground">{tool.label}</h4>
                       <p className="mt-2 text-sm text-muted-foreground min-h-[3.5rem]">{tool.description}</p>
                       <Button type="button" variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => onNavigate?.(tool.pageId)}>
@@ -418,7 +418,7 @@ export default function ProjectToolboxPage({ user, onNavigate }: { user: UserPro
               </section>
             ))}
           </div>
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-3">
+          <div className="rounded-2xl p-4 glass-record border-primary/20 text-sm text-muted-foreground flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <p>Unsafe approvals, signatures, payment releases, and statutory submissions are not performed from the toolbox. This page provides traceable files and evidence for the dedicated human-confirmed workflows.</p>
           </div>
