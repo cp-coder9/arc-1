@@ -250,11 +250,19 @@ npm run docs:api-contracts  # Validate API contracts
 ```bash
 npm run build               # Vite build → dist/
 npm run deploy:static:bundle    # Build + static upload bundle
-npm run deploy:api:bundle       # API bundle for cPanel
+npm run deploy:api:bundle       # API bundle for manual cPanel upload
 npm run deploy:test:bundle      # Test deployment (VITE_API_BASE_URL=https://api.architex.co.za)
 npm run smoke:deploy            # Smoke test deployed site
 npm run predeploy:check         # Pre-deployment validation
 ```
+
+### Automated Deploy (CI)
+
+`deploy-test.yml` triggers on push to `main`. It builds the SPA and deploys via FTP:
+- `test.architex.co.za` — SPA (from `release/ftp-upload/`)
+- `api.architex.co.za` — PHP gateway (from `api-php/`)
+
+Same FTP credentials used for both subdirectories (same cPanel account).
 
 ---
 
@@ -464,11 +472,11 @@ Data stored under `/demo/{uid}/` in Firestore. Security rules enforce uid-scoped
 - **File uploads**: Sent as base64 JSON to `/api/files/upload` — 50MB body limit
 - **Build chunks**: Manual chunk splitting in `vite.config.ts` (firebase, react, framer, pdf-vendor, etc.)
 - **Admin SDK**: Uses firebase-admin `v13` with service account credentials
-- **cPanel deployment**: Build bundles via `scripts/build-static-upload-bundle.mjs` / `scripts/build-cpanel-api-bundle.mjs`
+- **cPanel deployment**: SPA via CI (`.github/workflows/deploy-test.yml`); API PHP gateway via CI (same workflow); manual bundles via `scripts/build-static-upload-bundle.mjs` / `scripts/build-cpanel-api-bundle.mjs`
 - **~190 top-level service files** in `src/services/` covering all project lifecycle phases
 - **~152 component TSX files** in `src/` with role-specific dashboards + specialized tools
 - **Vercel Blob** active in `api-router.ts` — not yet replaced
-- **CI exists** at `.github/workflows/verification.yml` — deployment automation incomplete
+- **CI exists** at `.github/workflows/verification.yml` (lint+test+build) and `.github/workflows/deploy-test.yml` (deploy SPA + API PHP)
 
 ---
 
