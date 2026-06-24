@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architex — Bird Flock Landing (Liquid Glass)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0d2520; --bg-deep: #081a16;
+    --primary: #005b4e; --primary-light: #007666; --secondary: #aeefe3;
+    --text: #ffffff; --muted: rgba(255,255,255,0.62);
+    --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(174,239,227,0.24); --glass-glow: rgba(0,118,102,0.38);
+    --grid-step: 54px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family:'Inter',system-ui,sans-serif; color:var(--text); background: linear-gradient(180deg,var(--bg) 0%,var(--bg-deep) 100%); overflow:hidden; }
+  .stage { position: fixed; inset: 0; }
+
+  .blobs { position:absolute; inset:-10%; z-index:0; filter:saturate(150%); }
+  .blob { position:absolute; border-radius:50%; filter:blur(60px); opacity:.5; mix-blend-mode:screen; }
+  .blob.b1 { width:46vw; height:46vw; background:radial-gradient(circle,#007666,transparent 70%); top:18%; left:28%; animation:drift1 16s ease-in-out infinite; }
+  .blob.b2 { width:38vw; height:38vw; background:radial-gradient(circle,#aeefe3,transparent 70%); top:40%; left:50%; opacity:.24; animation:drift2 21s ease-in-out infinite; }
+  .blob.b3 { width:34vw; height:34vw; background:radial-gradient(circle,#0e8f79,transparent 70%); top:55%; left:18%; animation:drift3 19s ease-in-out infinite; }
+  @keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(8vw,-6vw) scale(1.15)}}
+  @keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-10vw,7vw) scale(1.1)}}
+  @keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,8vw) scale(1.2)}}
+
+  /* checkered grid — stays after activation, just dimmer */
+  .grid { position:absolute; inset:0; z-index:1; pointer-events:none;
+    background-image: linear-gradient(rgba(174,239,227,0.06) 1px,transparent 1px), linear-gradient(90deg,rgba(174,239,227,0.06) 1px,transparent 1px);
+    background-size: var(--grid-step) var(--grid-step);
+    opacity: 1; transition: opacity 1.2s ease; }
+
+  /* twinkling network nodes at grid junctions */
+  .nodes { position:absolute; inset:0; z-index:2; pointer-events:none; opacity:0.55; transition: opacity 1.2s ease; }
+  .node { position:absolute; width:6px; height:6px; border-radius:50%; background:var(--secondary); box-shadow:0 0 10px 2px rgba(174,239,227,0.7); transform: translate(-50%,-50%); animation: twinkle 3.6s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100%{opacity:.35; transform:translate(-50%,-50%) scale(.7)} 50%{opacity:1; transform:translate(-50%,-50%) scale(1.15)} }
+
+  .scrim { position:absolute; inset:0; z-index:1; background:rgba(8,26,22,0); transition:background 1.2s ease; }
+
+  /* flock agents travel along the grid lines, beneath the sign-in card */
+  .flock { position:absolute; inset:0; z-index:3; pointer-events:none; }
+  .shard { position:absolute; will-change:transform,opacity; background-repeat:no-repeat; mix-blend-mode:screen; }
+  .agent { position:absolute; will-change:transform,opacity; object-fit:contain; mix-blend-mode:screen; filter: drop-shadow(0 0 7px rgba(174,239,227,0.55)); }
+
+  header { position:absolute; top:0; left:0; right:0; z-index:6; display:flex; align-items:center; justify-content:space-between; padding:22px 40px; }
+  .brand { display:flex; align-items:center; gap:13px; }
+  .brand img { width:40px; height:40px; display:block; mix-blend-mode:screen; filter:drop-shadow(0 4px 14px rgba(0,0,0,0.5)); }
+  .wordmark { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; letter-spacing:0.34em; padding-left:0.34em; }
+  .top-actions { display:flex; align-items:center; gap:16px; }
+  .signup { background:none; border:none; color:var(--muted); font-size:15px; cursor:pointer; font-family:inherit; transition:color .2s; }
+  .signup:hover { color:var(--text); }
+
+  .glass { background:var(--glass-bg); backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%); border:1px solid var(--glass-border); box-shadow:0 18px 50px rgba(0,0,0,0.32), 0 0 28px var(--glass-glow), inset 0 1px 0 rgba(255,255,255,0.16); }
+  .pill { font-family:inherit; font-size:15px; color:var(--text); padding:11px 22px; border-radius:999px; cursor:pointer; transition:transform .2s, background .2s; }
+  .pill:hover { transform:translateY(-1px); background:rgba(255,255,255,0.12); }
+
+  main { position:absolute; inset:0; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 24px; }
+  .hero-fade { transition:opacity .7s ease, transform .7s ease, filter .7s ease; }
+  .orbit { position:relative; width:min(58vw,540px); aspect-ratio:1; display:grid; place-items:center; margin-bottom:6px; }
+  .ring { position:absolute; inset:6%; border-radius:50%; border:1.5px solid rgba(174,239,227,0.18); box-shadow:0 0 70px rgba(0,118,102,0.26), inset 0 0 90px rgba(0,118,102,0.16); transition:opacity .5s ease; }
+  .bird { width:86%; height:86%; object-fit:contain; display:block; cursor:pointer; mix-blend-mode:screen; filter:drop-shadow(0 16px 44px rgba(0,0,0,0.55)); transition:opacity .25s ease, transform .25s ease; }
+  .bird:hover { transform: scale(1.05); }
+  .bird:focus-visible { outline: 2px solid var(--secondary); outline-offset: 8px; border-radius: 12px; }
+
+  h1 { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:clamp(26px,4.2vw,46px); line-height:1.1; letter-spacing:-0.01em; margin-top:6px; }
+  .subline { color:var(--muted); font-size:clamp(13px,1.4vw,17px); margin-top:13px; }
+  .cta { margin-top:26px; font-family:inherit; font-weight:600; font-size:16px; color:#00201b; background:linear-gradient(180deg,#c5f6d4,var(--secondary)); border:none; padding:15px 40px; border-radius:999px; cursor:pointer; box-shadow:0 14px 36px rgba(174,239,227,0.3), inset 0 1px 0 rgba(255,255,255,0.6); transition:transform .2s, box-shadow .2s; }
+  .cta:hover { transform:translateY(-2px); box-shadow:0 20px 46px rgba(174,239,227,0.42); }
+
+  .quicknav { position:absolute; left:0; right:0; bottom:36px; z-index:4; display:flex; justify-content:center; gap:clamp(20px,6vw,80px); }
+  .qn-item { display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--muted); background:none; border:none; font-family:inherit; }
+  .qn-item svg { width:24px; height:24px; stroke:currentColor; stroke-width:1.6; fill:none; }
+  .qn-item span { font-size:12px; }
+
+  .os { position:absolute; inset:0; z-index:7; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .8s ease; }
+  .os.show { opacity:1; pointer-events:auto; }
+  .signin-card { width:min(92vw,400px); border-radius:28px; padding:38px 34px; text-align:center; transform:translateY(24px) scale(.96); transition:transform .8s cubic-bezier(.2,.8,.2,1); backdrop-filter: blur(13px) saturate(150%); -webkit-backdrop-filter: blur(13px) saturate(150%); }
+  .os.show .signin-card { transform:translateY(0) scale(1); }
+  .signin-card .mini-bird { width:48px; height:48px; margin:0 auto 16px; display:block; mix-blend-mode:screen; }
+  .signin-card h2 { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:24px; }
+  .signin-card .hint { color:var(--muted); font-size:14px; margin-top:6px; margin-bottom:24px; }
+  .field { text-align:left; margin-bottom:14px; }
+  .field label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; letter-spacing:.04em; }
+  .field input { width:100%; padding:13px 15px; border-radius:14px; background:rgba(255,255,255,0.06); border:1px solid rgba(174,239,227,0.2); color:var(--text); font-family:inherit; font-size:15px; outline:none; }
+  .field input:focus { border-color:var(--secondary); }
+  .signin-btn { width:100%; margin-top:8px; font-family:inherit; font-weight:600; font-size:15px; color:#00201b; background:linear-gradient(180deg,#c5f6d4,var(--secondary)); border:none; padding:14px; border-radius:14px; cursor:pointer; box-shadow:0 12px 30px rgba(174,239,227,0.3); }
+  .forgot { display:inline-block; margin-top:16px; color:var(--muted); font-size:13px; text-decoration:none; }
+  .forgot:hover { color:var(--secondary); }
+
+  .replay { position:absolute; z-index:9; bottom:22px; right:24px; display:flex; gap:10px; }
+  .replay button { font-family:inherit; font-size:13px; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid rgba(174,239,227,0.18); padding:9px 16px; border-radius:999px; cursor:pointer; transition:color .2s, background .2s; }
+  .replay button:hover { color:var(--text); background:rgba(255,255,255,0.1); }
+  .label { position:absolute; z-index:9; top:18px; left:50%; transform:translateX(-50%); font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:rgba(174,239,227,0.6); }
+
+  .toast { position:absolute; z-index:10; top:74px; right:40px; background:rgba(8,26,22,0.9); border:1px solid var(--glass-border); color:var(--text); padding:12px 16px; border-radius:14px; font-size:13px; max-width:280px; opacity:0; transform:translateY(-8px); transition:opacity .3s, transform .3s; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  .is-hidden { opacity:0 !important; transform:translateY(-14px) scale(.98); filter:blur(3px); pointer-events:none; }
+  @media (prefers-reduced-motion: reduce) { .blob,.node { animation:none; } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="grid" id="grid"></div>
+  <div class="nodes" id="nodes"></div>
+  <div class="scrim" id="scrim"></div>
+
+  <header>
+    <div class="brand hero-fade" id="topbar">
+      <img src="logo.png" alt="Architex" />
+      <span class="wordmark">ARCHITEX</span>
+    </div>
+    <div class="top-actions hero-fade" id="topactions">
+      <button class="signup" onclick="signUp()">Sign up</button>
+      <button class="pill glass" onclick="play()">Enter OS</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="orbit hero-fade" id="orbit">
+      <div class="ring" id="ring"></div>
+      <img class="bird" id="bird" src="logo.png" alt="Architex — Enter OS" title="Enter OS" tabindex="0" role="button" onclick="play()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();play();}" />
+    </div>
+    <h1 class="hero-fade" id="headline">The Operating System<br/>for the Built Environment</h1>
+    <p class="subline hero-fade" id="subline">Simplify complexity. Deliver with confidence.</p>
+    <button class="cta hero-fade" id="cta" onclick="play()">Enter OS</button>
+  </main>
+
+  <nav class="quicknav hero-fade" id="quicknav">
+    <button class="qn-item"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>People</span></button>
+    <button class="qn-item"><svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg><span>Projects</span></button>
+    <button class="qn-item"><svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/></svg><span>Approvals</span></button>
+    <button class="qn-item"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span>Payments</span></button>
+  </nav>
+
+  <div class="flock" id="flock"></div>
+
+  <div class="os" id="os">
+    <div class="signin-card glass">
+      <img class="mini-bird" src="logo.png" alt="Architex" />
+      <h2>Welcome to Architex OS</h2>
+      <p class="hint">Access your workspace</p>
+      <div class="field"><label>Email address</label><input type="email" placeholder="you@firm.co.za" /></div>
+      <div class="field"><label>Password</label><input type="password" placeholder="••••••••" /></div>
+      <button class="signin-btn">Sign in</button>
+      <a class="forgot" href="#" onclick="reset();return false;">Back to landing</a>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="label" id="label">Bird Flock · AI agents at work</div>
+  <div class="replay">
+    <button onclick="play()">▶ Enter OS</button>
+    <button onclick="reset()">↺ Reset</button>
+  </div>
+</div>
+
+<script>
+const STEP = 54;          // grid cell size (matches --grid-step)
+const NODE_STEP = STEP * 2; // junction spacing for network nodes
+const flock = document.getElementById('flock');
+const nodesLayer = document.getElementById('nodes');
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = false;
+let agents = [];
+let nodeCols = [], nodeRows = [];
+
+// Build twinkling nodes at grid junctions across the viewport.
+function buildNodes() {
+  nodesLayer.innerHTML = '';
+  nodeCols = []; nodeRows = [];
+  for (let x = STEP; x < window.innerWidth - 10; x += NODE_STEP) nodeCols.push(x);
+  for (let y = STEP; y < window.innerHeight - 10; y += NODE_STEP) nodeRows.push(y);
+  nodeCols.forEach(x => nodeRows.forEach(y => {
+    const n = document.createElement('div');
+    n.className = 'node';
+    n.style.left = x + 'px';
+    n.style.top = y + 'px';
+    n.style.animationDelay = (Math.random() * 3.6) + 's';
+    nodesLayer.appendChild(n);
+  }));
+}
+buildNodes();
+
+function signUp() {
+  const t = document.getElementById('toast');
+  t.textContent = 'Sign up → separate page (placeholder). Will connect to the existing test.architex.co.za login at integration stage.';
+  t.classList.add('show');
+  clearTimeout(signUp._t);
+  signUp._t = setTimeout(() => t.classList.remove('show'), 3800);
+}
+
+function play() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('label').textContent = 'Activation · agents disperse';
+
+  const birdEl = document.getElementById('bird');
+  const r = birdEl.getBoundingClientRect();
+  birdEl.style.opacity = '0';
+  ['headline','subline','cta','quicknav','ring','topactions'].forEach(id => document.getElementById(id).classList.add('is-hidden'));
+
+  if (reduce) { dimBackground(); finishReveal(); return; }
+
+  // explode into miniature bird logos of varying sizes
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const N = 34;
+
+  agents = [];
+  for (let k = 0; k < N; k++) {
+    const size = 20 + Math.random() * 40;            // varying mini-bird sizes
+    const s = document.createElement('img');
+    s.className = 'agent';
+    s.src = 'logo.png'; s.alt = '';
+    s.style.width = size + 'px'; s.style.height = size + 'px';
+    s.style.left = (cx - size / 2) + 'px';
+    s.style.top = (cy - size / 2) + 'px';
+    flock.appendChild(s);
+
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 240 + Math.random() * Math.max(window.innerWidth, 700) * 0.5;
+    const ex = Math.cos(ang) * dist, ey = Math.sin(ang) * dist * 0.8 - 30;
+    const rot = (Math.random() - 0.5) * 540;
+
+    // build a closed loop on the grid so each mini bird travels node-to-node,
+    // turning between vertical and horizontal runs at the nodes
+    const ax = nodeCols[Math.floor(Math.random() * nodeCols.length)];
+    const ay = nodeRows[Math.floor(Math.random() * nodeRows.length)];
+    let w = NODE_STEP * (1 + Math.floor(Math.random() * 3));
+    let h = NODE_STEP * (1 + Math.floor(Math.random() * 3));
+    if (ax + w > window.innerWidth - STEP) w = -w;   // keep loop on-screen
+    if (ay + h > window.innerHeight - STEP) h = -h;
+    let pts = [[ax, ay], [ax + w, ay], [ax + w, ay + h], [ax, ay + h], [ax, ay]];
+    if (Math.random() < 0.5) pts.reverse();          // mix clockwise / counter-clockwise
+    const pieceCX = cx, pieceCY = cy;
+    const tx = pts[0][0] - pieceCX;                  // settle onto the first node
+    const ty = pts[0][1] - pieceCY;
+    const perim = 2 * (Math.abs(w) + Math.abs(h));
+
+    agents.push({ el: s, ex, ey, rot, tx, ty, pts, pieceCX, pieceCY, perim });
+  }
+
+  // PHASE 1 — explode (bright)
+  agents.forEach(a => a.el.animate([
+    { transform:'translate(0,0) rotate(0deg) scale(1)', opacity:1 },
+    { transform:`translate(${a.ex}px,${a.ey}px) rotate(${a.rot}deg) scale(1.05)`, opacity:1 }
+  ], { duration: 800 + Math.random()*300, easing:'cubic-bezier(.15,.7,.2,1)', fill:'forwards' }));
+
+  // PHASE 2 — snap onto the grid lines / nodes, dim down, dim the background
+  setTimeout(() => {
+    document.getElementById('label').textContent = 'Agents organising the system';
+    dimBackground();
+    agents.forEach(a => a.el.animate([
+      { transform:`translate(${a.ex}px,${a.ey}px) rotate(${a.rot}deg) scale(1.05)`, opacity:1 },
+      { transform:`translate(${a.tx}px,${a.ty}px) rotate(0deg) scale(1)`, opacity:0.42 }
+    ], { duration:1300, easing:'cubic-bezier(.4,0,.2,1)', fill:'forwards' }));
+    finishReveal();
+  }, 950);
+
+  // PHASE 3 — patrol along the grid lines, node to node (some up, some down)
+  setTimeout(() => {
+    document.getElementById('label').textContent = 'System working for you · agents moving between nodes';
+    agents.forEach(a => {
+      const speed = 30; // px/sec — uniform, orderly
+      const dur = Math.max(a.perim / speed, 3) * 1000;
+      // walk the rectangle: horizontal edges and vertical edges, turning at each node
+      const frames = a.pts.map(p => ({
+        transform: `translate(${p[0] - a.pieceCX}px,${p[1] - a.pieceCY}px) scale(1)`,
+        opacity: 0.42
+      }));
+      a.el.animate(frames, { duration: dur, iterations: Infinity, easing: 'linear', delay: Math.random() * 400 });
+    });
+  }, 2350);
+}
+
+function dimBackground() {
+  document.getElementById('grid').style.opacity = '0.45';   // keep squares, dimmer
+  document.getElementById('nodes').style.opacity = '0.3';   // dimmer nodes on sign-in page
+  document.getElementById('scrim').style.background = 'rgba(8,26,22,0.42)';
+}
+
+function finishReveal() { document.getElementById('os').classList.add('show'); playing = false; }
+
+function reset() {
+  playing = false;
+  agents.forEach(a => a.el.getAnimations().forEach(an => an.cancel()));
+  agents = [];
+  flock.innerHTML = '';
+  document.getElementById('os').classList.remove('show');
+  document.getElementById('bird').style.opacity = '1';
+  document.getElementById('grid').style.opacity = '1';
+  document.getElementById('nodes').style.opacity = '0.55';
+  document.getElementById('scrim').style.background = 'rgba(8,26,22,0)';
+  ['headline','subline','cta','quicknav','ring','topactions'].forEach(id => document.getElementById(id).classList.remove('is-hidden'));
+  document.getElementById('label').textContent = 'Bird Flock · AI agents at work';
+}
+</script>
+</body>
+</html>
