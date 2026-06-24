@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architex — Design System & Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0d2520; --bg-deep:#081a16; --primary:#005b4e; --primary-light:#007666;
+    --primary-dark:#00201b; --secondary:#aeefe3; --text:#ffffff; --muted:rgba(255,255,255,0.62);
+    --glass-bg:rgba(255,255,255,0.07); --glass-border:rgba(174,239,227,0.24); --glass-glow:rgba(0,118,102,0.38);
+    --radius:18px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Inter',system-ui,sans-serif; color:var(--text); min-height:100vh;
+    background:
+      radial-gradient(circle at 22% 12%, rgba(0,118,102,0.28), transparent 50%),
+      radial-gradient(circle at 82% 70%, rgba(174,239,227,0.08), transparent 46%),
+      linear-gradient(180deg,#0d2520,#081a16);
+    padding:48px 40px 80px; }
+
+  .glass { background:var(--glass-bg); backdrop-filter:blur(18px) saturate(150%); -webkit-backdrop-filter:blur(18px) saturate(150%);
+    border:1px solid var(--glass-border); box-shadow:0 18px 50px rgba(0,0,0,0.32), 0 0 26px var(--glass-glow), inset 0 1px 0 rgba(255,255,255,0.14); }
+
+  .doc-head { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  .doc-head img { width:40px; height:40px; mix-blend-mode:screen; }
+  h1 { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:30px; letter-spacing:-0.01em; }
+  .sub { color:var(--muted); margin-bottom:42px; }
+  h2 { font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; letter-spacing:0.2em; text-transform:uppercase; color:var(--secondary); margin:42px 0 18px; }
+
+  /* tokens */
+  .swatches { display:flex; flex-wrap:wrap; gap:16px; }
+  .swatch { width:150px; border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); }
+  .swatch .chip { height:78px; }
+  .swatch .meta { padding:10px 12px; background:rgba(255,255,255,0.04); font-size:12px; }
+  .swatch .meta b { display:block; font-size:13px; margin-bottom:2px; }
+  .swatch .meta code { color:var(--muted); font-family:ui-monospace,monospace; }
+
+  /* glass cards */
+  .cards { display:flex; flex-wrap:wrap; gap:20px; }
+  .card { width:280px; border-radius:22px; padding:24px; }
+  .card h3 { font-family:'Space Grotesk',sans-serif; font-size:18px; margin-bottom:8px; }
+  .card p { color:var(--muted); font-size:14px; line-height:1.5; }
+
+  /* buttons */
+  .btn-row { display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
+  .btn { font-family:inherit; font-weight:600; font-size:15px; cursor:pointer; padding:13px 30px; border-radius:999px; border:none; transition:transform .2s, box-shadow .2s, background .2s; }
+  .btn-primary { color:var(--primary-dark); background:linear-gradient(180deg,#c5f6d4,var(--secondary)); box-shadow:0 14px 36px rgba(174,239,227,0.28), inset 0 1px 0 rgba(255,255,255,0.6); }
+  .btn-primary:hover { transform:translateY(-2px); box-shadow:0 20px 46px rgba(174,239,227,0.42); }
+  .btn-glass { color:var(--text); background:var(--glass-bg); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--glass-border); }
+  .btn-glass:hover { transform:translateY(-1px); background:rgba(255,255,255,0.12); }
+  .btn-ghost { color:var(--muted); background:none; }
+  .btn-ghost:hover { color:var(--text); }
+
+  /* typography */
+  .type-stack > * { margin-bottom:12px; }
+  .t-h1 { font-family:'Space Grotesk',sans-serif; font-size:44px; font-weight:600; letter-spacing:-0.02em; }
+  .t-h2 { font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:600; }
+  .t-body { font-size:16px; color:rgba(255,255,255,0.85); }
+  .t-muted { font-size:14px; color:var(--muted); }
+
+  /* ── Elemental OS workspace ───────────────────────────────
+     The expressive animated background is reserved for the landing page.
+     Inside the OS, surfaces stay calm, spacious, and clutter-free. */
+  .ws { border-radius:24px; overflow:hidden; display:grid; grid-template-columns:228px 1fr; min-height:440px; }
+  .ws-aside { padding:24px 18px; border-right:1px solid rgba(174,239,227,0.12); display:flex; flex-direction:column; gap:6px; }
+  .ws-brand { display:flex; align-items:center; gap:10px; margin-bottom:22px; }
+  .ws-brand img { width:26px; height:26px; mix-blend-mode:screen; }
+  .ws-brand span { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.28em; }
+  .nav-item { display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:12px; color:var(--muted); font-size:14px; cursor:pointer; transition:background .2s, color .2s; }
+  .nav-item svg { width:18px; height:18px; stroke:currentColor; stroke-width:1.7; fill:none; }
+  .nav-item:hover { color:var(--text); background:rgba(255,255,255,0.05); }
+  .nav-item.active { color:var(--primary-dark); background:linear-gradient(180deg,#c5f6d4,var(--secondary)); font-weight:600; }
+
+  .ws-main { padding:30px 32px; display:flex; flex-direction:column; gap:24px; }
+  .ws-top { display:flex; align-items:center; justify-content:space-between; }
+  .ws-top h3 { font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; }
+  .ws-top .crumb { color:var(--muted); font-size:13px; margin-top:4px; }
+  .stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .stat { border-radius:16px; padding:20px; }
+  .stat .k { color:var(--muted); font-size:12px; letter-spacing:.05em; text-transform:uppercase; }
+  .stat .v { font-family:'Space Grotesk',sans-serif; font-size:28px; font-weight:600; margin-top:8px; }
+  .stat .d { color:var(--secondary); font-size:12px; margin-top:6px; }
+  .panel { border-radius:16px; padding:22px; }
+  .panel h4 { font-size:14px; font-weight:600; margin-bottom:14px; }
+  .line { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid rgba(174,239,227,0.1); font-size:14px; color:var(--muted); }
+  .line:first-of-type { border-top:none; }
+  .line .tag { font-size:11px; padding:3px 10px; border-radius:999px; background:rgba(174,239,227,0.14); color:var(--secondary); }
+
+  .note { margin-top:14px; color:var(--muted); font-size:13px; max-width:760px; }
+</style>
+</head>
+<body>
+  <div class="doc-head"><img src="logo.png" alt="Architex" /><h1>Architex Design System</h1></div>
+  <p class="sub">Dark teal palette · liquid-glass surfaces · Space Grotesk + Inter · calm, clutter-free workspaces</p>
+
+  <h2>Color Tokens</h2>
+  <div class="swatches">
+    <div class="swatch"><div class="chip" style="background:#0d2520"></div><div class="meta"><b>Background</b><code>#0d2520</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#005b4e"></div><div class="meta"><b>Primary</b><code>#005b4e</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#007666"></div><div class="meta"><b>Primary light</b><code>#007666</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#00201b"></div><div class="meta"><b>Primary dark</b><code>#00201b</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#aeefe3"></div><div class="meta"><b>Secondary / mint</b><code>#aeefe3</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#ffffff"></div><div class="meta"><b>Text</b><code>#ffffff</code></div></div>
+  </div>
+
+  <h2>Glass Surfaces</h2>
+  <div class="cards">
+    <div class="card glass"><h3>Single Source of Truth</h3><p>Every role contributes to one living project record — no duplication, no drift.</p></div>
+    <div class="card glass"><h3>AI-Guided Workflow</h3><p>The OS turns a multidimensional industry into a simple, guided path from brief to close-out.</p></div>
+    <div class="card glass"><h3>Role-Based Toolsets</h3><p>Complementary tools per professional, composed into one coherent platform.</p></div>
+  </div>
+
+  <h2>Buttons &amp; States</h2>
+  <div class="btn-row">
+    <button class="btn btn-primary">Enter OS</button>
+    <button class="btn btn-glass">Sign up</button>
+    <button class="btn btn-ghost">Learn more</button>
+  </div>
+
+  <h2>Typography</h2>
+  <div class="type-stack">
+    <div class="t-h1">The Operating System</div>
+    <div class="t-h2">for the Built Environment</div>
+    <div class="t-body">Simplify complexity. Deliver with confidence.</div>
+    <div class="t-muted">Body and caption text uses Inter at reduced opacity for hierarchy.</div>
+  </div>
+
+  <h2>OS Workspace — Elemental</h2>
+  <div class="ws glass">
+    <aside class="ws-aside">
+      <div class="ws-brand"><img src="logo.png" alt="Architex" /><span>ARCHITEX</span></div>
+      <div class="nav-item active"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Command Centre</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/></svg>Projects</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>People</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/></svg>Approvals</div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Payments</div>
+    </aside>
+    <main class="ws-main">
+      <div class="ws-top">
+        <div><h3>Command Centre</h3><div class="crumb">Today · 3 actions need you</div></div>
+        <button class="btn btn-primary" style="padding:11px 22px;">New project</button>
+      </div>
+      <div class="stat-row">
+        <div class="stat glass"><div class="k">Active projects</div><div class="v">12</div><div class="d">+2 this week</div></div>
+        <div class="stat glass"><div class="k">Approvals pending</div><div class="v">3</div><div class="d">2 due today</div></div>
+        <div class="stat glass"><div class="k">Escrow held</div><div class="v">R4.2M</div><div class="d">across 5 projects</div></div>
+      </div>
+      <div class="panel glass">
+        <h4>Required actions</h4>
+        <div class="line"><span>Sign appointment — Maple Street Residential</span><span class="tag">Appoint</span></div>
+        <div class="line"><span>Review SANS 10400-K wall compliance</span><span class="tag">Comply</span></div>
+        <div class="line"><span>Approve milestone certificate #3</span><span class="tag">Pay</span></div>
+      </div>
+    </main>
+  </div>
+  <p class="note">Inside the OS, the expressive landing animation (the bird flock and moving grid) is deliberately absent. Workspaces reuse the same tokens, glass surfaces, and buttons, but stay calm, spacious, and clutter-free so professionals can focus on the work.</p>
+</body>
+</html>
