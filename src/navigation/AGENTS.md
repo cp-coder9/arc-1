@@ -25,6 +25,7 @@ Central navigation configuration and routing infrastructure that determines what
 - Each module specifies: role access list, key sections, phase awareness
 - Modules include: Command Centre, Inbox/Action Centre, Projects, Toolboxes, CPD & Learning, Documents/Knowledge Hub, People, Marketplace, Payments/Finance, Compliance Hub, Admin/Governance
 - Navigation is consumed by `src/App.tsx` for sidebar rendering
+- **Role visibility contract:** `App.tsx` `visibleNavItems` filters strictly by `item.roles.includes(user.role)` with **no** role normalization. Every `UserRole` that should reach a surface must be listed explicitly in that module's `roles` array. All 17 roles now share the workflow spine (`command_centre`, `inbox`, `projects`, `messages`); `documents` is granted to all design/governance roles. `finance`, `settings`, `cpd_learning`, `marketplace`, `user_settings` remain intentionally role-restricted — extend deliberately, not by default.
 
 ### Dashboard Adapter (`navDashboardAdapter.ts`)
 - Maps navigation modules to their corresponding dashboard components
