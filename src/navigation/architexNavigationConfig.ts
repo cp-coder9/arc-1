@@ -5,7 +5,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'command_centre',
     label: 'Command Centre',
     description: 'Personal daily cockpit curated by the user agent.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
       { key: 'active_projects', label: 'Active Projects', description: 'Current project responsibilities.' },
@@ -18,7 +18,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'inbox',
     label: 'Inbox / Action Centre',
     description: 'Protected action centre for required work and agent-pushed tasks.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'required_actions', label: 'Required Actions', description: 'Tasks requiring user action.', supportsContextualMessaging: true },
       { key: 'approvals', label: 'Approvals', description: 'Items awaiting approval.', supportsContextualMessaging: true },
@@ -30,7 +30,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'projects',
     label: 'Projects',
     description: 'Phase-aware project workspace.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'dashboard', label: 'Project Dashboard', description: 'Project overview.', projectScoped: true, phaseAware: true },
       { key: 'team', label: 'Team', description: 'Project team and responsibilities.', projectScoped: true, supportsContextualMessaging: true },
@@ -75,7 +75,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'documents',
     label: 'Documents / Knowledge Hub',
     description: 'Global document, template and knowledge hub.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'my_documents', label: 'My Documents', description: 'User documents.' },
       { key: 'project_documents', label: 'Project Documents', description: 'Cross-project document search.', supportsContextualMessaging: true },
@@ -115,7 +115,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'messages',
     label: 'Messages',
     description: 'Full persistent messaging centre linked to project context.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'direct', label: 'Direct Messages', description: 'One-to-one messages.' },
       { key: 'project_groups', label: 'Project Groups', description: 'Project group conversations.' },

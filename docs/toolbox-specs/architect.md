@@ -1,0 +1,38 @@
+# Architect Toolbox Spec
+
+**Role key:** `architect` · **UserRole:** ✅ · **TOOLBOX_CONFIG:** ✅ · **Nav:** Command Centre, Inbox, Projects, Toolboxes, CPD & Learning, Documents, Marketplace, Messages, My Account
+
+## 1. Identity
+- **Title:** Architect / Design-Team Toolbox
+- **Subtitle:** Architectural delivery tools aligned to the BEP professional workflow.
+- **Scope:** Architect is treated as a BEP subtype for authorization while keeping familiar role labels in the UI.
+- **Responsibilities:** Refine architectural scope/drawings · Coordinate design review evidence · Prepare statutory package inputs.
+- **Handoff boundaries:** No AI-generated compliance certification · No statutory release without accountable sign-off.
+
+## 2. AI-guided toolbox groups
+| Group | Tools (→ pageId) |
+|-------|------------------|
+| Architectural compliance | Technical Brief Editor → `technical-brief` · AI Drawing Checker → `drawing-checker` · SANS / Compliance Forms → `sans-forms` |
+| Delivery resources | Remote Desktop / Resources → `resource-sharing` |
+
+## 3. Standalone tools (`getToolsForRole('architect')` → 19)
+fee_calculator, fenestration_calc, rvalue_calc, ai_drawing_checker, sans_forms, drawing_register, technical_brief, doc_control_issue, cpd_standalone, boq_takeoff, rfi_generator, snag_creator, freelancer_resource_centre, xa_compliance_calc, fire_rational_design, fire_compliance_check, firm_document_register, valuation_cert, zoning_check
+
+Categories spanned: fee_calculator, compliance, drawing, document_control, briefing, cpd, estimating, site_management, resource_centre, payment.
+
+## 4. Lifecycle participation (broadest professional role)
+- **feasibility/appointment:** fee_calculator, technical_brief, zoning_check.
+- **concept/design_development:** fenestration_calc, rvalue_calc, ai_drawing_checker, xa/fire calcs, drawing_register, doc_control_issue.
+- **municipal_submission:** sans_forms, firm_document_register.
+- **tender/construction:** boq_takeoff, rfi_generator, valuation_cert.
+- **closeout:** snag_creator.
+- **continuous:** cpd_standalone, freelancer_resource_centre.
+
+## 5. Governance gates
+- AI drawing checks advisory only (`ai_drawing_checker.standaloneOnly`, supervisor/sign-off gate).
+- Compliance forms prepared, never auto-certified.
+
+## 6. Workflow verification & gaps
+- ✅ AI-guided routes (`technical-brief`, `drawing-checker`, `sans-forms`, `resource-sharing`) valid.
+- ⚠ AI-guided mode exposes only 4 of 19 tools. Strong candidates missing from guided flow: `fee_calculator` (proposal stage), `drawing_register`, `boq_takeoff`, `valuation_cert`, `zoning_check`, `snag_creator`. Recommend a "Proposal & fees", "Costing", and "Closeout" group to match the registry breadth.
+- ✅ Architect↔BEP equivalence: registry gives architect a superset of BEP tools (adds boq_takeoff, rfi_generator, snag_creator, valuation_cert, zoning_check). Confirm auth layer treats architect as BEP subtype as the scope claims.
