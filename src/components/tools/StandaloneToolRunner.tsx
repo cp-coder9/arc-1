@@ -1,5 +1,10 @@
 ﻿// Standalone Tool Runner â€” Opens a standalone tool instance
-// Generates input forms by tool category and wires discipline calculators where available.
+//
+// Definition-driven delegation (Task 5.3): when a tool declares a `calculatorDefinitionId`
+// that resolves to a registered `CalculatorDefinition`, the runner delegates to the rich
+// Toolbox Capability Framework UI (`DefinitionToolRunner` + optional `ScheduleGrid` +
+// `ClauseResultPanel` + `ToolReportPreview`). Otherwise it falls back to the legacy,
+// category-driven form path below (zero-downtime migration per design "Migration / Rollout").
 import React, { useState, useMemo } from 'react'
 import { ArrowLeft, Save, Download, FolderOpen, Plus } from 'lucide-react'
 import type { StandaloneToolDef, StandaloneToolRun } from '@/types/standaloneToolTypes'
@@ -7,6 +12,8 @@ import type { ToolboxContext } from '@/types/toolboxCalculators'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { listCalculatorsForContext, runCalculator } from '@/services/toolsets/toolboxCalculatorService'
+import { getCalculatorDefinition } from '@/services/toolbox/definitions'
+import DefinitionStandaloneRunner from './DefinitionStandaloneRunner'
 
 interface StandaloneToolRunnerProps {
   tool: StandaloneToolDef
@@ -15,6 +22,29 @@ interface StandaloneToolRunnerProps {
   onAssign: (run: StandaloneToolRun) => void
   onExport: (run: StandaloneToolRun, format: 'pdf' | 'csv' | 'json') => void
   latestRun: StandaloneToolRun | null
+}
+
+/**
+ * Definition-aware entry point. Resolves the tool's `calculatorDefinitionId` against the
+ * calculator-definition registry: if a definition is registered, the rich definition-driven
+ * runner takes over; otherwise the legacy runner preserves existing behaviour exactly.
+ */
+export default function StandaloneToolRunner(props: StandaloneToolRunnerProps) {
+  const definition = getCalculatorDefinition(props.tool.calculatorDefinitionId)
+  if (definition) {
+    return (
+      <DefinitionStandaloneRunner
+        definition={definition}
+        tool={props.tool}
+        onBack={props.onBack}
+        onSave={props.onSave}
+        onAssign={props.onAssign}
+        onExport={props.onExport}
+        latestRun={props.latestRun}
+      />
+    )
+  }
+  return <LegacyStandaloneToolRunner {...props} />
 }
 
 function FormField({ label, type, value, onChange, placeholder, options }: {
@@ -39,7 +69,7 @@ function FormField({ label, type, value, onChange, placeholder, options }: {
 
 interface BoQItem { description: string; qty: string; unit: string; rate: string }
 
-export default function StandaloneToolRunner({ tool, onBack, onSave, onAssign, onExport, latestRun }: StandaloneToolRunnerProps) {
+function LegacyStandaloneToolRunner({ tool, onBack, onSave, onAssign, onExport, latestRun }: StandaloneToolRunnerProps) {
   const [input, setInput] = useState<Record<string, unknown>>({})
   const [output, setOutput] = useState<Record<string, unknown>>({})
   const [saved, setSaved] = useState(false)

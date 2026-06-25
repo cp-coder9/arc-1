@@ -35,3 +35,22 @@ Categories spanned: fee_calculator, compliance, drawing, document_control, brief
 - ⚠ **#1 Orphaned role.** `fire_engineer` appears ONLY in the `toolboxes` navigation module — no Command Centre, Inbox, Projects, or Messages. The role can use tools but has no project context, action queue, or communication surface. Recommend adding at least Command Centre + Projects nav for lifecycle participation.
 - ✅ AI-guided routes (`design`, `drawing-checker`, `sans-forms`, `technical-brief`, `resource-sharing`, `cpd-assessment`) valid.
 - ⚠ AI-guided mode exposes 6 of 11 tools. Missing from guided flow: `fire_rational_design`, `fire_compliance_check`, `drawing_register`, `fee_calculator`. Recommend a "Rational fire design" group (fire_rational_design / fire_compliance_check) so the role's core deliverables are reachable in guided mode.
+
+## 7. Toolbox Framework Status
+
+All fire engineer tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (2)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| fire_compliance_check | `fire_compliance_check_v1` | clauseSet | SANS 10400-T thresholds, occupancy classes |
+| fire_rational_design | `fire_rational_design_v1` | clauseSet | Rational fire engineering, performance criteria |
+
+### Preview-status tools (0)
+All fire engineer tools have reached full status.
+
+### Framework details
+- **Methods used:** clauseSet
+- **Versioned tables:** SANS 10400-T thresholds, fire resistance ratings, occupancy classifications
+- **Rendering:** `DefinitionToolRunner` for all tools
+- **Reports:** PDF/CSV export with clause outcomes (pass/fail/advisory), source versions, disclaimers

@@ -1,5 +1,7 @@
 // Standalone Tool Types — Independent Tool Tiles System
 
+import type { ClauseResult, GuidelineVersionRef } from '@/services/toolbox/types'
+
 export type StandaloneToolCategory =
   | 'fee_calculator'
   | 'compliance'
@@ -37,6 +39,12 @@ export interface StandaloneToolDef {
   canAssignToProject: boolean
   recentRunsCount: number
   tags: string[]
+  /**
+   * Optional FK to a Toolbox Capability Framework `CalculatorDefinition`.
+   * When present, the definition-driven runner takes over; otherwise the legacy
+   * runner path is used (zero-downtime migration). Additive, non-breaking.
+   */
+  calculatorDefinitionId?: string
 }
 
 export interface StandaloneToolRun {
@@ -56,6 +64,24 @@ export interface StandaloneToolRun {
   createdAt: string
   updatedAt: string
   version: number
+  /**
+   * Toolbox Capability Framework run metadata (additive, optional — legacy runs omit these).
+   * Persists the calculator definition, schedule rows, pinned guideline versions, and
+   * clause outcomes so a run is fully reproducible (Requirements 3.3, 9.1).
+   */
+  calculatorDefinitionId?: string
+  scheduleRows?: unknown[]
+  guidelineVersions?: GuidelineVersionRef[]
+  clauseResults?: ClauseResult[]
+  /**
+   * Lineage + project hand-off references (additive, optional — legacy runs omit these).
+   * `previousRunId` links a run created by re-opening a saved run as a new version
+   * (Requirement 9.2). `projectRecordId` / `documentId` capture the project record and
+   * document-adapter entries produced when a run is assigned to a project (Requirement 9.3).
+   */
+  previousRunId?: string
+  projectRecordId?: string
+  documentId?: string
 }
 
 export interface StandaloneToolResult {

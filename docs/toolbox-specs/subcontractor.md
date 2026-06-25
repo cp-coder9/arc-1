@@ -36,3 +36,27 @@ Categories spanned: document_control, payment, estimating, site_management, proc
 - ✅ AI-guided routes (`packages`, `procurement`, `construction`, `snagging`) valid.
 - ⚠ AI-guided mode surfaces only 4 curated tools of 17 standalone. Strong candidates missing from guided flow: `shop_drawing_submission`, `package_scope_viewer`, `payment_claim_builder`, `snag_evidence_upload`, `hs_compliance`, `warranty_upload`. Recommend "Submissions", "H&S & site", and "Closeout evidence" groups to match registry breadth.
 - ✅ Lifecycle alignment: subcontractor delivers package scope across tender_procurement → construction_execution → closeout, consistent with `lifecycleDefinitions`.
+
+## 7. Toolbox Framework Status
+
+All subcontractor tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (4)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| workforce_timesheet | `workforce_timesheet_v1` | time | Hours/cost, PAYE/UIF/SDL deductions |
+| plant_register | `plant_register_v1` | time | Hire rates, utilization tracking |
+| site_diary_entry | `site_diary_entry_v1` | schedule | Weather, progress, resource records |
+| shop_drawing_submission | `shop_drawing_submission_v1` | schedule | Revision states, review routing |
+
+### Preview-status tools (2)
+| Tool | Status | Notes |
+|------|--------|-------|
+| snag_evidence_upload | `preview` | Evidence capture workflow — definition pending |
+| quote_response | `preview` | Supplier quote response — definition pending |
+
+### Framework details
+- **Methods used:** time, schedule
+- **Versioned tables:** PAYE/UIF/SDL tables, plant rates, revision states
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with timesheet summaries, source versions, disclaimers

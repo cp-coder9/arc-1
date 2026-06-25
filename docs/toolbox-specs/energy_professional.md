@@ -35,3 +35,24 @@ Categories spanned: fee_calculator, compliance, drawing, document_control, brief
 - ⚠ **#1 Orphaned role.** `energy_professional` appears ONLY in the `toolboxes` navigation module — no Command Centre, Inbox, Projects, or Messages. The role can use tools but has no project context, action queue, or communication surface. Recommend adding at least Command Centre + Projects nav for lifecycle participation.
 - ✅ AI-guided routes (`sans-forms`, `design`, `drawing-checker`, `technical-brief`, `cpd-assessment`) valid.
 - ⚠ AI-guided mode exposes 5 of 13 tools. Missing from guided flow: `fenestration_calc`, `rvalue_calc`, `xa_compliance_calc`, `energy_certificate`, `drawing_register`. Recommend an "Energy modelling" group (R-value / fenestration / XA calc) and a "Certification" group (energy_certificate) to match registry breadth.
+
+## 7. Toolbox Framework Status
+
+All energy professional tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (4)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| xa_compliance_calc | `xa_energy_compliance_v1` | clauseSet | SANS 10400-XA full energy compliance |
+| fenestration_calc | `fenestration_n_v1` | clauseSet + area | SANS 10400-N ventilation 5%, lighting 10% |
+| rvalue_calc | `rvalue_calc_v1` | clauseSet + area | Thermal resistance minimums per element |
+| energy_certificate | `energy_certificate_v1` | clauseSet | XA rating bands, certification readiness |
+
+### Preview-status tools (0)
+All energy professional tools have reached full status.
+
+### Framework details
+- **Methods used:** clauseSet, area
+- **Versioned tables:** XA zone limits, glazing properties, material R-values, rating band thresholds
+- **Rendering:** `DefinitionToolRunner` for all tools
+- **Reports:** PDF/CSV export with per-opening clause outcomes, per-storey rollups, source versions, disclaimers

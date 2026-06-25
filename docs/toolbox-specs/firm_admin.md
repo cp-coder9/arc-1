@@ -34,3 +34,22 @@ Categories spanned: drawing, briefing, document_control, cpd, payment, resource_
 - ⚠ **Workflow finding #1 — orphaned role.** `firm_admin` appears ONLY in the `toolboxes` navigation module. No Command Centre, Projects, or People modules route to this role; firm operations are reachable solely through the Toolboxes shell.
 - ⚠ AI-guided mode surfaces 6 tools across 2 groups; tiles mode surfaces 8 standalone tools. Gap of 2 (`technical_brief`, `doc_control_issue`) reachable only via "All tools" toggle. Note guided `staff` and `cpd-assessment` routes resolve to standalone `staff_cpd_tracker` / `cpd_standalone` equivalents.
 - ✅ Practice-management + compliance grouping aligns with firm-governance scope; professional sign-off correctly excluded.
+
+## 7. Toolbox Framework Status
+
+All firm admin tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (2)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| staff_cpd_tracker | `staff_cpd_tracker_v1` | hybrid | Multi-staff CPD monitoring, body rules |
+| firm_document_register | `firm_document_register_v1` | schedule | Document categories, revision states |
+
+### Preview-status tools (0)
+All firm admin tools have reached full status.
+
+### Framework details
+- **Methods used:** hybrid, schedule
+- **Versioned tables:** CPD body rules, document categories
+- **Rendering:** `DefinitionToolRunner` for all tools
+- **Reports:** PDF/CSV export with CPD compliance summaries, document registers, source versions

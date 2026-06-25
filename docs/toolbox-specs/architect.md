@@ -36,3 +36,33 @@ Categories spanned: fee_calculator, compliance, drawing, document_control, brief
 - ✅ AI-guided routes (`technical-brief`, `drawing-checker`, `sans-forms`, `resource-sharing`) valid.
 - ⚠ AI-guided mode exposes only 4 of 19 tools. Strong candidates missing from guided flow: `fee_calculator` (proposal stage), `drawing_register`, `boq_takeoff`, `valuation_cert`, `zoning_check`, `snag_creator`. Recommend a "Proposal & fees", "Costing", and "Closeout" group to match the registry breadth.
 - ✅ Architect↔BEP equivalence: registry gives architect a superset of BEP tools (adds boq_takeoff, rfi_generator, snag_creator, valuation_cert, zoning_check). Confirm auth layer treats architect as BEP subtype as the scope claims.
+
+## 7. Toolbox Framework Status
+
+All architect tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (10)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| fee_calculator | `fee_calculator_v1` | bracket | SACAP fee brackets, stage apportionment |
+| xa_compliance_calc | `xa_energy_compliance_v1` | clauseSet | SANS 10400-XA energy compliance |
+| fenestration_calc | `fenestration_n_v1` | clauseSet + area | SANS 10400-N ventilation/lighting |
+| rvalue_calc | `rvalue_calc_v1` | clauseSet + area | SANS 10400-XA thermal resistance |
+| energy_certificate | `energy_certificate_v1` | clauseSet | XA rating bands, certification |
+| drawing_register | `drawing_register_v1` | schedule | Revision states, superseded detection |
+| doc_control_issue | `doc_control_issue_v1` | schedule | Issue/revision governance |
+| proposal_comparison | `proposal_comparison_v1` | hybrid | Scope/fee/term scoring |
+| stage_gate_review | `stage_gate_review_v1` | hybrid | Gate criteria pass/fail |
+| cpd_standalone | `cpd_standalone_v1` | hybrid | CPD body rules, credit accumulation |
+
+### Preview-status tools (2)
+| Tool | Status | Notes |
+|------|--------|-------|
+| technical_brief | `preview` | Guided AI workflow — no calculator definition yet |
+| progress_viewer | `preview` | Read-only dashboard — no calculation path |
+
+### Framework details
+- **Methods used:** bracket, clauseSet, area, schedule, hybrid
+- **Versioned tables:** SACAP brackets, XA zone limits, glazing properties, material R-values, CPD body rules
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with clause outcomes, source versions, disclaimers

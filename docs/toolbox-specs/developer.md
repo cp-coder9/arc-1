@@ -34,3 +34,24 @@ Categories spanned: drawing, briefing, document_control, cpd, fee_calculator, pa
 - ⚠ **Workflow finding #1 — orphaned role.** `developer` appears ONLY in the `toolboxes` navigation module. No Command Centre, Projects, or Finance modules route to this role, so tools are reachable solely through the Toolboxes shell.
 - ⚠ AI-guided mode surfaces 6 tools across 2 groups; tiles mode surfaces 10 standalone tools. Gap of 4 (`drawing_register`, `technical_brief`, `doc_control_issue`, `cpd_standalone`) reachable only via "All tools" toggle.
 - ✅ Financial-control + oversight grouping aligns with portfolio-governance scope; project-level execution correctly deferred to appointed professionals.
+
+## 7. Toolbox Framework Status
+
+All developer tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (2)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| feasibility_estimator | `feasibility_estimator_v1` | hybrid | Budget baseline, go/no-go assessment |
+| soft_cost_estimator | `soft_cost_estimator_v1` | hybrid | Multi-discipline + municipal allowances |
+
+### Preview-status tools (1)
+| Tool | Status | Notes |
+|------|--------|-------|
+| payment_dashboard | `preview` | Read-only view — no calculator definition |
+
+### Framework details
+- **Methods used:** hybrid
+- **Versioned tables:** Municipal fee schedules, discipline cost percentages
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with feasibility summaries, source versions, disclaimers

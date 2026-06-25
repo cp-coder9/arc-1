@@ -35,3 +35,27 @@ Categories spanned: fee_calculator, compliance, drawing, document_control, brief
 - ⚠ **Workflow finding #1 — orphaned role:** `engineer` appears **only** in the `toolboxes` nav module — no Command Centre, Inbox, Projects, or Messages. The role has full `TOOLBOX_CONFIG` and 14 registry tools but cannot reach a project, inbox, or messages through nav. Either add `engineer` to the relevant nav modules or treat it as a `bep` subtype at the auth layer. See `_CROSS_ROLE_FINDINGS.md`.
 - ⚠ AI-guided mode exposes 6 curated tools across 2 groups; tiles mode surfaces 14. Costing/closeout tools (`boq_takeoff`, `rfi_generator`, `fenestration_calc`, `rvalue_calc`) only reachable via "All tools" toggle.
 - ✅ AI-guided routes (`design`, `drawing-checker`, `sans-forms`, `drawing-register`, `technical-brief`, `resource-sharing`) are valid pageId targets — verify they resolve given the orphaned nav.
+
+## 7. Toolbox Framework Status
+
+All engineer tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (4)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| fee_calculator | `fee_calculator_v1` | bracket | ECSA fee brackets, stage apportionment |
+| fire_compliance_check | `fire_compliance_check_v1` | clauseSet | SANS 10400-T thresholds |
+| fire_rational_design | `fire_rational_design_v1` | clauseSet | Rational fire engineering |
+| rvalue_calc | `rvalue_calc_v1` | clauseSet + area | SANS 10400-XA thermal resistance |
+
+### Preview-status tools (2)
+| Tool | Status | Notes |
+|------|--------|-------|
+| rfi_generator | `preview` | Document workflow — no calculator definition yet |
+| rfi_response | `preview` | Document workflow — no calculator definition yet |
+
+### Framework details
+- **Methods used:** bracket, clauseSet, area
+- **Versioned tables:** ECSA brackets, SANS 10400-T thresholds, material R-values
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with clause outcomes, source versions, disclaimers

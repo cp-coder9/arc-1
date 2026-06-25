@@ -35,3 +35,25 @@ Categories spanned: payment, estimating, procurement, drawing, catalogue, quote,
 - ✅ AI-guided routes (`procurement`, `packages`, `snagging`, `payments`) valid.
 - ⚠ AI-guided mode surfaces 4 curated tools of 9 standalone. Candidates missing from guided flow: `tender_bid_bench`, `material_procurement`, `shop_drawing_submission`, `rfi_response`. Tightest gap is small here, but consider a "Tender & product data" group to surface bid/RFI tools.
 - ✅ Scope separation: supplier registry omits Documents/Finance nav and execution tools — consistent with delivery/procurement-only scope claim.
+
+## 7. Toolbox Framework Status
+
+All supplier tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (1)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| material_procurement | `material_procurement_v1` | area | Rate build-ups, supplier pricing, priority |
+
+### Preview-status tools (3)
+| Tool | Status | Notes |
+|------|--------|-------|
+| catalogue_manager | `preview` | Catalogue CRUD — definition pending |
+| delivery_note | `preview` | Delivery evidence — definition pending |
+| warranty_upload | `preview` | Warranty document — definition pending |
+
+### Framework details
+- **Methods used:** area
+- **Versioned tables:** Rate libraries, supplier pricing
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with procurement summaries, source versions, disclaimers
