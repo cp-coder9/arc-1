@@ -39,6 +39,11 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-landing-bg: var(--landing-bg);
+    --color-landing-bg-deep: var(--landing-bg-deep);
+    --color-landing-text: var(--landing-text);
+    --color-landing-text-muted: var(--landing-text-muted);
+    --color-landing-accent: var(--landing-accent);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -84,6 +89,64 @@
     --sidebar-accent-foreground: #0d1e25;
     --sidebar-border: #d0e3dc;
     --sidebar-ring: #006b5c;
+
+    /* Landing / Liquid Glass semantic tokens — Light_Theme values.
+       Additive only: no existing token above is renamed or removed.
+       Dark_Theme (the default appearance) overrides the same NAMES below. */
+    --landing-bg: #f5faf7;
+    --landing-bg-deep: #e4f0ea;
+    --landing-text: #0d1e25;
+    --landing-text-muted: rgba(13, 30, 37, 0.66);
+    --landing-accent: var(--primary); /* dark teal keeps >=4.5:1 on light bg (mint is the Dark_Theme accent) */
+    --glass-bg: rgba(13, 37, 32, 0.06);
+    --glass-border: rgba(0, 91, 78, 0.22);
+    --glass-glow: rgba(0, 118, 102, 0.18);
+    --glass-blur: 20px;
+
+    /* Theme-invariant grid cell size; declared once. Responsive so the grid
+       scales cleanly from 320px through 3840px viewports. */
+    --grid-step: clamp(38px, 3.8vw, 60px);
+}
+
+/* Dark_Theme = the DEFAULT appearance, applied on the document root by ThemeProvider.
+   Overrides the SAME semantic token names with dark teal values (Req 14). Both the
+   [data-theme="dark"] attribute and the .dark class are targeted so the existing
+   @custom-variant dark and any dark: utilities keep working unchanged. */
+[data-theme="dark"], .dark {
+    --background: #0d2520;
+    --foreground: #ffffff;
+    --card: #11302a;
+    --card-foreground: #ffffff;
+    --popover: #11302a;
+    --popover-foreground: #ffffff;
+    --primary-foreground: #ffffff;
+    --secondary-foreground: #00201c;
+    --muted: #123129;
+    --muted-foreground: rgba(255, 255, 255, 0.62);
+    --accent: #9b7bd4;
+    --accent-foreground: #0d2520;
+    --border: rgba(174, 239, 227, 0.16);
+    --input: rgba(174, 239, 227, 0.16);
+    --ring: #aeefe3;
+    --sidebar: #0d2520;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #aeefe3;
+    --sidebar-primary-foreground: #00201c;
+    --sidebar-accent: #123129;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: rgba(174, 239, 227, 0.16);
+    --sidebar-ring: #aeefe3;
+
+    /* Landing / Liquid Glass semantic tokens — Dark_Theme values */
+    --landing-bg: #0d2520;            /* Req 1.1 dark teal background */
+    --landing-bg-deep: #081a16;       /* gradient floor / opaque glass fallback */
+    --landing-text: #ffffff;          /* Req 1.3 / 1.6 white body text */
+    --landing-text-muted: rgba(255, 255, 255, 0.62);
+    --landing-accent: var(--secondary); /* Req 1.3 / 1.6 canonical mint (#aeefe3 == --secondary) */
+    --glass-bg: rgba(255, 255, 255, 0.07);
+    --glass-border: rgba(174, 239, 227, 0.24);
+    --glass-glow: rgba(0, 118, 102, 0.38);
+    --glass-blur: 20px;
 }
 
 @layer base {
@@ -372,6 +435,33 @@
 
   .empty-state {
     @apply border-2 border-dashed border-border rounded-[2rem] bg-card/70 text-center;
+  }
+
+  /* Liquid Glass surface — single canonical definition (Req 2.1, 2.6).
+     Exactly four named layers, all derived from --glass-* tokens (no literal
+     colors) so the surface re-skins automatically on Theme_Mode flip (Req 14.8). */
+  .glass {
+    /* layer 1: backdrop blur */
+    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    /* layer 2: layered background translucency */
+    background: var(--glass-bg);
+    /* layer 3: light-toned border */
+    border: 1px solid var(--glass-border);
+    /* layer 4: outer glow (plus inner highlight) */
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.32),
+      0 0 28px var(--glass-glow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  /* Opaque fallback when backdrop-filter is unsupported (Req 2.5): swap to an
+     opaque deep-teal background so foreground text keeps >=4.5:1 contrast with
+     no loss of content. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background: var(--landing-bg-deep);
+    }
   }
 
 }
