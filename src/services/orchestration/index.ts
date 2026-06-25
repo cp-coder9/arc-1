@@ -10,7 +10,7 @@ export { createProjectStateService } from './projectStateService';
 export { buildActionCentre, hasOutstandingActions, NO_OUTSTANDING_ACTIONS_MESSAGE } from './actionCentreService';
 export { generateGuidance } from './aiGuidanceService';
 export { initiateHandoff, resolveHandoff, checkOverdue } from './handoffService';
-export { upsertTask, recomputeSchedule, getUnifiedProgramme, visibleTasks, overdueEvents } from './programmeService';
+export { upsertTask, recomputeSchedule, visibleTasks, overdueEvents, defaultProgrammeStore } from './programmeService';
 export { evaluateAdvancement, advancePhase } from './phaseProgressionService';
 export { reconcileToolRun, linkSharedRecord } from './toolReconciliationService';
 export { authorize } from './accessControlService';

@@ -134,7 +134,7 @@ export {
   materialRowSchema,
   materialProcurementClauseSet,
   type MaterialProcurementInput,
-  type MaterialRow,
+  type MaterialRow as MaterialProcurementRow,
   type MaterialPriority,
 } from './materialProcurement'
 

@@ -192,8 +192,8 @@ export interface CalculatorDefinition<
   toolId: string // FK to STANDALONE_TOOL_REGISTRY
   title: string
   method: MethodType
-  inputSchema: ZodType<TInput>
-  scheduleSchema?: ZodType<TRow>
+  inputSchema: ZodType<any, any, any>
+  scheduleSchema?: ZodType<any, any, any>
   tableRefs: string[] // GuidelineTable ids consumed
   clauseSet?: ClauseCheckDef<TInput, TRow>[]
   compute: (ctx: ComputeContext<TInput, TRow>) => CalculationResult

@@ -21,7 +21,7 @@ import {
 import { createProjectStateService, ProjectStateService } from '../projectStateService';
 import { buildActionCentre } from '../actionCentreService';
 import { generateGuidance } from '../aiGuidanceService';
-import { getUnifiedProgramme, visibleTasks } from '../programmeService';
+import { visibleTasks, defaultProgrammeStore } from '../programmeService';
 
 interface UseOrchestrationServicesOptions {
   /** User profile for authorization context. */
@@ -76,7 +76,7 @@ export function useOrchestrationServices(
     () =>
       user
         ? {
-            tenantId: user.tenantId || 'default-tenant',
+            tenantId: user.primaryFirmId || 'default-tenant',
             userId: user.uid,
             role: user.role,
             now: new Date().toISOString(),
@@ -92,7 +92,6 @@ export function useOrchestrationServices(
     try {
       const service = createProjectStateService({
         repository,
-        auditService: undefined, // In real usage, pass the audit service
       });
       setStateService(service);
     } catch (err) {
@@ -161,7 +160,7 @@ export function useOrchestrationServices(
 
     const generateGuidanceAsync = async () => {
       try {
-        const firstProject = Array.from(projectStates.values())[0];
+        const firstProject = Array.from(projectStates.values())[0] as ProjectStateView | undefined;
         if (!firstProject) return;
 
         const result = await generateGuidance({
