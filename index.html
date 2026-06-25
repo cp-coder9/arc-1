@@ -10,6 +10,36 @@
 
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Theme pre-paint bootstrap (feature: website-ui-redesign).
+         Runs before first paint to set the Theme_Mode on <html> so there is no
+         flash of the wrong theme before React hydrates. Resolution order mirrors
+         resolveInitialTheme(): stored 'architex-theme' -> prefers-color-scheme:
+         light (only when no stored value) -> Dark_Theme default. All storage
+         access is wrapped in try/catch; any failure falls back to dark. -->
+    <script>
+      (function () {
+        try {
+          var stored = null;
+          try { stored = localStorage.getItem('architex-theme'); } catch (e) {}
+          var mode =
+            stored === 'dark' || stored === 'light'
+              ? stored
+              : (window.matchMedia &&
+                  window.matchMedia('(prefers-color-scheme: light)').matches
+                  ? 'light'
+                  : 'dark');
+          var root = document.documentElement;
+          root.setAttribute('data-theme', mode);
+          if (mode === 'dark') root.classList.add('dark');
+          else root.classList.remove('dark');
+        } catch (e) {
+          var el = document.documentElement;
+          el.setAttribute('data-theme', 'dark');
+          el.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

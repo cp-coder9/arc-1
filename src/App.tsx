@@ -92,6 +92,13 @@ import type { ArchitexNavKey } from './navigation/navTypes';
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
 import BirdFlocks from './components/animations/BirdFlocks';
 
+// Website UI redesign (liquid glass) — additive, isolated layer.
+// Dark_Theme is applied app-wide via ThemeProvider; the new LandingPage is the
+// unauthenticated home view (imported aliased to avoid colliding with the
+// legacy in-file `LandingPage` marketing component, which is left intact).
+import { ThemeProvider } from '@/design-system/theme/ThemeProvider';
+import { LandingPage as LandingExperience } from '@/features/landing/LandingPage';
+
 type LazyImport<T extends ComponentType<any>> = () => Promise<{ default: T }>;
 
 function isDynamicImportError(error: unknown) {
@@ -413,7 +420,7 @@ function isPublicSignupRoute(pathname: string) {
   return path === '/signup' || path.endsWith('/signup') || path === '/register' || path.endsWith('/register');
 }
 
-export default function App() {
+function AppContent() {
   const prefersReducedMotion = useReducedMotion();
   const isAdminRoute = isAdminAuthRoute(window.location.pathname);
   const isLoginRoute = isPublicLoginRoute(window.location.pathname) && !isAdminRoute;
@@ -797,7 +804,13 @@ export default function App() {
   }
 
   if (!user && !showLogin) {
-    return <LandingPage onGetStarted={() => setShowOnboarding(true)} onLogin={() => setShowLogin(true)} />;
+    return (
+      <LandingExperience
+        onSignUp={() => setShowOnboarding(true)}
+        onSignIn={() => setShowLogin(true)}
+        onNavigate={(route) => window.location.assign(route)}
+      />
+    );
   }
 
   if (!user && showLogin) {
@@ -1087,6 +1100,16 @@ export default function App() {
       <Toaster />
     </div>
     </DemoModeProvider>
+  );
+}
+
+// Wrap the entire app tree so Dark_Theme (the redesign default) applies app-wide
+// across both the unauthenticated Landing experience and the authenticated shell.
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

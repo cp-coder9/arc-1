@@ -1,0 +1,849 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Glass_Surface appearance > renders the \`.glass\` material for the card variant > glass-card-className 1`] = `"glass rounded-3xl"`;
+
+exports[`Glass_Surface appearance > renders the \`.glass\` material for the pill variant > glass-pill-className 1`] = `"glass rounded-full"`;
+
+exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stable structure in Dark_Theme 1`] = `
+<div
+  class="relative min-h-screen w-full overflow-x-hidden"
+  style="background-color: var(--landing-bg); color: var(--landing-text);"
+>
+  <span
+    aria-hidden="true"
+    style="position: absolute; top: 0px; left: 0px; width: var(--grid-step); height: 0px; visibility: hidden; pointer-events: none;"
+  />
+  <div
+    aria-hidden="true"
+    style="position: absolute; inset: 0px; overflow: hidden; pointer-events: none; filter: blur(80px); z-index: 0;"
+  >
+    <div
+      style="position: absolute; left: -8%; top: -10%; width: 60vmax; height: 60vmax; border-radius: 50%; background: radial-gradient(circle at center, var(--glass-glow) 0%, transparent 70%); mix-blend-mode: screen; opacity: 0.55; will-change: transform;"
+    />
+    <div
+      style="position: absolute; left: 55%; top: 10%; width: 48vmax; height: 48vmax; border-radius: 50%; background: radial-gradient(circle at center, var(--primary-light) 0%, transparent 70%); mix-blend-mode: screen; opacity: 0.55; will-change: transform;"
+    />
+    <div
+      style="position: absolute; left: 20%; top: 55%; width: 52vmax; height: 52vmax; border-radius: 50%; background: radial-gradient(circle at center, var(--landing-accent) 0%, transparent 70%); mix-blend-mode: screen; opacity: 0.55; will-change: transform;"
+    />
+  </div>
+  <div
+    aria-hidden="true"
+    class="z-[1]"
+    style="position: absolute; inset: 0px; pointer-events: none; opacity: 1; transition: opacity 600ms ease; background-image: linear-gradient(to right, var(--glass-border) 1px, transparent 1px), linear-gradient(to bottom, var(--glass-border) 1px, transparent 1px); background-size: var(--grid-step) var(--grid-step);"
+  />
+  <div
+    aria-hidden="true"
+    style="position: absolute; inset: 0px; pointer-events: none; z-index: 1; background: linear-gradient(var(--landing-bg-deep), var(--landing-bg-deep)), rgba(0, 0, 0, 0.6); opacity: 0;"
+  />
+  <div
+    aria-hidden="true"
+    class="z-[2]"
+    style="position: absolute; inset: 0px; pointer-events: none; overflow: hidden; opacity: 1; transition: opacity 600ms ease;"
+  >
+    <span
+      aria-hidden="true"
+      style="position: absolute; top: 0px; left: 0px; width: var(--grid-step); height: 0px; visibility: hidden; pointer-events: none;"
+    />
+  </div>
+  <div
+    class="relative z-[4] flex min-h-screen flex-col"
+  >
+    <div
+      class="relative z-[6] w-full"
+    >
+      <div
+        class="mx-auto w-full max-w-6xl"
+      >
+        <header
+          class="w-full flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
+        >
+          <div
+            class="flex items-center gap-2 sm:gap-3"
+          >
+            <span
+              class="inline-flex items-center justify-center"
+            >
+              <img
+                alt="Architex"
+                class="object-contain"
+                decoding="async"
+                draggable="false"
+                height="40"
+                referrerpolicy="no-referrer"
+                src="/logo.png"
+                srcset="/logo.png 1x, /logo.png 2x"
+                style="width: 40px; height: 40px;"
+                width="40"
+              />
+            </span>
+            <span
+              class="font-heading font-bold tracking-tight text-lg sm:text-xl leading-none whitespace-nowrap"
+              style="color: var(--landing-text);"
+            >
+              ARCHITEX
+            </span>
+          </div>
+          <div
+            class="flex items-center gap-2 sm:gap-3"
+          >
+            <button
+              aria-label="Switch color theme"
+              aria-pressed="true"
+              class="inline-flex items-center justify-center rounded-full h-10 w-10 cursor-pointer select-none border outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-offset-0"
+              style="color: var(--landing-text); border-color: var(--glass-border); --tw-ring-color: var(--ring);"
+              title="Switch color theme"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-moon h-5 w-5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+                />
+              </svg>
+            </button>
+            <button
+              aria-label="Sign up"
+              class="inline-flex items-center justify-center whitespace-nowrap rounded-full border px-4 font-sans text-sm font-medium cursor-pointer select-none transition-colors duration-200 ease-out min-h-11 min-w-11 outline-none focus-visible:ring-2 focus-visible:ring-offset-0"
+              style="color: var(--landing-text); border-color: var(--glass-border); --tw-ring-color: var(--ring);"
+              type="button"
+            >
+              Sign up
+            </button>
+            <button
+              aria-label="Enter OS"
+              class="glass rounded-full inline-flex items-center justify-center whitespace-nowrap px-5 font-heading text-sm font-semibold cursor-pointer select-none transition-transform duration-200 ease-out hover:scale-105 min-h-11 min-w-11 outline-none focus-visible:ring-2 focus-visible:ring-offset-0"
+              style="color: var(--landing-accent); --tw-ring-color: var(--ring);"
+            >
+              Enter OS
+            </button>
+          </div>
+        </header>
+      </div>
+    </div>
+    <main
+      aria-hidden="false"
+      class="mx-auto flex w-full flex-1 items-center justify-center px-4 py-10 max-w-6xl"
+      style="pointer-events: auto;"
+    >
+      <div
+        class="w-full"
+      >
+        <section
+          class="relative flex flex-col items-center text-center px-6"
+          style="color: var(--landing-text); opacity: 0; transform: translateY(24px);"
+        >
+          <div
+            class="relative mx-auto flex items-center justify-center"
+            style="width: 360px; height: 360px;"
+          >
+            <span
+              aria-hidden="true"
+              style="position: absolute; top: 50%; left: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); border-radius: 50%; border-style: solid; border-width: 2px; border-color: var(--glass-border); box-shadow: 0 0 40px var(--glass-glow); pointer-events: none;"
+            />
+            <div
+              aria-label="Enter Architex OS"
+              class="inline-flex items-center justify-center cursor-pointer select-none transition-transform duration-200 ease-out hover:scale-105"
+              role="button"
+              tabindex="0"
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                class="object-contain"
+                decoding="async"
+                draggable="false"
+                height="280"
+                referrerpolicy="no-referrer"
+                src="/logo.png"
+                srcset="/logo.png 1x, /logo.png 2x"
+                style="width: 280px; height: 280px; mix-blend-mode: screen;"
+                width="280"
+              />
+            </div>
+          </div>
+          <h1
+            class="mt-10 max-w-3xl font-heading font-bold leading-tight text-4xl sm:text-5xl lg:text-6xl"
+            style="font-family: var(--font-heading); color: var(--landing-text);"
+          >
+            The Operating System for the Built Environment
+          </h1>
+          <p
+            class="mt-5 max-w-xl text-lg sm:text-xl"
+            style="font-family: var(--font-sans); color: var(--landing-text-muted);"
+          >
+            Simplify complexity. Deliver with confidence.
+          </p>
+          <button
+            class="mt-9 inline-flex items-center justify-center rounded-full px-9 py-4 text-base font-semibold font-heading select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            style="font-family: var(--font-heading); background-color: var(--landing-accent); color: var(--secondary-foreground); box-shadow: 0 10px 30px var(--glass-glow); --tw-ring-color: var(--landing-accent);"
+            tabindex="0"
+            type="button"
+          >
+            Enter OS
+          </button>
+        </section>
+      </div>
+    </main>
+    <div
+      aria-hidden="false"
+      class="mx-auto w-full px-4 pb-10 max-w-6xl"
+      style="pointer-events: auto;"
+    >
+      <nav
+        aria-label="Quick navigation"
+        class="w-full"
+      >
+        <ul
+          class="grid grid-cols-4 gap-2 sm:gap-4"
+        >
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-users shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                />
+                <path
+                  d="M16 3.128a4 4 0 0 1 0 7.744"
+                />
+                <path
+                  d="M22 21v-2a4 4 0 0 0-3-3.87"
+                />
+                <circle
+                  cx="9"
+                  cy="7"
+                  r="4"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                People
+              </span>
+            </button>
+          </li>
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-boxes shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"
+                />
+                <path
+                  d="m7 16.5-4.74-2.85"
+                />
+                <path
+                  d="m7 16.5 5-3"
+                />
+                <path
+                  d="M7 16.5v5.17"
+                />
+                <path
+                  d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"
+                />
+                <path
+                  d="m17 16.5-5-3"
+                />
+                <path
+                  d="m17 16.5 4.74-2.85"
+                />
+                <path
+                  d="M17 16.5v5.17"
+                />
+                <path
+                  d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"
+                />
+                <path
+                  d="M12 8 7.26 5.15"
+                />
+                <path
+                  d="m12 8 4.74-2.85"
+                />
+                <path
+                  d="M12 13.5V8"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                Projects
+              </span>
+            </button>
+          </li>
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-building2 lucide-building-2 shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M10 12h4"
+                />
+                <path
+                  d="M10 8h4"
+                />
+                <path
+                  d="M14 21v-3a2 2 0 0 0-4 0v3"
+                />
+                <path
+                  d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"
+                />
+                <path
+                  d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                Approvals
+              </span>
+            </button>
+          </li>
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-credit-card shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  height="14"
+                  rx="2"
+                  width="20"
+                  x="2"
+                  y="5"
+                />
+                <line
+                  x1="2"
+                  x2="22"
+                  y1="10"
+                  y2="10"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                Payments
+              </span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stable structure in Light_Theme 1`] = `
+<div
+  class="relative min-h-screen w-full overflow-x-hidden"
+  style="background-color: var(--landing-bg); color: var(--landing-text);"
+>
+  <span
+    aria-hidden="true"
+    style="position: absolute; top: 0px; left: 0px; width: var(--grid-step); height: 0px; visibility: hidden; pointer-events: none;"
+  />
+  <div
+    aria-hidden="true"
+    style="position: absolute; inset: 0px; overflow: hidden; pointer-events: none; filter: blur(80px); z-index: 0;"
+  >
+    <div
+      style="position: absolute; left: -8%; top: -10%; width: 60vmax; height: 60vmax; border-radius: 50%; background: radial-gradient(circle at center, var(--glass-glow) 0%, transparent 70%); mix-blend-mode: screen; opacity: 0.55; will-change: transform;"
+    />
+    <div
+      style="position: absolute; left: 55%; top: 10%; width: 48vmax; height: 48vmax; border-radius: 50%; background: radial-gradient(circle at center, var(--primary-light) 0%, transparent 70%); mix-blend-mode: screen; opacity: 0.55; will-change: transform;"
+    />
+    <div
+      style="position: absolute; left: 20%; top: 55%; width: 52vmax; height: 52vmax; border-radius: 50%; background: radial-gradient(circle at center, var(--landing-accent) 0%, transparent 70%); mix-blend-mode: screen; opacity: 0.55; will-change: transform;"
+    />
+  </div>
+  <div
+    aria-hidden="true"
+    class="z-[1]"
+    style="position: absolute; inset: 0px; pointer-events: none; opacity: 1; transition: opacity 600ms ease; background-image: linear-gradient(to right, var(--glass-border) 1px, transparent 1px), linear-gradient(to bottom, var(--glass-border) 1px, transparent 1px); background-size: var(--grid-step) var(--grid-step);"
+  />
+  <div
+    aria-hidden="true"
+    style="position: absolute; inset: 0px; pointer-events: none; z-index: 1; background: linear-gradient(var(--landing-bg-deep), var(--landing-bg-deep)), rgba(0, 0, 0, 0.6); opacity: 0;"
+  />
+  <div
+    aria-hidden="true"
+    class="z-[2]"
+    style="position: absolute; inset: 0px; pointer-events: none; overflow: hidden; opacity: 1; transition: opacity 600ms ease;"
+  >
+    <span
+      aria-hidden="true"
+      style="position: absolute; top: 0px; left: 0px; width: var(--grid-step); height: 0px; visibility: hidden; pointer-events: none;"
+    />
+  </div>
+  <div
+    class="relative z-[4] flex min-h-screen flex-col"
+  >
+    <div
+      class="relative z-[6] w-full"
+    >
+      <div
+        class="mx-auto w-full max-w-6xl"
+      >
+        <header
+          class="w-full flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6"
+        >
+          <div
+            class="flex items-center gap-2 sm:gap-3"
+          >
+            <span
+              class="inline-flex items-center justify-center"
+            >
+              <img
+                alt="Architex"
+                class="object-contain"
+                decoding="async"
+                draggable="false"
+                height="40"
+                referrerpolicy="no-referrer"
+                src="/logo.png"
+                srcset="/logo.png 1x, /logo.png 2x"
+                style="width: 40px; height: 40px;"
+                width="40"
+              />
+            </span>
+            <span
+              class="font-heading font-bold tracking-tight text-lg sm:text-xl leading-none whitespace-nowrap"
+              style="color: var(--landing-text);"
+            >
+              ARCHITEX
+            </span>
+          </div>
+          <div
+            class="flex items-center gap-2 sm:gap-3"
+          >
+            <button
+              aria-label="Switch color theme"
+              aria-pressed="false"
+              class="inline-flex items-center justify-center rounded-full h-10 w-10 cursor-pointer select-none border outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-offset-0"
+              style="color: var(--landing-text); border-color: var(--glass-border); --tw-ring-color: var(--ring);"
+              title="Switch color theme"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-sun h-5 w-5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="4"
+                />
+                <path
+                  d="M12 2v2"
+                />
+                <path
+                  d="M12 20v2"
+                />
+                <path
+                  d="m4.93 4.93 1.41 1.41"
+                />
+                <path
+                  d="m17.66 17.66 1.41 1.41"
+                />
+                <path
+                  d="M2 12h2"
+                />
+                <path
+                  d="M20 12h2"
+                />
+                <path
+                  d="m6.34 17.66-1.41 1.41"
+                />
+                <path
+                  d="m19.07 4.93-1.41 1.41"
+                />
+              </svg>
+            </button>
+            <button
+              aria-label="Sign up"
+              class="inline-flex items-center justify-center whitespace-nowrap rounded-full border px-4 font-sans text-sm font-medium cursor-pointer select-none transition-colors duration-200 ease-out min-h-11 min-w-11 outline-none focus-visible:ring-2 focus-visible:ring-offset-0"
+              style="color: var(--landing-text); border-color: var(--glass-border); --tw-ring-color: var(--ring);"
+              type="button"
+            >
+              Sign up
+            </button>
+            <button
+              aria-label="Enter OS"
+              class="glass rounded-full inline-flex items-center justify-center whitespace-nowrap px-5 font-heading text-sm font-semibold cursor-pointer select-none transition-transform duration-200 ease-out hover:scale-105 min-h-11 min-w-11 outline-none focus-visible:ring-2 focus-visible:ring-offset-0"
+              style="color: var(--landing-accent); --tw-ring-color: var(--ring);"
+            >
+              Enter OS
+            </button>
+          </div>
+        </header>
+      </div>
+    </div>
+    <main
+      aria-hidden="false"
+      class="mx-auto flex w-full flex-1 items-center justify-center px-4 py-10 max-w-6xl"
+      style="pointer-events: auto;"
+    >
+      <div
+        class="w-full"
+      >
+        <section
+          class="relative flex flex-col items-center text-center px-6"
+          style="color: var(--landing-text); opacity: 0; transform: translateY(24px);"
+        >
+          <div
+            class="relative mx-auto flex items-center justify-center"
+            style="width: 360px; height: 360px;"
+          >
+            <span
+              aria-hidden="true"
+              style="position: absolute; top: 50%; left: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); border-radius: 50%; border-style: solid; border-width: 2px; border-color: var(--glass-border); box-shadow: 0 0 40px var(--glass-glow); pointer-events: none;"
+            />
+            <div
+              aria-label="Enter Architex OS"
+              class="inline-flex items-center justify-center cursor-pointer select-none transition-transform duration-200 ease-out hover:scale-105"
+              role="button"
+              tabindex="0"
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                class="object-contain"
+                decoding="async"
+                draggable="false"
+                height="280"
+                referrerpolicy="no-referrer"
+                src="/logo.png"
+                srcset="/logo.png 1x, /logo.png 2x"
+                style="width: 280px; height: 280px; mix-blend-mode: screen;"
+                width="280"
+              />
+            </div>
+          </div>
+          <h1
+            class="mt-10 max-w-3xl font-heading font-bold leading-tight text-4xl sm:text-5xl lg:text-6xl"
+            style="font-family: var(--font-heading); color: var(--landing-text);"
+          >
+            The Operating System for the Built Environment
+          </h1>
+          <p
+            class="mt-5 max-w-xl text-lg sm:text-xl"
+            style="font-family: var(--font-sans); color: var(--landing-text-muted);"
+          >
+            Simplify complexity. Deliver with confidence.
+          </p>
+          <button
+            class="mt-9 inline-flex items-center justify-center rounded-full px-9 py-4 text-base font-semibold font-heading select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            style="font-family: var(--font-heading); background-color: var(--landing-accent); color: var(--secondary-foreground); box-shadow: 0 10px 30px var(--glass-glow); --tw-ring-color: var(--landing-accent);"
+            tabindex="0"
+            type="button"
+          >
+            Enter OS
+          </button>
+        </section>
+      </div>
+    </main>
+    <div
+      aria-hidden="false"
+      class="mx-auto w-full px-4 pb-10 max-w-6xl"
+      style="pointer-events: auto;"
+    >
+      <nav
+        aria-label="Quick navigation"
+        class="w-full"
+      >
+        <ul
+          class="grid grid-cols-4 gap-2 sm:gap-4"
+        >
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-users shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                />
+                <path
+                  d="M16 3.128a4 4 0 0 1 0 7.744"
+                />
+                <path
+                  d="M22 21v-2a4 4 0 0 0-3-3.87"
+                />
+                <circle
+                  cx="9"
+                  cy="7"
+                  r="4"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                People
+              </span>
+            </button>
+          </li>
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-boxes shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"
+                />
+                <path
+                  d="m7 16.5-4.74-2.85"
+                />
+                <path
+                  d="m7 16.5 5-3"
+                />
+                <path
+                  d="M7 16.5v5.17"
+                />
+                <path
+                  d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"
+                />
+                <path
+                  d="m17 16.5-5-3"
+                />
+                <path
+                  d="m17 16.5 4.74-2.85"
+                />
+                <path
+                  d="M17 16.5v5.17"
+                />
+                <path
+                  d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"
+                />
+                <path
+                  d="M12 8 7.26 5.15"
+                />
+                <path
+                  d="m12 8 4.74-2.85"
+                />
+                <path
+                  d="M12 13.5V8"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                Projects
+              </span>
+            </button>
+          </li>
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-building2 lucide-building-2 shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M10 12h4"
+                />
+                <path
+                  d="M10 8h4"
+                />
+                <path
+                  d="M14 21v-3a2 2 0 0 0-4 0v3"
+                />
+                <path
+                  d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"
+                />
+                <path
+                  d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                Approvals
+              </span>
+            </button>
+          </li>
+          <li
+            class="min-w-0"
+          >
+            <button
+              class="group flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-3 sm:px-3 sm:py-4 cursor-pointer select-none transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style="color: var(--landing-text); --tw-ring-color: var(--landing-accent); --tw-ring-offset-color: transparent;"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-credit-card shrink-0 transition-transform duration-200 ease-out group-hover:scale-110"
+                fill="none"
+                height="22"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="22"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  height="14"
+                  rx="2"
+                  width="20"
+                  x="2"
+                  y="5"
+                />
+                <line
+                  x1="2"
+                  x2="22"
+                  y1="10"
+                  y2="10"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium leading-none whitespace-nowrap sm:text-sm"
+                style="color: var(--landing-text-muted);"
+              >
+                Payments
+              </span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+`;

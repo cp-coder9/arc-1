@@ -477,6 +477,7 @@ Data stored under `/demo/{uid}/` in Firestore. Security rules enforce uid-scoped
 - **~152 component TSX files** in `src/` with role-specific dashboards + specialized tools
 - **Vercel Blob** active in `api-router.ts` — not yet replaced
 - **CI exists** at `.github/workflows/verification.yml` (lint+test+build) and `.github/workflows/deploy-test.yml` (deploy SPA + API PHP)
+- **App-wide theme**: `App.tsx` wraps the tree in `ThemeProvider` (`src/design-system/theme/`) — Dark_Theme default app-wide. The unauthenticated home view mounts `LandingPage` from `src/features/landing/` (liquid-glass redesign). The legacy in-file marketing `LandingPage` in `App.tsx` is retained but unused.
 
 ---
 
