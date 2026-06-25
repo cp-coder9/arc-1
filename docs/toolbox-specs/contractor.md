@@ -35,3 +35,28 @@ Categories spanned: procurement, estimating, document_control, site_management, 
 - ✅ AI-guided routes (`procurement`, `packages`, `contractor-staff`, `programme`) valid.
 - ⚠ AI-guided mode surfaces only 4 curated tools of 18 standalone. Strong candidates missing from guided flow: `tender_bid_bench`, `payment_claim_builder`, `valuation_cert`, `snag_creator`, `hs_compliance`, `rfi_generator`. Recommend "Tender & claims", "Compliance & H&S", and "Closeout" groups to match registry breadth.
 - ✅ Lifecycle alignment: contractor owns tender_procurement → construction_execution → closeout delivery, consistent with `lifecycleDefinitions`.
+
+## 7. Toolbox Framework Status
+
+All contractor tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (8)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| boq_takeoff | `boq_takeoff_v1` | area | Quantity × rate, rate build-ups, contingencies |
+| material_procurement | `material_procurement_v1` | area | Supplier pricing, priority scheduling |
+| valuation_cert | `valuation_cert_v1` | hybrid | Work-done/retention/previous/VAT/certified |
+| payment_claim_builder | `payment_claim_builder_v1` | hybrid | Platform-fee disclosure, retention calcs |
+| workforce_timesheet | `workforce_timesheet_v1` | time | Hours/cost, PAYE/UIF/SDL deductions |
+| plant_register | `plant_register_v1` | time | Hire rates, utilization tracking |
+| site_diary_entry | `site_diary_entry_v1` | schedule | Weather, progress, resource records |
+| hs_compliance | `hs_compliance_v1` | clauseSet | H&S regulation checklist (OHS Act) |
+
+### Preview-status tools (0)
+All contractor tools have reached full status.
+
+### Framework details
+- **Methods used:** area, hybrid, time, schedule, clauseSet
+- **Versioned tables:** Rate libraries, retention/VAT config, PAYE/UIF/SDL tables, plant rates, H&S checklist
+- **Rendering:** `DefinitionToolRunner` for all tools
+- **Reports:** PDF/CSV export with clause outcomes, payroll summaries, source versions, disclaimers

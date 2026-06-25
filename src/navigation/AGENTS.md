@@ -32,6 +32,13 @@ Central navigation configuration and routing infrastructure that determines what
 - Provides `getDashboardForRole()` — returns the correct dashboard component for a given user role
 - Supports role-specific dashboards: Client, Architect, Admin, Contractor, BEP, Freelancer, Subcontractor, Supplier
 
+### Toolbox Framework Integration
+- Tools in the Toolboxes module now link to the Toolbox Capability Framework via `calculatorDefinitionId`
+- When a tool has a `CalculatorDefinition` (`status: 'full'`), `DefinitionToolRunner` renders it with Zod-validated forms, live recomputation, clause panels, and report export
+- When a tool is `status: 'preview'`, the legacy `StandaloneToolRunner` fallback renders it
+- Navigation does not gate tool status — all 54 tools remain routable; the runner determines rendering mode at runtime
+- Tool registry entries carry `calculatorDefinitionId` linking them to their definition in `src/services/toolbox/definitions/`
+
 ### Contextual Messaging (`contextualMessagingService.ts`)
 - Determines when contextual messaging UI surfaces based on navigation context
 - Integrates with `src/features/project-communications/` for project-scoped threads

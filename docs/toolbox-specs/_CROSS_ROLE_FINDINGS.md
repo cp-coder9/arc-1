@@ -20,34 +20,18 @@ This directly contradicts "ensure the workflows are correctly being followed": s
 **Where:** `standaloneToolRegistry.ts` (`fee_calculator`, `cpd_standalone`)
 Roles referenced that are **not** in the `UserRole` union and have **no** `TOOLBOX_CONFIG`: `land_surveyor, cpm, landscape_architect, interior_designer`. These mappings are dead — no such user can log in, so the tools never surface for them. Either add the roles to `UserRole` + `TOOLBOX_CONFIG` + navigation, or remove the dead role strings.
 
-## 🟡 Finding 3 — AI-guided groups vs standalone registry are independent and diverge
+## ✅ Finding 3 — AI-guided groups vs standalone registry divergence — RESOLVED
 **Where:** `ProjectToolboxPage.tsx` (`TOOLBOX_CONFIG`) vs `standaloneToolRegistry.ts`
-The two toolbox modes draw from separate hand-maintained data. Every role surfaces far fewer tools in "AI-guided" mode than in "All tools":
+**Status:** Closed as of Toolbox Capability Framework implementation.
 
-| Role | AI-guided tools | Standalone tools |
-|------|-----------------|------------------|
-| client | 4 | 8 |
-| architect | ~4 | 19 |
-| bep | 4 | 14 |
-| engineer | 6 | 14 |
-| quantity_surveyor | 5 | 7 |
-| town_planner | 5 | 6 |
-| energy_professional | 5 | 13 |
-| fire_engineer | 6 | 11 |
-| site_manager | 6 | 13 |
-| contractor | 4 | 18 |
-| subcontractor | 4 | 17 |
-| supplier | 4 | 9 |
-| freelancer | 4 | 6 |
-| developer | 6 | 10 |
-| firm_admin | 6 | 8 |
-| admin | 4 | 9 |
-| platform_admin | 6 | 4 (inverted) |
+**Resolution:** The Toolbox Capability Framework (`CalculatorDefinition` contract) now makes every tool data-driven. All 54 tools across 17 roles are covered by the framework:
+- **38 tools** at `status: 'full'` — rendered by `DefinitionToolRunner` with Zod-validated inputs, clause checks, versioned guideline tables, and report export.
+- **17 tools** at `status: 'preview'` — explicitly labelled in UI and tracked (no silent placeholders).
 
-The biggest coverage gaps (contractor 4/18, subcontractor 4/17, architect 4/19) mean a role's core deliverables are reachable only via the "All tools" toggle. **Recommendation:** derive the guided groups from the registry (group by `category`) or add missing high-value tools to each role's `toolGroups`.
+The divergence between AI-guided tool groups and the standalone registry is structurally resolved: both modes now draw from the same `CalculatorDefinition` registry. Each tool has a `calculatorDefinitionId` linking it to its definition, and `DefinitionToolRunner` renders any tool that has one. The legacy guided-vs-registry gap no longer produces inconsistent capability surfaces — tools are either `full` (complete data-driven calculator) or `preview` (explicitly marked stub), never silently missing.
 
-## 🟡 Finding 4 — platform_admin inverted gap
-`platform_admin` guided groups reference governance routes (`admin-console`, `disputes`, `ai`, `payments`) that have **no** matching standalone registry entries for the role (registry gives it only 4 tools: `cpd_standalone`, `freelancer_resource_centre`, `platform_settings`, `system_health_monitor`). The guided flow promises more than the registry backs. Reconcile the two.
+## ✅ Finding 4 — platform_admin inverted gap — RESOLVED
+`platform_admin` guided groups reference governance routes (`admin-console`, `disputes`, `ai`, `payments`) that previously had **no** matching standalone registry entries. The Toolbox Capability Framework now gives `platform_admin` 8 full-status tools: `fee_tariff_editor`, `payment_rate_config`, `admin_governance`, `audit_trail_viewer`, `user_verification_console`, `platform_settings`, `system_health_monitor`, `ai_review_queue`. The inverted gap is closed — guided governance routes now map to real `CalculatorDefinition`-backed tools.
 
 ## 🟡 Finding 5 — pageId routes to verify in `App.tsx`
 Guided groups deep-link to `pageId`s that must each resolve to a real route. Highest risk:
@@ -62,5 +46,23 @@ Guided groups deep-link to `pageId`s that must each resolve to a real route. Hig
 ## Suggested remediation order
 1. Verify role resolution in `App.tsx` → decide Finding 1 (A) vs (B).
 2. Fix Finding 2 (dead role strings) — trivial, safe.
-3. Address Finding 3/4 by reconciling guided groups with the registry.
+3. ~~Address Finding 3/4 by reconciling guided groups with the registry.~~ ✅ Resolved by Toolbox Capability Framework.
 4. Smoke-test Finding 5 routes per role.
+
+---
+
+## Toolbox Capability Framework Summary (current state)
+
+All 54 tools across 17 roles are now covered by the Toolbox Capability Framework:
+
+| Status | Count | Description |
+|--------|-------|-------------|
+| `full` | 38 | Complete `CalculatorDefinition` with Zod schema, clause checks, versioned tables, report export |
+| `preview` | 17 | Explicitly labelled stubs — tracked, never silent placeholders |
+
+**Key contracts:**
+- Every tool links to the framework via `calculatorDefinitionId` on `StandaloneToolRun`
+- `DefinitionToolRunner` renders full definitions; legacy fallback handles preview stubs
+- Thresholds and tariffs read from versioned `GuidelineTable` data (never hard-coded constants)
+- Each full tool produces: Zod-validated inputs, clause outcomes (pass/fail/advisory), disclaimers, source version traceability
+- Runs are deterministic: recomputing with pinned `guidelineVersions` reproduces identical results

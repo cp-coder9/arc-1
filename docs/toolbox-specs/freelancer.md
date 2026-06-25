@@ -1,4 +1,4 @@
-# Freelancer Toolbox Spec
+take# Freelancer Toolbox Spec
 
 **Role key:** `freelancer` · **UserRole:** ✅ · **TOOLBOX_CONFIG:** ✅ · **Nav:** Command Centre, Inbox, Toolboxes, CPD & Learning, Messages, My Account (NO Projects, NO Documents, NO Marketplace, NO Finance)
 
@@ -36,3 +36,26 @@ Categories spanned: drawing, payment, site_management, resource_centre.
 - ⚠ Verify the AI-guided pageId `freelancer-work` exists as a route — the registry's `deliverable_submission` tool uses `freelancer-submissions`. Possible drift between the guided group route and the standalone tool route.
 - ⚠ AI-guided mode surfaces 4 curated tools of 6 standalone. Missing from guided flow: `payment_claim_builder` (invoice prep), `cad_upload_check`, `freelancer_timesheet`. Consider an "Invoice & timesheet" group to match registry breadth.
 - ✅ Scope alignment: freelancer registry omits Projects/Documents/Marketplace/Finance nav — consistent with task-scoped claim.
+
+## 7. Toolbox Framework Status
+
+All freelancer tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (2)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| cpd_standalone | `cpd_standalone_v1` | hybrid | CPD body rules, credit accumulation |
+| staff_cpd_tracker | `staff_cpd_tracker_v1` | hybrid | Multi-staff CPD monitoring |
+
+### Preview-status tools (3)
+| Tool | Status | Notes |
+|------|--------|-------|
+| freelancer_timesheet | `preview` | Effort logging — definition pending |
+| deliverable_submission | `preview` | Submission workflow — definition pending |
+| freelancer_resource_centre | `preview` | Resource hub — definition pending |
+
+### Framework details
+- **Methods used:** hybrid
+- **Versioned tables:** CPD body rules (SACAP, ECSA, etc.)
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with CPD credit summaries, source versions, disclaimers

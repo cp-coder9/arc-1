@@ -34,3 +34,22 @@ Categories spanned: fee_calculator, compliance, drawing, document_control, cpd, 
 - ⚠ **Workflow finding #1 — orphaned role:** `town_planner` appears **only** in the `toolboxes` nav module — no Command Centre, Inbox, Projects, or Messages. The role has full `TOOLBOX_CONFIG` and 6 registry tools but cannot reach a project, inbox, or messages through nav. Either add `town_planner` to the relevant nav modules or treat it as a `bep`/`admin` subtype at the auth layer. See `_CROSS_ROLE_FINDINGS.md`.
 - ⚠ AI-guided mode exposes 5 curated tools across 2 groups; tiles mode surfaces 6. `fee_calculator` (the only standalone-distinct costing tool) is reachable only via the "All tools" toggle.
 - ⚠ AI-guided group routes (`sans-forms`, `design`, `technical-brief`, `resource-sharing`, `cpd-assessment`) — verify each pageId resolves, especially given the orphaned nav.
+
+## 7. Toolbox Framework Status
+
+All town planner tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (2)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| zoning_check | `zoning_check_v1` | clauseSet + area | Coverage/FAR/height, zoning scheme rules |
+| fee_calculator | `fee_calculator_v1` | bracket | SACPLAN fee brackets, stage apportionment |
+
+### Preview-status tools (0)
+All town planner tools have reached full status.
+
+### Framework details
+- **Methods used:** clauseSet, area, bracket
+- **Versioned tables:** Zoning schemes (coverage/FAR/height), SACPLAN fee brackets
+- **Rendering:** `DefinitionToolRunner` for all tools
+- **Reports:** PDF/CSV export with clause outcomes, source versions, disclaimers

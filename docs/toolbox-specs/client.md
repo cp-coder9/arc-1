@@ -40,3 +40,23 @@
 - ✅ AI-guided group tools (`client-intake`, `client-proposals`, `tasks`, `client-progress`) all map to standalone registry tools — **consistent**.
 - ⚠ AI-guided mode surfaces 4 tools; tiles mode surfaces 8. `soft_cost_estimator`, `snag_creator`, `feasibility_estimator`, `stage_gate_review` are only reachable via "All tools" toggle. Acceptable, but the guided flow omits feasibility/cost-estimation that the brief stage needs — consider adding a "Feasibility & cost" group.
 - ✅ Lifecycle alignment: client owns onboarding/feasibility/appointment entry and closeout approvals — matches `lifecycleDefinitions`.
+
+## 7. Toolbox Framework Status
+
+All client tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (0)
+Client tools are primarily wizard/dashboard surfaces without calculator logic.
+
+### Preview-status tools (3)
+| Tool | Status | Notes |
+|------|--------|-------|
+| brief_wizard | `preview` | Guided AI wizard — no calculator definition |
+| progress_viewer | `preview` | Read-only dashboard — no calculation path |
+| payment_dashboard | `preview` | Read-only payment view — no calculation path |
+
+### Framework details
+- **Methods used:** N/A (client tools are consumption/approval surfaces)
+- **Versioned tables:** N/A
+- **Rendering:** Legacy fallback for all preview stubs
+- **Notes:** Client interacts with framework outputs (reports, clause results) produced by professional roles; does not run calculators directly

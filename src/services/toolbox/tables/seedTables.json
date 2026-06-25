@@ -1,0 +1,383 @@
+{
+  "tables": [
+    {
+      "id": "xa_zone_limits",
+      "version": "2021.1",
+      "effectiveFrom": "2021-03-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "zone": 1, "zoneName": "Cold Interior", "maxGlazingRatioPct": 15, "maxUValue": 3.7, "maxShgc": 0.59 },
+        { "zone": 2, "zoneName": "Temperate Interior", "maxGlazingRatioPct": 15, "maxUValue": 3.7, "maxShgc": 0.59 },
+        { "zone": 3, "zoneName": "Hot Interior", "maxGlazingRatioPct": 15, "maxUValue": 3.7, "maxShgc": 0.46 },
+        { "zone": 4, "zoneName": "Temperate Coastal", "maxGlazingRatioPct": 15, "maxUValue": 3.7, "maxShgc": 0.46 },
+        { "zone": 5, "zoneName": "Sub-tropical Coastal", "maxGlazingRatioPct": 15, "maxUValue": 3.7, "maxShgc": 0.46 },
+        { "zone": 6, "zoneName": "Arid Interior", "maxGlazingRatioPct": 15, "maxUValue": 3.7, "maxShgc": 0.59 }
+      ]
+    },
+    {
+      "id": "glazing_props",
+      "version": "1.0.0",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "type": "single_clear", "label": "Single Clear", "uValue": 5.7, "shgc": 0.82 },
+        { "type": "single_tinted", "label": "Single Tinted", "uValue": 5.7, "shgc": 0.62 },
+        { "type": "double_clear", "label": "Double Glazed Clear", "uValue": 2.8, "shgc": 0.7 },
+        { "type": "double_lowe", "label": "Double Glazed Low-E", "uValue": 1.8, "shgc": 0.4 }
+      ]
+    },
+    {
+      "id": "sacap_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 500000, "percentageRate": 12, "fixedAmount": 0 },
+        { "lowerBound": 500000, "upperBound": 2000000, "percentageRate": 10, "fixedAmount": 60000 },
+        { "lowerBound": 2000000, "upperBound": 10000000, "percentageRate": 8, "fixedAmount": 210000 },
+        { "lowerBound": 10000000, "upperBound": 50000000, "percentageRate": 6.5, "fixedAmount": 850000 },
+        { "lowerBound": 50000000, "upperBound": null, "percentageRate": 5, "fixedAmount": 3450000 }
+      ]
+    },
+    {
+      "id": "ecsa_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 500000, "percentageRate": 10, "fixedAmount": 0 },
+        { "lowerBound": 500000, "upperBound": 2000000, "percentageRate": 8.5, "fixedAmount": 50000 },
+        { "lowerBound": 2000000, "upperBound": 10000000, "percentageRate": 7, "fixedAmount": 177500 },
+        { "lowerBound": 10000000, "upperBound": 50000000, "percentageRate": 5.5, "fixedAmount": 737500 },
+        { "lowerBound": 50000000, "upperBound": null, "percentageRate": 4.5, "fixedAmount": 2937500 }
+      ]
+    },
+    {
+      "id": "sacqsp_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 1000000, "percentageRate": 6, "fixedAmount": 0 },
+        { "lowerBound": 1000000, "upperBound": 5000000, "percentageRate": 5, "fixedAmount": 60000 },
+        { "lowerBound": 5000000, "upperBound": 20000000, "percentageRate": 4, "fixedAmount": 260000 },
+        { "lowerBound": 20000000, "upperBound": 100000000, "percentageRate": 3, "fixedAmount": 860000 },
+        { "lowerBound": 100000000, "upperBound": null, "percentageRate": 2.5, "fixedAmount": 3260000 }
+      ]
+    },
+    {
+      "id": "sacplan_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 500000, "percentageRate": 8, "fixedAmount": 15000 },
+        { "lowerBound": 500000, "upperBound": 2000000, "percentageRate": 6.5, "fixedAmount": 55000 },
+        { "lowerBound": 2000000, "upperBound": 10000000, "percentageRate": 5, "fixedAmount": 152500 },
+        { "lowerBound": 10000000, "upperBound": 50000000, "percentageRate": 4, "fixedAmount": 552500 },
+        { "lowerBound": 50000000, "upperBound": null, "percentageRate": 3, "fixedAmount": 2152500 }
+      ]
+    },
+    {
+      "id": "sacpcmp_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 1000000, "percentageRate": 7, "fixedAmount": 0 },
+        { "lowerBound": 1000000, "upperBound": 5000000, "percentageRate": 5.5, "fixedAmount": 70000 },
+        { "lowerBound": 5000000, "upperBound": 25000000, "percentageRate": 4.5, "fixedAmount": 290000 },
+        { "lowerBound": 25000000, "upperBound": 100000000, "percentageRate": 3.5, "fixedAmount": 1190000 },
+        { "lowerBound": 100000000, "upperBound": null, "percentageRate": 3, "fixedAmount": 3815000 }
+      ]
+    },
+    {
+      "id": "saclap_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 500000, "percentageRate": 11, "fixedAmount": 0 },
+        { "lowerBound": 500000, "upperBound": 2000000, "percentageRate": 9.5, "fixedAmount": 55000 },
+        { "lowerBound": 2000000, "upperBound": 10000000, "percentageRate": 7.5, "fixedAmount": 197500 },
+        { "lowerBound": 10000000, "upperBound": 50000000, "percentageRate": 6, "fixedAmount": 797500 },
+        { "lowerBound": 50000000, "upperBound": null, "percentageRate": 5, "fixedAmount": 3197500 }
+      ]
+    },
+    {
+      "id": "sagc_fee_brackets",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "lowerBound": 0, "upperBound": 1000000, "percentageRate": 5.5, "fixedAmount": 0 },
+        { "lowerBound": 1000000, "upperBound": 5000000, "percentageRate": 4.5, "fixedAmount": 55000 },
+        { "lowerBound": 5000000, "upperBound": 25000000, "percentageRate": 3.5, "fixedAmount": 235000 },
+        { "lowerBound": 25000000, "upperBound": 100000000, "percentageRate": 3, "fixedAmount": 935000 },
+        { "lowerBound": 100000000, "upperBound": null, "percentageRate": 2.5, "fixedAmount": 3185000 }
+      ]
+    },
+    {
+      "id": "fee_stages",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "recommended",
+      "rows": [
+        { "stage": "Stage 1: Inception", "percentage": 5 },
+        { "stage": "Stage 2: Concept & Viability", "percentage": 15 },
+        { "stage": "Stage 3: Design Development", "percentage": 20 },
+        { "stage": "Stage 4: Documentation", "percentage": 25 },
+        { "stage": "Stage 5: Procurement", "percentage": 5 },
+        { "stage": "Stage 6: Construction", "percentage": 25 },
+        { "stage": "Stage 7: Close-out", "percentage": 5 }
+      ]
+    },
+    {
+      "id": "vat_config",
+      "version": "2018.1",
+      "effectiveFrom": "2018-04-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [{ "ratePct": 15, "currency": "ZAR" }]
+    },
+    {
+      "id": "material_r_values",
+      "version": "1.0.0",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "material": "brick_clay", "label": "Clay Brick", "conductivity": 0.84 },
+        { "material": "concrete_block_hollow", "label": "Hollow Concrete Block", "conductivity": 0.51 },
+        { "material": "concrete_dense", "label": "Dense Concrete", "conductivity": 1.75 },
+        { "material": "cement_plaster", "label": "Cement Plaster / Render", "conductivity": 0.72 },
+        { "material": "gypsum_board", "label": "Gypsum Plasterboard", "conductivity": 0.25 },
+        { "material": "eps_insulation", "label": "EPS Insulation Board", "conductivity": 0.038 },
+        { "material": "mineral_wool", "label": "Mineral Wool Insulation", "conductivity": 0.04 },
+        { "material": "polyurethane", "label": "Polyurethane (PUR) Board", "conductivity": 0.025 },
+        { "material": "timber_softwood", "label": "Softwood Timber", "conductivity": 0.14 },
+        { "material": "concrete_roof_tile", "label": "Concrete Roof Tile", "conductivity": 1.1 },
+        { "material": "air_gap_25mm", "label": "Unventilated Air Gap (25mm)", "rValue": 0.17 }
+      ]
+    },
+    {
+      "id": "xa_rvalue_minimums",
+      "version": "2021.1",
+      "effectiveFrom": "2021-03-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "zone": 1, "element": "roof", "minRValue": 3.7, "rsi": 0.1, "rse": 0.04 },
+        { "zone": 1, "element": "wall", "minRValue": 0.35, "rsi": 0.13, "rse": 0.04 },
+        { "zone": 1, "element": "floor", "minRValue": 1.0, "rsi": 0.17, "rse": 0.04 },
+        { "zone": 2, "element": "roof", "minRValue": 3.2, "rsi": 0.1, "rse": 0.04 },
+        { "zone": 2, "element": "wall", "minRValue": 0.35, "rsi": 0.13, "rse": 0.04 },
+        { "zone": 2, "element": "floor", "minRValue": 1.0, "rsi": 0.17, "rse": 0.04 },
+        { "zone": 3, "element": "roof", "minRValue": 2.7, "rsi": 0.1, "rse": 0.04 },
+        { "zone": 3, "element": "wall", "minRValue": 0.35, "rsi": 0.13, "rse": 0.04 },
+        { "zone": 3, "element": "floor", "minRValue": 1.0, "rsi": 0.17, "rse": 0.04 },
+        { "zone": 4, "element": "roof", "minRValue": 3.7, "rsi": 0.1, "rse": 0.04 },
+        { "zone": 4, "element": "wall", "minRValue": 0.35, "rsi": 0.13, "rse": 0.04 },
+        { "zone": 4, "element": "floor", "minRValue": 1.0, "rsi": 0.17, "rse": 0.04 },
+        { "zone": 5, "element": "roof", "minRValue": 2.7, "rsi": 0.1, "rse": 0.04 },
+        { "zone": 5, "element": "wall", "minRValue": 0.35, "rsi": 0.13, "rse": 0.04 },
+        { "zone": 5, "element": "floor", "minRValue": 1.0, "rsi": 0.17, "rse": 0.04 },
+        { "zone": 6, "element": "roof", "minRValue": 3.5, "rsi": 0.1, "rse": 0.04 },
+        { "zone": 6, "element": "wall", "minRValue": 0.35, "rsi": 0.13, "rse": 0.04 },
+        { "zone": 6, "element": "floor", "minRValue": 1.0, "rsi": 0.17, "rse": 0.04 }
+      ]
+    },
+    {
+      "id": "sans_10400_n_requirements",
+      "version": "2012.1",
+      "effectiveFrom": "2012-01-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "occupancy": "habitable", "label": "Habitable Room", "ventilationMinPct": 5, "lightingMinPct": 10 },
+        { "occupancy": "non_habitable", "label": "Non-habitable Room", "ventilationMinPct": 5, "lightingMinPct": 0 }
+      ]
+    },
+    {
+      "id": "epc_energy_thresholds",
+      "version": "2020.1",
+      "effectiveFrom": "2020-12-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "buildingType": "office", "label": "Offices", "maxKwhM2Year": 200 },
+        { "buildingType": "retail", "label": "Retail / Wholesale", "maxKwhM2Year": 240 },
+        { "buildingType": "education", "label": "Educational", "maxKwhM2Year": 130 },
+        { "buildingType": "hospitality", "label": "Entertainment / Hospitality", "maxKwhM2Year": 260 },
+        { "buildingType": "residential", "label": "Residential / Dwelling", "maxKwhM2Year": 180 }
+      ]
+    },
+    {
+      "id": "epc_rating_bands",
+      "version": "2020.1",
+      "effectiveFrom": "2020-12-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "band": "A", "label": "A — Exceptional", "maxRatio": 0.5 },
+        { "band": "B", "label": "B — Excellent", "maxRatio": 0.7 },
+        { "band": "C", "label": "C — Good", "maxRatio": 0.9 },
+        { "band": "D", "label": "D — Compliant", "maxRatio": 1.0 },
+        { "band": "E", "label": "E — Below standard", "maxRatio": 1.15 },
+        { "band": "F", "label": "F — Poor", "maxRatio": 1.3 },
+        { "band": "G", "label": "G — Very poor", "maxRatio": null }
+      ]
+    },
+    {
+      "id": "municipal_fee_allowances",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "feeType": "building_plan_levy", "label": "Building Plan Levy", "ratePerM2": 15, "minFee": 5000 },
+        { "feeType": "plan_submission", "label": "Plan Submission Fee", "ratePerM2": 8, "minFee": 3000 },
+        { "feeType": "occupancy_certificate", "label": "Occupancy Certificate", "flatFee": 2500 },
+        { "feeType": "zoning_application", "label": "Zoning/Consent Use Application", "flatFee": 15000 },
+        { "feeType": "engineering_services", "label": "Engineering Services Contribution", "ratePerM2": 250, "minFee": 50000 }
+      ]
+    },
+    {
+      "id": "sans_10400_t_thresholds",
+      "version": "2012.1",
+      "effectiveFrom": "2012-01-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "occupancy": "A1", "label": "Entertainment", "maxTravelDistanceM": 45, "minExitWidthMmPerPerson": 7, "minFireResistanceMin": 120, "maxCompartmentAreaM2": 2500, "sprinklerRequired": true },
+        { "occupancy": "A2", "label": "Theatrical", "maxTravelDistanceM": 30, "minExitWidthMmPerPerson": 7, "minFireResistanceMin": 120, "maxCompartmentAreaM2": 2000, "sprinklerRequired": true },
+        { "occupancy": "B1", "label": "High Risk Commercial", "maxTravelDistanceM": 25, "minExitWidthMmPerPerson": 7, "minFireResistanceMin": 120, "maxCompartmentAreaM2": 1000, "sprinklerRequired": true },
+        { "occupancy": "G1", "label": "Office", "maxTravelDistanceM": 45, "minExitWidthMmPerPerson": 5, "minFireResistanceMin": 60, "maxCompartmentAreaM2": 5000, "sprinklerRequired": false },
+        { "occupancy": "H1", "label": "Hotel", "maxTravelDistanceM": 30, "minExitWidthMmPerPerson": 7, "minFireResistanceMin": 60, "maxCompartmentAreaM2": 4000, "sprinklerRequired": false },
+        { "occupancy": "H4", "label": "Dwelling House", "maxTravelDistanceM": 45, "minExitWidthMmPerPerson": 5, "minFireResistanceMin": 30, "maxCompartmentAreaM2": null, "sprinklerRequired": false },
+        { "occupancy": "J1", "label": "High Risk Storage", "maxTravelDistanceM": 25, "minExitWidthMmPerPerson": 7, "minFireResistanceMin": 120, "maxCompartmentAreaM2": 2000, "sprinklerRequired": true },
+        { "occupancy": "J2", "label": "Moderate Risk Storage", "maxTravelDistanceM": 45, "minExitWidthMmPerPerson": 5, "minFireResistanceMin": 60, "maxCompartmentAreaM2": 5000, "sprinklerRequired": false }
+      ]
+    },
+    {
+      "id": "fire_rational_parameters",
+      "version": "2012.1",
+      "effectiveFrom": "2012-01-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "category": "low", "label": "Low fire load", "minFireLoadMJm2": 0, "maxFireLoadMJm2": 200, "baseDurationMin": 30, "durationFactorPerMJm2": 0.06 },
+        { "category": "moderate", "label": "Moderate fire load", "minFireLoadMJm2": 200, "maxFireLoadMJm2": 500, "baseDurationMin": 42, "durationFactorPerMJm2": 0.08 },
+        { "category": "high", "label": "High fire load", "minFireLoadMJm2": 500, "maxFireLoadMJm2": 1000, "baseDurationMin": 66, "durationFactorPerMJm2": 0.1 },
+        { "category": "very_high", "label": "Very high fire load", "minFireLoadMJm2": 1000, "maxFireLoadMJm2": null, "baseDurationMin": 116, "durationFactorPerMJm2": 0.12 }
+      ]
+    },
+    {
+      "id": "zoning_scheme_parameters",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "zone": "residential_1", "label": "Residential 1 (Single Dwelling)", "maxCoveragePct": 50, "maxFAR": 0.6, "maxHeightM": 8, "maxStoreys": 2, "frontSetbackM": 4, "sideSetbackM": 1.5, "rearSetbackM": 3, "parkingPerUnit": 2 },
+        { "zone": "residential_2", "label": "Residential 2 (Medium Density)", "maxCoveragePct": 60, "maxFAR": 1.0, "maxHeightM": 12, "maxStoreys": 3, "frontSetbackM": 3, "sideSetbackM": 1.5, "rearSetbackM": 2, "parkingPerUnit": 1.5 },
+        { "zone": "residential_3", "label": "Residential 3 (High Density)", "maxCoveragePct": 70, "maxFAR": 2.0, "maxHeightM": 25, "maxStoreys": 7, "frontSetbackM": 2, "sideSetbackM": 0, "rearSetbackM": 2, "parkingPerUnit": 1 },
+        { "zone": "business_1", "label": "Business 1 (Local)", "maxCoveragePct": 80, "maxFAR": 2.0, "maxHeightM": 15, "maxStoreys": 4, "frontSetbackM": 0, "sideSetbackM": 0, "rearSetbackM": 3, "parkingPerUnit": 1 },
+        { "zone": "business_2", "label": "Business 2 (General)", "maxCoveragePct": 80, "maxFAR": 4.0, "maxHeightM": 40, "maxStoreys": 10, "frontSetbackM": 0, "sideSetbackM": 0, "rearSetbackM": 0, "parkingPerUnit": 1 },
+        { "zone": "industrial_1", "label": "Industrial 1 (Light)", "maxCoveragePct": 75, "maxFAR": 1.5, "maxHeightM": 15, "maxStoreys": 3, "frontSetbackM": 5, "sideSetbackM": 3, "rearSetbackM": 3, "parkingPerUnit": 1 },
+        { "zone": "industrial_2", "label": "Industrial 2 (Heavy)", "maxCoveragePct": 80, "maxFAR": 2.0, "maxHeightM": 20, "maxStoreys": 4, "frontSetbackM": 5, "sideSetbackM": 3, "rearSetbackM": 5, "parkingPerUnit": 1 }
+      ]
+    },
+    {
+      "id": "sans_form_requirements",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "formType": "rational_assessment", "label": "Rational Assessment Report", "requiredFields": ["buildingDescription", "occupancyClass", "designBasis", "professionalName", "professionalRegistration", "date"], "annexures": ["fire_report", "structural_report"] },
+        { "formType": "certificate_compliance", "label": "Certificate of Compliance", "requiredFields": ["buildingAddress", "erfNumber", "ownerName", "professionalName", "professionalRegistration", "date", "sansReference"], "annexures": ["approved_plans", "test_certificates"] },
+        { "formType": "energy_declaration", "label": "Energy Performance Declaration", "requiredFields": ["buildingAddress", "buildingType", "grossFloorArea", "energyRating", "professionalName", "professionalRegistration", "date"], "annexures": ["energy_model_summary"] }
+      ]
+    },
+    {
+      "id": "drawing_check_requirements",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "drawingType": "site_plan", "label": "Site Plan", "requiresTitleBlock": true, "requiresNorthPoint": true, "requiresScaleBar": true, "requiresDimensions": true, "requiresDrawingNumber": true, "minScale": "1:500", "notes": "Must show boundaries, contours, and services" },
+        { "drawingType": "floor_plan", "label": "Floor Plan", "requiresTitleBlock": true, "requiresNorthPoint": true, "requiresScaleBar": true, "requiresDimensions": true, "requiresDrawingNumber": true, "minScale": "1:100", "notes": "Must show room names, areas, and door swings" },
+        { "drawingType": "section", "label": "Section Drawing", "requiresTitleBlock": true, "requiresNorthPoint": false, "requiresScaleBar": true, "requiresDimensions": true, "requiresDrawingNumber": true, "minScale": "1:50", "notes": "Must show structural elements and levels" },
+        { "drawingType": "elevation", "label": "Elevation Drawing", "requiresTitleBlock": true, "requiresNorthPoint": false, "requiresScaleBar": true, "requiresDimensions": true, "requiresDrawingNumber": true, "minScale": "1:100", "notes": "Must show material finishes and levels" }
+      ]
+    },
+    {
+      "id": "cad_upload_standards",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "indicative",
+      "rows": [
+        { "format": "dwg", "label": "AutoCAD Drawing", "acceptedVersions": ["2018", "2020", "2024"], "maxFileSizeMB": 50, "requiresLayerNaming": true, "requiresGeoreference": false },
+        { "format": "dxf", "label": "Drawing Exchange Format", "acceptedVersions": ["R14", "2018", "2024"], "maxFileSizeMB": 100, "requiresLayerNaming": true, "requiresGeoreference": false },
+        { "format": "ifc", "label": "Industry Foundation Classes (BIM)", "acceptedVersions": ["IFC2x3", "IFC4"], "maxFileSizeMB": 200, "requiresLayerNaming": false, "requiresGeoreference": true },
+        { "format": "pdf", "label": "Portable Document Format", "acceptedVersions": ["1.5+"], "maxFileSizeMB": 25, "requiresLayerNaming": false, "requiresGeoreference": false }
+      ]
+    },
+    {
+      "id": "paye_uif_sdl",
+      "version": "2024.1",
+      "effectiveFrom": "2024-03-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "type": "paye", "label": "PAYE (Pay As You Earn)", "defaultPercent": 25 },
+        { "type": "uif", "label": "UIF (Unemployment Insurance Fund)", "defaultPercent": 1 },
+        { "type": "sdl", "label": "SDL (Skills Development Levy)", "defaultPercent": 1 }
+      ]
+    },
+    {
+      "id": "hs_checklist",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "clause": "OHS-001", "description": "Personal Protective Equipment (PPE) provided and worn", "category": "ppe" },
+        { "clause": "OHS-002", "description": "Scaffolding inspected and tagged", "category": "working_at_height" },
+        { "clause": "OHS-003", "description": "Excavations shored and barricaded", "category": "excavation" },
+        { "clause": "OHS-004", "description": "Fire extinguishers serviced and accessible", "category": "fire" },
+        { "clause": "OHS-005", "description": "First aid kit stocked and accessible", "category": "first_aid" },
+        { "clause": "OHS-006", "description": "Safety signage displayed", "category": "signage" },
+        { "clause": "OHS-007", "description": "Housekeeping — site tidy and safe", "category": "housekeeping" },
+        { "clause": "OHS-008", "description": "Fall protection in place (>2m)", "category": "working_at_height" }
+      ]
+    },
+    {
+      "id": "cpd_body_rules",
+      "version": "2024.1",
+      "effectiveFrom": "2024-01-01",
+      "jurisdiction": "ZA",
+      "status": "mandatory",
+      "rows": [
+        { "body": "SACAP", "annualTarget": 25, "structuredMinPct": 50, "cycleLengthYears": 1 },
+        { "body": "ECSA", "annualTarget": 25, "structuredMinPct": 50, "cycleLengthYears": 5 },
+        { "body": "SACQSP", "annualTarget": 25, "structuredMinPct": 50, "cycleLengthYears": 1 },
+        { "body": "SACPLAN", "annualTarget": 20, "structuredMinPct": 40, "cycleLengthYears": 1 },
+        { "body": "SACPCMP", "annualTarget": 25, "structuredMinPct": 50, "cycleLengthYears": 1 }
+      ]
+    }
+  ]
+}

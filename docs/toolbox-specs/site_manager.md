@@ -35,3 +35,26 @@ Categories spanned: drawing, compliance, document_control, briefing, cpd, site_m
 - ⚠ **#1 Orphaned role.** `site_manager` appears ONLY in the `toolboxes` navigation module — no Command Centre, Inbox, Projects, or Messages. A site-facing role with no project context, action queue, or communication surface is a significant gap, since daily site management is inherently project-bound. Recommend adding Command Centre, Projects, and Inbox nav.
 - ✅ AI-guided routes (`contractor-staff`, `programme`, `construction`, `snagging`, `procurement`, `packages`) valid.
 - ⚠ AI-guided mode surfaces grouped construction routes, but core standalone field tools — `site_diary_entry`, `workforce_timesheet`, `plant_register`, `rfi_generator`, `hs_compliance` — are reachable only via "All tools". Recommend a "Daily site control" group (site diary / timesheets / plant / H&S) so the role's primary daily workflow is in guided mode.
+
+## 7. Toolbox Framework Status
+
+All site manager tools now participate in the Toolbox Capability Framework (`CalculatorDefinition` contract).
+
+### Full-status tools (4)
+| Tool | Definition ID | Method | Key clause coverage |
+|------|---------------|--------|-------------------|
+| workforce_timesheet | `workforce_timesheet_v1` | time | Hours/cost, PAYE/UIF/SDL deductions |
+| plant_register | `plant_register_v1` | time | Hire rates, utilization tracking |
+| site_diary_entry | `site_diary_entry_v1` | schedule | Weather, progress, resource records |
+| hs_compliance | `hs_compliance_v1` | clauseSet | H&S regulation checklist (OHS Act) |
+
+### Preview-status tools (1)
+| Tool | Status | Notes |
+|------|--------|-------|
+| snag_creator | `preview` | Defect tracking workflow — definition pending |
+
+### Framework details
+- **Methods used:** time, schedule, clauseSet
+- **Versioned tables:** PAYE/UIF/SDL tables, plant rates, H&S checklist items
+- **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
+- **Reports:** PDF/CSV export with daily summaries, H&S clause outcomes, source versions, disclaimers

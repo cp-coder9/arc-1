@@ -19,6 +19,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['fee', 'calculator', 'SACAP', 'ECSA', 'SACQSP', 'SACPLAN', 'tariff', 'proposal'],
+    calculatorDefinitionId: 'fee_calculator_v1',
   },
   {
     id: 'fenestration_calc',
@@ -34,6 +35,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['SANS', '10400', 'fenestration', 'ventilation', 'lighting', 'compliance'],
+    calculatorDefinitionId: 'fenestration_n_v1',
   },
   {
     id: 'rvalue_calc',
@@ -49,6 +51,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['SANS', '10400-XA', 'thermal', 'R-value', 'insulation', 'compliance'],
+    calculatorDefinitionId: 'rvalue_calc_v1',
   },
   {
     id: 'ai_drawing_checker',
@@ -64,6 +67,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['drawing', 'AI', 'compliance', 'SANS', 'review', 'check'],
+    calculatorDefinitionId: 'ai_drawing_checker_v1',
   },
   {
     id: 'sans_forms',
@@ -79,6 +83,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['SANS', 'compliance', 'forms', 'autofill', 'municipal'],
+    calculatorDefinitionId: 'sans_forms_v1',
   },
   {
     id: 'drawing_register',
@@ -94,6 +99,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['drawing', 'register', 'document', 'revision', 'control'],
+    calculatorDefinitionId: 'drawing_register_v1',
   },
   {
     id: 'technical_brief',
@@ -109,6 +115,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['brief', 'scope', 'technical', 'deliverables'],
+    calculatorDefinitionId: 'technical_brief_v1',
   },
   {
     id: 'doc_control_issue',
@@ -124,6 +131,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['document', 'transmittal', 'issue', 'tracking', 'control'],
+    calculatorDefinitionId: 'doc_control_issue_v1',
   },
   {
     id: 'cpd_standalone',
@@ -139,6 +147,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: false,
     recentRunsCount: 0,
     tags: ['CPD', 'assessment', 'credits', 'SACAP', 'ECSA', 'development'],
+    calculatorDefinitionId: 'cpd_standalone_v1',
   },
 
   // ===== Client =====
@@ -156,6 +165,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['cost', 'estimate', 'professional', 'municipal', 'budget'],
+    calculatorDefinitionId: 'soft_cost_estimator_v1',
   },
   {
     id: 'brief_wizard',
@@ -171,6 +181,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['brief', 'wizard', 'client', 'requirements'],
+    calculatorDefinitionId: 'brief_wizard_v1',
   },
   {
     id: 'proposal_comparison',
@@ -186,6 +197,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['proposal', 'comparison', 'BEP', 'fee', 'selection'],
+    calculatorDefinitionId: 'proposal_comparison_v1',
   },
   {
     id: 'progress_viewer',
@@ -201,6 +213,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: false,
     recentRunsCount: 0,
     tags: ['progress', 'report', 'status', 'client'],
+    calculatorDefinitionId: 'progress_viewer_v1',
   },
   {
     id: 'payment_dashboard',
@@ -216,6 +229,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: false,
     recentRunsCount: 0,
     tags: ['payment', 'status', 'claim', 'invoice', 'tracking'],
+    calculatorDefinitionId: 'payment_dashboard_v1',
   },
 
   // ===== Contractor =====
@@ -233,6 +247,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['BoQ', 'BoM', 'takeoff', 'quantity', 'estimate', 'material'],
+    calculatorDefinitionId: 'boq_takeoff_v1',
   },
   {
     id: 'site_diary_entry',
@@ -248,6 +263,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['site', 'diary', 'daily', 'log', 'progress', 'photo'],
+    calculatorDefinitionId: 'site_diary_entry_v1',
   },
   {
     id: 'rfi_generator',
@@ -263,6 +279,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['RFI', 'instruction', 'site', 'communication', 'query'],
+    calculatorDefinitionId: 'rfi_generator_v1',
   },
   {
     id: 'workforce_timesheet',
@@ -278,6 +295,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['timesheet', 'workforce', 'labour', 'payroll', 'attendance'],
+    calculatorDefinitionId: 'workforce_timesheet_v1',
   },
   {
     id: 'plant_register',
@@ -293,6 +311,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['plant', 'equipment', 'asset', 'register', 'hire'],
+    calculatorDefinitionId: 'plant_register_v1',
   },
   {
     id: 'tender_bid_bench',
@@ -308,6 +327,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['tender', 'bid', 'pricing', 'BOQ', 'submission'],
+    calculatorDefinitionId: 'tender_bid_bench_v1',
   },
   {
     id: 'snag_creator',
@@ -323,6 +343,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['snag', 'punch', 'defect', 'inspection', 'closeout'],
+    calculatorDefinitionId: 'snag_creator_v1',
   },
   {
     id: 'material_procurement',
@@ -338,6 +359,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['material', 'procurement', 'order', 'purchase', 'list'],
+    calculatorDefinitionId: 'material_procurement_v1',
   },
   {
     id: 'payment_claim_builder',
@@ -648,6 +670,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['SANS', '10400-XA', 'energy', 'compliance', 'insulation', 'glazing', 'HVAC'],
+    calculatorDefinitionId: 'xa_energy_compliance_v1',
   },
   {
     id: 'energy_certificate',
@@ -663,6 +686,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['energy', 'certificate', 'performance', 'compliance', 'EPC'],
+    calculatorDefinitionId: 'energy_certificate_v1',
   },
 
   // ===== Fire Engineer =====
