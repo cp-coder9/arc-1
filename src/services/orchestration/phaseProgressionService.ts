@@ -216,6 +216,11 @@ export function createPhaseProgressionService(
       return { outcome: 'final_phase', fromPhase };
     }
 
+    // Tenant authorization: reject cross-tenant advancement (PR #114 review).
+    if (ctx.tenantId !== metadata.tenantId) {
+      return { outcome: 'blocked', fromPhase, unmetRequiredRecords: [] };
+    }
+
     const { mayAdvance, eligibility } = evaluateAdvancement(metadata, records);
 
     // R7.3: blocked — retain the phase, create no event, return unmet records.

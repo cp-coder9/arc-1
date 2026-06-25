@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { UserProfile, Project } from '@/types';
+import { UserProfile, UserRole, Project } from '@/types';
 import {
   AuthorizationContext,
   ProjectStateView,
@@ -17,6 +17,7 @@ import {
   GuidanceResult,
   ProgrammeTask,
   UnifiedProgramme,
+  ArchitexRole,
 } from '../orchestrationTypes';
 import { createProjectStateService, ProjectStateService } from '../projectStateService';
 import { buildActionCentre } from '../actionCentreService';
@@ -30,6 +31,34 @@ interface UseOrchestrationServicesOptions {
   projects: Project[];
   /** Optional: Firestore/API repository (defaults to in-memory for demo). */
   repository?: any;
+}
+
+/**
+ * Maps an app-layer `UserRole` to the orchestration-layer `ArchitexRole`.
+ * The orchestration tier uses a narrower role set; UI roles that don't have a
+ * direct mapping are mapped to the closest equivalent (PR #114 review comment 2).
+ */
+function mapUserRoleToArchitexRole(role: UserRole): ArchitexRole {
+  const mapping: Record<UserRole, ArchitexRole> = {
+    client: 'client_developer',
+    developer: 'client_developer',
+    architect: 'architect',
+    engineer: 'engineer',
+    quantity_surveyor: 'quantity_surveyor',
+    town_planner: 'candidate_professional',
+    energy_professional: 'candidate_professional',
+    fire_engineer: 'engineer',
+    site_manager: 'site_manager',
+    contractor: 'contractor',
+    subcontractor: 'contractor',
+    supplier: 'supplier',
+    freelancer: 'candidate_professional',
+    bep: 'architect',
+    firm_admin: 'admin',
+    platform_admin: 'platform_admin',
+    admin: 'admin',
+  };
+  return mapping[role] ?? 'candidate_professional';
 }
 
 interface UseOrchestrationServicesResult {
@@ -78,7 +107,7 @@ export function useOrchestrationServices(
         ? {
             tenantId: user.primaryFirmId || 'default-tenant',
             userId: user.uid,
-            role: user.role,
+            role: mapUserRoleToArchitexRole(user.role),
             now: new Date().toISOString(),
           }
         : null,

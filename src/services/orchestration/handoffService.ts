@@ -230,6 +230,15 @@ export function createHandoffService(config: HandoffServiceConfig): HandoffServi
       };
     }
 
+    // 1b. Reject cross-tenant handoff creation (PR #114 review — defence in depth).
+    if (input.tenantId !== ctx.tenantId) {
+      return {
+        ok: false,
+        reason: 'unauthorized',
+        error: 'Cannot create a handoff in a different tenant.',
+      };
+    }
+
     // 2. Validate the receiving role is appointed to the project (R3.7).
     if (!input.appointedRoles.includes(input.toRole)) {
       return {
