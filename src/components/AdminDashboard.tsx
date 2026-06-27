@@ -16,6 +16,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
+import { RoleAwareSidebar } from './navigation/RoleAwareSidebar';
+import { MobileMenuTrigger } from './navigation/MobileMenuTrigger';
+import { Breadcrumbs } from './navigation/Breadcrumbs';
+import { GlassButton } from './ui/GlassButton';
+import { StatCardAnimated } from './animated/StatCardAnimated';
+import { DashboardSection } from './composite/DashboardSection';
+import { GlassTable } from './composite/GlassTable';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { ShieldCheck, Eye, CheckCircle2, XCircle, History, Info, Cpu, Activity, ListFilter, Settings2, Save, Trash2, Plus, RefreshCcw, AlertTriangle, FileText, Briefcase, ExternalLink, Search, Users, Upload, Loader2, ChevronDown, ChevronUp, Sparkles, Shield, Maximize2, Download, AlertCircle, ArrowRight, Star, Building2, CreditCard, Landmark } from 'lucide-react';
 import {
   Accordion,
@@ -932,36 +940,110 @@ export default function AdminDashboard({
   };
 
 
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#ba1a1a' }}>
-        <div>
-          <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground flex items-center gap-4">
-             <Shield className="text-primary w-12 h-12" /> Admin Command Center
-          </h1>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl mt-2 leading-relaxed">Platform orchestration and agent supervision.</p>
-        </div>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Fixed left sidebar — hidden on mobile, visible md:block */}
+      <RoleAwareSidebar
+        user={user}
+        activeTab={activeTab}
+        onNavigate={onTabChange}
+      />
+
+      {/* Mobile hamburger trigger */}
+      <div className="fixed top-4 left-4 z-50 md:hidden">
+        <MobileMenuTrigger user={user} />
       </div>
 
-      <Tabs value={internalTab} onValueChange={(val) => {
-        const reverseMapping: Record<string, string> = {
-          agents: 'compliance',
-          logs: 'audit',
-          users: 'users',
-          settings: 'settings',
-          knowledge: 'knowledge',
-          jobs: 'projects',
-          fees: 'fees',
-          financial: 'financial',
-          firms: 'firms',
-          verifications: 'verifications',
-          'governance-tools': 'governance-tools',
-          submissions: 'overview'
-        };
-        onTabChange?.(reverseMapping[val] || val);
-      }} className="w-full">
-        <div className="mb-8 rounded-[1.25rem] border border-border beos-glass p-3 beos-soft-shadow">
-          <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-[1.5rem] bg-secondary/40 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {/* Main content offset for sidebar */}
+      <main className="md:ml-64 p-4 md:p-6 space-y-6">
+        {/* Header: glass-panel with title, breadcrumbs, action buttons */}
+        <header className="glass-panel rounded-2xl p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <Shield className="text-primary w-7 h-7" aria-hidden="true" />
+                <h1 className="text-2xl md:text-3xl font-heading font-black tracking-tight text-foreground">
+                  Admin Command Center
+                </h1>
+              </div>
+              <p className="text-foreground/60 text-sm max-w-xl">Platform orchestration and agent supervision.</p>
+              <Breadcrumbs className="mt-2" onNavigate={onTabChange} />
+            </div>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <GlassButton
+                size="sm"
+                variant="solid"
+                onClick={() => onTabChange?.('compliance')}
+                aria-label="Manage AI agents"
+              >
+                <Cpu size={14} className="mr-1" /> Agents
+              </GlassButton>
+              <GlassButton
+                size="sm"
+                onClick={() => onTabChange?.('users')}
+                aria-label="View users"
+              >
+                <Users size={14} className="mr-1" /> Users
+              </GlassButton>
+            </div>
+          </div>
+        </header>
+
+        {/* Stats overview row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCardAnimated
+            label="Total Jobs"
+            value={stats.totalJobs}
+            icon={<Briefcase size={18} />}
+            delay={prefersReducedMotion ? 0 : 0 * 0.05}
+            prefersReducedMotion={prefersReducedMotion ?? false}
+          />
+          <StatCardAnimated
+            label="Approved Drawings"
+            value={stats.approvedDrawings}
+            icon={<CheckCircle2 size={18} />}
+            trend={{ direction: 'up', value: `${stats.approvedDrawings}` }}
+            delay={prefersReducedMotion ? 0 : 1 * 0.05}
+            prefersReducedMotion={prefersReducedMotion ?? false}
+          />
+          <StatCardAnimated
+            label="Active Agents"
+            value={stats.activeAgents}
+            icon={<Cpu size={18} />}
+            delay={prefersReducedMotion ? 0 : 2 * 0.05}
+            prefersReducedMotion={prefersReducedMotion ?? false}
+          />
+          <StatCardAnimated
+            label="System Errors"
+            value={stats.errorCount}
+            icon={<AlertTriangle size={18} />}
+            trend={stats.errorCount > 0 ? { direction: 'down', value: `${stats.errorCount}` } : undefined}
+            delay={prefersReducedMotion ? 0 : 3 * 0.05}
+            prefersReducedMotion={prefersReducedMotion ?? false}
+          />
+        </div>
+
+        <Tabs value={internalTab} onValueChange={(val) => {
+          const reverseMapping: Record<string, string> = {
+            agents: 'compliance',
+            logs: 'audit',
+            users: 'users',
+            settings: 'settings',
+            knowledge: 'knowledge',
+            jobs: 'projects',
+            fees: 'fees',
+            financial: 'financial',
+            firms: 'firms',
+            verifications: 'verifications',
+            'governance-tools': 'governance-tools',
+            submissions: 'overview'
+          };
+          onTabChange?.(reverseMapping[val] || val);
+        }} className="w-full">
+        <div className="mb-6 glass-panel rounded-2xl p-3">
+          <TabsList className="grid w-full grid-cols-2 items-stretch gap-2 rounded-xl bg-transparent p-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             <TabsTrigger value="submissions" className={tabTriggerClass}>
               <FileText size={16} /> Submissions
             </TabsTrigger>
@@ -1014,33 +1096,33 @@ export default function AdminDashboard({
         </div>
 
         <TabsContent value="submissions">
-           <div className="beos-section-card p-5 md:p-8 space-y-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">Submissions Review Pipeline</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Review, approve, or reject uploaded drawings from one clear queue.</p>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
-                  <div className="rounded-2xl border border-border bg-secondary/30 p-3">
-                    <p className="text-xl font-bold">{submissions.length}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total</p>
-                  </div>
-                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3">
-                    <p className="text-xl font-bold text-primary">{pendingSubmissionCount}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pending</p>
-                  </div>
-                  <div className="rounded-2xl border border-red-100 bg-red-50 p-3">
-                    <p className="text-xl font-bold text-red-700">{failedSubmissionCount}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Issues</p>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
+           <DashboardSection
+             title="Submissions Review Pipeline"
+             description="Review, approve, or reject uploaded drawings from one clear queue."
+             icon={<FileText size={18} />}
+             action={
+               <div className="flex flex-wrap gap-2 text-center">
+                 <div className="glass-tile rounded-xl px-4 py-2 text-center min-w-[70px]">
+                   <p className="text-xl font-bold">{submissions.length}</p>
+                   <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/60">Total</p>
+                 </div>
+                 <div className="glass-tile rounded-xl px-4 py-2 text-center min-w-[70px]">
+                   <p className="text-xl font-bold text-primary">{pendingSubmissionCount}</p>
+                   <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/60">Pending</p>
+                 </div>
+                 <div className="glass-tile rounded-xl px-4 py-2 text-center min-w-[70px]">
+                   <p className="text-xl font-bold text-red-400">{failedSubmissionCount}</p>
+                   <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/60">Issues</p>
+                 </div>
+               </div>
+             }
+           >
+              <div className="space-y-3">
                 {pagedSubmissions.map(submission => (
-                  <div key={submission.id} className="grid gap-4 rounded-2xl border border-border bg-white p-4 transition-colors hover:border-primary/30 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                  <div key={submission.id} className="glass-record rounded-xl p-4 transition-all hover:-translate-y-0.5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                     <div className="min-w-0">
-                      <p className="truncate font-bold">{submission.drawingName}</p>
-                      <p className="text-xs text-muted-foreground">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
+                      <p className="truncate font-bold text-foreground">{submission.drawingName}</p>
+                      <p className="text-xs text-foreground/60">Job {submission.jobId} · {new Date(submission.createdAt).toLocaleDateString()}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{(submission.status || 'processing').replace('_', ' ')}</Badge>
@@ -1050,77 +1132,75 @@ export default function AdminDashboard({
                     </div>
                   </div>
                 ))}
-                {submissions.length === 0 && <p className="text-muted-foreground italic">No submissions awaiting review.</p>}
+                {submissions.length === 0 && <p className="text-foreground/50 italic py-8 text-center">No submissions awaiting review.</p>}
               </div>
               {submissions.length > pageSize && <PaginationControls page={submissionPage} totalPages={totalPages(submissions.length, pageSize)} onPageChange={setSubmissionPage} />}
-           </div>
+           </DashboardSection>
         </TabsContent>
 
         <TabsContent value="disputes">
-          <div className="beos-section-card p-8 space-y-6">
-            <h2 className="text-2xl font-bold">Dispute Mediation</h2>
+          <DashboardSection
+            title="Dispute Mediation"
+            description="Review and resolve platform disputes."
+            icon={<AlertTriangle size={18} />}
+          >
             <div className="space-y-3">
               {pagedDisputes.map(dispute => <div key={dispute.id}><DisputeRow dispute={dispute} /></div>)}
-              {disputes.length === 0 && <p className="text-muted-foreground italic">No open disputes.</p>}
+              {disputes.length === 0 && <p className="text-foreground/50 italic py-8 text-center">No open disputes.</p>}
             </div>
             {disputes.length > pageSize && <PaginationControls page={disputePage} totalPages={totalPages(disputes.length, pageSize)} onPageChange={setDisputePage} />}
-          </div>
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="analytics">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <StatCard title="Jobs" value={stats.totalJobs} />
-            <StatCard title="Approved Drawings" value={stats.approvedDrawings} />
-            <StatCard title="Active Agents" value={stats.activeAgents} />
-            <StatCard title="Errors" value={stats.errorCount} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCardAnimated label="Jobs" value={stats.totalJobs} icon={<Briefcase size={18} />} delay={0 * 0.05} prefersReducedMotion={prefersReducedMotion ?? false} />
+            <StatCardAnimated label="Approved Drawings" value={stats.approvedDrawings} icon={<CheckCircle2 size={18} />} delay={1 * 0.05} prefersReducedMotion={prefersReducedMotion ?? false} />
+            <StatCardAnimated label="Active Agents" value={stats.activeAgents} icon={<Cpu size={18} />} delay={2 * 0.05} prefersReducedMotion={prefersReducedMotion ?? false} />
+            <StatCardAnimated label="Errors" value={stats.errorCount} icon={<AlertTriangle size={18} />} delay={3 * 0.05} prefersReducedMotion={prefersReducedMotion ?? false} />
           </div>
         </TabsContent>
 
         <TabsContent value="logs">
-          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
-            <h2 className="text-2xl font-bold mb-8">System Activity Logs</h2>
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-secondary/30">
-                  <TableRow>
-                    <TableHead>Level</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Timestamp</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.map(log => (
-                    <TableRow key={log.id}>
-                      <TableCell>
-                        <Badge variant={log.level === 'error' || log.level === 'critical' ? 'destructive' : 'outline'} className="uppercase text-[10px]">
-                          {log.level}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{log.source}</TableCell>
-                      <TableCell className="text-xs">{log.message}</TableCell>
-                      <TableCell className="text-muted-foreground text-[10px]">{safeFormat(log.timestamp, 'MMM d, HH:mm:ss')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+          <DashboardSection
+            title="System Activity Logs"
+            description="Live read-only stream of system events and audit records."
+            icon={<History size={18} />}
+          >
+            <GlassTable
+              columns={[
+                { key: 'level', label: 'Level', render: (val) => (
+                  <Badge variant={(val === 'error' || val === 'critical') ? 'destructive' : 'outline'} className="uppercase text-[10px]">
+                    {String(val)}
+                  </Badge>
+                )},
+                { key: 'source', label: 'Source', render: (val) => <span className="font-mono text-xs">{String(val)}</span> },
+                { key: 'message', label: 'Message', render: (val) => <span className="text-xs">{String(val)}</span> },
+                { key: 'timestamp', label: 'Time', render: (val) => <span className="text-[10px] text-foreground/60">{safeFormat(String(val), 'MMM d, HH:mm:ss')}</span> },
+              ]}
+              rows={logs}
+              rowKey="id"
+              emptyState={<span className="text-foreground/50 italic">No system log records are currently visible.</span>}
+            />
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="jobs">
-          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
-            <h2 className="text-2xl font-bold mb-8">Platform Jobs</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <DashboardSection
+            title="Platform Jobs"
+            description="All jobs on the platform."
+            icon={<Briefcase size={18} />}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {allJobs.map(job => (
-                <Card key={job.id} className="border-border shadow-sm rounded-2xl p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <Badge className="bg-primary/5 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
+                <div key={job.id} className="glass-card rounded-xl p-5 transition-all hover:-translate-y-0.5">
+                  <div className="flex justify-between items-start mb-3">
+                    <Badge className="bg-primary/10 text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
                     <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{job.status}</Badge>
                   </div>
-                  <h3 className="font-bold mb-2">{job.title}</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{job.description}</p>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
+                  <h3 className="font-bold mb-2 text-foreground">{job.title}</h3>
+                  <p className="text-xs text-foreground/60 line-clamp-2 mb-4">{job.description}</p>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-foreground/60 uppercase">
                     <span>Budget: R {(job.budget ?? 0).toLocaleString()}</span>
                     <span>Created: {safeFormat(job.createdAt, 'MMM d, yyyy')}</span>
                   </div>
@@ -1130,77 +1210,92 @@ export default function AdminDashboard({
                       <AdvanceStageButton project={projectsByJobId[job.id]} actorId={user.uid} size="sm" />
                     )}
                   </div>
-                </Card>
+                </div>
               ))}
+              {allJobs.length === 0 && <p className="text-foreground/50 italic py-8 text-center col-span-full">No jobs found on the platform.</p>}
             </div>
-          </div>
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="settings">
-          <div className="bg-white p-8 rounded-[2rem] border border-border">
-            <h2 className="text-2xl font-bold mb-8">System Configuration</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <DashboardSection
+            title="System Configuration"
+            description="Global LLM strategy and system health."
+            icon={<Settings2 size={18} />}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
                   <Cpu size={16} /> Global LLM Strategy
                 </h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Active Provider</label>
-                    <select className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm outline-none focus:ring-2 focus:ring-primary">
+                    <label className="text-xs font-bold text-foreground/60 uppercase tracking-widest">Active Provider</label>
+                    <select className="w-full h-12 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-primary">
                       <option value="gemini">Google Gemini (Recommended)</option>
                       <option value="openai">OpenAI</option>
                       <option value="openrouter">OpenRouter</option>
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Default Model</label>
+                    <label className="text-xs font-bold text-foreground/60 uppercase tracking-widest">Default Model</label>
                     <Input placeholder="gemini-2.0-flash" className="h-12 rounded-xl" />
                   </div>
-                  <Button className="w-full h-12 rounded-xl font-bold shadow-lg shadow-primary/20">Save Global Settings</Button>
+                  <GlassButton variant="solid" size="md" className="w-full">Save Global Settings</GlassButton>
                 </div>
               </div>
 
-              <div className="space-y-6 p-8 bg-secondary/20 rounded-[2rem] border border-border">
+              <div className="space-y-6 glass-panel rounded-2xl p-6">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2">
                   <Activity size={16} /> System Health
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">API Latency</span>
-                    <span className="font-bold text-primary-light">142ms</span>
+                    <span className="text-foreground/60">API Latency</span>
+                    <span className="font-bold text-primary">142ms</span>
                   </div>
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">Database Connectivity</span>
-                    <span className="font-bold text-primary-light">Stable</span>
+                    <span className="text-foreground/60">Database Connectivity</span>
+                    <span className="font-bold text-primary">Stable</span>
                   </div>
                   <div className="flex justify-between text-xs py-2 border-b border-border/50">
-                    <span className="text-muted-foreground">Agent Response Rate</span>
+                    <span className="text-foreground/60">Agent Response Rate</span>
                     <span className="font-bold">98.4%</span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="reviews">
-           <div className="bg-white p-8 rounded-[2rem] border border-border">
+           <DashboardSection
+             title="Content Moderation"
+             description="Review and moderate platform reviews and reports."
+             icon={<Star size={18} />}
+           >
               <ReviewManagement />
-           </div>
+           </DashboardSection>
         </TabsContent>
 
         <TabsContent value="agents">
-          <div className="mb-6 flex flex-col gap-3 rounded-[2rem] border border-border bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Agent Configuration</h2>
-              <p className="text-sm text-muted-foreground">Create, test, and tune specialist agents with provider defaults filled automatically.</p>
-            </div>
-            <Button onClick={() => setIsCreatingAgent(true)} className="h-12 rounded-xl font-bold gap-2" disabled={isCreatingAgent}>
-              <Plus size={16} /> New Agent
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <DashboardSection
+            title="Agent Configuration"
+            description="Create, test, and tune specialist agents with provider defaults filled automatically."
+            icon={<Cpu size={18} />}
+            action={
+              <GlassButton
+                variant="solid"
+                size="sm"
+                onClick={() => setIsCreatingAgent(true)}
+                disabled={isCreatingAgent}
+                aria-label="Create new agent"
+              >
+                <Plus size={16} className="mr-1" /> New Agent
+              </GlassButton>
+            }
+          >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isCreatingAgent && (
               <AgentCard
                 agent={createBlankAgent()}
@@ -1213,83 +1308,83 @@ export default function AdminDashboard({
               <AgentCard key={agent.id} agent={agent} />
             ))}
             {agents.length === 0 && !isCreatingAgent && (
-              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-[2rem] bg-white/50">
-                <p className="text-muted-foreground italic">No agents found in the system.</p>
+              <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-2xl">
+                <p className="text-foreground/50 italic">No agents found in the system.</p>
               </div>
             )}
           </div>
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="users">
-          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold">User Management</h2>
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Search users..."
-                    className="pl-10 rounded-full w-[300px]"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
+          <DashboardSection
+            title="User Management"
+            description="View and manage all registered platform users."
+            icon={<Users size={18} />}
+            action={
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40 w-4 h-4" />
+                <Input
+                  placeholder="Search users..."
+                  className="pl-10 rounded-full w-[260px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-secondary/30">
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allUsers
-                    .filter(u => (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()))
-                    .map(u => (
-                    <TableRow key={u.uid}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                            {(u.displayName || u.email || 'U')[0]}
-                          </div>
-                          <span className="font-medium">{u.displayName || u.email || 'Unknown User'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{u.role}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{u.email}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{safeFormat(u.createdAt, 'MMM d, yyyy')}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Managing user ${u.displayName || u.email || u.uid}`)}>
-                          <Settings2 size={16} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+            }
+          >
+            <GlassTable
+              columns={[
+                { key: 'uid', label: 'User', render: (_val, row) => (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                      {((row as UserProfile).displayName || (row as UserProfile).email || 'U')[0]}
+                    </div>
+                    <span className="font-medium">{(row as UserProfile).displayName || (row as UserProfile).email || 'Unknown User'}</span>
+                  </div>
+                )},
+                { key: 'role', label: 'Role', render: (val) => (
+                  <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{String(val)}</Badge>
+                )},
+                { key: 'email', label: 'Email', render: (val) => <span className="text-foreground/60 text-xs">{String(val || '')}</span> },
+                { key: 'createdAt', label: 'Joined', render: (val) => <span className="text-foreground/60 text-xs">{safeFormat(String(val || ''), 'MMM d, yyyy')}</span> },
+                { key: 'uid', label: 'Actions', render: (_val, row) => (
+                  <Button variant="ghost" size="sm" onClick={() => toast.info(`Managing user ${(row as UserProfile).displayName || (row as UserProfile).email || (row as UserProfile).uid}`)}>
+                    <Settings2 size={16} />
+                  </Button>
+                )},
+              ]}
+              rows={allUsers.filter(u =>
+                (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+              )}
+              rowKey="uid"
+              emptyState={<span className="text-foreground/50 italic">No users found matching your search.</span>}
+            />
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="knowledge">
-           <div className="space-y-8">
-              <AdminKnowledgeUploader user={user} />
-              <AgentKnowledgeManager user={user} />
-           </div>
+           <DashboardSection
+             title="Knowledge Base"
+             description="Upload and manage agent knowledge and training materials."
+             icon={<Sparkles size={18} />}
+           >
+              <div className="space-y-6">
+                <AdminKnowledgeUploader user={user} />
+                <AgentKnowledgeManager user={user} />
+              </div>
+           </DashboardSection>
         </TabsContent>
 
         <TabsContent value="municipal">
-           <div className="bg-white p-8 rounded-[2rem] border border-border shadow-sm">
+           <DashboardSection
+             title="Municipal Settings"
+             description="Configure municipal submission credentials and tracking."
+             icon={<Building2 size={18} />}
+           >
               <MunicipalSettingsAdmin />
-           </div>
+           </DashboardSection>
         </TabsContent>
 
         <TabsContent value="fees">
@@ -1301,80 +1396,65 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="verifications">
-          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden space-y-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-primary" /> Verification Agent Queue</h2>
-                <p className="text-sm text-muted-foreground mt-1">Review records created by the Architex browser verification agent against official registers.</p>
-              </div>
+          <DashboardSection
+            title="Verification Agent Queue"
+            description="Review records created by the Architex browser verification agent against official registers."
+            icon={<ShieldCheck size={18} />}
+            action={
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.total} records</Badge>
-                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.pending} pending</Badge>
-                <Badge variant={verificationQueue.summary.overdue > 0 ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.overdue} SLA overdue</Badge>
-                <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{verificationQueue.summary.dueForRecheck} rechecks</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verificationQueue.summary.total} records</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verificationQueue.summary.pending} pending</Badge>
+                <Badge variant={verificationQueue.summary.overdue > 0 ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verificationQueue.summary.overdue} SLA overdue</Badge>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verificationQueue.summary.dueForRecheck} rechecks</Badge>
               </div>
-            </div>
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-secondary/30">
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Register</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Agent Evidence</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {verificationQueue.items.map(queueItem => {
-                    const verification = verificationsById.get(queueItem.id);
-                    if (!verification) return null;
-                    const agentResult = verification.metadata?.verificationAgent as any;
-                    const lifecycle = getVerificationLifecycle(verification);
-                    const agentStatus = verification.metadata?.verificationAgentStatus as string | undefined;
-                    return (
-                      <TableRow key={verification.id}>
-                        <TableCell className="font-mono text-xs">{verification.userId}</TableCell>
-                        <TableCell><Badge variant="outline" className="uppercase text-[10px] tracking-widest">{verification.subjectType}</Badge></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {verification.statutoryBody || 'Unspecified'} · {verification.registrationNumber || 'No number'}
-                          {verification.expiresAt && <p className="mt-1">Expires {safeFormat(verification.expiresAt, 'MMM d, yyyy')}</p>}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col items-start gap-1">
-                            <Badge variant={verification.status === 'verified' ? 'secondary' : verification.status === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{verification.status}</Badge>
-                            <Badge variant={queueItem.priority === 'urgent' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{queueItem.priority} priority</Badge>
-                            {(lifecycle.isDueForRecheck || agentStatus) && (
-                              <Badge variant={lifecycle.isExpired ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">
-                                {agentStatus === 'queued' ? 'Agent queued' : lifecycle.lifecycleStatus.replace(/_/g, ' ')}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-[320px] text-xs text-muted-foreground">
-                          {agentResult?.officialUrl ? (
-                            <a className="text-primary underline" href={agentResult.officialUrl} target="_blank" rel="noreferrer">{agentResult.provider} official check</a>
-                          ) : 'Queued or not yet checked'}
-                          <p className="mt-1 font-medium text-foreground">{queueItem.action}</p>
-                          {queueItem.blocker && <p className="mt-1 text-red-600">{queueItem.blocker}</p>}
-                          {agentResult?.error && <p className="mt-1 line-clamp-2 text-red-600">{agentResult.error}</p>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => recheckUserVerification(verification)} disabled={verification.status === 'pending'}>Recheck</Button>
-                            <Button size="sm" onClick={() => reviewUserVerification(verification, 'verified')} disabled={verification.status === 'verified'}>Approve</Button>
-                            <Button size="sm" variant="destructive" onClick={() => reviewUserVerification(verification, 'rejected')} disabled={verification.status === 'rejected'}>Reject</Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            {userVerifications.length === 0 && <p className="text-muted-foreground italic">No verification records have been submitted yet.</p>}
-          </div>
+            }
+          >
+            <GlassTable
+              columns={[
+                { key: 'userId', label: 'User', render: (val) => <span className="font-mono text-xs">{String(val)}</span> },
+                { key: 'subjectType', label: 'Subject', render: (val) => <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{String(val)}</Badge> },
+                { key: 'id', label: 'Register', render: (_val, row) => {
+                  const v = row as UserVerification;
+                  return (
+                    <div className="text-xs text-foreground/60">
+                      {v.statutoryBody || 'Unspecified'} · {v.registrationNumber || 'No number'}
+                      {v.expiresAt && <p className="mt-1">Expires {safeFormat(v.expiresAt, 'MMM d, yyyy')}</p>}
+                    </div>
+                  );
+                }},
+                { key: 'status', label: 'Status', render: (val, row) => {
+                  const v = row as UserVerification;
+                  const queueItem = verificationQueue.items.find(i => i.id === v.id);
+                  const lifecycle = getVerificationLifecycle(v);
+                  const agentStatus = v.metadata?.verificationAgentStatus as string | undefined;
+                  return (
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge variant={val === 'verified' ? 'secondary' : val === 'rejected' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{String(val)}</Badge>
+                      {queueItem && <Badge variant={queueItem.priority === 'urgent' ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">{queueItem.priority} priority</Badge>}
+                      {(lifecycle.isDueForRecheck || agentStatus) && (
+                        <Badge variant={lifecycle.isExpired ? 'destructive' : 'outline'} className="uppercase text-[10px] tracking-widest">
+                          {agentStatus === 'queued' ? 'Agent queued' : lifecycle.lifecycleStatus.replace(/_/g, ' ')}
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                }},
+                { key: 'id', label: 'Actions', render: (_val, row) => {
+                  const v = row as UserVerification;
+                  return (
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => recheckUserVerification(v)} disabled={v.status === 'pending'}>Recheck</Button>
+                      <Button size="sm" onClick={() => reviewUserVerification(v, 'verified')} disabled={v.status === 'verified'}>Approve</Button>
+                      <Button size="sm" variant="destructive" onClick={() => reviewUserVerification(v, 'rejected')} disabled={v.status === 'rejected'}>Reject</Button>
+                    </div>
+                  );
+                }},
+              ]}
+              rows={userVerifications}
+              rowKey="id"
+              emptyState={<span className="text-foreground/50 italic">No verification records have been submitted yet.</span>}
+            />
+          </DashboardSection>
         </TabsContent>
 
         <TabsContent value="governance-tools">
@@ -1382,40 +1462,30 @@ export default function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="firms">
-          <div className="bg-white p-8 rounded-[2rem] border border-border overflow-hidden space-y-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2"><Building2 className="text-primary" /> Firm Oversight</h2>
-                <p className="text-sm text-muted-foreground mt-1">Review firm workspace records and subscription/access status without replacing user management.</p>
-              </div>
-              <Badge variant="outline" className="uppercase text-[10px] tracking-widest w-fit">{firms.length} firms</Badge>
-            </div>
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-secondary/30">
-                  <TableRow>
-                    <TableHead>Firm</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Subscription</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Created</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {firms.map(firm => (
-                    <TableRow key={firm.id}>
-                      <TableCell className="font-bold">{firm.name}</TableCell>
-                      <TableCell className="font-mono text-xs">{firm.ownerId}</TableCell>
-                      <TableCell><Badge variant="outline" className="uppercase text-[10px] tracking-widest">{firm.subscriptionStatus}</Badge></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{firm.primaryContactEmail || firm.billingEmail || 'Not set'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{safeFormat(firm.createdAt, 'MMM d, yyyy')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            {firms.length === 0 && <p className="text-muted-foreground italic">No firm workspaces have been created yet.</p>}
-          </div>
+          <DashboardSection
+            title="Firm Oversight"
+            description="Review firm workspace records and subscription/access status without replacing user management."
+            icon={<Building2 size={18} />}
+            action={<Badge variant="outline" className="uppercase text-[10px] tracking-widest">{firms.length} firms</Badge>}
+          >
+            <GlassTable
+              columns={[
+                { key: 'name', label: 'Firm', render: (val) => <span className="font-bold">{String(val)}</span> },
+                { key: 'ownerId', label: 'Owner', render: (val) => <span className="font-mono text-xs">{String(val)}</span> },
+                { key: 'subscriptionStatus', label: 'Subscription', render: (val) => (
+                  <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{String(val)}</Badge>
+                )},
+                { key: 'primaryContactEmail', label: 'Contact', render: (_val, row) => {
+                  const f = row as Firm;
+                  return <span className="text-xs text-foreground/60">{f.primaryContactEmail || f.billingEmail || 'Not set'}</span>;
+                }},
+                { key: 'createdAt', label: 'Created', render: (val) => <span className="text-xs text-foreground/60">{safeFormat(String(val || ''), 'MMM d, yyyy')}</span> },
+              ]}
+              rows={firms}
+              rowKey="id"
+              emptyState={<span className="text-foreground/50 italic">No firm workspaces have been created yet.</span>}
+            />
+          </DashboardSection>
         </TabsContent>
       </Tabs>
 
@@ -1458,8 +1528,8 @@ export default function AdminDashboard({
             const jobDisputes = disputes.filter(dispute => dispute.jobId === selectedJob.id);
 
             return (
-              <div className="bg-white">
-                <DialogHeader className="p-8 border-b border-border bg-primary/5 text-left">
+              <div className="glass-panel rounded-[2rem]">
+                <DialogHeader className="p-8 border-b border-border/50 text-left">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                     <div>
                       <div className="flex flex-wrap gap-2 mb-4">
@@ -1489,7 +1559,7 @@ export default function AdminDashboard({
                   )}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <DetailPanel title="Project Brief" className="lg:col-span-2">
-                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{selectedJob.description || 'No description provided.'}</p>
+                      <p className="text-sm text-foreground/60 leading-relaxed whitespace-pre-wrap">{selectedJob.description || 'No description provided.'}</p>
                     </DetailPanel>
                     <DetailPanel title="Project Metadata">
                       <DetailRow label="Location" value={selectedJob.location || 'Not specified'} />
@@ -1504,7 +1574,7 @@ export default function AdminDashboard({
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <DetailPanel title="Stakeholders">
                       <StakeholderBlock label="Client" user={client} fallbackId={selectedJob.clientId} />
-                      <div className="mt-4 pt-4 border-t border-border">
+                      <div className="mt-4 pt-4 border-t border-border/50">
                         <StakeholderBlock label="Selected BEP / Design Professional" user={architect} fallbackId={selectedProfessionalId} empty="No design professional selected yet" />
                       </div>
                     </DetailPanel>
@@ -1513,14 +1583,14 @@ export default function AdminDashboard({
                       {selectedJob.requirements?.length ? (
                         <ul className="space-y-2">
                           {selectedJob.requirements.map((requirement, index) => (
-                            <li key={`${requirement}-${index}`} className="flex gap-3 rounded-xl border border-border bg-secondary/20 p-3 text-sm">
+                            <li key={`${requirement}-${index}`} className="flex gap-3 glass-record rounded-xl p-3 text-sm">
                               <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-primary" />
                               <span>{requirement}</span>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">No requirements captured for this project.</p>
+                        <p className="text-sm text-foreground/50 italic">No requirements captured for this project.</p>
                       )}
                     </DetailPanel>
                   </div>
@@ -1529,10 +1599,10 @@ export default function AdminDashboard({
                     {jobSubmissions.length ? (
                       <div className="space-y-3">
                         {jobSubmissions.map(submission => (
-                          <div key={submission.id} className="rounded-2xl border border-border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div key={submission.id} className="glass-record rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
                               <p className="font-bold text-sm">{submission.drawingName}</p>
-                              <p className="text-xs text-muted-foreground">Submitted {safeFormat(submission.createdAt, 'MMM d, yyyy HH:mm')} · Architect {submission.architectId}</p>
+                              <p className="text-xs text-foreground/60">Submitted {safeFormat(submission.createdAt, 'MMM d, yyyy HH:mm')} · Architect {submission.architectId}</p>
                               {submission.riskStatus && <p className="text-xs text-primary mt-1">Risk: {submission.riskStatus.replaceAll('_', ' ')}</p>}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -1548,7 +1618,7 @@ export default function AdminDashboard({
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground italic">No drawing submissions or compliance activity recorded yet.</p>
+                      <p className="text-sm text-foreground/50 italic">No drawing submissions or compliance activity recorded yet.</p>
                     )}
                   </DetailPanel>
 
@@ -1559,13 +1629,13 @@ export default function AdminDashboard({
                           {selectedJob.statusHistory.map((item, index) => (
                             <div key={`${item.status}-${item.timestamp}-${index}`} className="border-l-2 border-primary/30 pl-4 py-1">
                               <p className="text-sm font-bold capitalize">{item.status.replace('-', ' ')}</p>
-                              <p className="text-xs text-muted-foreground">{safeFormat(item.timestamp, 'MMM d, yyyy HH:mm')} · Actor {item.actorId}</p>
+                              <p className="text-xs text-foreground/60">{safeFormat(item.timestamp, 'MMM d, yyyy HH:mm')} · Actor {item.actorId}</p>
                               {item.note && <p className="text-xs mt-1">{item.note}</p>}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">No status history has been recorded.</p>
+                        <p className="text-sm text-foreground/50 italic">No status history has been recorded.</p>
                       )}
                     </DetailPanel>
 
@@ -1573,18 +1643,18 @@ export default function AdminDashboard({
                       {jobDisputes.length ? (
                         <div className="space-y-3">
                           {jobDisputes.map(dispute => (
-                            <div key={dispute.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <div key={dispute.id} className="glass-record rounded-xl p-4">
                               <div className="flex items-center justify-between gap-3 mb-2">
                                 <p className="text-sm font-bold">{dispute.reason}</p>
-                                <Badge variant="outline" className="uppercase text-[10px] tracking-widest bg-white">{dispute.status.replaceAll('_', ' ')}</Badge>
+                                <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{dispute.status.replaceAll('_', ' ')}</Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground">Requested: {dispute.requestedResolution}</p>
+                              <p className="text-xs text-foreground/60">Requested: {dispute.requestedResolution}</p>
                               {dispute.adminNotes && <p className="text-xs mt-2">Admin notes: {dispute.adminNotes}</p>}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">No disputes linked to this project.</p>
+                        <p className="text-sm text-foreground/50 italic">No disputes linked to this project.</p>
                       )}
                     </DetailPanel>
                   </div>
@@ -1594,14 +1664,15 @@ export default function AdminDashboard({
           })()}
         </DialogContent>
       </Dialog>
+      </main>
     </div>
   );
 }
 
 function ProjectMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+    <div className="glass-tile rounded-xl p-4">
+      <p className="text-[10px] font-black uppercase tracking-widest text-foreground/60">{label}</p>
       <p className="mt-1 text-lg font-heading font-black text-foreground">{value}</p>
     </div>
   );
@@ -1609,7 +1680,7 @@ function ProjectMetric({ label, value }: { label: string; value: React.ReactNode
 
 function DetailPanel({ title, className = '', children }: React.PropsWithChildren<{ title: string; className?: string }>) {
   return (
-    <section className={`rounded-[1.5rem] border border-border bg-white p-6 shadow-sm ${className}`}>
+    <section className={`glass-card rounded-2xl p-6 ${className}`}>
       <h3 className="text-[10px] font-black uppercase tracking-widest text-primary mb-4">{title}</h3>
       {children}
     </section>
@@ -1618,8 +1689,8 @@ function DetailPanel({ title, className = '', children }: React.PropsWithChildre
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="py-3 border-b border-border/60 last:border-b-0">
-      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+    <div className="py-3 border-b border-border/40 last:border-b-0">
+      <p className="text-[10px] font-black uppercase tracking-widest text-foreground/60">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground break-words">{value}</p>
     </div>
   );
@@ -1690,20 +1761,18 @@ function DisputeRow({ dispute }: { dispute: Dispute }) {
 
 function StatCard({ title, value }: { title: string; value: number }) {
   return (
-    <Card className="beos-stat-card">
-      <CardHeader>
-        <CardDescription className="beos-label-caps text-muted-foreground">{title}</CardDescription>
-        <CardTitle className="beos-metric">{value}</CardTitle>
-      </CardHeader>
-    </Card>
+    <div className="glass-tile rounded-xl p-5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/60">{title}</p>
+      <p className="mt-2 text-3xl font-heading font-black text-foreground">{value}</p>
+    </div>
   );
 }
 
 function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
+    <div className="flex items-center justify-between glass-panel rounded-xl p-3 mt-4">
       <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-      <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
+      <span className="text-xs font-bold text-foreground/60">Page {page} of {totalPages}</span>
       <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
     </div>
   );

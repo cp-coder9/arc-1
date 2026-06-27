@@ -1,4 +1,5 @@
 import type { NavigationItem } from './navTypes';
+import type { UserRole } from '../types';
 
 export const architexNavigation: NavigationItem[] = [
   {
@@ -150,3 +151,33 @@ export const architexNavigation: NavigationItem[] = [
     ],
   },
 ];
+
+/**
+ * Returns the navigation modules accessible to a given user role.
+ *
+ * Each top-level module is included if:
+ *   - it has no `roles` filter (accessible to all), OR
+ *   - the user's role is listed in its `roles` array.
+ *
+ * Within included modules, sections that carry their own `roles` filter
+ * are also filtered by the user's role — sections without a `roles` filter
+ * are always included.
+ *
+ * Preconditions: `role` is a valid UserRole from src/types.ts
+ * Postconditions: returns array of NavigationItems visible to that role with
+ *   section-level role filtering applied
+ */
+export function getNavigationForRole(role: UserRole): NavigationItem[] {
+  return architexNavigation
+    .filter((item) => {
+      if (!item.roles || item.roles.length === 0) return true;
+      return item.roles.includes(role);
+    })
+    .map((item) => ({
+      ...item,
+      sections: item.sections.filter((section) => {
+        if (!section.roles || section.roles.length === 0) return true;
+        return section.roles.includes(role);
+      }),
+    }));
+}
