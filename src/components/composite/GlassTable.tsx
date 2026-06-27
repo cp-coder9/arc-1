@@ -83,7 +83,9 @@ export function GlassTable<T>({
         aria-label="Loading table data"
       >
         {Array.from({ length: 5 }).map((_, i) => (
-          <SkeletonTableRow key={i} />
+          <div key={i}>
+            <SkeletonTableRow />
+          </div>
         ))}
       </div>
     )
