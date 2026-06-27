@@ -80,6 +80,8 @@ import {
   Factory,
   ChevronRight,
   BarChart3,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -433,6 +435,19 @@ function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('architex.sidebarCollapsed') === 'true';
+  });
+  const toggleSidebarCollapsed = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('architex.sidebarCollapsed', String(next));
+      }
+      return next;
+    });
+  }, []);
   const [activeTab, setActiveTab] = useState('command');
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
 
@@ -948,21 +963,35 @@ function AppContent() {
     <DemoModeProvider>
     <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:w-[288px] md:shrink-0 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col gap-y-4 p-7 overflow-y-auto">
-          <div className="flex items-center justify-between shrink-0">
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-all duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:shrink-0 md:translate-x-0 ${isSidebarCollapsed ? 'md:w-[84px]' : 'md:w-[288px]'} ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`h-full flex flex-col gap-y-4 overflow-y-auto overflow-x-hidden p-7 ${isSidebarCollapsed ? 'md:px-3' : ''}`}>
+          <div className={`flex items-center justify-between shrink-0 ${isSidebarCollapsed ? 'md:justify-center' : ''}`}>
             <div className="flex items-center gap-3">
               <Logo iconClassName="h-14 w-14 object-contain sm:h-16 sm:w-16" textClassName="hidden" />
-              <div>
+              <div className={isSidebarCollapsed ? 'md:hidden' : ''}>
                 <p className="font-sans text-[1.35rem] font-black tracking-[-0.055em] text-primary">Architex OS</p>
                 <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
               </div>
             </div>
-            <DemoRoleSwitcher />
+            <div className={isSidebarCollapsed ? 'md:hidden' : ''}>
+              <DemoRoleSwitcher />
+            </div>
             <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-primary/10" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
-          <div className="rounded-[1.25rem] border border-border/70 bg-muted/70 p-4 shadow-[0_10px_26px_rgba(20,71,63,0.06)]" style={{ borderTop: `4px solid ${roleVisual.accent}` }}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`hidden md:inline-flex rounded-full hover:bg-primary/10 self-end shrink-0 ${isSidebarCollapsed ? 'md:self-center' : ''}`}
+            onClick={toggleSidebarCollapsed}
+            aria-label={isSidebarCollapsed ? 'Expand navigation menu' : 'Collapse navigation menu'}
+            aria-expanded={!isSidebarCollapsed}
+            title={isSidebarCollapsed ? 'Expand menu' : 'Collapse menu'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+          </Button>
+
+          <div className={`rounded-[1.25rem] border border-border/70 bg-muted/70 p-4 shadow-[0_10px_26px_rgba(20,71,63,0.06)] ${isSidebarCollapsed ? 'md:hidden' : ''}`} style={{ borderTop: `4px solid ${roleVisual.accent}` }}>
             <div className="flex items-center justify-between gap-3">
               <span className="beos-label-caps text-muted-foreground">Current Role</span>
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: roleVisual.accent, boxShadow: `0 0 18px ${roleVisual.accent}` }} />
@@ -982,12 +1011,13 @@ function AppContent() {
                 icon={navKeyIcon(item.key)}
                 label={item.label}
                 active={activeNavKey === item.key}
+                collapsed={isSidebarCollapsed}
                 onClick={() => navigateDashboard(getDefaultPageForNavKey(item.key), 'sidebar')}
               />
             ))}
           </nav>
 
-            <div className="mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground" data-testid="dashboard-keyboard-shortcuts">
+            <div className={`mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground ${isSidebarCollapsed ? 'md:hidden' : ''}`} data-testid="dashboard-keyboard-shortcuts">
               <p className="font-bold text-foreground">Keyboard shortcuts</p>
               <p className="mt-1">Alt+1–9 opens your first visible pages. Alt+K Command, Alt+A AI, Alt+P Profile, Alt+F Files, Alt+I Invoicing.</p>
               <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Visible page shortcut map">
@@ -996,8 +1026,13 @@ function AppContent() {
             </div>
 
           <div className="pt-5 mt-auto border-t border-border/70 shrink-0">
-            <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold" onClick={handleLogout}>
-              <LogOut size={20} /> <span className="font-bold">Logout</span>
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold ${isSidebarCollapsed ? 'md:justify-center md:gap-0 md:px-0' : ''}`}
+              onClick={handleLogout}
+              title={isSidebarCollapsed ? 'Logout' : undefined}
+            >
+              <LogOut size={20} /> <span className={`font-bold ${isSidebarCollapsed ? 'md:hidden' : ''}`}>Logout</span>
             </Button>
           </div>
         </div>
@@ -1541,17 +1576,18 @@ function NavSectionLabel({ children }: { children: React.ReactNode }) {
   return <div className="px-3 pt-4 pb-1 beos-label-caps text-muted-foreground/80">{children}</div>;
 }
 
-function NavItem({ icon, label, active, onClick, ...props }: any) {
+function NavItem({ icon, label, active, onClick, collapsed, ...props }: any) {
   return (
     <button
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`group w-full flex items-center gap-3 rounded-[1.05rem] px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'bg-[#dff1fa] text-primary shadow-[0_12px_30px_rgba(20,71,63,0.10)]' : 'text-muted-foreground hover:bg-muted hover:text-primary'}`}
+      title={collapsed ? label : undefined}
+      className={`group w-full flex items-center gap-3 rounded-[1.05rem] px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${collapsed ? 'md:justify-center md:gap-0 md:px-0' : ''} ${active ? 'bg-[#dff1fa] text-primary shadow-[0_12px_30px_rgba(20,71,63,0.10)]' : 'text-muted-foreground hover:bg-muted hover:text-primary'}`}
       {...props}
     >
       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[0.7rem] border transition-all ${active ? 'border-primary/15 bg-white text-primary' : 'border-transparent bg-white/70 text-muted-foreground group-hover:border-primary/15 group-hover:text-primary'}`}>{icon}</span>
-      <span className="min-w-0 flex-1 truncate font-bold tracking-[0.01em]">{label}</span>
-      {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-primary" />}
+      <span className={`min-w-0 flex-1 truncate font-bold tracking-[0.01em] ${collapsed ? 'md:hidden' : ''}`}>{label}</span>
+      {active && <span aria-hidden="true" className={`h-2 w-2 rounded-full bg-primary ${collapsed ? 'md:hidden' : ''}`} />}
     </button>
   );
 }
