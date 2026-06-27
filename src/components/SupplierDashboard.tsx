@@ -7,9 +7,17 @@ import type { DeliveryEvidenceItem, ProcurementCommitment } from '@/services/pac
 import PackageProcurementWorkspace from './PackageProcurementWorkspace';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-
-
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
+
+// ─── Glass system & design components ────────────────────────────────────────
+import { RoleAwareSidebar } from '@/components/navigation/RoleAwareSidebar';
+import { MobileMenuTrigger } from '@/components/navigation/MobileMenuTrigger';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { GlassButton } from '@/components/ui/GlassButton';
+import { StatCardAnimated } from '@/components/animated/StatCardAnimated';
+import { DashboardSection } from '@/components/composite/DashboardSection';
+import { GlassTable } from '@/components/composite/GlassTable';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 type SupplierRecord = ProcurementCommitment | DeliveryEvidenceItem;
 
 function timestampMs(value: unknown): number {
@@ -23,6 +31,7 @@ function timestampMs(value: unknown): number {
 }
 
 export default function SupplierDashboard({ user }: { user: UserProfile }) {
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const [publishedPackages, setPublishedPackages] = useState<TenderPackage[]>([]);
   const [commitments, setCommitments] = useState<ProcurementCommitment[]>([]);
   const [evidence, setEvidence] = useState<DeliveryEvidenceItem[]>([]);
@@ -75,64 +84,67 @@ export default function SupplierDashboard({ user }: { user: UserProfile }) {
     .slice(0, 5), [commitments, evidence]);
 
   return (
-    <div className="space-y-8" data-testid="supplier-dashboard">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <Badge variant="secondary" className="w-fit rounded-full uppercase tracking-widest">Supplier workspace</Badge>
-              <CardTitle className="font-heading text-3xl md:text-5xl font-black tracking-[-0.055em] flex items-center gap-3">
-                <Factory className="h-8 w-8 text-primary" /> Supply Chain Dashboard
-              </CardTitle>
-              <CardDescription className="max-w-3xl text-base leading-relaxed">
-                Quote response, product-data, lead-time, delivery-note, warranty, manual, and certificate tools for supplier-scoped delivery. Supplier actions remain procurement/evidence scoped.
-              </CardDescription>
-            </div>
-            <Badge variant="outline" className="w-fit rounded-full capitalize">{user.professionalLabel || 'Supplier'}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <Metric label="Open packages" value={stats.available} icon={<PackageOpen className="h-5 w-5" />} loading={loading} />
-          <Metric label="Quotes" value={stats.quotes} icon={<ClipboardList className="h-5 w-5" />} />
-          <Metric label="Delivery notes" value={stats.deliveryNotes} icon={<Truck className="h-5 w-5" />} />
-          <Metric label="Close-out docs" value={stats.closeoutDocs} icon={<FileCheck2 className="h-5 w-5" />} />
-        </CardContent>
-      </Card>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden" data-testid="supplier-dashboard">
+      {/* Fixed left sidebar (hidden on mobile, visible md+) */}
+      <RoleAwareSidebar user={user} activeTab="overview" onNavigate={() => {}} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px]">
-        <Card className="rounded-2xl border-border bg-card/95 shadow-sm">
-          <CardHeader>
-            <CardTitle className="font-heading text-xl flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Supplier authority boundary</CardTitle>
-            <CardDescription>Suppliers can provide evidence and respond to procurement requests, but cannot issue subcontract orders, accept their own deliveries, or release payments.</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card className="rounded-2xl border-border bg-card/95 shadow-sm">
-          <CardHeader>
-            <CardTitle className="font-heading text-xl">Recent supplier records</CardTitle>
-            <CardDescription>{recentRecords.length ? 'Latest quote/evidence records for this supplier.' : 'No supplier records found yet.'}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {recentRecords.map((record) => (
-              <div key={record.id} className="rounded-xl border border-border bg-background/70 p-3 text-sm">
-                <p className="font-bold text-foreground">{record.title}</p>
-                <p className="text-xs text-muted-foreground capitalize">{record.type.replaceAll('_', ' ')}</p>
+      {/* Main content — shifted right on desktop for sidebar */}
+      <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
+        {/* ── Page header ────────────────────────────────────────────────── */}
+        <header className="glass-panel rounded-2xl p-5 md:p-6">
+          <div className="flex items-start gap-3">
+            <MobileMenuTrigger user={user} className="mt-1 shrink-0" />
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Factory className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <Badge variant="secondary" className="w-fit rounded-full uppercase tracking-widest text-[10px] mb-1">Supplier workspace</Badge>
+                  <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground tracking-tight">Supply Chain Dashboard</h1>
+                </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              <p className="text-sm text-foreground-muted mt-2 max-w-2xl leading-relaxed">
+                Quote response, product-data, lead-time, delivery-note, warranty, manual, and certificate tools for supplier-scoped delivery.
+              </p>
+              <Breadcrumbs className="mt-2" />
+            </div>
+          </div>
+        </header>
 
-      <PackageProcurementWorkspace user={user} mode="procurement" />
+        {/* ── Stats ──────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCardAnimated label="Open packages" value={stats.available} icon={<PackageOpen size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 0 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Quotes" value={stats.quotes} icon={<ClipboardList size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 1 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Delivery notes" value={stats.deliveryNotes} icon={<Truck size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 2 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Close-out docs" value={stats.closeoutDocs} icon={<FileCheck2 size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 3 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+        </div>
+
+        {/* ── Info + Recent records ──────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_380px]">
+          <DashboardSection title="Supplier authority boundary" icon={<ShieldCheck size={18} aria-hidden="true" />}>
+            <p className="text-sm text-foreground-muted leading-relaxed">Suppliers can provide evidence and respond to procurement requests, but cannot issue subcontract orders, accept their own deliveries, or release payments.</p>
+          </DashboardSection>
+
+          <DashboardSection title="Recent supplier records">
+            <div className="space-y-2">
+              {recentRecords.length === 0 && <p className="text-sm text-foreground-muted italic">No supplier records found yet.</p>}
+              {recentRecords.map((record) => (
+                <div key={record.id} className="glass-record rounded-xl p-3 text-sm">
+                  <p className="font-bold text-foreground">{record.title}</p>
+                  <p className="text-xs text-foreground-muted capitalize">{record.type.replaceAll('_', ' ')}</p>
+                </div>
+              ))}
+            </div>
+          </DashboardSection>
+        </div>
+
+        {/* ── Workspace ──────────────────────────────────────────────────── */}
+        <PackageProcurementWorkspace user={user} mode="procurement" />
+      </main>
     </div>
   );
 }
 
-function Metric({ label, value, icon, loading = false }: { label: string; value: number; icon: React.ReactNode; loading?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-      <div className="flex items-center justify-between text-primary">{icon}<Badge variant="outline" className="rounded-full">live</Badge></div>
-      <p className="mt-4 text-3xl font-heading font-black tracking-[-0.05em]">{loading ? '…' : value}</p>
-      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-    </div>
-  );
-}
+
+

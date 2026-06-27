@@ -164,18 +164,18 @@ export default function FeeEstimator({ role, compact = false, onEstimateBudget }
           <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Project type">
-                <select value={input.projectType} onChange={e => updateInput('projectType', e.target.value as FeeProjectType)} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
+                <select aria-label="Project type" value={input.projectType} onChange={e => updateInput('projectType', e.target.value as FeeProjectType)} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
                   {projectTypes.map(type => <option key={type} value={type}>{feeProjectTypeLabels[type]}</option>)}
                 </select>
               </Field>
               <Field label="Municipality / location">
-                <Input value={input.municipality} onChange={e => updateInput('municipality', e.target.value)} placeholder="Johannesburg, Tshwane, Cape Town..." className="h-12 rounded-xl" />
+                <Input aria-label="Municipality or location" value={input.municipality} onChange={e => updateInput('municipality', e.target.value)} placeholder="Johannesburg, Tshwane, Cape Town..." className="h-12 rounded-xl" />
               </Field>
               <Field label="Value of works excl. VAT">
-                <Input type="number" min="0" value={input.constructionValue} onChange={e => updateInput('constructionValue', Number(e.target.value))} className="h-12 rounded-xl" />
+                <Input aria-label="Value of works excluding VAT" type="number" min="0" value={input.constructionValue} onChange={e => updateInput('constructionValue', Number(e.target.value))} className="h-12 rounded-xl" />
               </Field>
               <Field label="Estimated floor area (sqm)">
-                <Input type="number" min="0" value={input.areaSqm} onChange={e => updateInput('areaSqm', Number(e.target.value))} className="h-12 rounded-xl" />
+                <Input aria-label="Estimated floor area in square meters" type="number" min="0" value={input.areaSqm} onChange={e => updateInput('areaSqm', Number(e.target.value))} className="h-12 rounded-xl" />
               </Field>
             </div>
 
@@ -192,7 +192,7 @@ export default function FeeEstimator({ role, compact = false, onEstimateBudget }
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Urgency">
-                <select value={input.urgency} onChange={e => updateInput('urgency', e.target.value as FeeEstimatorInput['urgency'])} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
+                <select aria-label="Project urgency" value={input.urgency} onChange={e => updateInput('urgency', e.target.value as FeeEstimatorInput['urgency'])} className="w-full h-12 px-4 rounded-xl border border-border bg-white text-sm">
                   <option value="standard">Standard programme</option>
                   <option value="urgent">Urgent (+10%)</option>
                   <option value="express">Express / compressed (+20%)</option>
@@ -301,7 +301,7 @@ function EstimatorHeader({ eyebrow, title, description, loadingSettings }: { eye
 function Field({ label, children }: React.PropsWithChildren<{ label: string }>) {
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</label>
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
       {children}
     </div>
   );

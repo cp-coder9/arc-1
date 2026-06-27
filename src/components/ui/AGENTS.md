@@ -8,7 +8,7 @@ Reusable, unstyled UI primitive components built on shadcn/ui conventions (`@rad
 
 - **Path:** `src/components/ui/`
 - **Owner:** Frontend / Design Systems Team
-- **Key files (~20):** `button.tsx`, `card.tsx`, `dialog.tsx`, `input.tsx`, `label.tsx`, `tabs.tsx`, `badge.tsx`, `avatar.tsx`, `accordion.tsx`, `alert.tsx`, `table.tsx`, `switch.tsx`, `slider.tsx`, `skeleton.tsx`, `progress.tsx`, `scroll-area.tsx`, `separator.tsx`, `popover.tsx`, `textarea.tsx`, `sonner.tsx`, `optimized-image.tsx`, `optimized-image.test.tsx`
+- **Key files (~35):** `button.tsx`, `card.tsx`, `dialog.tsx`, `input.tsx`, `label.tsx`, `tabs.tsx`, `badge.tsx`, `avatar.tsx`, `accordion.tsx`, `alert.tsx`, `table.tsx`, `switch.tsx`, `slider.tsx`, `skeleton.tsx`, `progress.tsx`, `scroll-area.tsx`, `separator.tsx`, `popover.tsx`, `textarea.tsx`, `sonner.tsx`, `optimized-image.tsx`, `optimized-image.test.tsx`, `GlassButton.tsx`, `GlassButton.test.tsx`, `GlassCard.tsx`, `GlassInput.tsx`, `GlassInput.test.tsx`, `GlassPanel.tsx`, `GlassPanel.test.tsx`, `GlassModal.tsx`, `GlassModal.test.tsx`, `GlassPill.tsx`, `GlassPill.test.tsx`, `GlassIconBox.tsx`, `GlassIconBox.test.tsx`, `GlassDrawer.tsx`, `GlassDrawer.test.tsx`, `LoadingSkeleton.tsx`, `LoadingSkeleton.test.tsx`
 
 ## Local Contracts
 
@@ -43,10 +43,21 @@ Every UI primitive must:
 
 ## Verification
 
-- `npm test` covers `optimized-image.test.tsx`
+- `npm test` covers `optimized-image.test.tsx`, `GlassInput.test.tsx`, `GlassPanel.test.tsx`, `GlassButton.test.tsx`, `GlassModal.test.tsx`, `GlassPill.test.tsx`, `GlassIconBox.test.tsx`, `GlassDrawer.test.tsx`, `LoadingSkeleton.test.tsx`, and `focus-ring-components.test.tsx`
+- `src/lib/__tests__/focus-ring-css.test.ts` covers CSS structure, --ring token values, and WCAG contrast for focus rings (runs in node environment)
 - TypeScript type checking via `npm run lint`
 - E2E visual regression tests via Playwright (`npm run test:e2e`)
-- No dedicated primitive test suite yet — add one if primitives grow beyond 30
+- Glass primitive test files use `*.test.tsx` pattern alongside each component — run via jsdom environment
+
+## Focus Ring Contracts (Task 6.7 — Req 10.3, 10.5, 10.9)
+
+All interactive Glass primitives MUST:
+- Apply `focus-visible-ring` class when interactive (has `onClick`/`tabIndex ≥ 0`)
+- Pair any `focus:outline-none` with `focus-visible-ring` to replace, not suppress, the focus indicator
+- Never use `focus:outline-none` alone on a keyboard-reachable element (`tabIndex ≥ 0`)
+- Exception: `tabIndex={-1}` (programmatic-only focus targets, e.g. GlassDrawer dialog root) may use `focus:outline-none`
+
+Focus ring colour: `--ring` resolves to `#aeefe3` (Dark_Theme) / `#006b5c` (Light_Theme). Both exceed WCAG 3:1 for non-text contrast (1.4.11). Dark_Theme achieves ~11–13:1 (WCAG AAA).
 
 ## Child DOX Index
 

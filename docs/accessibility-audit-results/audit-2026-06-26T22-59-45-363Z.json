@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-06-26T22-59-45-363Z",
+  "results": [
+    {
+      "dashboard": "ArchitectDashboard",
+      "violations": 5,
+      "passes": 23,
+      "incomplete": 0,
+      "violationDetails": [
+        "[critical] aria-required-parent: Ensures elements with an ARIA role that require parent roles are contained by them (8 node(s))",
+        "[minor] empty-heading: Ensures headings have discernible text (1 node(s))",
+        "[moderate] landmark-main-is-top-level: Ensures the main landmark is at top level (1 node(s))",
+        "[moderate] landmark-no-duplicate-main: Ensures the document has at most one main landmark (1 node(s))",
+        "[moderate] landmark-unique: Landmarks should have a unique role or role/label/title (i.e. accessible name) combination (1 node(s))"
+      ]
+    },
+    {
+      "dashboard": "AdminDashboard",
+      "violations": 3,
+      "passes": 19,
+      "incomplete": 0,
+      "violationDetails": [
+        "[moderate] landmark-main-is-top-level: Ensures the main landmark is at top level (1 node(s))",
+        "[moderate] landmark-no-duplicate-main: Ensures the document has at most one main landmark (1 node(s))",
+        "[moderate] landmark-unique: Landmarks should have a unique role or role/label/title (i.e. accessible name) combination (1 node(s))"
+      ]
+    },
+    {
+      "dashboard": "ClientDashboard",
+      "violations": 6,
+      "passes": 17,
+      "incomplete": 0,
+      "violationDetails": [
+        "[minor] empty-heading: Ensures headings have discernible text (1 node(s))",
+        "[critical] label: Ensures every form element has a label (2 node(s))",
+        "[moderate] landmark-main-is-top-level: Ensures the main landmark is at top level (1 node(s))",
+        "[moderate] landmark-no-duplicate-main: Ensures the document has at most one main landmark (1 node(s))",
+        "[moderate] landmark-unique: Landmarks should have a unique role or role/label/title (i.e. accessible name) combination (1 node(s))",
+        "[critical] select-name: Ensures select element has an accessible name (2 node(s))"
+      ]
+    }
+  ]
+}

@@ -325,8 +325,11 @@ arc-b2 platform fee: fully merged via integration.
 |------|------|----------|
 | Unit tests | Vitest | `*.test.ts` / `*.test.tsx` alongside source or `__tests__/` |
 | E2E tests | Playwright | `e2e/` directory (config: `playwright.config.ts`) |
+| Accessibility audit | jest-axe (axe-core) | `src/__tests__/accessibility.test.tsx` — runs axe on 3 primary dashboards |
 | Setup | — | `src/test/setup.ts` (Firebase + Vercel Blob mocks) |
 | Firestore rules | — | `scripts/run-firestore-rules-tests.mjs` |
+
+Accessibility audit results are exported to `docs/accessibility-audit-results/` (JSON + markdown) after each run.
 
 Run specific test:
 ```bash
@@ -569,7 +572,8 @@ arc/
 ├── AGENTS.md                          ← Root (this file) — project-wide contracts
 ├── src/
 │   ├── components/
-│   │   └── ui/AGENTS.md               ← UI Primitives (shadcn/ui) — atomic components
+│   │   ├── ui/AGENTS.md               ← UI Primitives (shadcn/ui) — atomic components
+│   │   └── composite/AGENTS.md        ← Tier 2 Composite Components — dashboard panels, tables, sections
 │   ├── features/
 │   │   └── project-communications/AGENTS.md ← Project Communication Feature
 │   ├── navigation/AGENTS.md           ← Role-Aware Navigation — info architecture
@@ -591,6 +595,8 @@ arc/
 | `src/demo-context/AGENTS.md` | Demo mode React context — role switching, sandbox seeding, localStorage persistence | Single-file module with explicit contracts for demo mode state management consumed by App.tsx and all components. |
 | `src/demo-seed/AGENTS.md` | Demo mock data and Firestore persistence wrapper | 8-file subsystem (12 mock projects, 19 users, CPD data, persistence layer) with its own seed contracts and import patterns. |
 | `src/components/ui/AGENTS.md` | Reusable shadcn/ui primitive components | Atomic component library with its own styling conventions, accessibility contracts, and prop patterns consumed by every feature component in the app. |
+| `src/components/composite/AGENTS.md` | Tier 2 composite components (GlassTable, StatCard, DashboardSection) | Dashboard-specific composites that compose Tier 1 primitives into reusable panels and data displays. Defined by Phase 3 of the UI/UX Overhaul spec. |
+| `src/components/composite/AGENTS.md` | Tier 2 composite dashboard components (DashboardSection, StatCard, GlassTable) | Composites that orchestrate Tier 1 primitives into reusable dashboard panels, stat tiles, and tables — a distinct layer between raw primitives and full page layouts. |
 | `src/navigation/AGENTS.md` | Role-aware navigation configuration and routing | Central information architecture contract that determines what every user role sees. Consumed by App.tsx and all dashboards. |
 | `src/features/project-communications/AGENTS.md` | Project chat, messaging, phase-aware communication panels | Bounded feature module with its own component tree, service layer, type system, and config — the clearest feature boundary in the project. |
 
@@ -601,7 +607,7 @@ arc/
 | `src/types/` | Pure type definitions (11 files), no behavioral rules or workflow — too thin for a separate doc |
 | `src/lib/` | Heterogeneous collection of utilities (firebase, api, routes, schemas, encryption) — no single purpose boundary |
 | `src/test/` | Test infrastructure (setup, mocks) — already documented in root AGENTS.md testing section |
-| `src/hooks/` | Single custom hook — insufficient scope |
+| `src/hooks/` | 4 custom hooks (useReducedMotion, useTheme, usePlatformSpine, useBreadcrumbs) — thin utility layer, no behavioral contracts beyond individual hook docs |
 | `src/data/` | Only 2 static data files — operational, not a durable boundary |
 | `src/examples/` | Single example file — reference material, not a working boundary |
 | `src/components/cpd/` | 6 CPD UI components nested under components — defers to when components/ as a whole gets indexed |

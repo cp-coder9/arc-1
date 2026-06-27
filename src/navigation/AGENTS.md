@@ -10,6 +10,22 @@ Central navigation configuration and routing infrastructure that determines what
 - **Owner:** Frontend / UX Architecture Team
 - **Key files:** `architexNavigationConfig.ts`, `navTypes.ts`, `navDashboardAdapter.ts`, `contextualMessagingService.ts`, `example.ts`
 
+### RoleAwareSidebar (`src/components/navigation/RoleAwareSidebar.tsx`)
+- Glass navigation sidebar rendered by all authenticated dashboard pages
+- Calls `getNavigationForRole(user.role)` from `architexNavigationConfig.ts` — must be the single source of truth for role filtering
+- Accepts `activeTab` + `onNavigate` for page-tab routing (not URL-based); these match App.tsx's `activeTab`/`navigateDashboard` contract
+- `getNavigationForRole` exported from `architexNavigationConfig.ts` — filters both module-level and section-level `roles` arrays
+- Requirement 5.8: hidden on mobile via `hidden md:flex` classes; mobile access provided by `MobileMenuTrigger` + `GlassDrawer` (separate component)
+
+### MobileMenuTrigger (`src/components/navigation/MobileMenuTrigger.tsx`)
+- Renders a hamburger button (Menu icon from lucide-react) visible only on mobile (`block md:hidden`)
+- On click, opens a `GlassDrawer` that slides in from the left containing `RoleAwareSidebar`
+- Accepts `user: UserProfile`, `onSignOut?: () => void`, `className?: string`
+- Manages `isOpen` state internally; closing via Escape, backdrop click, or Sign Out
+- Accessible: `aria-label="Open navigation menu"`, `aria-expanded` reflects open state
+- Sign Out inside the drawer calls `onSignOut` callback and then closes the drawer
+- Requirement: 5.8
+
 ## Local Contracts
 
 ### Navigation Type System (`navTypes.ts`)

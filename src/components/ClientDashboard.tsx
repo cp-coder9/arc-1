@@ -1,101 +1,114 @@
 import { apiFetch } from '../lib/apiClient';
 import { getSelectedProfessionalId } from '../lib/professionalRoleCompatibility';
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, orderBy, deleteField } from 'firebase/firestore';
-import { UserProfile, Job, Submission, Application, JobCategory, Review, Project } from '../types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
-import { Button } from './ui/button';
+import { auth } from '../lib/firebase';
+import { query, where, onSnapshot, getDoc, updateDoc, addDoc, orderBy, deleteField } from 'firebase/firestore';
+import { UserProfile, Job, Application, Review, Project } from '../types';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { GlassButton } from './ui/GlassButton';
+import { StatCardAnimated } from './animated/StatCardAnimated';
+import { DashboardSection } from './composite/DashboardSection';
+import { GlassTable } from './composite/GlassTable';
+import RoleAwareSidebar from './navigation/RoleAwareSidebar';
+import Breadcrumbs from './navigation/Breadcrumbs';
+import MobileMenuTrigger from './navigation/MobileMenuTrigger';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import {
-  LayoutDashboard,
-
   Briefcase,
-  Clock,
   CheckCircle2,
-  History,
-  MapPin,
-  Plus,
-  Search,
   Star,
   MessageCircle,
+  Plus,
+  Users,
+  Loader2,
+  CreditCard,
   FileText,
-  AlertCircle,
-  ArrowRight,
-  TrendingUp,
-  Award,
-  User as UserIcon,
-  MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Users, CreditCard, Landmark, History as HistoryIcon, ShieldCheck, User, ExternalLink, UploadCloud, Loader2, Sparkles, Shield, X, Building2, ShieldX } from 'lucide-react';
 import ProfileEditor from './ProfileEditor';
 import RatingSystem from './RatingSystem';
 import { Chat } from './Chat';
-import { ArchitectPortfolio } from './ArchitectPortfolio';
-import { ArchitectRecommendations } from './ArchitectRecommendations';
-import { Logo } from './Logo';
-import { uploadAndTrackFile } from '../lib/uploadService';
-import { reviewDrawing, logSystemEvent, AIProgress } from '../services/geminiService';
-import { notificationService } from '../services/notificationService';
-import { SubmissionItem } from './SubmissionItem';
-import { OrchestrationProgressModal } from './OrchestrationProgressModal';
-import { safeLocale } from '@/lib/utils';
-import ReactMarkdown from 'react-markdown';
-import MunicipalTracker from './MunicipalTracker';
 import { paginateItems, totalPages } from '@/lib/utils';
 import FeeEstimator from './FeeEstimator';
 import StageProgressTracker from './StageProgressTracker';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
-
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
-// import { motion } from 'framer-motion';
 
-export default function ClientDashboard({ 
-  user, 
-  activeTab, 
-  onTabChange 
-}: { 
-  user: UserProfile, 
-  activeTab?: string, 
-  onTabChange?: (tab: string) => void 
+/**
+ * ClientDashboard — Property owner / developer workspace.
+ *
+ * Preconditions:
+ *   - user is authenticated with role 'client'
+ *   - Firebase is initialized and readable
+ *
+ * Postconditions:
+ *   - renders full glass design system layout
+ *   - all glass components are interactive and keyboard navigable
+ *   - animations respect prefers-reduced-motion
+ *   - all text meets WCAG AA contrast minimum 4.5:1
+ *
+ * Layout:
+ *   z1: RoleAwareSidebar (fixed left, hidden mobile)
+ *   z2: MobileMenuTrigger (visible mobile only)
+ *   z3: Header (glass-panel with title + Breadcrumbs + actions)
+ *   z4: Stat cards grid (StatCard components)
+ *   z5: Content sections (DashboardSection + GlassTable)
+ *
+ * Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6
+ */
+export default function ClientDashboard({
+  user,
+  activeTab,
+  onTabChange,
+}: {
+  user: UserProfile;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }) {
   const [myJobs, setJobs] = useState<Job[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
+  const prefersReducedMotion = useReducedMotion() ?? false;
 
   useEffect(() => {
     if (activeTab === 'post-job') {
       setIsPosting(true);
     }
   }, [activeTab]);
+
   const [newJob, setNewJob] = useState<Partial<Job>>({
     title: '',
     description: '',
     budget: 0,
     deadline: '',
     requirements: [],
-    category: 'Residential'
+    category: 'Residential',
   });
+
   const [jobPage, setJobPage] = useState(1);
   const pageSize = 5;
   const pagedJobs = paginateItems<Job>(myJobs, jobPage, pageSize);
   const jobPages = totalPages(myJobs.length, pageSize);
 
   useEffect(() => {
-    const q = query(getDemoCol( 'jobs'), where('clientId', '==', user.uid));
+    const q = query(getDemoCol('jobs'), where('clientId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job)));
+      setJobs(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Job)));
       setLoading(false);
     });
 
-    const qReviews = query(getDemoCol( 'reviews'), where('toId', '==', user.uid), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
+    const qReviews = query(
+      getDemoCol('reviews'),
+      where('toId', '==', user.uid),
+      where('status', '==', 'approved'),
+      orderBy('createdAt', 'desc'),
+    );
     const unsubReviews = onSnapshot(qReviews, (snap) => {
-      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
+      setReviews(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Review)));
     });
 
     return () => {
@@ -107,121 +120,268 @@ export default function ClientDashboard({
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(getDemoCol( 'jobs'), {
+      await addDoc(getDemoCol('jobs'), {
         ...newJob,
         clientId: user.uid,
         status: 'open',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
       setIsPosting(false);
-      setNewJob({ title: '', description: '', budget: 0, deadline: '', requirements: [], category: 'Residential' });
-      toast.success("Job posted successfully");
+      setNewJob({
+        title: '',
+        description: '',
+        budget: 0,
+        deadline: '',
+        requirements: [],
+        category: 'Residential',
+      });
+      toast.success('Job posted successfully');
     } catch (error) {
-      toast.error("Failed to post job");
+      toast.error('Failed to post job');
     }
   };
+
+  const activeJobsCount = myJobs.filter((j) => j.status !== 'completed' && j.status !== 'cancelled').length;
+  const completedJobsCount = myJobs.filter((j) => j.status === 'completed').length;
+  const avgRating = reviews.length
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    : '—';
 
   const showOverview = !activeTab || activeTab === 'overview' || activeTab === 'post-job';
   const showProjects = activeTab === 'projects';
   const showFees = activeTab === 'fees';
 
   return (
-    <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-        <div>
-          <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Welcome, {user.displayName}</h1>
-            <ProfileEditor user={user} />
-          </div>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed font-medium">Manage your projects and connect with elite architectural experts.</p>
-        </div>
-        <Dialog open={isPosting} onOpenChange={setIsPosting}>
-          <DialogTrigger render={<Button className="rounded-full h-14 px-8 font-bold tracking-wide text-base beos-button-shadow hover:scale-[1.02] transition-all duration-300"><Plus className="mr-2" /> Post New Job</Button>} />
-          <DialogContent className="sm:max-w-[500px] rounded-3xl">
-             <DialogHeader>
-                <DialogTitle>Post a New Job</DialogTitle>
-                <DialogDescription>Use the fee estimator first if you want a professional-fee budget guide before posting.</DialogDescription>
-             </DialogHeader>
-             <form onSubmit={handlePostJob} className="space-y-4">
-                <Input placeholder="Job Title" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} required />
-                <Textarea placeholder="Job Description" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} required />
-                <Input type="number" placeholder="Budget" value={newJob.budget} onChange={e => setNewJob({...newJob, budget: Number(e.target.value)})} required />
-                <Input type="date" value={newJob.deadline} onChange={e => setNewJob({...newJob, deadline: e.target.value})} required />
-                <Button type="submit" className="w-full h-14 rounded-2xl font-bold tracking-wide text-lg mt-4 hover:scale-[1.02] transition-all duration-300 shadow-xl shadow-primary/20">Post Job</Button>
-             </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* ── Sidebar (desktop) ─────────────────────────────────────────────── */}
+      <RoleAwareSidebar
+        user={user}
+        activeTab={activeTab}
+        onNavigate={onTabChange}
+      />
 
-      {showOverview && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <FeeEstimator role="client" compact onEstimateBudget={(amount) => setNewJob(current => ({ ...current, budget: amount }))} />
-            <h2 className="text-2xl font-heading font-bold">Your Active Jobs</h2>
-            <div className="grid grid-cols-1 gap-6">
-                {pagedJobs.map(job => (
-                  <div key={job.id}><ClientJobCard job={job} user={user} /></div>
-                ))}
-                {myJobs.length > pageSize && (
-                  <PaginationControls page={jobPage} totalPages={jobPages} onPageChange={setJobPage} />
-                )}
-                {myJobs.length === 0 && !loading && (
-                  <div className="empty-state py-20 text-center">
-                    <p className="text-muted-foreground italic">You haven't posted any jobs yet.</p>
-                  </div>
-                )}
+      {/* ── Main content area ─────────────────────────────────────────────── */}
+      <main className="md:ml-64 p-4 md:p-6 space-y-6">
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <header className="glass-panel rounded-2xl p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              {/* Mobile hamburger */}
+              <MobileMenuTrigger user={user} className="mt-1" />
+              <div>
+                <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">
+                  Welcome, {user.displayName}
+                </h1>
+                <Breadcrumbs />
+                <p className="text-sm text-foreground/60 mt-1 max-w-xl">
+                  Manage your projects and connect with elite architectural experts.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <ProfileEditor user={user} />
+              <Dialog open={isPosting} onOpenChange={setIsPosting}>
+                <DialogTrigger render={
+                  <GlassButton variant="solid" size="sm">
+                    <Plus className="w-4 h-4 mr-1" /> Post New Job
+                  </GlassButton>
+                } />
+                <DialogContent className="sm:max-w-[500px] rounded-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Post a New Job</DialogTitle>
+                    <DialogDescription>
+                      Use the fee estimator first if you want a professional-fee budget guide before posting.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handlePostJob} className="space-y-4">
+                    <Input placeholder="Job Title" value={newJob.title} onChange={(e) => setNewJob({ ...newJob, title: e.target.value })} required />
+                    <Textarea placeholder="Job Description" value={newJob.description} onChange={(e) => setNewJob({ ...newJob, description: e.target.value })} required />
+                    <Input type="number" placeholder="Budget" value={newJob.budget} onChange={(e) => setNewJob({ ...newJob, budget: Number(e.target.value) })} required />
+                    <Input type="date" value={newJob.deadline} onChange={(e) => setNewJob({ ...newJob, deadline: e.target.value })} required />
+                    <GlassButton type="submit" variant="solid" className="w-full">
+                      Post Job
+                    </GlassButton>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
-          <div className="space-y-8">
-            <Card className="beos-section-card">
-                <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent p-6 border-b border-border/50">
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                    <Star size={16} className="text-yellow-500 fill-yellow-500" /> Professional Feedback
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  {reviews.map(review => (
-                    <div key={review.id} className="p-4 rounded-2xl bg-secondary/5 border border-border/50 hover:bg-secondary/10 transition-colors duration-300 mb-4 last:mb-0">
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="flex text-yellow-400">
-                          {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? 'scale-110' : 'opacity-30'} />)}
-                        </div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+        </header>
+
+        {/* ── Stat cards grid ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCardAnimated
+            label="Active Jobs"
+            value={activeJobsCount}
+            icon={<Briefcase className="w-5 h-5" />}
+            delay={prefersReducedMotion ? 0 : 0 * 0.05}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+          <StatCardAnimated
+            label="Completed Projects"
+            value={completedJobsCount}
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            trend={completedJobsCount > 0 ? { direction: 'up', value: `${completedJobsCount}` } : undefined}
+            delay={prefersReducedMotion ? 0 : 1 * 0.05}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+          <StatCardAnimated
+            label="Avg Feedback Rating"
+            value={avgRating === '—' ? '—' : `${avgRating}/5`}
+            icon={<Star className="w-5 h-5" />}
+            delay={prefersReducedMotion ? 0 : 2 * 0.05}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+        </div>
+
+        {/* ── Overview tab ────────────────────────────────────────────────── */}
+        {showOverview && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: Fee Estimator + Active Jobs */}
+            <div className="lg:col-span-2 space-y-6">
+              <DashboardSection
+                title="Fee Estimator"
+                description="Get a budget estimate before posting your job"
+                icon={<CreditCard className="w-5 h-5" />}
+              >
+                <FeeEstimator
+                  role="client"
+                  compact
+                  onEstimateBudget={(amount) =>
+                    setNewJob((current) => ({ ...current, budget: amount }))
+                  }
+                />
+              </DashboardSection>
+
+              <DashboardSection
+                title="Your Active Jobs"
+                description="Jobs you've posted on the platform"
+                icon={<Briefcase className="w-5 h-5" />}
+                action={
+                  <GlassButton variant="outline" size="sm" onClick={() => setIsPosting(true)}>
+                    <Plus className="w-4 h-4 mr-1" /> New Job
+                  </GlassButton>
+                }
+              >
+                {pagedJobs.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4">
+                    {pagedJobs.map((job) => (
+                      <div key={job.id}>
+                        <ClientJobCard job={job} user={user} />
                       </div>
-                      <p className="text-xs italic text-foreground leading-relaxed">"{review.comment}"</p>
-                    </div>
-                  ))}
-                  {reviews.length === 0 && <p className="text-xs text-center text-muted-foreground py-10 italic">No reviews yet.</p>}
-                </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
+                    ))}
+                    {myJobs.length > pageSize && (
+                      <PaginationControls
+                        page={jobPage}
+                        totalPages={jobPages}
+                        onPageChange={setJobPage}
+                      />
+                    )}
+                  </div>
+                ) : !loading ? (
+                  <p className="text-sm text-foreground/60 italic py-8 text-center">
+                    You haven't posted any jobs yet.
+                  </p>
+                ) : (
+                  <p className="text-sm text-foreground/60 py-8 text-center">Loading...</p>
+                )}
+              </DashboardSection>
+            </div>
 
-      {showProjects && (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-heading font-bold">Project Portfolio</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {myJobs.map(job => (
-              <div key={job.id}><ClientJobCard job={job} user={user} /></div>
-            ))}
-            {myJobs.length === 0 && !loading && (
-              <div className="empty-state col-span-full py-20 text-center">
-                <p className="text-muted-foreground italic">No projects found.</p>
+            {/* Right: Professional Feedback */}
+            <div>
+              <DashboardSection
+                title="Professional Feedback"
+                description="Reviews from professionals you've worked with"
+                icon={<Star className="w-5 h-5" />}
+              >
+                {reviews.length > 0 ? (
+                  <div className="space-y-3">
+                    {reviews.map((review) => (
+                      <div
+                        key={review.id}
+                        className="glass-tile rounded-xl p-4 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex text-yellow-400">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                size={12}
+                                fill={i < review.rating ? 'currentColor' : 'none'}
+                                className={i < review.rating ? 'scale-110' : 'opacity-30'}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/60">
+                            {new Date(review.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-xs italic text-foreground leading-relaxed">
+                          "{review.comment}"
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-center text-foreground/60 py-8 italic">
+                    No reviews yet.
+                  </p>
+                )}
+              </DashboardSection>
+            </div>
+          </div>
+        )}
+
+        {/* ── Projects tab ────────────────────────────────────────────────── */}
+        {showProjects && (
+          <DashboardSection
+            title="Project Portfolio"
+            description="All your jobs and projects"
+            icon={<FileText className="w-5 h-5" />}
+          >
+            {myJobs.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myJobs.map((job) => (
+                  <div key={job.id}>
+                    <ClientJobCard job={job} user={user} />
+                  </div>
+                ))}
               </div>
+            ) : !loading ? (
+              <p className="text-sm text-foreground/60 italic py-8 text-center">
+                No projects found.
+              </p>
+            ) : (
+              <p className="text-sm text-foreground/60 py-8 text-center">Loading...</p>
             )}
-          </div>
-        </div>
-      )}
+          </DashboardSection>
+        )}
 
-      {showFees && (
-        <FeeEstimator role="client" onEstimateBudget={(amount) => setNewJob(current => ({ ...current, budget: amount }))} />
-      )}
+        {/* ── Fees tab ────────────────────────────────────────────────────── */}
+        {showFees && (
+          <DashboardSection
+            title="Fee Estimator"
+            description="Professional fee calculation tool"
+            icon={<CreditCard className="w-5 h-5" />}
+          >
+            <FeeEstimator
+              role="client"
+              onEstimateBudget={(amount) =>
+                setNewJob((current) => ({ ...current, budget: amount }))
+              }
+            />
+          </DashboardSection>
+        )}
+      </main>
     </div>
   );
 }
 
-function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
+/* ---------------------------------------------------------------------------
+ * ClientJobCard — Individual job card with all management actions
+ * --------------------------------------------------------------------------- */
+function ClientJobCard({ job, user }: { job: Job; user: UserProfile }) {
   const [architect, setArchitect] = useState<UserProfile | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [project, setProject] = useState<Project | null>(null);
@@ -237,7 +397,7 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   useEffect(() => {
     if (selectedProfessionalId) {
       const fetchArchitect = async () => {
-        const archDoc = await getDoc(getDemoDoc( 'users', selectedProfessionalId));
+        const archDoc = await getDoc(getDemoDoc('users', selectedProfessionalId));
         if (archDoc.exists()) setArchitect({ uid: archDoc.id, ...archDoc.data() } as UserProfile);
       };
       fetchArchitect();
@@ -247,11 +407,13 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   }, [selectedProfessionalId]);
 
   useEffect(() => {
-    const q = query(getDemoCol( `jobs/${job.id}/applications`), where('status', '==', 'pending'));
+    const q = query(
+      getDemoCol(`jobs/${job.id}/applications`),
+      where('status', '==', 'pending'),
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application)));
+      setApplications(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Application)));
     });
-
     return () => unsubscribe();
   }, [job.id]);
 
@@ -262,19 +424,19 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
 
   const appendHistory = (status: Job['status'], note?: string) => [
     ...(job.statusHistory || []),
-    { status, timestamp: new Date().toISOString(), actorId: user.uid, note }
+    { status, timestamp: new Date().toISOString(), actorId: user.uid, note },
   ];
 
   const handleSaveJob = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateDoc(getDemoDoc( 'jobs', job.id), {
+      await updateDoc(getDemoDoc('jobs', job.id), {
         title: editJob.title,
         description: editJob.description,
         budget: Number(editJob.budget || 0),
         deadline: editJob.deadline,
         location: editJob.location || '',
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
       setIsEditing(false);
       toast.success('Job updated');
@@ -286,12 +448,12 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const handleCancelJob = async () => {
     const reason = prompt('Reason for cancelling this job?') || 'Cancelled by client';
     try {
-      await updateDoc(getDemoDoc( 'jobs', job.id), {
+      await updateDoc(getDemoDoc('jobs', job.id), {
         status: 'cancelled',
         cancellationReason: reason,
         cancelledAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        statusHistory: appendHistory('cancelled', reason)
+        statusHistory: appendHistory('cancelled', reason),
       });
       toast.success('Job cancelled');
     } catch {
@@ -301,13 +463,13 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
 
   const handleUnassignArchitect = async () => {
     try {
-      await updateDoc(getDemoDoc( 'jobs', job.id), {
+      await updateDoc(getDemoDoc('jobs', job.id), {
         selectedProfessionalId: deleteField(),
         selectedBepId: deleteField(),
         selectedArchitectId: deleteField(),
         status: 'open',
         updatedAt: new Date().toISOString(),
-        statusHistory: appendHistory('open', 'Architect unassigned by client')
+        statusHistory: appendHistory('open', 'Architect unassigned by client'),
       });
       toast.success('Architect unassigned');
     } catch {
@@ -321,13 +483,16 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('You must be logged in to accept an application');
 
-      const response = await apiFetch(`/api/jobs/${job.id}/applications/${application.id}/accept`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const response = await apiFetch(
+        `/api/jobs/${job.id}/applications/${application.id}/accept`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -345,14 +510,14 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
   const handleFileDispute = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(getDemoCol( 'disputes'), {
+      await addDoc(getDemoCol('disputes'), {
         jobId: job.id,
         filedBy: user.uid,
         filedAgainst: selectedProfessionalId,
         reason: disputeReason,
         requestedResolution,
         status: 'open',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
       setIsDisputing(false);
       setDisputeReason('');
@@ -363,128 +528,228 @@ function ClientJobCard({ job, user }: { job: Job, user: UserProfile }) {
     }
   };
 
+  const statusColorClass =
+    job.status === 'completed'
+      ? 'bg-green-100 text-green-700'
+      : job.status === 'in-progress'
+        ? 'bg-blue-100 text-blue-700'
+        : 'bg-yellow-100 text-yellow-700';
+
   return (
-    <Card className="beos-record-card overflow-hidden group">
-      <div className="p-8 space-y-6">
-        <div className="flex justify-between items-start">
-          <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest font-bold">
-            {job.category}
-          </Badge>
-          <Badge className={`text-[10px] uppercase tracking-widest ${
-            job.status === 'completed' ? 'bg-green-100 text-green-700' :
-            job.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-            'bg-yellow-100 text-yellow-700'
-          }`}>
-            {(job.status || 'open').replace('-', ' ')}
-          </Badge>
-        </div>
-        <h3 className="font-heading font-bold text-2xl group-hover:text-primary transition-colors tracking-tight">{job.title}</h3>
-        <p className="text-sm text-muted-foreground line-clamp-2">{job.description}</p>
-        {project && <StageProgressTracker currentStage={project.currentStage} stageHistory={project.stageHistory} />}
-        <div className="flex flex-wrap gap-2">
-          <Dialog open={isEditing} onOpenChange={setIsEditing}>
-            <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full">Edit</Button>} />
-            <DialogContent className="sm:max-w-lg rounded-3xl">
-              <DialogHeader><DialogTitle>Edit Job</DialogTitle></DialogHeader>
-              <form onSubmit={handleSaveJob} className="space-y-4">
-                <Input value={editJob.title || ''} onChange={e => setEditJob({ ...editJob, title: e.target.value })} required />
-                <Textarea value={editJob.description || ''} onChange={e => setEditJob({ ...editJob, description: e.target.value })} required />
-                <Input type="number" value={editJob.budget || 0} onChange={e => setEditJob({ ...editJob, budget: Number(e.target.value) })} required />
-                <Input type="date" value={editJob.deadline || ''} onChange={e => setEditJob({ ...editJob, deadline: e.target.value })} required />
-                <Input placeholder="Location" value={editJob.location || ''} onChange={e => setEditJob({ ...editJob, location: e.target.value })} />
-                <Button type="submit" className="w-full">Save changes</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-          {job.status !== 'cancelled' && job.status !== 'completed' && <Button size="sm" variant="outline" className="rounded-full" onClick={handleCancelJob}>Cancel Job</Button>}
-          <Dialog open={isDisputing} onOpenChange={setIsDisputing}>
-            <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full">File Dispute</Button>} />
-            <DialogContent className="sm:max-w-lg rounded-3xl">
-              <DialogHeader><DialogTitle>File Dispute</DialogTitle><DialogDescription>Send this project to admin mediation.</DialogDescription></DialogHeader>
-              <form onSubmit={handleFileDispute} className="space-y-4">
-                <Textarea placeholder="What happened?" value={disputeReason} onChange={e => setDisputeReason(e.target.value)} required />
-                <Textarea placeholder="Requested resolution" value={requestedResolution} onChange={e => setRequestedResolution(e.target.value)} required />
-                <Button type="submit" className="w-full">Submit dispute</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-        {!!job.statusHistory?.length && (
-          <div className="rounded-2xl border border-border bg-secondary/20 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Status History</p>
-            {job.statusHistory.slice(-3).map((entry, index) => (
-              <p key={`${entry.timestamp}-${index}`} className="text-xs text-muted-foreground">{entry.status.replace('-', ' ')} · {new Date(entry.timestamp).toLocaleDateString()} {entry.note ? `· ${entry.note}` : ''}</p>
-            ))}
-          </div>
-        )}
-        {job.status === 'open' && applications.length > 0 && (
-          <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4 space-y-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-              <Users size={12} /> Architect Applications
-            </p>
-            {applications.map(application => (
-              <div key={application.id} className="rounded-xl bg-card/95 border border-border p-4 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-foreground">{application.architectName}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Applied {new Date(application.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{application.status}</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{application.proposal}</p>
-                {application.notes && <p className="text-[10px] text-muted-foreground italic">Notes: {application.notes}</p>}
-                <Button
-                  size="sm"
-                  className="rounded-full font-bold"
-                  disabled={acceptingApplicationId === application.id}
-                  onClick={() => handleAcceptApplication(application)}
-                >
-                  {acceptingApplicationId === application.id ? <Loader2 size={14} className="mr-2 animate-spin" /> : <CheckCircle2 size={14} className="mr-2" />}
-                  Accept Architect
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        {architect && (
-          <div className="flex items-center justify-between pt-6 border-t border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{architect.displayName[0]}</div>
-              <div>
-                <p className="text-sm font-bold text-foreground">{architect.displayName}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Assigned Architect</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" className="rounded-full gap-2" onClick={() => setIsChatOpen(true)}>
-                <MessageCircle size={16} /> Chat
-              </Button>
-              <Button variant="outline" size="sm" className="rounded-full" onClick={handleUnassignArchitect}>Unassign</Button>
-              {job.status === 'completed' && (
-                <Dialog>
-                  <DialogTrigger render={<Button size="sm" variant="outline" className="rounded-full gap-2"><Star size={16} /> Rate</Button>} />
-                  <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl border-none">
-                    <RatingSystem fromId={user.uid} toId={architect.uid} toName={architect.displayName} jobId={job.id} type="client_to_architect" />
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          </div>
-        )}
+    <div className="glass-record rounded-2xl p-6 space-y-5 group">
+      {/* Status badges */}
+      <div className="flex justify-between items-start">
+        <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 uppercase text-[10px] tracking-widest font-bold">
+          {job.category}
+        </Badge>
+        <Badge className={`text-[10px] uppercase tracking-widest ${statusColorClass}`}>
+          {(job.status || 'open').replace('-', ' ')}
+        </Badge>
       </div>
-      {isChatOpen && architect && (
-        <Chat job={job} currentUser={user} otherUser={architect} isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
+      {/* Title */}
+      <h3 className="font-heading font-bold text-xl group-hover:text-primary transition-colors tracking-tight">
+        {job.title}
+      </h3>
+      <p className="text-sm text-foreground/60 line-clamp-2">{job.description}</p>
+
+      {/* Stage tracker */}
+      {project && (
+        <StageProgressTracker
+          currentStage={project.currentStage}
+          stageHistory={project.stageHistory}
+        />
       )}
-    </Card>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2">
+        <Dialog open={isEditing} onOpenChange={setIsEditing}>
+          <DialogTrigger render={
+            <GlassButton size="sm" variant="outline">Edit</GlassButton>
+          } />
+          <DialogContent className="sm:max-w-lg rounded-3xl">
+            <DialogHeader><DialogTitle>Edit Job</DialogTitle></DialogHeader>
+            <form onSubmit={handleSaveJob} className="space-y-4">
+              <Input value={editJob.title || ''} onChange={(e) => setEditJob({ ...editJob, title: e.target.value })} required />
+              <Textarea value={editJob.description || ''} onChange={(e) => setEditJob({ ...editJob, description: e.target.value })} required />
+              <Input type="number" value={editJob.budget || 0} onChange={(e) => setEditJob({ ...editJob, budget: Number(e.target.value) })} required />
+              <Input type="date" value={editJob.deadline || ''} onChange={(e) => setEditJob({ ...editJob, deadline: e.target.value })} required />
+              <Input placeholder="Location" value={editJob.location || ''} onChange={(e) => setEditJob({ ...editJob, location: e.target.value })} />
+              <GlassButton type="submit" variant="solid" className="w-full">Save changes</GlassButton>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {job.status !== 'cancelled' && job.status !== 'completed' && (
+          <GlassButton size="sm" variant="outline" onClick={handleCancelJob}>
+            Cancel Job
+          </GlassButton>
+        )}
+
+        <Dialog open={isDisputing} onOpenChange={setIsDisputing}>
+          <DialogTrigger render={
+            <GlassButton size="sm" variant="outline">File Dispute</GlassButton>
+          } />
+          <DialogContent className="sm:max-w-lg rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>File Dispute</DialogTitle>
+              <DialogDescription>Send this project to admin mediation.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleFileDispute} className="space-y-4">
+              <Textarea placeholder="What happened?" value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} required />
+              <Textarea placeholder="Requested resolution" value={requestedResolution} onChange={(e) => setRequestedResolution(e.target.value)} required />
+              <GlassButton type="submit" variant="solid" className="w-full">Submit dispute</GlassButton>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Status history */}
+      {!!job.statusHistory?.length && (
+        <div className="glass-tile rounded-xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/60 mb-2">
+            Status History
+          </p>
+          {job.statusHistory.slice(-3).map((entry, index) => (
+            <p key={`${entry.timestamp}-${index}`} className="text-xs text-foreground/60">
+              {entry.status.replace('-', ' ')} · {new Date(entry.timestamp).toLocaleDateString()}
+              {entry.note ? ` · ${entry.note}` : ''}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Architect applications */}
+      {job.status === 'open' && applications.length > 0 && (
+        <div className="glass-tile rounded-xl p-4 space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Users size={12} /> Architect Applications
+          </p>
+          {applications.map((application) => (
+            <div key={application.id} className="glass-record rounded-xl p-4 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-foreground">{application.architectName}</p>
+                  <p className="text-[10px] text-foreground/60 uppercase tracking-widest">
+                    Applied {new Date(application.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <Badge variant="outline" className="uppercase text-[10px] tracking-widest">
+                  {application.status}
+                </Badge>
+              </div>
+              <p className="text-xs text-foreground/60 leading-relaxed">{application.proposal}</p>
+              {application.notes && (
+                <p className="text-[10px] text-foreground/60 italic">Notes: {application.notes}</p>
+              )}
+              <GlassButton
+                size="sm"
+                variant="solid"
+                disabled={acceptingApplicationId === application.id}
+                onClick={() => handleAcceptApplication(application)}
+              >
+                {acceptingApplicationId === application.id ? (
+                  <Loader2 size={14} className="mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 size={14} className="mr-2" />
+                )}
+                Accept Architect
+              </GlassButton>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Assigned architect */}
+      {architect && (
+        <div className="flex items-center justify-between pt-4 border-t border-border/40">
+          <div className="flex items-center gap-3">
+            <div className="glass-icon-box w-10 h-10 rounded-full flex items-center justify-center text-primary font-bold">
+              {architect.displayName[0]}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">{architect.displayName}</p>
+              <p className="text-[10px] text-foreground/60 uppercase tracking-widest font-bold">
+                Assigned Architect
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <GlassButton variant="outline" size="sm" onClick={() => setIsChatOpen(true)}>
+              <MessageCircle size={16} className="mr-1" /> Chat
+            </GlassButton>
+            <GlassButton variant="outline" size="sm" onClick={handleUnassignArchitect}>
+              Unassign
+            </GlassButton>
+            {job.status === 'completed' && (
+              <Dialog>
+                <DialogTrigger render={
+                  <GlassButton size="sm" variant="outline">
+                    <Star size={16} className="mr-1" /> Rate
+                  </GlassButton>
+                } />
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-3xl border-none">
+                  <RatingSystem
+                    fromId={user.uid}
+                    toId={architect.uid}
+                    toName={architect.displayName}
+                    jobId={job.id}
+                    type="client_to_architect"
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Chat overlay */}
+      {isChatOpen && architect && (
+        <Chat
+          job={job}
+          currentUser={user}
+          otherUser={architect}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
+    </div>
   );
 }
 
-function PaginationControls({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
+/* ---------------------------------------------------------------------------
+ * PaginationControls — prev/next navigation for paginated lists
+ * --------------------------------------------------------------------------- */
+function PaginationControls({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-border bg-card/95 p-3 beos-soft-shadow">
-      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-      <span className="text-xs font-bold text-muted-foreground">Page {page} of {totalPages}</span>
-      <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+    <div className="glass-tile rounded-xl flex items-center justify-between p-3">
+      <GlassButton
+        variant="outline"
+        size="sm"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+      >
+        Previous
+      </GlassButton>
+      <span className="text-xs font-bold text-foreground/60">
+        Page {page} of {totalPages}
+      </span>
+      <GlassButton
+        variant="outline"
+        size="sm"
+        disabled={page >= totalPages}
+        onClick={() => onPageChange(page + 1)}
+      >
+        Next
+      </GlassButton>
     </div>
   );
 }
