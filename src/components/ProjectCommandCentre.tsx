@@ -8,7 +8,6 @@ import { getRoleProfileCompletion } from '../services/roleProfileService';
 import type { DelegatedTask, Job, Project, TenderPackage, UserProfile } from '../types';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
@@ -209,44 +208,44 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
 
   return (
     <div className="space-y-6" data-testid="project-command-centre">
-      <Card className="rounded-[1.25rem] border-border bg-card/95 beos-soft-shadow overflow-hidden" style={{ borderTop: `5px solid ${roleVisual.accent}` }}>
-        <CardHeader className="bg-[#f4faff]/80 border-b border-border/70">
+      <section className="glass-panel rounded-2xl overflow-hidden" style={{ borderTop: `4px solid ${roleVisual.accent}` }}>
+        <div className="p-6 border-b border-border/40">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-              <Badge variant="secondary" className="rounded-full beos-label-caps">Command Centre</Badge>
+              <span className="glass-pill text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide text-foreground-muted">Command Centre</span>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <CardTitle className="font-sans text-3xl sm:text-4xl font-black tracking-[-0.055em]">{activeJob?.title ?? roleVisual.headline}</CardTitle>
-                <Badge className="rounded-full border-0 text-white" style={{ backgroundColor: roleVisual.accent }}>{roleVisual.viewLabel}</Badge>
+                <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-[-0.04em] text-foreground">{activeJob?.title ?? roleVisual.headline}</h1>
+                <span className="rounded-full border-0 text-white text-xs font-semibold px-3 py-1" style={{ backgroundColor: roleVisual.accent }}>{roleVisual.viewLabel}</span>
               </div>
-              <CardDescription className="mt-3 max-w-3xl text-base leading-relaxed">
+              <p className="mt-3 max-w-3xl text-base leading-relaxed text-foreground-muted">
                 {activeJob || activePackage || activeTask ? roleVisual.description : `${roleVisual.description} No visible live project or package record is selected yet.`} It never performs approval, payment, signature, or submission actions without the dedicated human-confirmed workflow.
-              </CardDescription>
+              </p>
             </div>
-            <div className="rounded-[1.1rem] border border-border bg-white/80 p-3 min-w-[180px]">
-              <p className="beos-label-caps text-muted-foreground">Live projection</p>
-              <p className="mt-2 text-2xl font-black tracking-[-0.055em]" style={{ color: roleVisual.accent }}>{joinedJobs.length + packages.length + delegatedTasks.length}</p>
-              <p className="text-xs text-muted-foreground">visible job/package/task records</p>
+            <div className="glass-tile rounded-xl p-4 min-w-[180px]">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Live projection</p>
+              <p className="mt-2 text-2xl font-black tracking-[-0.04em]" style={{ color: roleVisual.accent }}>{joinedJobs.length + packages.length + delegatedTasks.length}</p>
+              <p className="text-xs text-foreground-muted">visible job/package/task records</p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {state === 'loading' && <div className="lg:col-span-3 flex items-center gap-3 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project state...</div>}
-          <div className="lg:col-span-2 rounded-[1.25rem] border p-5 space-y-4" style={{ borderColor: roleVisual.accent, backgroundColor: roleVisual.accentSoft }}>
+        </div>
+        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {state === 'loading' && <div className="lg:col-span-3 flex items-center gap-3 text-foreground-muted"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project state...</div>}
+          <div className="lg:col-span-2 glass-tile rounded-xl p-5 space-y-4" style={{ borderColor: roleVisual.accent }}>
             <div className="flex items-center gap-3">
-              <span className="rounded-[0.8rem] bg-white p-2" style={{ color: roleVisual.accent }}><ListChecks className="h-5 w-5" /></span>
-              <h3 className="font-sans text-xl font-black tracking-[-0.03em]">Next Best Action</h3>
+              <span className="glass-icon-box p-2" style={{ color: roleVisual.accent }}><ListChecks className="h-5 w-5" /></span>
+              <h3 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground">Next Best Action</h3>
             </div>
-            <p className="text-2xl font-black tracking-[-0.045em]">{nextAction.label}</p>
-            <p className="text-sm text-muted-foreground leading-relaxed">{nextAction.detail}</p>
-            <Button onClick={() => onNavigate?.(nextAction.target)} className="rounded-full gap-2 beos-button-shadow" style={{ backgroundColor: roleVisual.accent }}>Take next action <ArrowRight className="h-4 w-4" /></Button>
+            <p className="text-2xl font-black tracking-[-0.04em] text-foreground">{nextAction.label}</p>
+            <p className="text-sm text-foreground-muted leading-relaxed">{nextAction.detail}</p>
+            <Button onClick={() => onNavigate?.(nextAction.target)} className="rounded-full gap-2 text-white" style={{ backgroundColor: roleVisual.accent }}>Take next action <ArrowRight className="h-4 w-4" /></Button>
           </div>
-          <div className="rounded-[1.25rem] border border-border bg-background/70 p-5 space-y-2">
-            <h3 className="beos-label-caps text-muted-foreground">Current Stage</h3>
-            <p className="beos-metric capitalize">{commandGuidance.stageLabel}</p>
-            <p className="text-xs text-muted-foreground">From canonical project lifecycle records, with legacy scoping mapped to intake.</p>
+          <div className="glass-tile rounded-xl p-5 space-y-2">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Current Stage</h3>
+            <p className="text-2xl font-black tracking-[-0.04em] capitalize text-foreground">{commandGuidance.stageLabel}</p>
+            <p className="text-xs text-foreground-muted">From canonical project lifecycle records, with legacy scoping mapped to intake.</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
         <MetricCard icon={<CheckCircle2 />} label="Open approvals / requirements" value={openApprovals} detail={activeJob ? 'Requirements and decision points visible from the active job.' : 'Package scope/evidence decision points visible to this role.'} accent={roleVisual.accent} />
@@ -257,59 +256,55 @@ export default function ProjectCommandCentre({ user, onNavigate }: ProjectComman
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <Card className="lg:col-span-2 rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
-          <CardHeader>
-            <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">AI Summary</CardTitle>
-            <CardDescription>Generated deterministically from live project/job fields. Human review required.</CardDescription>
-          </CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{commandGuidance.aiSummary}</p></CardContent>
-        </Card>
-        <Card className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
-          <CardHeader>
-            <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">Key Dates</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> Deadline: {activeJob?.deadline ?? activePackage?.deadline ?? activeTask?.deadline ?? 'Not recorded'}</div>
-            <div className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Created: {activeJob?.createdAt ?? activePackage?.createdAt ?? activeTask?.createdAt ?? activeProject?.createdAt ?? 'Not recorded'}</div>
-          </CardContent>
-        </Card>
+        <section className="lg:col-span-2 glass-panel rounded-2xl p-6">
+          <div className="mb-4">
+            <h2 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground">AI Summary</h2>
+            <p className="text-sm text-foreground-muted">Generated deterministically from live project/job fields. Human review required.</p>
+          </div>
+          <p className="text-sm text-foreground-muted leading-relaxed">{commandGuidance.aiSummary}</p>
+        </section>
+        <section className="glass-panel rounded-2xl p-6">
+          <h2 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground mb-4">Key Dates</h2>
+          <div className="space-y-3 text-sm text-foreground">
+            <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" aria-hidden="true" /> Deadline: {activeJob?.deadline ?? activePackage?.deadline ?? activeTask?.deadline ?? 'Not recorded'}</div>
+            <div className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" aria-hidden="true" /> Created: {activeJob?.createdAt ?? activePackage?.createdAt ?? activeTask?.createdAt ?? activeProject?.createdAt ?? 'Not recorded'}</div>
+          </div>
+        </section>
       </div>
 
-      <Card className="rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow">
-        <CardHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="font-sans text-xl font-black tracking-[-0.03em]">Recent Activity</CardTitle>
-              <CardDescription>Latest live jobs, package records, and delegated tasks visible to this role. No mock activity is generated.</CardDescription>
-            </div>
-            <Badge variant="outline" className="w-fit rounded-full">live data</Badge>
+      <section className="glass-panel rounded-2xl p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <h2 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground">Recent Activity</h2>
+            <p className="text-sm text-foreground-muted">Latest live jobs, package records, and delegated tasks visible to this role. No mock activity is generated.</p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {joinedJobs.length === 0 && packages.length === 0 && delegatedTasks.length === 0 ? <p className="text-sm text-muted-foreground">No live job, project, package, or delegated task records are currently visible for this role.</p> : (
+          <span className="glass-pill w-fit rounded-full text-xs px-3 py-1 text-foreground-muted">live data</span>
+        </div>
+        <div className="space-y-3">
+          {joinedJobs.length === 0 && packages.length === 0 && delegatedTasks.length === 0 ? <p className="text-sm text-foreground-muted">No live job, project, package, or delegated task records are currently visible for this role.</p> : (
             <>
               {joinedJobs.slice(0, 5).map((job) => (
-                <div key={`job-${job.id}`} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <div><p className="font-semibold">{job.title}</p><p className="text-xs text-muted-foreground">{job.location ?? 'Location not recorded'} · {job.createdAt}</p></div>
+                <div key={`job-${job.id}`} className="glass-record rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div><p className="font-semibold text-foreground">{job.title}</p><p className="text-xs text-foreground-muted">{job.location ?? 'Location not recorded'} · {job.createdAt}</p></div>
                   <Badge variant={job.status === 'in-progress' ? 'default' : 'secondary'} className="rounded-full">{job.status}</Badge>
                 </div>
               ))}
               {joinedJobs.length < 5 && packages.slice(0, 5 - joinedJobs.length).map((pkg) => (
-                <div key={`package-${pkg.id}`} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <div><p className="font-semibold">{pkg.title}</p><p className="text-xs text-muted-foreground">Package · {pkg.createdAt} · {pkg.source === 'awarded' ? 'awarded to you' : 'visible opportunity'}</p></div>
+                <div key={`package-${pkg.id}`} className="glass-record rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div><p className="font-semibold text-foreground">{pkg.title}</p><p className="text-xs text-foreground-muted">Package · {pkg.createdAt} · {pkg.source === 'awarded' ? 'awarded to you' : 'visible opportunity'}</p></div>
                   <Badge variant={pkg.status === 'awarded' ? 'default' : 'secondary'} className="rounded-full">{pkg.status}</Badge>
                 </div>
               ))}
               {joinedJobs.length + packages.length < 5 && delegatedTasks.slice(0, 5 - joinedJobs.length - packages.length).map((task) => (
-                <div key={"task-" + task.id} className="rounded-[1rem] border border-border bg-background/60 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <div><p className="font-semibold">{task.assigneeRole || "Delegated task"}</p><p className="text-xs text-muted-foreground">Freelancer task · {task.createdAt} · due {task.deadline || "not recorded"}</p></div>
+                <div key={"task-" + task.id} className="glass-record rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div><p className="font-semibold text-foreground">{task.assigneeRole || "Delegated task"}</p><p className="text-xs text-foreground-muted">Freelancer task · {task.createdAt} · due {task.deadline || "not recorded"}</p></div>
                   <Badge variant={task.status === "completed" ? "default" : "secondary"} className="rounded-full">{task.submissionStatus?.replaceAll("_", " ") ?? task.status}</Badge>
                 </div>
               ))}
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }
@@ -320,15 +315,11 @@ function ShieldProfileIcon() {
 
 function MetricCard({ icon, label, value, detail, tone = 'default', target, onNavigate, accent }: { icon: React.ReactNode; label: string; value: React.ReactNode; detail: string; tone?: 'default' | 'danger'; target?: string; onNavigate?: (pageId: string) => void; accent: string }) {
   return (
-    <Card className={`rounded-[1.25rem] border-border bg-card/90 beos-soft-shadow ${tone === 'danger' ? 'border-destructive/40' : ''}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-3 [&>svg]:h-5 [&>svg]:w-5" style={{ color: tone === 'danger' ? '#d95747' : accent }}>{icon}<CardTitle className="font-sans text-base font-black tracking-[-0.02em] text-foreground">{label}</CardTitle></div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="beos-metric">{value}</div>
-        <p className="text-xs text-muted-foreground leading-relaxed">{detail}</p>
-        {target && <Button variant="outline" size="sm" className="rounded-full" onClick={() => onNavigate?.(target)}>Open</Button>}
-      </CardContent>
-    </Card>
+    <div className={`glass-tile rounded-xl p-5 space-y-2 ${tone === 'danger' ? 'border-destructive/40' : ''}`}>
+      <div className="flex items-center gap-3 [&>svg]:h-5 [&>svg]:w-5" style={{ color: tone === 'danger' ? '#d95747' : accent }}>{icon}<h3 className="font-heading text-base font-bold tracking-[-0.01em] text-foreground">{label}</h3></div>
+      <div className="text-2xl font-black tracking-[-0.04em] text-foreground">{value}</div>
+      <p className="text-xs text-foreground-muted leading-relaxed">{detail}</p>
+      {target && <Button variant="outline" size="sm" className="rounded-full" onClick={() => onNavigate?.(target)}>Open</Button>}
+    </div>
   );
 }
