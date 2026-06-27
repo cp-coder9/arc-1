@@ -1,8 +1,7 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
+import { limit, onSnapshot, query, type DocumentData, type Query, where } from 'firebase/firestore';
 import { AlertTriangle, Bot, CheckCircle2, FileText, Loader2, MessageCircle, Paperclip, Search, Send, ShieldCheck, Smartphone, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { db } from '@/lib/firebase';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 import type { Job, Message, ProjectCommunicationCaptureType, ProjectStage, UserProfile } from '@/types';
 import { PROJECT_STAGE_LABELS, PROJECT_STAGE_ORDER } from '@/types';
@@ -11,7 +10,6 @@ import { getPhaseCommunicationConfig, PROJECT_COMMUNICATION_CAPTURE_TYPES } from
 import { buildProjectCommunicationCentreModel, type ProjectCommunicationThreadCard } from '@/services/projectCommunicationCentreService';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
@@ -112,70 +110,67 @@ function ProjectChatApplet({ user, selectedJob, messages, scope }: { user: UserP
   };
 
   return (
-    <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm" data-testid="project-chat-applet">
-      <CardHeader>
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Badge variant="secondary" className="uppercase tracking-widest"><Smartphone className="mr-1 h-3 w-3" /> ProjectChatApplet</Badge>
-            <CardTitle className="mt-3 font-heading text-2xl">Mobile-style project capture</CardTitle>
-            <CardDescription>WhatsApp-familiar chat, phase selector, capture type, prompts, files, RFIs, approvals, and audit-aware records.</CardDescription>
-          </div>
-          <Badge className="w-fit capitalize">{user.role}</Badge>
+    <section className="glass-panel rounded-2xl p-6 space-y-4" data-testid="project-chat-applet">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <span className="glass-pill text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-widest text-foreground-muted"><Smartphone className="mr-1 h-3 w-3" /> ProjectChatApplet</span>
+          <h2 className="mt-3 font-heading text-2xl font-bold tracking-[-0.02em] text-foreground">Mobile-style project capture</h2>
+          <p className="mt-1 text-sm text-foreground-muted">WhatsApp-familiar chat, phase selector, capture type, prompts, files, RFIs, approvals, and audit-aware records.</p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium">
-            Phase
-            <select value={phase} onChange={(event) => setPhase(event.target.value as ProjectStage)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm">
-              {PROJECT_STAGE_ORDER.map(stage => <option key={stage} value={stage}>{PROJECT_STAGE_LABELS[stage]}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-2 text-sm font-medium">
-            Capture type
-            <select value={captureType} onChange={(event) => setCaptureType(event.target.value as ProjectCommunicationCaptureType)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm">
-              {PROJECT_COMMUNICATION_CAPTURE_TYPES.map(type => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}
-            </select>
-          </label>
-        </div>
+        <Badge className="w-fit capitalize">{user.role}</Badge>
+      </div>
 
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-foreground"><Sparkles className="h-4 w-4 text-primary" /> Phase prompts</div>
-          <div className="flex flex-wrap gap-2">
-            {phaseConfig.suggestedPrompts.map(prompt => <Badge key={prompt} variant="outline" className="rounded-full">{prompt}</Badge>)}
-          </div>
-        </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          Phase
+          <select value={phase} onChange={(event) => setPhase(event.target.value as ProjectStage)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm">
+            {PROJECT_STAGE_ORDER.map(stage => <option key={stage} value={stage}>{PROJECT_STAGE_LABELS[stage]}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-foreground">
+          Capture type
+          <select value={captureType} onChange={(event) => setCaptureType(event.target.value as ProjectCommunicationCaptureType)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm">
+            {PROJECT_COMMUNICATION_CAPTURE_TYPES.map(type => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}
+          </select>
+        </label>
+      </div>
 
-        <div className="max-h-[22rem] space-y-3 overflow-y-auto rounded-2xl border border-border bg-background/40 p-3">
-          {messages.length === 0 && <p className="p-4 text-sm text-muted-foreground">No messages are recorded for this project yet.</p>}
-          {messages.map((message) => {
-            const mine = message.senderId === user.uid;
-            return (
-              <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[86%] rounded-2xl border p-3 text-sm ${mine ? 'border-primary/20 bg-primary text-primary-foreground' : 'border-border bg-card'}`}>
-                  <div className="mb-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest opacity-75">
-                    <span>{messageAuthor(message, user)}</span>
-                    <span>{message.phase ?? 'legacy'}</span>
-                    <span>{message.captureType ?? 'chat'}</span>
-                  </div>
-                  <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+      <div className="glass-tile rounded-xl p-4 text-sm text-foreground-muted">
+        <div className="mb-2 flex items-center gap-2 font-semibold text-foreground"><Sparkles className="h-4 w-4 text-primary" /> Phase prompts</div>
+        <div className="flex flex-wrap gap-2">
+          {phaseConfig.suggestedPrompts.map(prompt => <Badge key={prompt} variant="outline" className="rounded-full">{prompt}</Badge>)}
+        </div>
+      </div>
+
+      <div className="glass-tile max-h-[22rem] space-y-3 overflow-y-auto rounded-xl p-3">
+        {messages.length === 0 && <p className="p-4 text-sm text-foreground-muted">No messages are recorded for this project yet.</p>}
+        {messages.map((message) => {
+          const mine = message.senderId === user.uid;
+          return (
+            <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+              <div className={mine ? 'max-w-[86%] rounded-2xl border border-primary/20 bg-primary p-3 text-sm text-primary-foreground' : 'glass-record max-w-[86%] rounded-2xl p-3 text-sm text-foreground'}>
+                <div className="mb-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest opacity-75">
+                  <span>{messageAuthor(message, user)}</span>
+                  <span>{message.phase ?? 'legacy'}</span>
+                  <span>{message.captureType ?? 'chat'}</span>
                 </div>
+                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        <form onSubmit={sendMessage} className="grid gap-3 border-t border-border pt-4">
-          <Textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Capture a project message, photo note, RFI, approval request, or site record..." disabled={!scope.canSend || sending} />
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <p className="flex gap-2 text-sm text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> {scope.reason}</p>
-            <Button type="submit" disabled={!scope.canSend || sending || !draft.trim()} className="w-fit rounded-xl gap-2">
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Capture
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      <form onSubmit={sendMessage} className="grid gap-3 border-t border-border/40 pt-4">
+        <Textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Capture a project message, photo note, RFI, approval request, or site record..." disabled={!scope.canSend || sending} />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="flex gap-2 text-sm text-foreground-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> {scope.reason}</p>
+          <Button type="submit" disabled={!scope.canSend || sending || !draft.trim()} className="w-fit rounded-xl gap-2">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Capture
+          </Button>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -184,26 +179,26 @@ function ProjectMessageCentre({ cards }: { cards: ProjectCommunicationThreadCard
   const selected = cards.find(card => card.id === selectedId) ?? cards[0];
 
   return (
-    <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm" data-testid="project-message-centre">
-      <CardHeader>
-        <Badge variant="secondary" className="w-fit uppercase tracking-widest"><MessageCircle className="mr-1 h-3 w-3" /> ProjectMessageCentre</Badge>
-        <CardTitle className="font-heading text-2xl">Desktop message centre</CardTitle>
-        <CardDescription>Searchable governance view for assignment, conversion, approvals, attachments, record links, and audit follow-up.</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+    <section className="glass-panel rounded-2xl p-6 space-y-4" data-testid="project-message-centre">
+      <div>
+        <span className="glass-pill w-fit text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-widest text-foreground-muted"><MessageCircle className="mr-1 h-3 w-3" /> ProjectMessageCentre</span>
+        <h2 className="mt-3 font-heading text-2xl font-bold tracking-[-0.02em] text-foreground">Desktop message centre</h2>
+        <p className="mt-1 text-sm text-foreground-muted">Searchable governance view for assignment, conversion, approvals, attachments, record links, and audit follow-up.</p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-3">
-          {cards.length === 0 && <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">No communication records match the current filters.</p>}
+          {cards.length === 0 && <p className="glass-record rounded-xl p-6 text-sm text-foreground-muted">No communication records match the current filters.</p>}
           {cards.map(card => (
-            <button key={card.id} type="button" onClick={() => setSelectedId(card.id)} className={`w-full rounded-2xl border p-4 text-left transition hover:border-primary/40 ${selected?.id === card.id ? 'border-primary/40 bg-primary/5' : 'border-border bg-background/60'}`}>
+            <button key={card.id} type="button" onClick={() => setSelectedId(card.id)} className={`glass-record w-full rounded-xl p-4 text-left transition ${selected?.id === card.id ? 'border-primary/40' : ''}`}>
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{card.phase}</Badge>
                 <Badge variant="secondary">{card.captureType.replaceAll('_', ' ')}</Badge>
                 <Badge variant={card.structuredStatus === 'raw' ? 'destructive' : 'default'}>{card.structuredStatus}</Badge>
                 {card.requiresHumanApproval && <Badge className="gap-1"><AlertTriangle className="h-3 w-3" /> approval</Badge>}
               </div>
-              <h3 className="font-semibold">{card.jobTitle}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{card.content}</p>
-              <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <h3 className="font-semibold text-foreground">{card.jobTitle}</h3>
+              <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{card.content}</p>
+              <div className="mt-3 flex flex-wrap gap-3 text-xs text-foreground-muted">
                 <span className="flex items-center gap-1"><Paperclip className="h-3 w-3" /> {card.attachmentCount} files</span>
                 <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> {card.linkedRecordCount} links</span>
                 {card.legacyFallback && <span>legacy fallback</span>}
@@ -212,34 +207,34 @@ function ProjectMessageCentre({ cards }: { cards: ProjectCommunicationThreadCard
           ))}
         </div>
 
-        <aside className="rounded-2xl border border-border bg-background/70 p-4">
-          {!selected ? <p className="text-sm text-muted-foreground">Select a message to review details.</p> : (
+        <aside className="glass-tile rounded-xl p-5">
+          {!selected ? <p className="text-sm text-foreground-muted">Select a message to review details.</p> : (
             <div className="space-y-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Structured detail</p>
-                <h3 className="mt-1 font-heading text-xl">{selected.jobTitle}</h3>
+                <p className="text-xs font-bold uppercase tracking-widest text-foreground-muted">Structured detail</p>
+                <h3 className="mt-1 font-heading text-xl text-foreground">{selected.jobTitle}</h3>
               </div>
-              <p className="rounded-xl bg-muted/60 p-3 text-sm leading-relaxed">{selected.content}</p>
+              <p className="glass-record rounded-xl p-3 text-sm leading-relaxed text-foreground">{selected.content}</p>
               <div className="grid gap-2 text-sm">
-                <div className="flex justify-between gap-3"><span className="text-muted-foreground">Visibility</span><strong>{selected.visibility}</strong></div>
-                <div className="flex justify-between gap-3"><span className="text-muted-foreground">Actions</span><strong>{selected.actionCount}</strong></div>
-                <div className="flex justify-between gap-3"><span className="text-muted-foreground">recordLinks</span><strong>{selected.linkedRecordCount}</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-foreground-muted">Visibility</span><strong className="text-foreground">{selected.visibility}</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-foreground-muted">Actions</span><strong className="text-foreground">{selected.actionCount}</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-foreground-muted">recordLinks</span><strong className="text-foreground">{selected.linkedRecordCount}</strong></div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Suggested conversions</p>
+                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-foreground-muted">Suggested conversions</p>
                 <div className="flex flex-wrap gap-2">{selected.suggestedConversionRoutes.map(route => <Badge key={route} variant="outline">{route}</Badge>)}</div>
               </div>
               {selected.requiresHumanApproval && (
-                <div className="rounded-2xl border border-amber-300/40 bg-amber-50 p-3 text-sm text-amber-900">
-                  <div className="mb-1 flex items-center gap-2 font-semibold"><Bot className="h-4 w-4" /> AI draft only</div>
+                <div className="glass-tile rounded-xl border-amber-400/40 p-3 text-sm text-foreground-muted">
+                  <div className="mb-1 flex items-center gap-2 font-semibold text-amber-300"><Bot className="h-4 w-4" /> AI draft only</div>
                   <p>{selected.aiSummary ?? 'Review and approve before issuing any formal instruction, approval, or submission.'}</p>
                 </div>
               )}
             </div>
           )}
         </aside>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -296,25 +291,25 @@ export default function ProjectCommunicationCentrePage({ user }: { user: UserPro
 
   return (
     <div className="space-y-6" data-testid="project-communication-centre-page">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <section className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-border/40">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <Badge variant="secondary" className="uppercase tracking-widest">Project Communications</Badge>
-              <CardTitle className="font-heading text-3xl mt-3 flex items-center gap-3"><MessageCircle className="h-7 w-7 text-primary" /> Project Communication Engine</CardTitle>
-              <CardDescription className="mt-2 max-w-3xl text-base">Native Architex communication layer: mobile capture plus desktop message centre, backed by project permissions, lifecycle stages, AI draft suggestions, and auditable records.</CardDescription>
+              <span className="glass-pill text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-widest text-foreground-muted">Project Communications</span>
+              <h1 className="font-heading text-3xl font-bold tracking-[-0.04em] text-foreground mt-3 flex items-center gap-3"><MessageCircle className="h-7 w-7 text-primary" /> Project Communication Engine</h1>
+              <p className="mt-2 max-w-3xl text-base leading-relaxed text-foreground-muted">Native Architex communication layer: mobile capture plus desktop message centre, backed by project permissions, lifecycle stages, AI draft suggestions, and auditable records.</p>
             </div>
             <Badge className="capitalize w-fit">{user.role}</Badge>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 space-y-4">
-          {state === 'loading' && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading visible projects...</div>}
+        </div>
+        <div className="p-6 space-y-4">
+          {state === 'loading' && <div className="flex items-center gap-2 text-sm text-foreground-muted"><Loader2 className="h-4 w-4 animate-spin" /> Loading visible projects...</div>}
           {state === 'error' && <div className="text-sm text-destructive">Unable to load project communications for this role. Check Firestore permissions.</div>}
           {jobs.length > 0 ? (
             <select value={selectedJob?.id ?? ''} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm md:max-w-2xl">
               {jobs.map((job) => <option key={job.id} value={job.id}>{job.title} · {job.status}</option>)}
             </select>
-          ) : state !== 'loading' && <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">No live project context is visible for communications.</div>}
+          ) : state !== 'loading' && <div className="glass-record rounded-xl p-6 text-sm text-foreground-muted">No live project context is visible for communications.</div>}
           <div className="grid gap-3 md:grid-cols-5">
             <Metric label="Messages" value={centreModel.summary.totalMessages} />
             <Metric label="Unread" value={centreModel.summary.unreadMessages} />
@@ -322,35 +317,35 @@ export default function ProjectCommunicationCentrePage({ user }: { user: UserPro
             <Metric label="Attachments" value={centreModel.summary.attachmentMessages} />
             <Metric label="Approval queue" value={centreModel.summary.humanApprovalQueue} danger={centreModel.summary.humanApprovalQueue > 0} />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {messageState === 'error' && <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">This role cannot read the selected communication thread yet.</p>}
+      {messageState === 'error' && <p className="glass-record rounded-xl p-4 text-sm text-foreground-muted">This role cannot read the selected communication thread yet.</p>}
 
       <ProjectChatApplet user={user} selectedJob={selectedJob} messages={messages} scope={scope} />
 
-      <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
-        <CardContent className="grid gap-3 p-4 md:grid-cols-3">
-          <label className="grid gap-2 text-sm font-medium">
+      <section className="glass-panel rounded-2xl p-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             Filter phase
             <select value={phaseFilter} onChange={(event) => setPhaseFilter(event.target.value as ProjectStage | 'all')} className="h-11 rounded-xl border border-input bg-background px-3 text-sm">
               <option value="all">All phases</option>
               {PROJECT_STAGE_ORDER.map(stage => <option key={stage} value={stage}>{PROJECT_STAGE_LABELS[stage]}</option>)}
             </select>
           </label>
-          <label className="grid gap-2 text-sm font-medium">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             Filter capture
             <select value={captureFilter} onChange={(event) => setCaptureFilter(event.target.value as ProjectCommunicationCaptureType | 'all')} className="h-11 rounded-xl border border-input bg-background px-3 text-sm">
               <option value="all">All capture types</option>
               {PROJECT_COMMUNICATION_CAPTURE_TYPES.map(type => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}
             </select>
           </label>
-          <label className="grid gap-2 text-sm font-medium">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             Search
-            <div className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search messages, phases, roles..." /></div>
+            <div className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-foreground-muted" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search messages, phases, roles..." /></div>
           </label>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <ProjectMessageCentre cards={centreModel.threadCards} />
     </div>
@@ -359,9 +354,9 @@ export default function ProjectCommunicationCentrePage({ user }: { user: UserPro
 
 function Metric({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   return (
-    <div className={`rounded-2xl border p-4 ${danger ? 'border-amber-300/50 bg-amber-50 text-amber-950' : 'border-border bg-background/70'}`}>
-      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className="mt-1 flex items-center gap-2 text-2xl font-black">{danger ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5 text-primary" />} {value}</p>
+    <div className={`glass-tile rounded-xl p-4 ${danger ? 'border-amber-400/50' : ''}`}>
+      <p className="text-xs font-bold uppercase tracking-widest text-foreground-muted">{label}</p>
+      <p className="mt-1 flex items-center gap-2 text-2xl font-black text-foreground">{danger ? <AlertTriangle className="h-5 w-5 text-amber-400" /> : <CheckCircle2 className="h-5 w-5 text-primary" />} {value}</p>
     </div>
   );
 }

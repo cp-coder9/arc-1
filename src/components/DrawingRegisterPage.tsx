@@ -7,7 +7,6 @@ import { safeFormat } from '@/lib/utils';
 import type { Project, UserProfile } from '@/types';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 
@@ -417,23 +416,23 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
   };
 
   if (state === 'loading') {
-    return <Card className="rounded-[2rem] border-border bg-card/95"><CardContent className="p-8 flex items-center gap-3 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading drawing register...</CardContent></Card>;
+    return <section className="glass-panel rounded-2xl p-8 flex items-center gap-3 text-foreground-muted"><Loader2 className="h-4 w-4 animate-spin" /> Loading drawing register...</section>;
   }
 
   return (
     <div className="space-y-6" data-testid="drawing-register-page">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="border-b border-border bg-primary/5">
+      <section className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-border/40">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <Badge variant="secondary" className="uppercase tracking-widest">Document Control</Badge>
-              <CardTitle className="mt-3 flex items-center gap-3 font-heading text-3xl"><FileArchive className="h-7 w-7 text-primary" /> Drawing Register & Transmittals</CardTitle>
-              <CardDescription className="mt-2 max-w-3xl text-base">Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs backed by live project document-control records. External delivery, statutory approval, and legal sign-off remain human-confirmed.</CardDescription>
+              <span className="glass-pill text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-widest text-foreground-muted">Document Control</span>
+              <h1 className="mt-3 flex items-center gap-3 font-heading text-3xl font-bold tracking-[-0.04em] text-foreground"><span className="glass-icon-box p-2 text-primary"><FileArchive className="h-7 w-7" /></span> Drawing Register & Transmittals</h1>
+              <p className="mt-2 max-w-3xl text-base leading-relaxed text-foreground-muted">Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs backed by live project document-control records. External delivery, statutory approval, and legal sign-off remain human-confirmed.</p>
             </div>
             <Badge className="w-fit capitalize">{user.role}</Badge>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 space-y-5">
+        </div>
+        <div className="p-6 space-y-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Metric icon={<FileText />} label="Register records" value={documents.length} />
             <Metric icon={<FileClock />} label="Active / issued" value={activeDocuments.length} />
@@ -443,18 +442,18 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div>
-              <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Active project</label>
-              <select className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm" value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
+              <label className="text-xs font-black uppercase tracking-widest text-foreground-muted">Active project</label>
+              <select className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-3 text-sm" value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.id} · {project.currentStage}</option>)}
               </select>
             </div>
-            <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+            <div className="glass-tile rounded-xl p-5 text-sm text-foreground-muted">
               <p className="font-semibold text-foreground">Human confirmation boundary</p>
               <p className="mt-1">Transmittals record issue metadata only. They do not send email, certify municipal submissions, or approve construction use.</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {state === 'error' && <Notice title="Drawing register needs attention" message="Project access could not be resolved for this role. Existing project data remains unchanged; check sign-in, role assignment, or Firestore access before recording revisions." />}
       {!selectedProject && state !== 'error' && <Notice title="No active project found" message="Create or appoint a project before issuing drawing register records or transmittals." />}
@@ -462,18 +461,18 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
       {selectedProject && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-6">
-            <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm">
-              <CardHeader>
-                <CardTitle className="font-heading text-2xl">Live drawing register</CardTitle>
-                <CardDescription>Current revisions and issue status. Select a record to view immutable revision history and transmittal coverage.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {documents.length === 0 && <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No drawing register records are visible for this project yet.</div>}
+            <section className="glass-panel rounded-2xl p-6">
+              <div className="mb-4">
+                <h2 className="font-heading text-2xl font-bold tracking-[-0.02em] text-foreground">Live drawing register</h2>
+                <p className="text-sm text-foreground-muted">Current revisions and issue status. Select a record to view immutable revision history and transmittal coverage.</p>
+              </div>
+              <div className="space-y-3">
+                {documents.length === 0 && <div className="glass-record rounded-xl border-dashed p-8 text-center text-sm text-foreground-muted">No drawing register records are visible for this project yet.</div>}
                 {documents.map((documentRecord) => {
                   const currentKey = versionKey(documentRecord.id, documentRecord.currentVersionId);
                   const transmitted = transmittals.some((transmittal) => transmittal.documentVersionIds.includes(currentKey) || transmittal.documentVersionIds.includes(documentRecord.currentVersionId || ''));
                   return (
-                    <button key={documentRecord.id} type="button" onClick={() => setSelectedDocumentId(documentRecord.id)} className={`w-full rounded-2xl border p-4 text-left transition hover:border-primary/50 ${selectedDocumentId === documentRecord.id ? 'border-primary bg-primary/5' : 'border-border bg-background/70'}`}>
+                    <button key={documentRecord.id} type="button" onClick={() => setSelectedDocumentId(documentRecord.id)} className={`glass-record w-full rounded-xl p-4 text-left transition hover:border-primary/50 ${selectedDocumentId === documentRecord.id ? 'border-primary' : ''}`}>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -481,79 +480,78 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
                             <Badge variant="outline" className={`rounded-full ${statusTone(String(documentRecord.status))}`}>{documentRecord.status}</Badge>
                             {transmitted && <Badge className="rounded-full">Transmitted</Badge>}
                           </div>
-                          <p className="mt-2 font-semibold text-base">{documentRecord.drawingNumber ? `${documentRecord.drawingNumber} · ` : ''}{documentRecord.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Revision {documentRecord.currentRevision || 'unversioned'} · {documentRecord.discipline || 'No discipline'} · Updated {safeFormat(documentRecord.updatedAt ?? documentRecord.createdAt, 'MMM d, yyyy')}</p>
+                          <p className="mt-2 font-semibold text-base text-foreground">{documentRecord.drawingNumber ? `${documentRecord.drawingNumber} · ` : ''}{documentRecord.title}</p>
+                          <p className="mt-1 text-xs text-foreground-muted">Revision {documentRecord.currentRevision || 'unversioned'} · {documentRecord.discipline || 'No discipline'} · Updated {safeFormat(documentRecord.updatedAt ?? documentRecord.createdAt, 'MMM d, yyyy')}</p>
                         </div>
                         {documentRecord.latestFileUrl && <a href={documentRecord.latestFileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline" onClick={(event) => event.stopPropagation()}>Open file</a>}
                       </div>
                     </button>
                   );
                 })}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
             {selectedDocument && (
-              <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="font-heading text-2xl">Revision history</CardTitle>
-                  <CardDescription>{selectedDocument.title} · current revision {selectedDocument.currentRevision || 'not set'}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {selectedVersions.length === 0 && <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">No immutable versions are visible for this record.</p>}
+              <section className="glass-panel rounded-2xl p-6">
+                <div className="mb-4">
+                  <h2 className="font-heading text-2xl font-bold tracking-[-0.02em] text-foreground">Revision history</h2>
+                  <p className="text-sm text-foreground-muted">{selectedDocument.title} · current revision {selectedDocument.currentRevision || 'not set'}</p>
+                </div>
+                <div className="space-y-3">
+                  {selectedVersions.length === 0 && <p className="glass-record rounded-xl border-dashed p-6 text-sm text-foreground-muted">No immutable versions are visible for this record.</p>}
                   {selectedVersions.map((version) => {
                     const key = versionKey(selectedDocument.id, version.id);
                     return (
-                      <label key={version.id} className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background/70 p-4 text-sm">
+                      <label key={version.id} className="glass-record flex cursor-pointer items-start gap-3 rounded-xl p-4 text-sm">
                         <input type="checkbox" className="mt-1" checked={selectedVersionKeys.includes(key)} onChange={() => toggleVersion(key)} disabled={!manager} />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{version.revision}</Badge><Badge variant="secondary">v{version.versionNumber}</Badge>{version.supersedesVersionId && <Badge variant="outline">supersedes {version.supersedesVersionId}</Badge>}</div>
-                          <p className="mt-2 font-semibold">{version.fileName || selectedDocument.latestFileName || 'No file name recorded'}</p>
-                          {version.notes && <p className="mt-1 text-muted-foreground">{version.notes}</p>}
-                          <p className="mt-2 text-[11px] uppercase tracking-widest text-muted-foreground">Recorded {safeFormat(version.createdAt, 'MMM d, yyyy HH:mm')}</p>
+                          <p className="mt-2 font-semibold text-foreground">{version.fileName || selectedDocument.latestFileName || 'No file name recorded'}</p>
+                          {version.notes && <p className="mt-1 text-foreground-muted">{version.notes}</p>}
+                          <p className="mt-2 text-[11px] uppercase tracking-widest text-foreground-muted">Recorded {safeFormat(version.createdAt, 'MMM d, yyyy HH:mm')}</p>
                         </div>
                         {version.fileUrl && <a href={version.fileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">Open</a>}
                       </label>
                     );
                   })}
-                </CardContent>
-              </Card>
+                </div>
+              </section>
             )}
 
-            <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm">
-              <CardHeader>
-                <CardTitle className="font-heading text-2xl">Recipient transmittal log</CardTitle>
-                <CardDescription>Issued packages and recipient logs for the selected project.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {transmittals.length === 0 && <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">No transmittals are visible for this project yet.</p>}
+            <section className="glass-panel rounded-2xl p-6">
+              <div className="mb-4">
+                <h2 className="font-heading text-2xl font-bold tracking-[-0.02em] text-foreground">Recipient transmittal log</h2>
+                <p className="text-sm text-foreground-muted">Issued packages and recipient logs for the selected project.</p>
+              </div>
+              <div className="space-y-3">
+                {transmittals.length === 0 && <p className="glass-record rounded-xl border-dashed p-6 text-sm text-foreground-muted">No transmittals are visible for this project yet.</p>}
                 {transmittals.map((transmittal) => (
-                  <div key={transmittal.id} className="rounded-2xl border border-border bg-background/70 p-4 text-sm">
+                  <div key={transmittal.id} className="glass-record rounded-xl p-4 text-sm">
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={statusTone(String(transmittal.status))}>{transmittal.status}</Badge><Badge variant="secondary">{transmittal.documentVersionIds.length} revisions</Badge><Badge variant="secondary">{transmittal.recipientIds.length} recipients</Badge></div>
-                        <p className="mt-2 font-semibold">{transmittal.title}</p>
-                        {transmittal.purpose && <p className="mt-1 text-muted-foreground">{transmittal.purpose}</p>}
-                        <p className="mt-2 text-[11px] uppercase tracking-widest text-muted-foreground">Issued {safeFormat(transmittal.issuedAt ?? transmittal.createdAt, 'MMM d, yyyy HH:mm')}</p>
+                        <p className="mt-2 font-semibold text-foreground">{transmittal.title}</p>
+                        {transmittal.purpose && <p className="mt-1 text-foreground-muted">{transmittal.purpose}</p>}
+                        <p className="mt-2 text-[11px] uppercase tracking-widest text-foreground-muted">Issued {safeFormat(transmittal.issuedAt ?? transmittal.createdAt, 'MMM d, yyyy HH:mm')}</p>
                       </div>
                     </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
           <div className="space-y-6">
             {manager ? (
               <>
-                <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm">
-                  <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Add register record</CardTitle><CardDescription>Create the first immutable version for a drawing/report/addendum/submission pack.</CardDescription></CardHeader>
-                  <CardContent>
+                <section className="glass-panel rounded-2xl p-6">
+                  <div className="mb-4"><h2 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground flex items-center gap-2"><Plus className="h-5 w-5 text-primary" /> Add register record</h2><p className="text-sm text-foreground-muted">Create the first immutable version for a drawing/report/addendum/submission pack.</p></div>
                     <form onSubmit={createDocument} className="space-y-3">
                       <Input placeholder="Title" value={documentForm.title} onChange={(event) => setDocumentForm((current) => ({ ...current, title: event.target.value }))} />
                       <Input placeholder="Drawing / document number" value={documentForm.drawingNumber} onChange={(event) => setDocumentForm((current) => ({ ...current, drawingNumber: event.target.value }))} />
                       <div className="grid grid-cols-2 gap-3">
-                        <select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={documentForm.documentType} onChange={(event) => setDocumentForm((current) => ({ ...current, documentType: event.target.value as DocumentType }))}>{DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}</select>
-                        <select className="rounded-xl border border-border bg-background px-3 py-2 text-sm" value={documentForm.status} onChange={(event) => setDocumentForm((current) => ({ ...current, status: event.target.value as DocumentStatus }))}>{DOCUMENT_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select>
+                        <select className="rounded-xl border border-input bg-background px-3 py-2 text-sm" value={documentForm.documentType} onChange={(event) => setDocumentForm((current) => ({ ...current, documentType: event.target.value as DocumentType }))}>{DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}</select>
+                        <select className="rounded-xl border border-input bg-background px-3 py-2 text-sm" value={documentForm.status} onChange={(event) => setDocumentForm((current) => ({ ...current, status: event.target.value as DocumentStatus }))}>{DOCUMENT_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select>
                       </div>
                       <Input placeholder="Discipline" value={documentForm.discipline} onChange={(event) => setDocumentForm((current) => ({ ...current, discipline: event.target.value }))} />
                       <Input placeholder="Initial revision, e.g. P01" value={documentForm.revision} onChange={(event) => setDocumentForm((current) => ({ ...current, revision: event.target.value }))} />
@@ -563,12 +561,10 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
                       <Input placeholder="Tags, comma separated" value={documentForm.tags} onChange={(event) => setDocumentForm((current) => ({ ...current, tags: event.target.value }))} />
                       <Button className="w-full rounded-xl" disabled={saving} type="submit">Create register record</Button>
                     </form>
-                  </CardContent>
-                </Card>
+                </section>
 
-                <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm">
-                  <CardHeader><CardTitle className="font-heading text-xl">Add revision</CardTitle><CardDescription>Append a new immutable version for the selected record.</CardDescription></CardHeader>
-                  <CardContent>
+                <section className="glass-panel rounded-2xl p-6">
+                  <div className="mb-4"><h2 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground">Add revision</h2><p className="text-sm text-foreground-muted">Append a new immutable version for the selected record.</p></div>
                     <form onSubmit={addRevision} className="space-y-3">
                       <Input placeholder="Revision, e.g. P02" value={revisionForm.revision} onChange={(event) => setRevisionForm((current) => ({ ...current, revision: event.target.value }))} disabled={!selectedDocument} />
                       <Input placeholder="File URL" value={revisionForm.fileUrl} onChange={(event) => setRevisionForm((current) => ({ ...current, fileUrl: event.target.value }))} disabled={!selectedDocument} />
@@ -576,22 +572,19 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
                       <Textarea placeholder="Revision notes" value={revisionForm.notes} onChange={(event) => setRevisionForm((current) => ({ ...current, notes: event.target.value }))} disabled={!selectedDocument} />
                       <Button className="w-full rounded-xl" variant="outline" disabled={saving || !selectedDocument} type="submit">Record revision</Button>
                     </form>
-                  </CardContent>
-                </Card>
+                </section>
 
-                <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm">
-                  <CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><FileOutput className="h-5 w-5 text-primary" /> Generate transmittal</CardTitle><CardDescription>Select revisions from the history, then record issue metadata and a linked coordination item.</CardDescription></CardHeader>
-                  <CardContent>
+                <section className="glass-panel rounded-2xl p-6">
+                  <div className="mb-4"><h2 className="font-heading text-xl font-bold tracking-[-0.02em] text-foreground flex items-center gap-2"><FileOutput className="h-5 w-5 text-primary" /> Generate transmittal</h2><p className="text-sm text-foreground-muted">Select revisions from the history, then record issue metadata and a linked coordination item.</p></div>
                     <form onSubmit={issueTransmittal} className="space-y-3">
                       <Input placeholder="Transmittal title" value={transmittalForm.title} onChange={(event) => setTransmittalForm((current) => ({ ...current, title: event.target.value }))} />
-                      <select className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" value={transmittalForm.status} onChange={(event) => setTransmittalForm((current) => ({ ...current, status: event.target.value as TransmittalStatus }))}>{TRANSMITTAL_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select>
+                      <select className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" value={transmittalForm.status} onChange={(event) => setTransmittalForm((current) => ({ ...current, status: event.target.value as TransmittalStatus }))}>{TRANSMITTAL_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select>
                       <Textarea placeholder="Recipient user IDs, separated by commas or new lines" value={transmittalForm.recipientIds} onChange={(event) => setTransmittalForm((current) => ({ ...current, recipientIds: event.target.value }))} />
                       <Textarea placeholder="Purpose / issue note" value={transmittalForm.purpose} onChange={(event) => setTransmittalForm((current) => ({ ...current, purpose: event.target.value }))} />
-                      <p className="text-xs text-muted-foreground">Selected revisions: {selectedVersionKeys.length}</p>
+                      <p className="text-xs text-foreground-muted">Selected revisions: {selectedVersionKeys.length}</p>
                       <Button className="w-full rounded-xl" disabled={saving || selectedVersionKeys.length === 0} type="submit">Issue transmittal record</Button>
                     </form>
-                  </CardContent>
-                </Card>
+                </section>
               </>
             ) : (
               <Notice title="Read-only register" message="Clients can view issued register records and transmittals. Creating revisions or transmittals remains with the design lead/admin." />
@@ -600,15 +593,15 @@ export default function DrawingRegisterPage({ user }: { user: UserProfile }) {
         </div>
       )}
 
-      {selectedDocument && selectedDocumentTransmittals.length > 0 && <p className="text-xs text-muted-foreground">Selected current revision appears in {selectedDocumentTransmittals.length} transmittal record(s).</p>}
+      {selectedDocument && selectedDocumentTransmittals.length > 0 && <p className="text-xs text-foreground-muted">Selected current revision appears in {selectedDocumentTransmittals.length} transmittal record(s).</p>}
     </div>
   );
 }
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return <div className="rounded-2xl border border-border bg-background/70 p-4"><div className="mb-3 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p><p className="mt-1 font-heading text-2xl font-black">{value}</p></div>;
+  return <div className="glass-tile rounded-xl p-5"><div className="mb-3 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</div><p className="text-[10px] font-black uppercase tracking-widest text-foreground-muted">{label}</p><p className="mt-1 font-heading text-2xl font-black text-foreground">{value}</p></div>;
 }
 
 function Notice({ title, message }: { title: string; message: string }) {
-  return <Card className="rounded-2xl border-border bg-card/95"><CardContent className="flex gap-3 p-6"><AlertTriangle className="mt-1 h-5 w-5 text-amber-600" /><div><p className="font-heading text-lg font-bold">{title}</p><p className="mt-1 text-sm text-muted-foreground">{message}</p></div></CardContent></Card>;
+  return <section className="glass-tile flex gap-3 rounded-xl p-6"><AlertTriangle className="mt-1 h-5 w-5 text-amber-600" /><div><p className="font-heading text-lg font-bold text-foreground">{title}</p><p className="mt-1 text-sm text-foreground-muted">{message}</p></div></section>;
 }
