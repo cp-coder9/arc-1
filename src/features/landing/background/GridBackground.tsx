@@ -25,7 +25,7 @@ export interface GridBackgroundProps {
 /** Full-strength opacity on the initial Landing_Page. */
 const GRID_OPACITY = 1;
 /** Dimmer opacity once activation completes — strictly lower (Req 13.3). */
-const GRID_OPACITY_DIMMED = 0.4;
+const GRID_OPACITY_DIMMED = 0.45;
 
 /**
  * Renders the checkered Grid_Background.

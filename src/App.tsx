@@ -715,6 +715,23 @@ function AppContent() {
     }
   };
 
+  // Landing OS-reveal sign-in card: authenticate and let the onAuthStateChanged
+  // effect load the profile + setUser(...), which renders the Command Centre.
+  // On failure, stay on the landing — do NOT open the role-select screen.
+  const handleLandingSignIn = async (signInEmail: string, signInPassword: string) => {
+    if (isLoggingIn || profileLoading) return;
+    setIsLoggingIn(true);
+    try {
+      await signInWithEmailAndPassword(auth, signInEmail, signInPassword);
+      // Success: onAuthStateChanged handles profile load + setUser -> workspace.
+    } catch (error: unknown) {
+      console.error("Landing sign-in error:", error);
+      toast.error(getAuthErrorMessage(error));
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -806,8 +823,8 @@ function AppContent() {
   if (!user && !showLogin) {
     return (
       <LandingExperience
-        onSignUp={() => setShowOnboarding(true)}
-        onSignIn={() => setShowLogin(true)}
+        onSignUp={() => { setShowLogin(true); setAuthMode('selection'); }}
+        onSignIn={handleLandingSignIn}
         onNavigate={(route) => window.location.assign(route)}
       />
     );
@@ -815,7 +832,7 @@ function AppContent() {
 
   if (!user && showLogin) {
     return (
-      <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-[#04302c]/92 px-3 py-3 text-[#04302c] backdrop-blur-xl sm:px-4 sm:py-6">
+      <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-[#04302c]/92 px-3 py-3 text-white backdrop-blur-xl sm:px-4 sm:py-6">
         <AnimatedFloorPlan />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[0.09] bg-[linear-gradient(rgba(248,250,252,0.8)_1px,transparent_1px),linear-gradient(90deg,rgba(248,250,252,0.8)_1px,transparent_1px)] bg-[size:36px_36px]" />
         <motion.div
@@ -823,7 +840,7 @@ function AppContent() {
           animate={{ opacity: 1, y: 0 }}
           className={`${authMode === 'selection' ? 'max-w-6xl' : 'max-w-4xl'} relative z-10 w-full pb-[max(env(safe-area-inset-bottom),0px)]`}
         >
-          <Card className="overflow-hidden rounded-[1.6rem] border border-white/15 bg-[#F8FAFC]/96 shadow-[0_32px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[2.2rem]">
+          <Card className="overflow-hidden rounded-[1.6rem] border border-[rgba(174,239,227,0.22)] bg-[#0d2520]/96 text-white shadow-[0_32px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[2.2rem]">
             <CardHeader className="relative overflow-hidden bg-[#04302c] px-5 pb-5 pt-16 text-[#F8FAFC] sm:px-7 sm:pb-6 sm:pt-12">
               <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,rgba(15,107,98,0.48),transparent_28%),radial-gradient(circle_at_86%_0%,rgba(248,250,252,0.12),transparent_28%)]" />
               <div className="absolute left-4 right-4 top-4 flex items-center justify-between sm:left-6 sm:right-6 sm:top-6">
@@ -886,13 +903,13 @@ function AppContent() {
                       <AuthRoleCard data-testid="role-select-subcontractor" icon={<Hammer className="w-8 h-8" />} title="Subcontractor" description="I deliver a trade package, evidence, and close-out items" active={roleSelection === 'subcontractor'} onClick={() => setRoleSelection('subcontractor')} />
                       <AuthRoleCard data-testid="role-select-supplier" icon={<Factory className="w-8 h-8" />} title="Supplier" description="I supply materials, products, deliveries, or warranties" active={roleSelection === 'supplier'} onClick={() => setRoleSelection('supplier')} />
                     </div>
-                    <div className="rounded-[1.25rem] border border-[#04302c]/10 bg-[#04302c]/[0.035] p-3 sm:p-4">
-                      <Button onClick={handleGoogleLogin} className="h-14 w-full rounded-2xl bg-[#04302c] text-base font-black text-[#F8FAFC] shadow-lg hover:bg-[#0f6b62]" disabled={!roleSelection || isLoggingIn}>
+                    <div className="rounded-[1.25rem] border border-[rgba(174,239,227,0.18)] bg-white/[0.05] p-3 sm:p-4">
+                      <Button onClick={handleGoogleLogin} className="h-14 w-full rounded-2xl bg-gradient-to-r from-[#aeefe3] to-[#7cd7c3] text-base font-black text-[#00201b] shadow-lg hover:from-[#bff5ea] hover:to-[#8fe0cf]" disabled={!roleSelection || isLoggingIn}>
                         {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                       </Button>
                       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
-                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl border-[rgba(174,239,227,0.24)] bg-white/[0.06] font-bold text-white hover:bg-white/[0.12] hover:text-white" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl border-[rgba(174,239,227,0.24)] bg-white/[0.06] font-bold text-white hover:bg-white/[0.12] hover:text-white" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
                       </div>
                     </div>
                   </motion.div>
@@ -908,25 +925,25 @@ function AppContent() {
                   >
                     {authMode === 'email-signup' && (
                       <div className="space-y-2">
-                        <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
-                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
+                        <label className="text-sm font-bold uppercase tracking-widest text-white/62">Full Name</label>
+                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl border-[rgba(174,239,227,0.18)] bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-[#aeefe3] focus-visible:ring-[#aeefe3]/30" />
                       </div>
                     )}
                     <div className="space-y-2">
-                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
-                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
+                      <label className="text-sm font-bold uppercase tracking-widest text-white/62">Email Address</label>
+                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl border-[rgba(174,239,227,0.18)] bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-[#aeefe3] focus-visible:ring-[#aeefe3]/30" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Password</label>
-                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
+                      <label className="text-sm font-bold uppercase tracking-widest text-white/62">Password</label>
+                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl border-[rgba(174,239,227,0.18)] bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-[#aeefe3] focus-visible:ring-[#aeefe3]/30" />
                     </div>
-                    <Button type="submit" className="mt-6 h-14 w-full rounded-2xl bg-[#04302c] text-lg font-black text-[#F8FAFC] shadow-lg hover:bg-[#0f6b62]" disabled={isLoggingIn}>
+                    <Button type="submit" className="mt-6 h-14 w-full rounded-2xl bg-gradient-to-r from-[#aeefe3] to-[#7cd7c3] text-lg font-black text-[#00201b] shadow-lg hover:from-[#bff5ea] hover:to-[#8fe0cf]" disabled={isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
                     </Button>
-                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl font-bold" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
+                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl border-[rgba(174,239,227,0.24)] bg-white/[0.06] font-bold text-white hover:bg-white/[0.12] hover:text-white" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                     </Button>
-                    <Button type="button" variant="ghost" className="w-full text-muted-foreground rounded-full" onClick={() => setAuthMode('selection')}>Back to Options</Button>
+                    <Button type="button" variant="ghost" className="w-full text-white/62 rounded-full hover:bg-white/10 hover:text-white" onClick={() => setAuthMode('selection')}>Back to Options</Button>
                   </motion.form>
                 )}
               </AnimatePresence>
@@ -1518,18 +1535,18 @@ function AuthRoleCard({ icon, title, description, active, onClick, ...props }: {
   return (
     <button
       onClick={onClick}
-      className={`group flex min-h-[118px] gap-4 rounded-3xl border p-4 text-left shadow-sm transition-all duration-300 hover:shadow-xl sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5 ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
+      className={`group flex min-h-[118px] gap-4 rounded-3xl border p-4 text-left shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5 ${active ? 'border-[#aeefe3] bg-[rgba(174,239,227,0.10)] ring-2 ring-[rgba(174,239,227,0.30)]' : 'border-[rgba(174,239,227,0.18)] bg-white/[0.05] hover:border-[#aeefe3] hover:bg-white/[0.08]'}`}
       {...props}
     >
-      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all group-hover:scale-105 sm:h-14 sm:w-14 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all group-hover:scale-105 sm:h-14 sm:w-14 ${active ? 'bg-[rgba(174,239,227,0.22)] text-[#aeefe3]' : 'bg-[rgba(174,239,227,0.14)] text-[#aeefe3]'}`}>
         {icon}
       </div>
       <div className="min-w-0 space-y-1.5 sm:space-y-2">
-        <h3 className="font-heading text-xl font-bold sm:text-2xl">{title}</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+        <h3 className="font-heading text-xl font-bold text-white sm:text-2xl">{title}</h3>
+        <p className="text-sm text-white/62 leading-relaxed">{description}</p>
       </div>
-      <div className="mt-auto hidden w-full border-t border-border/50 pt-3 sm:block">
-        <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
+      <div className="mt-auto hidden w-full border-t border-[rgba(174,239,227,0.18)] pt-3 sm:block">
+        <span className="text-[10px] uppercase tracking-widest font-black text-[#aeefe3] flex items-center gap-2 group-hover:gap-4 transition-all">
           {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
         </span>
       </div>

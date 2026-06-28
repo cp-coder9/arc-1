@@ -50,8 +50,10 @@ const TWINKLE_HIGH = 0.85;
 /** Static resting opacity used under reduced motion. */
 const STATIC_OPACITY = 0.5;
 /** Field opacity on the initial Landing_Page vs. dimmed after activation (Req 13.4). */
-const FIELD_OPACITY = 1;
-const FIELD_OPACITY_DIMMED = 0.4;
+const FIELD_OPACITY = 0.55;
+const FIELD_OPACITY_DIMMED = 0.3;
+/** Fallback grid step (px) when the `--grid-step` probe resolves to 0. */
+const DEFAULT_STEP_PX = 54;
 
 /**
  * Deterministic pseudo-random value in [0, 1) seeded by a node index and salt.
@@ -80,24 +82,39 @@ export function NetworkNodes({
 
   // Measure the container and the resolved grid-step (the `--grid-step` token is
   // a clamp() expression, so we resolve it to px via a hidden probe element).
+  // Re-measure on window resize so the lattice rebuilds to match the viewport
+  // (like the mockup's resize handler).
   useLayoutEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
 
     const measure = () => {
+      // Measure the full-bleed container directly. In a real browser this
+      // always has a size; we deliberately do NOT substitute the window here so
+      // a zero-sized container (e.g. test/SSR) yields an empty lattice rather
+      // than a phantom one.
       setSize({ width: el.clientWidth, height: el.clientHeight });
       const probe = probeRef.current;
-      if (probe) setStepPx(probe.getBoundingClientRect().width);
+      const probed = probe ? probe.getBoundingClientRect().width : 0;
+      setStepPx(probed > 0 ? probed : DEFAULT_STEP_PX);
     };
 
     measure();
 
+    let ro: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(measure);
+      ro = new ResizeObserver(measure);
       ro.observe(el);
-      return () => ro.disconnect();
     }
-    return undefined;
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', measure);
+    }
+    return () => {
+      ro?.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', measure);
+      }
+    };
   }, []);
 
   // Junctions every 2 grid steps across the measured viewport (Req 13.2).

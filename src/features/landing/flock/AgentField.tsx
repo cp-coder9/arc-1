@@ -37,6 +37,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import BirdMark from '@/design-system/BirdMark';
+import { LANDING_ACCENT, tokenVar } from '@/design-system/tokens';
 import type { ActivationPhase } from './useFlockActivation';
 import {
   FLOCK,
@@ -67,14 +68,23 @@ export interface AgentFieldProps {
   className?: string;
 }
 
-/** Outward-flight duration in seconds (visual; the hook advances on completion). */
-const DISPERSE_DURATION_S = 1.2;
-/** Settle-onto-loop duration in seconds. */
-const SETTLE_DURATION_S = 0.6;
-/** Opacity of an Agent_Shard while in flight (clearly visible). */
-const FLIGHT_OPACITY = 0.9;
+/** Outward-flight (explosion) duration in seconds — matches the mockup's ~800–1100ms burst. */
+const DISPERSE_DURATION_S = 0.85;
+/** Settle-onto-loop duration in seconds — matches the mockup's ~1300ms settle. */
+const SETTLE_DURATION_S = 1.3;
+/** Opacity of an Agent_Shard at the peak of the explosion (fully bright, like the mockup). */
+const FLIGHT_OPACITY = 1;
+/** Scale applied at the peak of the burst so the shards "pop" outward (mockup feel). */
+const BURST_SCALE = 1.05;
 /** Slight blur applied to the settled/patrolling field so it reads as "behind glass". */
 const FIELD_BLUR_PX = 2;
+/**
+ * Mint glow + screen-blend treatment for each mini Bird_Mark, mirroring the
+ * mockup's `.agent { mix-blend-mode: screen; filter: drop-shadow(...) }`. The
+ * glow color is token-driven (the mint `--landing-accent`) so it re-skins with
+ * the Theme_Mode and never bakes a literal hex into the markup.
+ */
+const SHARD_GLOW = `drop-shadow(0 0 7px ${tokenVar(LANDING_ACCENT)})`;
 
 /** Default flock size (within FLOCK bounds) when the caller doesn't specify. */
 const DEFAULT_COUNT = 42;
@@ -222,6 +232,9 @@ export function AgentField({
           marginLeft: -half,
           marginTop: -half,
           willChange: 'transform, opacity' as const,
+          // Mint glow + screen blend so the mini birds read as luminous "agents"
+          // over the dark teal field (mockup parity, Req 12.2).
+          filter: SHARD_GLOW,
         };
 
         const shard = <BirdMark size={plan.sizePx} decorative blend />;
@@ -231,13 +244,27 @@ export function AgentField({
           // transitions on the same element so they chain seamlessly.
           const target =
             phase === 'dispersing'
-              ? { x: plan.burstTarget.x, y: plan.burstTarget.y, opacity: FLIGHT_OPACITY }
-              : { x: start.x, y: start.y, opacity: settledOpacity(plan.id) };
+              ? {
+                  x: plan.burstTarget.x,
+                  y: plan.burstTarget.y,
+                  opacity: FLIGHT_OPACITY,
+                  scale: BURST_SCALE,
+                }
+              : {
+                  x: start.x,
+                  y: start.y,
+                  opacity: settledOpacity(plan.id),
+                  scale: 1,
+                };
 
           const transition =
             phase === 'dispersing'
-              ? { duration: DISPERSE_DURATION_S, ease: 'easeOut' as const, delay: flightDelay(plan.id) }
-              : { duration: SETTLE_DURATION_S, ease: 'easeInOut' as const };
+              ? {
+                  duration: DISPERSE_DURATION_S,
+                  ease: [0.15, 0.7, 0.2, 1] as [number, number, number, number],
+                  delay: flightDelay(plan.id),
+                }
+              : { duration: SETTLE_DURATION_S, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] };
 
           const handleComplete = () => {
             if (phase === 'dispersing' && !firedRef.current.dispersed) {
