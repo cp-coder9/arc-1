@@ -1,11 +1,12 @@
 import type { NavigationItem } from './navTypes';
+import type { UserRole } from '../types';
 
 export const architexNavigation: NavigationItem[] = [
   {
     key: 'command_centre',
     label: 'Command Centre',
     description: 'Personal daily cockpit curated by the user agent.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
       { key: 'active_projects', label: 'Active Projects', description: 'Current project responsibilities.' },
@@ -18,7 +19,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'inbox',
     label: 'Inbox / Action Centre',
     description: 'Protected action centre for required work and agent-pushed tasks.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'required_actions', label: 'Required Actions', description: 'Tasks requiring user action.', supportsContextualMessaging: true },
       { key: 'approvals', label: 'Approvals', description: 'Items awaiting approval.', supportsContextualMessaging: true },
@@ -30,7 +31,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'projects',
     label: 'Projects',
     description: 'Phase-aware project workspace.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'dashboard', label: 'Project Dashboard', description: 'Project overview.', projectScoped: true, phaseAware: true },
       { key: 'team', label: 'Team', description: 'Project team and responsibilities.', projectScoped: true, supportsContextualMessaging: true },
@@ -47,7 +48,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'toolboxes',
     label: 'Toolboxes',
     description: 'Role-specific professional tools, not a flat list.',
-    roles: ['architect', 'admin', 'freelancer', 'contractor'],
+    roles: ['architect', 'admin', 'freelancer', 'contractor', 'bep', 'subcontractor', 'supplier', 'client', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
       { key: 'design_compliance', label: 'Design & Compliance', description: 'NBR/SANS/municipal/drawing checks.', supportsContextualMessaging: true },
@@ -76,7 +77,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'documents',
     label: 'Documents / Knowledge Hub',
     description: 'Global document, template and knowledge hub.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'my_documents', label: 'My Documents', description: 'User documents.' },
       { key: 'project_documents', label: 'Project Documents', description: 'Cross-project document search.', supportsContextualMessaging: true },
@@ -116,7 +117,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'messages',
     label: 'Messages',
     description: 'Full persistent messaging centre linked to project context.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'direct', label: 'Direct Messages', description: 'One-to-one messages.' },
       { key: 'project_groups', label: 'Project Groups', description: 'Project group conversations.' },
@@ -151,3 +152,33 @@ export const architexNavigation: NavigationItem[] = [
     ],
   },
 ];
+
+/**
+ * Returns the navigation modules accessible to a given user role.
+ *
+ * Each top-level module is included if:
+ *   - it has no `roles` filter (accessible to all), OR
+ *   - the user's role is listed in its `roles` array.
+ *
+ * Within included modules, sections that carry their own `roles` filter
+ * are also filtered by the user's role — sections without a `roles` filter
+ * are always included.
+ *
+ * Preconditions: `role` is a valid UserRole from src/types.ts
+ * Postconditions: returns array of NavigationItems visible to that role with
+ *   section-level role filtering applied
+ */
+export function getNavigationForRole(role: UserRole): NavigationItem[] {
+  return architexNavigation
+    .filter((item) => {
+      if (!item.roles || item.roles.length === 0) return true;
+      return item.roles.includes(role);
+    })
+    .map((item) => ({
+      ...item,
+      sections: item.sections.filter((section) => {
+        if (!section.roles || section.roles.length === 0) return true;
+        return section.roles.includes(role);
+      }),
+    }));
+}

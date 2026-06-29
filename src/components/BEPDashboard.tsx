@@ -7,7 +7,6 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import {
   LayoutDashboard,
-
   Briefcase,
   Clock,
   CheckCircle2,
@@ -35,9 +34,17 @@ import { Chat } from './Chat';
 import { subscribeToProjectByJobId } from '../services/projectLifecycleService';
 import SiteLogManager from './SiteLogManager';
 import BEPToolboxPage from './BEPToolboxPage';
-
-
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
+
+// ─── Glass system & design components ────────────────────────────────────────
+import { RoleAwareSidebar } from '@/components/navigation/RoleAwareSidebar';
+import { MobileMenuTrigger } from '@/components/navigation/MobileMenuTrigger';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { GlassButton } from '@/components/ui/GlassButton';
+import { StatCardAnimated } from '@/components/animated/StatCardAnimated';
+import { DashboardSection } from '@/components/composite/DashboardSection';
+import { GlassTable } from '@/components/composite/GlassTable';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
   'in-progress': 'bg-accent/10 text-primary border-accent/20',
@@ -45,6 +52,7 @@ const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> 
 };
 
 export default function BEPDashboard({ user }: { user: UserProfile }) {
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const [assignedTasks, setAssignedTasks] = useState<JobCard[]>([]);
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -93,207 +101,199 @@ export default function BEPDashboard({ user }: { user: UserProfile }) {
     const trade = user.professionalLabel?.toLowerCase() || '';
     const region = user.region?.toLowerCase() || '';
 
-    if (job.category.toLowerCase().includes(trade)) score += 50;
-    if (job.description.toLowerCase().includes(trade)) score += 30;
+    if (job.category?.toLowerCase().includes(trade)) score += 50;
+    if (job.description?.toLowerCase().includes(trade)) score += 30;
     if (job.location?.toLowerCase().includes(region)) score += 20;
 
     return { ...job, matchScore: score };
   }).filter(j => j.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore);
 
   return (
-    <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#7046a8' }}>
-        <div className="flex-1">
-          <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">
-              Professional Portal
-            </h1>
-            <ProfileEditor user={user} />
-          </div>
-          <div className="flex flex-wrap gap-3 mt-4">
-            <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-primary/5 text-primary border-primary/10 font-bold uppercase tracking-widest text-[10px]">
-              {user.professionalLabel || 'BEP'}
-            </Badge>
-            {user.nhbrcNumber && (
-              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-primary-light/10 text-primary-light border-primary-light/20 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
-                <ShieldCheck size={12} /> NHBRC: {user.nhbrcNumber}
-              </Badge>
-            )}
-            {user.cidbGrading && (
-              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-accent/10 text-primary border-accent/20 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
-                <BadgeCheck size={12} /> CIDB: {user.cidbGrading}
-              </Badge>
-            )}
-            {user.region && (
-              <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-secondary/50 text-muted-foreground border-border font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
-                <MapPin size={12} /> {user.region}
-              </Badge>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={activeView === 'overview' ? 'default' : 'outline'}
-            className="rounded-full px-6 h-12 font-bold beos-button-shadow"
-            onClick={() => setActiveView('overview')}
-          >
-            Overview
-          </Button>
-          <Button
-            variant={activeView === 'marketplace' ? 'default' : 'outline'}
-            className="rounded-full px-6 h-12 font-bold beos-button-shadow"
-            onClick={() => setActiveView('marketplace')}
-          >
-            Marketplace
-          </Button>
-          <Button
-            variant={activeView === 'toolbox' ? 'default' : 'outline'}
-            className="rounded-full px-6 h-12 font-bold beos-button-shadow"
-            onClick={() => setActiveView('toolbox')}
-          >
-            <Wrench className="h-4 w-4 mr-2" />
-            Toolbox
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Fixed left sidebar (hidden on mobile, visible md+) */}
+      <RoleAwareSidebar user={user} activeTab={activeView} onNavigate={(id) => setActiveView(id as typeof activeView)} />
 
-      {activeView === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatCard label="My Tasks" value={stats.totalTasks} icon={<LayoutDashboard size={20} />} />
-              <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} tone="accent" />
-              <StatCard label="Rating" value={`${Number(stats.rating).toFixed(1)}/5`} icon={<Star size={20} />} tone="success" />
-            </div>
-
-            {recommendedJobs.length > 0 && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-heading font-black tracking-[-0.04em] flex items-center gap-2">
-                    <Zap className="text-primary fill-primary" size={24} /> Recommended Projects
-                  </h2>
-                  <Button variant="ghost" size="sm" className="text-primary font-bold" onClick={() => setActiveView('marketplace')}>
-                    View All <ArrowRight size={16} className="ml-1" />
-                  </Button>
+      {/* Main content — shifted right on desktop for sidebar */}
+      <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
+        {/* ── Page header ────────────────────────────────────────────────── */}
+        <header className="glass-panel rounded-2xl p-5 md:p-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3">
+              <MobileMenuTrigger user={user} className="mt-1 shrink-0" />
+              <div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground tracking-tight">
+                    Professional Portal
+                  </h1>
+                  <ProfileEditor user={user} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {recommendedJobs.slice(0, 2).map(job => (
-                    <Card key={job.id} {...({job, user} as any)} className="border-primary/20 bg-primary/5 rounded-[2rem] overflow-hidden hover:border-primary transition-all group relative">
-                      <div className="absolute top-4 right-4">
-                        <Badge className="bg-primary/10 text-primary border-primary/20 uppercase text-[8px] font-black tracking-tighter">
-                          {job.matchScore}% Match
-                        </Badge>
-                      </div>
-                      <CardHeader className="p-8 pb-4">
-                        <Badge variant="secondary" className="w-fit mb-3 bg-white text-primary uppercase text-[10px] tracking-widest">{job.category}</Badge>
-                        <CardTitle className="font-heading font-bold text-xl group-hover:text-primary transition-colors">{job.title}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-8 pt-0">
-                        <p className="text-xs text-muted-foreground line-clamp-2 mb-6">{job.description}</p>
-                        <div className="flex justify-between items-center pt-4 border-t border-primary/10">
-                          <span className="text-sm font-bold text-primary font-mono">R {job.budget.toLocaleString()}</span>
-                          <Button size="sm" className="rounded-full px-6 font-bold uppercase text-[10px] tracking-widest">Apply Now</Button>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline" className="rounded-full px-3 py-1 bg-primary/5 text-primary border-primary/10 font-bold uppercase tracking-widest text-[10px]">
+                    {user.professionalLabel || 'BEP'}
+                  </Badge>
+                  {user.nhbrcNumber && (
+                    <Badge variant="outline" className="rounded-full px-3 py-1 bg-primary-light/10 text-primary-light border-primary-light/20 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+                      <ShieldCheck size={10} /> NHBRC: {user.nhbrcNumber}
+                    </Badge>
+                  )}
+                  {user.cidbGrading && (
+                    <Badge variant="outline" className="rounded-full px-3 py-1 bg-accent/10 text-primary border-accent/20 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+                      <BadgeCheck size={10} /> CIDB: {user.cidbGrading}
+                    </Badge>
+                  )}
+                  {user.region && (
+                    <Badge variant="outline" className="rounded-full px-3 py-1 bg-secondary/50 text-muted-foreground border-border font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+                      <MapPin size={10} /> {user.region}
+                    </Badge>
+                  )}
+                </div>
+                <Breadcrumbs className="mt-2" />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <GlassButton
+                variant={activeView === 'overview' ? 'solid' : 'outline'}
+                size="sm"
+                onClick={() => setActiveView('overview')}
+              >
+                Overview
+              </GlassButton>
+              <GlassButton
+                variant={activeView === 'marketplace' ? 'solid' : 'outline'}
+                size="sm"
+                onClick={() => setActiveView('marketplace')}
+              >
+                Marketplace
+              </GlassButton>
+              <GlassButton
+                variant={activeView === 'toolbox' ? 'solid' : 'outline'}
+                size="sm"
+                onClick={() => setActiveView('toolbox')}
+              >
+                <Wrench size={14} className="mr-1.5" aria-hidden="true" /> Toolbox
+              </GlassButton>
+            </div>
+          </div>
+        </header>
+
+        {/* ── View content ───────────────────────────────────────────────── */}
+        {activeView === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatCardAnimated label="My Tasks" value={stats.totalTasks} icon={<LayoutDashboard size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 0 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+                <StatCardAnimated label="In Progress" value={stats.inProgress} icon={<History size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 1 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+                <StatCardAnimated label="Rating" value={`${Number(stats.rating).toFixed(1)}/5`} icon={<Star size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 2 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+              </div>
+
+              {recommendedJobs.length > 0 && (
+                <DashboardSection
+                  title="Recommended Projects"
+                  icon={<Zap size={18} aria-hidden="true" />}
+                  action={
+                    <GlassButton variant="outline" size="sm" onClick={() => setActiveView('marketplace')}>
+                      View All <ArrowRight size={14} className="ml-1" />
+                    </GlassButton>
+                  }
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {recommendedJobs.slice(0, 2).map(job => (
+                      <div key={job.id} className="glass-record p-5 rounded-2xl group relative">
+                        <div className="absolute top-3 right-3">
+                          <Badge className="bg-primary/10 text-primary border-primary/20 uppercase text-[8px] font-black tracking-tighter">
+                            {job.matchScore}% Match
+                          </Badge>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <BEPConstructionSection user={user} tasks={assignedTasks} />
-
-            <div className="space-y-6">
-              <h2 className="text-2xl font-heading font-bold tracking-tight flex items-center gap-2">
-                <Clock className="text-primary" /> Active Job Cards
-              </h2>
-              <div className="grid grid-cols-1 gap-6">
-                {assignedTasks.map(task => (
-                  <BEPJobCard key={task.id} {...({task, user} as any)} task={task} user={user} />
-                ))}
-                {assignedTasks.length === 0 && !loading && (
-                  <div className="empty-state py-20 px-6">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
-                      <Briefcase className="w-8 h-8" />
-                    </div>
-                    <p className="text-muted-foreground italic">No tasks currently assigned to you.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-8">
-            <Card className="beos-section-card">
-              <CardHeader className="bg-primary/5 p-6 border-b border-border flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Star size={16} className="text-yellow-500" /> Feedback
-                </CardTitle>
-                <Badge variant="outline" className="text-[10px]">{reviews.length}</Badge>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                {reviews.map(review => (
-                  <div key={review.id} className="space-y-2 pb-4 border-b border-border last:border-0 last:pb-0">
-                    <div className="flex justify-between items-center">
-                      <div className="flex text-yellow-400">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />
-                        ))}
+                        <Badge variant="secondary" className="w-fit mb-3 uppercase text-[10px] tracking-widest">{job.category}</Badge>
+                        <h3 className="font-heading font-bold text-lg group-hover:text-[var(--landing-accent)] transition-colors">{job.title}</h3>
+                        <p className="text-xs text-foreground-muted line-clamp-2 mt-2 mb-4">{job.description}</p>
+                        <div className="flex justify-between items-center pt-3 border-t border-white/10">
+                          <span className="text-sm font-bold text-[var(--landing-accent)] font-mono">R {job.budget.toLocaleString()}</span>
+                          <GlassButton size="sm" variant="solid">Apply Now</GlassButton>
+                        </div>
                       </div>
-                      <span className="text-[8px] uppercase font-bold text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-xs text-foreground italic leading-relaxed">"{review.comment}"</p>
+                    ))}
                   </div>
-                ))}
-                {reviews.length === 0 && (
-                  <p className="text-xs text-center text-muted-foreground py-10 italic">No approved reviews yet.</p>
-                )}
-              </CardContent>
-            </Card>
+                </DashboardSection>
+              )}
 
-            <Card className="border-border shadow-sm bg-primary text-primary-foreground rounded-3xl overflow-hidden p-8">
-               <div className="flex items-center gap-4 mb-4">
-                 <div className="p-3 bg-white/20 rounded-2xl">
-                   <Target size={24} />
-                 </div>
-                 <h3 className="text-xl font-heading font-bold">Profile Visibility</h3>
-               </div>
-               <p className="text-sm text-primary-foreground/80 leading-relaxed mb-6">
-                 Your profile is visible to architects looking for <strong>{user.professionalLabel || 'skilled professionals'}</strong> in <strong>{user.region || 'South Africa'}</strong>.
-               </p>
-               <ProfileEditor user={user} trigger={<Button className="w-full bg-white text-primary hover:bg-white/90 rounded-2xl font-bold">Update Profile</Button>} />
-            </Card>
-          </div>
-        </div>
-      )}
+              <BEPConstructionSection user={user} tasks={assignedTasks} />
 
-      {activeView === 'marketplace' && (
-        <div className="space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-heading font-bold tracking-tight">Marketplace</h2>
-              <p className="text-muted-foreground">Find projects that match your trade and region.</p>
+              <DashboardSection title="Active Job Cards" icon={<Clock size={18} aria-hidden="true" />}>
+                <div className="grid grid-cols-1 gap-4">
+                  {assignedTasks.map(task => (
+                    <BEPJobCard key={task.id} {...({task, user} as any)} task={task} user={user} />
+                  ))}
+                  {assignedTasks.length === 0 && !loading && (
+                    <div className="text-center py-16 text-foreground-muted">
+                      <Briefcase className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                      <p className="italic">No tasks currently assigned to you.</p>
+                    </div>
+                  )}
+                </div>
+              </DashboardSection>
             </div>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+
+            <div className="space-y-4">
+              <DashboardSection title="Feedback" icon={<Star size={18} aria-hidden="true" />}>
+                <div className="space-y-4">
+                  {reviews.map(review => (
+                    <div key={review.id} className="space-y-2 pb-4 border-b border-white/10 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-center">
+                        <div className="flex text-yellow-400">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={10} fill={i < review.rating ? "currentColor" : "none"} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-foreground-muted">{new Date(review.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs text-foreground italic leading-relaxed">"{review.comment}"</p>
+                    </div>
+                  ))}
+                  {reviews.length === 0 && (
+                    <p className="text-xs text-center text-foreground-muted py-6 italic">No approved reviews yet.</p>
+                  )}
+                </div>
+              </DashboardSection>
+
+              <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="glass-icon-box p-2 rounded-xl">
+                    <Target size={20} aria-hidden="true" />
+                  </div>
+                  <h3 className="text-lg font-heading font-bold">Profile Visibility</h3>
+                </div>
+                <p className="text-sm text-foreground-muted leading-relaxed mb-4">
+                  Your profile is visible to architects looking for <strong>{user.professionalLabel || 'skilled professionals'}</strong> in <strong>{user.region || 'South Africa'}</strong>.
+                </p>
+                <ProfileEditor user={user} trigger={<GlassButton variant="solid" className="w-full">Update Profile</GlassButton>} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeView === 'marketplace' && (
+          <DashboardSection title="Marketplace" description="Find projects that match your trade and region.">
+            <div className="relative w-full md:w-72 mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted" />
               <input
                 type="text"
                 placeholder="Search trades or locations..."
-                className="w-full h-12 pl-10 pr-4 rounded-xl border border-border bg-white text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                className="w-full h-10 pl-10 pr-4 rounded-xl border border-white/10 bg-white/5 text-sm focus:ring-2 focus:ring-[var(--landing-accent)] outline-none transition-all"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {availableJobs.map(job => (
-              <MarketplaceJobCard key={job.id} {...({job, user} as any)} job={job} user={user} />
-            ))}
-          </div>
-        </div>
-      )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableJobs.map(job => (
+                <MarketplaceJobCard key={job.id} {...({job, user} as any)} job={job} user={user} />
+              ))}
+            </div>
+          </DashboardSection>
+        )}
 
-      {activeView === 'toolbox' && (
-        <BEPToolboxPage user={user} />
-      )}
+        {activeView === 'toolbox' && (
+          <BEPToolboxPage user={user} />
+        )}
+      </main>
     </div>
   );
 }
@@ -455,28 +455,6 @@ function MarketplaceJobCard({ job, user }: { job: Job, user: UserProfile }) {
           Apply Now <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
         </Button>
       </CardFooter>
-    </Card>
-  );
-}
-
-function StatCard({ label, value, icon, tone = "default" }: { label: string, value: string | number, icon: React.ReactNode, tone?: 'default' | 'accent' | 'success' }) {
-  const toneClass = {
-    default: 'bg-primary/10 text-primary',
-    accent: 'bg-accent/10 text-primary',
-    success: 'bg-primary-light/10 text-primary-light',
-  }[tone];
-
-  return (
-    <Card className="beos-stat-card">
-      <CardContent className="p-8 flex items-center gap-6">
-        <div className={`p-4 rounded-2xl ${toneClass}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="beos-label-caps text-muted-foreground mb-1">{label}</p>
-          <p className="beos-metric">{value}</p>
-        </div>
-      </CardContent>
     </Card>
   );
 }

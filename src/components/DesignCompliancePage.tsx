@@ -11,7 +11,6 @@ import ResponsibilityMatrix from './ResponsibilityMatrix';
 import TeamBuilder from './TeamBuilder';
 import DrawingChecklistTracker from './DrawingChecklistTracker';
 import { Badge } from './ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
@@ -96,23 +95,23 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-6" data-testid="design-compliance-page">
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <section className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-border/40">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-              <Badge variant="secondary" className="uppercase tracking-widest">Design & Compliance</Badge>
-              <CardTitle className="font-heading text-3xl mt-3">Design team responsibility matrix</CardTitle>
-              <CardDescription className="mt-2 max-w-3xl text-base">Live discipline coverage, responsibility assignment, professional invitations, and compliance gaps from project records. Missing disciplines remain command-centre blockers until covered by accountable humans.</CardDescription>
+              <span className="glass-pill text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-widest text-foreground-muted">Design &amp; Compliance</span>
+              <h1 className="font-heading text-3xl mt-3 text-foreground">Design team responsibility matrix</h1>
+              <p className="mt-2 max-w-3xl text-base text-foreground-muted">Live discipline coverage, responsibility assignment, professional invitations, and compliance gaps from project records. Missing disciplines remain command-centre blockers until covered by accountable humans.</p>
             </div>
             <Badge className="capitalize w-fit">{user.role}</Badge>
           </div>
-        </CardHeader>
-        <CardContent className="p-6 space-y-4">
-          {state === 'loading' && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading design records...</div>}
+        </div>
+        <div className="p-6 space-y-4">
+          {state === 'loading' && <div className="flex items-center gap-2 text-sm text-foreground-muted"><Loader2 className="h-4 w-4 animate-spin" /> Loading design records...</div>}
           {state === 'error' && <div className="text-sm text-destructive">Unable to load design records. Check Firestore rules and indexes.</div>}
           {jobs.length > 0 && <select value={selectedJob?.id ?? ''} onChange={(event) => setSelectedJobId(event.target.value)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm md:max-w-xl">{jobs.map((job) => <option key={job.id} value={job.id}>{job.title} · {job.category}</option>)}</select>}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard icon={<CheckCircle2 />} label="Filled disciplines" value={coverage.filled.length} />
@@ -120,10 +119,18 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
         <MetricCard icon={<Users />} label="Professionals visible" value={professionals.length} />
       </div>
 
-      {!selectedJob && <Card className="rounded-2xl border-dashed border-border"><CardContent className="p-8 text-center text-sm text-muted-foreground">No live design projects are visible for this role.</CardContent></Card>}
-      {selectedJob && !project && <Card className="rounded-2xl border-amber-200 bg-amber-50 text-amber-900"><CardContent className="p-5"><p className="font-semibold">Project lifecycle record not found.</p><p className="text-sm">Team assignment activates once this job has an associated project record.</p></CardContent></Card>}
+      {!selectedJob && <div className="glass-panel rounded-2xl p-8 text-center text-sm text-foreground-muted">No live design projects are visible for this role.</div>}
+      {selectedJob && !project && <div className="glass-panel rounded-2xl p-5 border-amber-300/60"><p className="font-semibold text-foreground">Project lifecycle record not found.</p><p className="text-sm text-foreground-muted">Team assignment activates once this job has an associated project record.</p></div>}
 
-      {coverage.missing.length > 0 && <Card className="rounded-2xl border-border bg-card/90"><CardHeader><CardTitle className="font-heading text-xl flex items-center gap-2"><Network className="h-5 w-5 text-primary" /> Coverage gaps</CardTitle><CardDescription>These disciplines still need assignment, invitation acceptance, or professional confirmation.</CardDescription></CardHeader><CardContent className="flex flex-wrap gap-2">{coverage.missing.map((discipline) => <Badge key={discipline} variant="outline" className="border-dashed">{labelFor(discipline)}</Badge>)}</CardContent></Card>}
+      {coverage.missing.length > 0 && (
+        <section className="glass-panel rounded-2xl p-6">
+          <div className="mb-4">
+            <h2 className="font-heading text-xl flex items-center gap-2 text-foreground"><Network className="h-5 w-5 text-primary" /> Coverage gaps</h2>
+            <p className="text-sm text-foreground-muted mt-1">These disciplines still need assignment, invitation acceptance, or professional confirmation.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">{coverage.missing.map((discipline) => <Badge key={discipline} variant="outline" className="border-dashed">{labelFor(discipline)}</Badge>)}</div>
+        </section>
+      )}
 
       {selectedJob && project && <DrawingChecklistTracker project={project} job={selectedJob} user={user} />}
       {selectedJob && <ResponsibilityMatrix job={selectedJob} project={project} teamMembers={teamMembers} professionals={professionals} currentUser={user} />}
@@ -133,5 +140,13 @@ export default function DesignCompliancePage({ user }: { user: UserProfile }) {
 }
 
 function MetricCard({ icon, label, value, danger = false }: { icon: React.ReactNode; label: string; value: React.ReactNode; danger?: boolean }) {
-  return <Card className={`rounded-2xl bg-card/90 shadow-sm ${danger ? 'border-destructive/40' : 'border-border'}`}><CardHeader className="pb-3"><div className="flex items-center gap-2 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}<CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</CardTitle></div></CardHeader><CardContent><p className="font-heading text-3xl font-black">{value}</p></CardContent></Card>;
+  return (
+    <div className={`glass-tile rounded-xl p-5 space-y-3 ${danger ? 'border-destructive/40' : ''}`}>
+      <div className={`flex items-center gap-2 [&>svg]:h-5 [&>svg]:w-5 ${danger ? 'text-destructive' : 'text-primary'}`}>
+        {icon}
+        <h3 className="text-xs font-bold uppercase tracking-widest text-foreground-muted">{label}</h3>
+      </div>
+      <p className="font-heading text-3xl font-black text-foreground">{value}</p>
+    </div>
+  );
 }

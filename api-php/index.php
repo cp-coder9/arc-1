@@ -434,6 +434,86 @@ if ($route === '/files/delete' && $method === 'POST') {
     architex_json(200, ['success' => true, 'message' => 'File metadata marked deleted successfully']);
 }
 
+if ($route === '/gemini/review' && $method === 'POST') {
+    $user = architex_require_user();
+    $body = architex_json_input();
+    $systemInstruction = (string) ($body['systemInstruction'] ?? '');
+    $prompt = (string) ($body['prompt'] ?? '');
+    if ($prompt === '') architex_json(400, ['error' => 'prompt is required']);
+    try {
+        $text = architex_call_gemini_text($prompt, $systemInstruction !== '' ? $systemInstruction : null);
+        architex_record_audit('gemini.review.completed', $user, ['type' => 'gemini_review'], []);
+        architex_json(200, [
+            'candidates' => [['content' => ['parts' => [['text' => $text]]]]],
+            'text' => $text,
+        ]);
+    } catch (Throwable $error) {
+        architex_record_audit('gemini.review.unavailable', $user, ['type' => 'gemini_review'], ['reason' => $error->getMessage()]);
+        architex_json(503, ['error' => 'Gemini review unavailable', 'message' => $error->getMessage()]);
+    }
+}
+
+if (preg_match('#^/admin/ai-review/([^/]+)/resolve$#', $route, $matches) === 1 && $method === 'POST') {
+    $user = architex_require_user();
+    if (!$user['isAdmin']) architex_json(403, ['error' => 'Admin access required']);
+    $itemId = rawurldecode($matches[1]);
+    $body = architex_json_input();
+    $decision = (string) ($body['decision'] ?? '');
+    $reason = trim((string) ($body['reason'] ?? ''));
+    if (!in_array($decision, ['resolved', 'dismissed', 'rejected'], true)) architex_json(400, ['error' => 'decision must be resolved, dismissed, or rejected']);
+    if ($reason === '') architex_json(400, ['error' => 'reason is required']);
+    $now = architex_now();
+    $updates = [
+        'status' => $decision,
+        'resolutionReason' => $reason,
+        'resolvedBy' => $user['uid'],
+        'resolvedAt' => $now,
+        'updatedAt' => $now,
+    ];
+    if (isset($body['humanSignOff']) && is_array($body['humanSignOff'])) {
+        $updates['humanSignOff'] = $body['humanSignOff'];
+        try {
+            architex_firestore_create_document('human_signoffs', [
+                'domain' => (string) ($body['humanSignOff']['domain'] ?? ''),
+                'target' => $body['humanSignOff']['target'] ?? [],
+                'declaration' => (string) ($body['humanSignOff']['declaration'] ?? ''),
+                'reviewedBy' => $user['uid'],
+                'resolvedAt' => $now,
+            ]);
+        } catch (Throwable $ignored) {}
+    }
+    $doc = architex_firestore_set_document('ai_review_queue', $itemId, $updates, true);
+    architex_record_audit('admin.ai_review.resolved', $user, ['type' => 'ai_review_queue', 'id' => $itemId], ['decision' => $decision]);
+    architex_json(200, ['success' => true, 'review' => architex_public_payload($doc)]);
+}
+
+if (preg_match('#^/projects/([^/]+)/kickoff-checklist$#', $route, $matches) === 1 && $method === 'GET') {
+    $projectId = rawurldecode($matches[1]);
+    $checklist = null;
+    try { $checklist = architex_firestore_get_document('kickoff_checklists', $projectId); } catch (Throwable $ignored) {}
+    $items = is_array($checklist) ? ($checklist['checklist'] ?? []) : [];
+    $gates = [];
+    $blockers = [];
+    foreach ($items as $item) {
+        if (!is_array($item) || !isset($item['id']) || strpos((string) $item['id'], 'gate-') !== 0) continue;
+        $passed = (bool) ($item['completed'] ?? false);
+        $gates[] = ['gate' => (int) str_replace('gate-', '', (string) $item['id']), 'label' => (string) ($item['label'] ?? ''), 'passed' => $passed];
+        if (!$passed && ($item['required'] ?? false)) {
+            $blockers[] = (string) ($item['label'] ?? 'Required gate not passed');
+        }
+    }
+    architex_json(200, ['gates' => $gates, 'blockers' => $blockers]);
+}
+
+if (preg_match('#^/projects/([^/]+)/submission-readiness$#', $route, $matches) === 1 && $method === 'GET') {
+    architex_json(501, [
+        'error' => 'Not Implemented',
+        'route' => $route,
+        'message' => 'Submission readiness is computed client-side from municipalSubmissionReadinessService until PHP parity lands.',
+        'migrationStatus' => 'client-fallback',
+    ]);
+}
+
 if (preg_match('#^/jobs/([^/]+)/applications$#', $route, $matches) === 1 && $method === 'POST') {
     $user = architex_require_user();
     $jobId = $matches[1];

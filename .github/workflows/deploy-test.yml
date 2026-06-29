@@ -1,6 +1,8 @@
 name: Deploy test.architex.co.za
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       dry-run:
@@ -42,15 +44,35 @@ jobs:
           npm run build
           node scripts/build-static-upload-bundle.mjs
 
-      - name: Upload via FTP
+      - name: Upload SPA via FTP
         if: ${{ !inputs.dry-run }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.TEST_ARCHITEX_FTP_SERVER }}
           username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
           password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
+          server-dir: public_html/test.architex.co.za/
           local-dir: release/ftp-upload/
-          server-dir: ${{ format('{0}/', secrets.TEST_ARCHITEX_FTP_SERVER_DIR) }}
+          state-name: deploy-spa-state-${{ github.run_id }}.json
+          log-level: verbose
+
+      - name: Prepare API PHP release
+        if: ${{ !inputs.dry-run }}
+        run: |
+          mkdir -p release/api-php-upload
+          cp -r api-php/. release/api-php-upload/
+
+      - name: Upload API PHP gateway via FTP
+        if: ${{ !inputs.dry-run }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.TEST_ARCHITEX_FTP_SERVER }}
+          username: ${{ secrets.TEST_ARCHITEX_FTP_USERNAME }}
+          password: ${{ secrets.TEST_ARCHITEX_FTP_PASSWORD }}
+          server-dir: public_html/api.architex.co.za/api-php/
+          local-dir: release/api-php-upload/
+          state-name: deploy-api-state-${{ github.run_id }}.json
+          log-level: verbose
 
       - name: Smoke test
         if: ${{ !inputs.dry-run }}

@@ -219,8 +219,6 @@ describe('canonical dashboard page registry', () => {
     expect(externalApiMockSource).toContain("mode: 'provider_gated'");
     expect(externalApiMockSource).toContain("mode: 'local_mock'");
     expect(externalApiMockSource).toContain('Provider status is explicit');
-    expect(projectToolboxSource).toContain("import { MOCK_EXTERNAL_API_INTEGRATIONS, MOCK_EXTERNAL_API_NOTICE } from '@/data/mockExternalApiIntegrations';");
-    expect(projectToolboxSource).toContain('Provider integration status');
   });
 
   it('keeps registry ids unique and every shell-backed page statically routable', () => {

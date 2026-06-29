@@ -35,7 +35,7 @@ export default function StageProgressTracker({
         <div className="flex items-center gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-primary">Project Lifecycle</p>
-            <h3 className="font-heading text-xl font-black tracking-tight text-foreground">{PROJECT_STAGE_LABELS[currentStage]}</h3>
+            <h3 className="font-heading text-xl font-black tracking-tight text-foreground">{PROJECT_STAGE_LABELS[currentStage] ?? currentStage ?? 'Project Stage'}</h3>
           </div>
           {riskLevel && riskLevel !== 'low' && (
             <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest', RISK_COLORS[riskLevel])} title={`Project risk level: ${riskLevel}`}>

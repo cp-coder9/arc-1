@@ -1469,6 +1469,12 @@ export interface NonConformanceReport {
   updatedAt: string;
 }
 
+export interface DrawingPin {
+  drawingId: string;          // non-empty project drawing identifier
+  x: number;                  // 0..1 inclusive
+  y: number;                  // 0..1 inclusive
+}
+
 export interface SnagItem {
   id: string;
   projectId: string;
@@ -1480,6 +1486,7 @@ export interface SnagItem {
   evidenceIds: string[];
   status: SnagStatus;
   blocksPayment: boolean;
+  drawingPin?: DrawingPin;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -1562,12 +1569,17 @@ export interface InspectionRecord {
   createdAt: string;
 }
 
+export type FieldActionType =
+  | 'create' | 'edit' | 'delete' | 'status_transition' | 'payment_release';
+
 export interface SiteAuditRecord {
   id: string;
   projectId: string;
   actorId: string;
   actorRole: UserRole;
   action: string;
+  actionType: FieldActionType;
+  outcome: 'permitted' | 'denied';
   sourceObjectId: string;
   sourceObjectType: string;
   createdAt: string;
@@ -1750,4 +1762,111 @@ export interface InspectionChecklistItem {
   inspectedBy?: string;
   inspectedAt?: string;
   comments?: string;
+}
+
+// ============== Field Tools Types (Pack 10 — Drawing Pins, Annotations, Checklists, Sync, Reports) ==============
+
+// --- Photo Annotation Types ---
+
+export type AnnotationShapeType = 'arrow' | 'text_note'; // extensible
+
+export interface AnnotationShape {
+  id: string;
+  type: AnnotationShapeType;
+  points: Array<{ x: number; y: number }>; // normalized 0..1
+  style: { color: string; strokeWidth: number; fontSize?: number };
+  text?: string; // for text_note
+}
+
+export interface PhotoAnnotation {
+  evidenceId: string;       // links to FieldEvidence
+  shapes: AnnotationShape[];
+  flattenedUri?: string;    // Vercel Blob URI of rendered image
+}
+
+// --- Checklist Types ---
+
+export type ResponseType = 'pass_fail_na' | 'numeric' | 'text';
+export type PassFailNa = 'pass' | 'fail' | 'na';
+
+export interface ChecklistItem {
+  id: string;
+  prompt: string;
+  responseType: ResponseType;
+  order: number;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  projectId: string;
+  title: string;
+  items: ChecklistItem[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ChecklistResponse {
+  itemId: string;
+  value: PassFailNa | number | string;
+}
+
+export interface ChecklistInstance {
+  id: string;
+  templateId: string;
+  projectId: string;
+  location: string;
+  items: ChecklistItem[];
+  responses: ChecklistResponse[];
+  passCount?: number;
+  failCount?: number;
+  naCount?: number;
+  status: 'in_progress' | 'completed';
+}
+
+// --- Offline Sync Queue Types ---
+
+export interface QueuedCapture {
+  clientId: string;            // client-generated idempotency key
+  kind: 'field_issue' | 'photo_annotation' | 'checklist_response';
+  payload: unknown;
+  createdAt: string;           // ISO; defines transmission order
+  attempts: number;            // retry accounting (max 5)
+  status: 'queued' | 'failed';
+}
+
+// --- Field Report Types ---
+
+export interface FieldIssueSummary {
+  id: string;
+  status: string;
+  severity: string;
+}
+
+export interface EvidenceRef {
+  id: string;
+  type: string;
+  uri: string;
+}
+
+export type FieldReportWeather = 'clear' | 'cloudy' | 'rain' | 'wind' | 'storm' | 'snow';
+
+export interface FieldReport {
+  projectId: string;
+  date: string;
+  timeZone: string;
+  issues: FieldIssueSummary[];
+  evidence: EvidenceRef[];
+  weather: FieldReportWeather | 'not_recorded';
+  paymentBlockingCount: number;
+  outstandingHandoverSnags?: number;
+}
+
+// --- Field Issue Draft (checklist fail → issue conversion) ---
+
+export interface FieldIssueDraft {
+  prompt: string;
+  checklistRef: { instanceId: string; itemId: string };
+  evidenceIds: string[];
+  location: string;
+  severity: Severity;
 }

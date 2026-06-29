@@ -8,9 +8,20 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Building2, FolderKanban, Mail, ShieldCheck, UserPlus, Users } from 'lucide-react';
 
+// ─── Glass system & design components ────────────────────────────────────────
+import { RoleAwareSidebar } from '@/components/navigation/RoleAwareSidebar';
+import { MobileMenuTrigger } from '@/components/navigation/MobileMenuTrigger';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { GlassButton } from '@/components/ui/GlassButton';
+import { StatCardAnimated } from '@/components/animated/StatCardAnimated';
+import { DashboardSection } from '@/components/composite/DashboardSection';
+import { GlassTable } from '@/components/composite/GlassTable';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+
 const INVITABLE_FIRM_ROLES: FirmRole[] = ['admin', 'coordinator', 'staff', 'billing_viewer'];
 
 export default function FirmDashboard({ user }: { user: UserProfile }) {
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const [firm, setFirm] = useState<Firm | null>(null);
   const [members, setMembers] = useState<FirmMember[]>([]);
   const [invites, setInvites] = useState<FirmInvite[]>([]);
@@ -64,73 +75,90 @@ export default function FirmDashboard({ user }: { user: UserProfile }) {
 
   if (!firmId) {
     return (
-      <div className="space-y-8">
-        <Card className="border-border shadow-sm bg-card rounded-[2.5rem] overflow-hidden">
-          <CardHeader className="p-10 bg-primary/5 border-b border-border">
-            <CardTitle className="font-heading text-3xl flex items-center gap-3"><Building2 className="text-primary" /> Firm Workspace</CardTitle>
-            <CardDescription>Firm workspace access is available after an owner creates a firm or invites you.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-10">
-            <div className="rounded-3xl border border-dashed border-border bg-secondary/30 p-10 text-center">
-              <Users className="mx-auto h-12 w-12 text-primary mb-4" />
-              <p className="text-muted-foreground">No active firm membership is linked to this profile yet.</p>
+      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+        <RoleAwareSidebar user={user} activeTab="overview" onNavigate={() => {}} />
+        <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
+          <header className="glass-panel rounded-2xl p-5 md:p-6">
+            <div className="flex items-start gap-3">
+              <MobileMenuTrigger user={user} className="mt-1 shrink-0" />
+              <div>
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-6 w-6 text-primary" aria-hidden="true" />
+                  <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground tracking-tight">Firm Workspace</h1>
+                </div>
+                <Breadcrumbs className="mt-2" />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </header>
+          <DashboardSection title="Firm Workspace">
+            <p className="text-foreground-muted">Firm workspace access is available after an owner creates a firm or invites you.</p>
+            <div className="rounded-2xl border border-dashed border-white/20 p-10 text-center mt-4">
+              <Users className="mx-auto h-10 w-10 opacity-40 mb-3" aria-hidden="true" />
+              <p className="text-sm text-foreground-muted">No active firm membership is linked to this profile yet.</p>
+            </div>
+          </DashboardSection>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-        <div>
-          <div className="flex items-center gap-4 mb-2">
-            <div className="h-14 w-14 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
-              <Building2 className="h-7 w-7" />
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Fixed left sidebar (hidden on mobile, visible md+) */}
+      <RoleAwareSidebar user={user} activeTab="overview" onNavigate={() => {}} />
+
+      {/* Main content — shifted right on desktop for sidebar */}
+      <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
+        {/* ── Page header ────────────────────────────────────────────────── */}
+        <header className="glass-panel rounded-2xl p-5 md:p-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3">
+              <MobileMenuTrigger user={user} className="mt-1 shrink-0" />
+              <div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                    <Building2 className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground tracking-tight">{firm?.name || 'Firm Workspace'}</h1>
+                </div>
+                <p className="text-sm text-foreground-muted mt-1 max-w-xl leading-relaxed">Members, invitations, and explicitly linked project access.</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline" className="rounded-full px-3 py-1 bg-primary/5 text-primary border-primary/10 font-bold uppercase tracking-widest text-[10px]">
+                    {user.firmRole || 'member'}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1 bg-secondary/50 text-muted-foreground border-border font-bold uppercase tracking-widest text-[10px]">
+                    Access: {user.firmStatus || 'active'}
+                  </Badge>
+                </div>
+                <Breadcrumbs className="mt-2" />
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl md:text-5xl font-heading font-bold tracking-tighter text-foreground">{firm?.name || 'Firm Workspace'}</h1>
-              <p className="text-muted-foreground text-base md:text-lg max-w-2xl mt-2 leading-relaxed">Members, invitations, and explicitly linked project access.</p>
-            </div>
+            <GlassButton variant="solid" size="sm" disabled={!canManageFirm} title={canManageFirm ? 'Use the invite panel to add verified firm members' : 'Only firm owners and admins can invite members'}>
+              <UserPlus className="mr-1.5 h-4 w-4" aria-hidden="true" /> Invite member
+            </GlassButton>
           </div>
-          <div className="flex flex-wrap gap-3 mt-5">
-            <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-primary/5 text-primary border-primary/10 font-bold uppercase tracking-widest text-[10px]">
-              {user.firmRole || 'member'}
-            </Badge>
-            <Badge variant="outline" className="rounded-full px-4 py-1.5 bg-secondary/50 text-muted-foreground border-border font-bold uppercase tracking-widest text-[10px]">
-              Access: {user.firmStatus || 'active'}
-            </Badge>
-          </div>
+        </header>
+
+        {/* ── Stats ──────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCardAnimated label="Active Members" value={members.filter((member) => member.status === 'active').length} icon={<Users size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 0 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Pending Invites" value={invites.length} icon={<Mail size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 1 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Linked Projects" value={projects.length} icon={<FolderKanban size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 2 * 0.05} prefersReducedMotion={prefersReducedMotion} />
         </div>
-        <Button className="rounded-full h-12 px-6 font-bold" disabled={!canManageFirm} title={canManageFirm ? 'Use the invite panel to add verified firm members' : 'Only firm owners and admins can invite members'}>
-          <UserPlus className="mr-2 h-4 w-4" /> Invite member
-        </Button>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard label="Active Members" value={members.filter((member) => member.status === 'active').length} icon={<Users size={20} />} />
-        <StatCard label="Pending Invites" value={invites.length} icon={<Mail size={20} />} tone="accent" />
-        <StatCard label="Linked Projects" value={projects.length} icon={<FolderKanban size={20} />} tone="success" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8">
-        <Card className="border-border shadow-sm bg-card rounded-[2.5rem] overflow-hidden">
-          <CardHeader className="p-8 border-b border-border bg-primary/5">
-            <CardTitle className="font-heading text-2xl flex items-center gap-2"><Users className="text-primary" /> Members</CardTitle>
-            <CardDescription>Verified active firm memberships and role-scoped access.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-8 space-y-4">
-            {loading && <p className="text-muted-foreground italic">Loading firm workspace...</p>}
+        {/* ── Members + Sidebar ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+          <DashboardSection title="Members" description="Verified active firm memberships and role-scoped access." icon={<Users size={18} aria-hidden="true" />}>
+            {loading && <p className="text-foreground-muted italic">Loading firm workspace...</p>}
             {!loading && members.map((member) => (
-              <div key={member.userId} className="rounded-3xl border border-border bg-white p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+              <div key={member.userId} className="glass-record rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
                     {(member.displayName || member.email || 'U')[0]}
                   </div>
                   <div>
-                    <p className="font-bold">{member.displayName || member.email}</p>
-                    <p className="text-xs text-muted-foreground">{member.email}</p>
+                    <p className="font-bold text-sm">{member.displayName || member.email}</p>
+                    <p className="text-xs text-foreground-muted">{member.email}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -139,64 +167,37 @@ export default function FirmDashboard({ user }: { user: UserProfile }) {
                 </div>
               </div>
             ))}
-            {!loading && members.length === 0 && <p className="text-muted-foreground italic">No active firm members found.</p>}
-          </CardContent>
-        </Card>
+            {!loading && members.length === 0 && <p className="text-foreground-muted italic">No active firm members found.</p>}
+          </DashboardSection>
 
-        <div className="space-y-6">
-          <Card className="border-border shadow-sm bg-card rounded-3xl overflow-hidden">
-            <CardHeader className="p-6 border-b border-border bg-secondary/30">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><Mail size={16} /> Pending Invites</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-3">
+          <div className="space-y-4">
+            <DashboardSection title="Pending Invites" icon={<Mail size={18} aria-hidden="true" />}>
               {canManageFirm && (
-                <form onSubmit={handleInviteMember} className="rounded-2xl border border-border bg-white p-4 space-y-3">
+                <form onSubmit={handleInviteMember} className="glass-record rounded-xl p-4 space-y-3 mb-3">
                   <Input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="team.member@example.com" required disabled={inviting} />
-                  <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as FirmRole)} disabled={inviting} className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                  <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as FirmRole)} disabled={inviting} className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm">
                     {INVITABLE_FIRM_ROLES.map((role) => <option key={role} value={role}>{role.replace('_', ' ')}</option>)}
                   </select>
-                  <Button type="submit" size="sm" className="w-full rounded-full" disabled={inviting}>{inviting ? 'Creating invite...' : 'Create invite'}</Button>
+                  <GlassButton type="submit" variant="solid" size="sm" className="w-full" disabled={inviting}>{inviting ? 'Creating invite...' : 'Create invite'}</GlassButton>
                 </form>
               )}
-              {loading && <p className="text-xs text-muted-foreground italic py-6 text-center">Loading invitations...</p>}
+              {loading && <p className="text-xs text-foreground-muted italic py-4 text-center">Loading invitations...</p>}
               {!loading && invites.map((invite) => (
-                <div key={invite.id} className="rounded-2xl border border-border p-4 bg-white">
+                <div key={invite.id} className="glass-record rounded-xl p-3 mb-2">
                   <p className="text-sm font-bold">{invite.email}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Role: {invite.role}</p>
+                  <p className="text-xs text-foreground-muted mt-1">Role: {invite.role}</p>
                 </div>
               ))}
-              {!loading && invites.length === 0 && <p className="text-xs text-muted-foreground italic py-6 text-center">No pending invitations.</p>}
-            </CardContent>
-          </Card>
+              {!loading && invites.length === 0 && <p className="text-xs text-foreground-muted italic py-4 text-center">No pending invitations.</p>}
+            </DashboardSection>
 
-          <Card className="border-border shadow-sm bg-primary text-primary-foreground rounded-3xl overflow-hidden">
-            <CardHeader className="p-8">
-              <CardTitle className="font-heading text-2xl flex items-center gap-2"><ShieldCheck /> Secure sharing</CardTitle>
-              <CardDescription className="text-primary-foreground/75">Firm membership never grants blanket project access. Projects must be explicitly linked and enabled.</CardDescription>
-            </CardHeader>
-          </Card>
+            <DashboardSection title="Secure Sharing" icon={<ShieldCheck size={18} aria-hidden="true" />}>
+              <p className="text-sm text-foreground-muted leading-relaxed">Firm membership never grants blanket project access. Projects must be explicitly linked and enabled.</p>
+            </DashboardSection>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
-function StatCard({ label, value, icon, tone = 'default' }: { label: string; value: string | number; icon: React.ReactNode; tone?: 'default' | 'accent' | 'success' }) {
-  const toneClass = {
-    default: 'bg-primary/10 text-primary',
-    accent: 'bg-accent/10 text-primary',
-    success: 'bg-primary-light/10 text-primary-light',
-  }[tone];
-
-  return (
-    <Card className="interactive-card border-border shadow-sm bg-card rounded-[2rem] overflow-hidden">
-      <CardContent className="p-8 flex items-center gap-6">
-        <div className={`p-4 rounded-2xl ${toneClass}`}>{icon}</div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
-          <p className="text-3xl font-heading font-bold tracking-tight">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

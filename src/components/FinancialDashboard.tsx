@@ -9,9 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
-
-
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
+
+// ─── Glass system & design components ────────────────────────────────────────
+import { GlassButton } from '@/components/ui/GlassButton';
+import { StatCardAnimated } from '@/components/animated/StatCardAnimated';
+import { DashboardSection } from '@/components/composite/DashboardSection';
+import { GlassTable } from '@/components/composite/GlassTable';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
 const PAYMENT_GUARD_STEPS = [
@@ -57,6 +62,7 @@ function jobQueriesForFinancialUser(user: UserProfile): Query<DocumentData>[] {
 }
 
 export default function FinancialDashboard({ user }: { user?: UserProfile }) {
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [escrows, setEscrows] = useState<EscrowV2[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -156,97 +162,75 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
   return (
-    <div className="space-y-8" data-testid="financial-dashboard">
-      <div className="rounded-[2rem] border border-border bg-white p-6 md:p-8 shadow-sm">
-        <Badge variant="outline" className="uppercase text-[10px] tracking-widest mb-3">Financial console</Badge>
-        <h2 className="text-3xl md:text-4xl font-heading font-black tracking-tight flex items-center gap-3"><Landmark className="text-primary" /> Payments, Escrow & Ledger</h2>
-        <p className="text-sm md:text-base text-muted-foreground mt-3 max-w-3xl">Real-time Firestore-backed view of platform revenue, escrow balances, refunds, milestone releases and project-level financial activity.</p>
+    <div className="space-y-6" data-testid="financial-dashboard">
+      <header className="glass-panel rounded-2xl p-5 md:p-6">
+        <Badge variant="outline" className="uppercase text-[10px] tracking-widest mb-2">Financial console</Badge>
+        <h2 className="text-2xl md:text-3xl font-heading font-bold tracking-tight flex items-center gap-3"><Landmark className="text-primary" aria-hidden="true" /> Payments, Escrow &amp; Ledger</h2>
+        <p className="text-sm text-foreground-muted mt-2 max-w-3xl">Real-time Firestore-backed view of platform revenue, escrow balances, refunds, milestone releases and project-level financial activity.</p>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCardAnimated icon={<ReceiptText size={20} aria-hidden="true" />} label="Total Revenue" value={currency.format(summary.totalRevenue)} delay={prefersReducedMotion ? 0 : 0 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+        <StatCardAnimated icon={<Landmark size={20} aria-hidden="true" />} label="Escrow Held" value={currency.format(summary.totalEscrowHeld)} delay={prefersReducedMotion ? 0 : 1 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+        <StatCardAnimated icon={<CreditCard size={20} aria-hidden="true" />} label="Pending Releases" value={summary.pendingReleases.toString()} delay={prefersReducedMotion ? 0 : 2 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+        <StatCardAnimated icon={<RotateCcw size={20} aria-hidden="true" />} label="Refunds" value={currency.format(summary.refunds)} delay={prefersReducedMotion ? 0 : 3 * 0.05} prefersReducedMotion={prefersReducedMotion} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <SummaryCard icon={<ReceiptText />} label="Total Revenue" value={currency.format(summary.totalRevenue)} />
-        <SummaryCard icon={<Landmark />} label="Escrow Held" value={currency.format(summary.totalEscrowHeld)} />
-        <SummaryCard icon={<CreditCard />} label="Pending Releases" value={summary.pendingReleases.toString()} />
-        <SummaryCard icon={<RotateCcw />} label="Refunds" value={currency.format(summary.refunds)} />
-      </div>
+      <DashboardSection title="Payment and escrow execution guard" icon={<AlertTriangle size={18} aria-hidden="true" />} description="Human-confirmed governance boundary for provider calls, invoice payments, milestone releases, refunds, and escrow actions.">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+          {PAYMENT_GUARD_STEPS.map((step) => <div key={step} className="flex gap-2 text-sm"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--landing-accent)]" aria-hidden="true" /><span>{step}</span></div>)}
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 mt-4">
+          <Button type="button" disabled variant="outline" className="rounded-xl opacity-80">Initiate payment disabled</Button>
+          <Button type="button" disabled variant="outline" className="rounded-xl opacity-80">Release escrow disabled</Button>
+          <Button type="button" disabled className="rounded-xl opacity-80">Provider submission disabled</Button>
+        </div>
+        <div className="glass-record rounded-xl p-4 mt-4">
+          <p className="font-bold text-sm">Pending release requests visible: {releaseRequestedMilestones.length}</p>
+          <p className="mt-1 text-xs text-foreground-muted">Use this count to triage human review. No release instruction is generated from this browser view.</p>
+        </div>
+      </DashboardSection>
 
-      <Card className="rounded-[2rem] border-amber-200 bg-amber-50/80 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase tracking-widest text-amber-950 flex items-center gap-2"><AlertTriangle size={16} /> Payment and escrow execution guard</CardTitle>
-          <CardDescription className="text-amber-900">Human-confirmed governance boundary for provider calls, invoice payments, milestone releases, refunds, and escrow actions.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-amber-950">
-          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-            {PAYMENT_GUARD_STEPS.map((step) => <div key={step} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><span>{step}</span></div>)}
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Initiate payment disabled</Button>
-            <Button type="button" disabled variant="outline" className="rounded-xl border-amber-300 bg-white/70 text-amber-950 disabled:opacity-80">Release escrow disabled</Button>
-            <Button type="button" disabled className="rounded-xl bg-amber-900 text-white disabled:opacity-80">Provider submission disabled</Button>
-          </div>
-          <div className="rounded-2xl border border-amber-300 bg-white/70 p-4">
-            <p className="font-bold">Pending release requests visible: {releaseRequestedMilestones.length}</p>
-            <p className="mt-1 text-xs text-amber-900">Use this count to triage human review. No release instruction is generated from this browser view.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <DashboardSection title="Monthly Platform Revenue" description="CSS-only chart from ledger platform fee entries.">
+        <div className="flex h-52 items-end gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
+          {monthlyRevenue.length === 0 && <p className="text-sm text-foreground-muted italic">No platform fee ledger entries yet.</p>}
+          {monthlyRevenue.map(([month, amount]) => <div key={month} className="flex flex-1 flex-col items-center gap-2"><div className="w-full rounded-t-xl bg-[var(--landing-accent)]/60" style={{ height: `${Math.max(8, (amount / maxRevenue) * 160)}px` }} /><span className="text-[10px] font-bold text-foreground-muted">{month}</span><span className="text-[10px] font-black">{currency.format(amount)}</span></div>)}
+        </div>
+      </DashboardSection>
 
-      <Card className="rounded-[2rem] border-border bg-white shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary">Monthly platform revenue</CardTitle>
-          <CardDescription>CSS-only chart from ledger platform fee entries.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-56 items-end gap-4 rounded-2xl border border-border bg-secondary/20 p-5">
-            {monthlyRevenue.length === 0 && <p className="text-sm text-muted-foreground italic">No platform fee ledger entries yet.</p>}
-            {monthlyRevenue.map(([month, amount]) => <div key={month} className="flex flex-1 flex-col items-center gap-2"><div className="w-full rounded-t-xl bg-primary" style={{ height: `${Math.max(8, (amount / maxRevenue) * 170)}px` }} /><span className="text-[10px] font-bold text-muted-foreground">{month}</span><span className="text-[10px] font-black">{currency.format(amount)}</span></div>)}
-          </div>
-        </CardContent>
-      </Card>
+      <DashboardSection title="Ledger" description="Filter transactions by project/job ID and type." icon={<Filter size={18} aria-hidden="true" />}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <Input value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} placeholder="Filter by project or job ID" className="rounded-xl" />
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-white/5 px-3 text-sm">
+            <option value="all">All transaction types</option>
+            <option value="escrow_deposit">Escrow deposits</option>
+            <option value="milestone_release">Milestone releases</option>
+            <option value="platform_fee">Platform fees</option>
+            <option value="refund">Refunds</option>
+            <option value="invoice_payment">Invoice payments</option>
+          </select>
+        </div>
+        <Table>
+          <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Project</TableHead><TableHead>Description</TableHead><TableHead>Direction</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {filteredLedger.map((entry) => <TableRow key={entry.id} className="glass-record"><TableCell className="text-xs">{new Date(entry.createdAt).toLocaleDateString('en-ZA')}</TableCell><TableCell><Badge variant="outline" className="uppercase text-[10px]">{entry.type.replaceAll('_', ' ')}</Badge></TableCell><TableCell className="font-mono text-xs">{entry.projectId}</TableCell><TableCell className="text-sm">{entry.description}</TableCell><TableCell className="capitalize text-xs">{entry.direction}</TableCell><TableCell className="text-right font-bold">{currency.format(entry.amount)}</TableCell></TableRow>)}
+            {filteredLedger.length === 0 && <TableRow><TableCell colSpan={6} className="py-12 text-center text-foreground-muted italic">No ledger entries match the current filters.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </DashboardSection>
 
-      <Card className="rounded-[2rem] border-border bg-white shadow-sm overflow-hidden">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary flex items-center gap-2"><Filter size={16} /> Ledger</CardTitle>
-          <CardDescription>Filter transactions by project/job ID and type.</CardDescription>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
-            <Input value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} placeholder="Filter by project or job ID" className="rounded-xl" />
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-10 rounded-xl border border-border bg-white px-3 text-sm">
-              <option value="all">All transaction types</option>
-              <option value="escrow_deposit">Escrow deposits</option>
-              <option value="milestone_release">Milestone releases</option>
-              <option value="platform_fee">Platform fees</option>
-              <option value="refund">Refunds</option>
-              <option value="invoice_payment">Invoice payments</option>
-            </select>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Project</TableHead><TableHead>Description</TableHead><TableHead>Direction</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {filteredLedger.map((entry) => <TableRow key={entry.id}><TableCell className="text-xs">{new Date(entry.createdAt).toLocaleDateString('en-ZA')}</TableCell><TableCell><Badge variant="outline" className="uppercase text-[10px]">{entry.type.replaceAll('_', ' ')}</Badge></TableCell><TableCell className="font-mono text-xs">{entry.projectId}</TableCell><TableCell className="text-sm">{entry.description}</TableCell><TableCell className="capitalize text-xs">{entry.direction}</TableCell><TableCell className="text-right font-bold">{currency.format(entry.amount)}</TableCell></TableRow>)}
-              {filteredLedger.length === 0 && <TableRow><TableCell colSpan={6} className="py-12 text-center text-muted-foreground italic">No ledger entries match the current filters.</TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-[2rem] border-border bg-white shadow-sm">
-        <CardHeader><CardTitle className="text-sm font-bold uppercase tracking-widest text-primary">Per-project escrow overview</CardTitle><CardDescription>Milestone release progress by project escrow.</CardDescription></CardHeader>
-        <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <DashboardSection title="Per-Project Escrow Overview" description="Milestone release progress by project escrow.">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {escrows.map((escrow) => {
             const project = escrow.linkedProjectId ? projectById.get(escrow.linkedProjectId) : undefined;
             const released = (escrow.milestones || []).filter((milestone) => milestone.status === 'released').length;
             const total = escrow.milestones?.length || 0;
-            return <div key={escrow.jobId} className="rounded-2xl border border-border p-5"><div className="flex justify-between gap-3"><div><p className="font-bold">{project?.id || escrow.linkedProjectId || escrow.jobId}</p><p className="text-xs text-muted-foreground">Job {escrow.jobId}</p></div><Badge variant="outline" className="uppercase text-[10px]">{escrow.status.replaceAll('_', ' ')}</Badge></div><div className="mt-4 h-3 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-primary" style={{ width: `${total ? (released / total) * 100 : 0}%` }} /></div><p className="mt-2 text-xs text-muted-foreground">{released}/{total} milestones released · Held {currency.format(escrow.heldAmount || 0)}</p></div>;
+            return <div key={escrow.jobId} className="glass-record rounded-2xl p-5"><div className="flex justify-between gap-3"><div><p className="font-bold text-sm">{project?.id || escrow.linkedProjectId || escrow.jobId}</p><p className="text-xs text-foreground-muted">Job {escrow.jobId}</p></div><Badge variant="outline" className="uppercase text-[10px]">{escrow.status.replaceAll('_', ' ')}</Badge></div><div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[var(--landing-accent)]/60" style={{ width: `${total ? (released / total) * 100 : 0}%` }} /></div><p className="mt-2 text-xs text-foreground-muted">{released}/{total} milestones released · Held {currency.format(escrow.heldAmount || 0)}</p></div>;
           })}
-          {escrows.length === 0 && <p className="text-sm text-muted-foreground italic">No escrow records found.</p>}
-        </CardContent>
-      </Card>
+          {escrows.length === 0 && <p className="text-sm text-foreground-muted italic">No escrow records found.</p>}
+        </div>
+      </DashboardSection>
     </div>
   );
 }
 
-function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <Card className="rounded-[1.5rem] border-border bg-white shadow-sm"><CardContent className="p-5 flex items-center gap-4"><div className="rounded-2xl bg-primary/10 p-3 text-primary">{icon}</div><div><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p><p className="text-2xl font-heading font-black">{value}</p></div></CardContent></Card>;
-}

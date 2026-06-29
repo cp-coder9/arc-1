@@ -80,6 +80,8 @@ import {
   Factory,
   ChevronRight,
   BarChart3,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -436,6 +438,19 @@ function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('architex.sidebarCollapsed') === 'true';
+  });
+  const toggleSidebarCollapsed = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('architex.sidebarCollapsed', String(next));
+      }
+      return next;
+    });
+  }, []);
   const [activeTab, setActiveTab] = useState('command');
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
 
@@ -718,8 +733,8 @@ function AppContent() {
     }
   };
 
-  // Landing OS-reveal sign-in card: authenticate and let the onAuthStateChanged
-  // effect load the profile + setUser(...), which renders the Command Centre.
+  // Landing page inline sign-in: authenticates directly from the glass card.
+  // On success, onAuthStateChanged will fire → load profile → render workspace.
   // On failure, stay on the landing — do NOT open the role-select screen.
   const handleLandingSignIn = async (signInEmail: string, signInPassword: string) => {
     if (isLoggingIn || profileLoading) return;
@@ -842,7 +857,7 @@ function AppContent() {
 
   if (!user && showLogin) {
     return (
-      <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-[#04302c]/92 px-3 py-3 text-white backdrop-blur-xl sm:px-4 sm:py-6">
+      <div className="fixed inset-0 z-50 flex min-h-dvh items-start justify-center overflow-y-auto overscroll-contain bg-[#04302c]/92 px-3 py-3 text-[#04302c] backdrop-blur-xl sm:px-4 sm:py-6">
         <AnimatedFloorPlan />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[0.09] bg-[linear-gradient(rgba(248,250,252,0.8)_1px,transparent_1px),linear-gradient(90deg,rgba(248,250,252,0.8)_1px,transparent_1px)] bg-[size:36px_36px]" />
         <motion.div
@@ -850,7 +865,7 @@ function AppContent() {
           animate={{ opacity: 1, y: 0 }}
           className={`${authMode === 'selection' ? 'max-w-6xl' : 'max-w-4xl'} relative z-10 w-full pb-[max(env(safe-area-inset-bottom),0px)]`}
         >
-          <Card className="overflow-hidden rounded-[1.6rem] border border-[rgba(174,239,227,0.22)] bg-[#0d2520]/96 text-white shadow-[0_32px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[2.2rem]">
+          <Card className="overflow-hidden rounded-[1.6rem] border border-white/15 bg-[#F8FAFC]/96 shadow-[0_32px_120px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:rounded-[2.2rem]">
             <CardHeader className="relative overflow-hidden bg-[#04302c] px-5 pb-5 pt-16 text-[#F8FAFC] sm:px-7 sm:pb-6 sm:pt-12">
               <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_14%_18%,rgba(15,107,98,0.48),transparent_28%),radial-gradient(circle_at_86%_0%,rgba(248,250,252,0.12),transparent_28%)]" />
               <div className="absolute left-4 right-4 top-4 flex items-center justify-between sm:left-6 sm:right-6 sm:top-6">
@@ -913,13 +928,13 @@ function AppContent() {
                       <AuthRoleCard data-testid="role-select-subcontractor" icon={<Hammer className="w-8 h-8" />} title="Subcontractor" description="I deliver a trade package, evidence, and close-out items" active={roleSelection === 'subcontractor'} onClick={() => setRoleSelection('subcontractor')} />
                       <AuthRoleCard data-testid="role-select-supplier" icon={<Factory className="w-8 h-8" />} title="Supplier" description="I supply materials, products, deliveries, or warranties" active={roleSelection === 'supplier'} onClick={() => setRoleSelection('supplier')} />
                     </div>
-                    <div className="rounded-[1.25rem] border border-[rgba(174,239,227,0.18)] bg-white/[0.05] p-3 sm:p-4">
-                      <Button onClick={handleGoogleLogin} className="h-14 w-full rounded-2xl bg-gradient-to-r from-[#aeefe3] to-[#7cd7c3] text-base font-black text-[#00201b] shadow-lg hover:from-[#bff5ea] hover:to-[#8fe0cf]" disabled={!roleSelection || isLoggingIn}>
+                    <div className="rounded-[1.25rem] border border-[#04302c]/10 bg-[#04302c]/[0.035] p-3 sm:p-4">
+                      <Button onClick={handleGoogleLogin} className="h-14 w-full rounded-2xl bg-[#04302c] text-base font-black text-[#F8FAFC] shadow-lg hover:bg-[#0f6b62]" disabled={!roleSelection || isLoggingIn}>
                         {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                       </Button>
                       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Button variant="outline" className="h-12 rounded-2xl border-[rgba(174,239,227,0.24)] bg-white/[0.06] font-bold text-white hover:bg-white/[0.12] hover:text-white" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
-                        <Button variant="outline" className="h-12 rounded-2xl border-[rgba(174,239,227,0.24)] bg-white/[0.06] font-bold text-white hover:bg-white/[0.12] hover:text-white" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-login')} disabled={!roleSelection}>Login with Email</Button>
+                        <Button variant="outline" className="h-12 rounded-2xl font-bold" onClick={() => setAuthMode('email-signup')} disabled={!roleSelection}>Sign Up with Email</Button>
                       </div>
                     </div>
                   </motion.div>
@@ -935,25 +950,25 @@ function AppContent() {
                   >
                     {authMode === 'email-signup' && (
                       <div className="space-y-2">
-                        <label className="text-sm font-bold uppercase tracking-widest text-white/62">Full Name</label>
-                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl border-[rgba(174,239,227,0.18)] bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-[#aeefe3] focus-visible:ring-[#aeefe3]/30" />
+                        <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+                        <Input placeholder="John Doe" value={displayName} onChange={e => setDisplayName(e.target.value)} required className="h-12 rounded-xl" />
                       </div>
                     )}
                     <div className="space-y-2">
-                      <label className="text-sm font-bold uppercase tracking-widest text-white/62">Email Address</label>
-                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl border-[rgba(174,239,227,0.18)] bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-[#aeefe3] focus-visible:ring-[#aeefe3]/30" />
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
+                      <Input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold uppercase tracking-widest text-white/62">Password</label>
-                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl border-[rgba(174,239,227,0.18)] bg-white/[0.06] text-white placeholder:text-white/40 focus-visible:border-[#aeefe3] focus-visible:ring-[#aeefe3]/30" />
+                      <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Password</label>
+                      <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl" />
                     </div>
-                    <Button type="submit" className="mt-6 h-14 w-full rounded-2xl bg-gradient-to-r from-[#aeefe3] to-[#7cd7c3] text-lg font-black text-[#00201b] shadow-lg hover:from-[#bff5ea] hover:to-[#8fe0cf]" disabled={isLoggingIn}>
+                    <Button type="submit" className="mt-6 h-14 w-full rounded-2xl bg-[#04302c] text-lg font-black text-[#F8FAFC] shadow-lg hover:bg-[#0f6b62]" disabled={isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : (authMode === 'email-login' ? 'Login' : 'Create Account')}
                     </Button>
-                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl border-[rgba(174,239,227,0.24)] bg-white/[0.06] font-bold text-white hover:bg-white/[0.12] hover:text-white" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
+                    <Button type="button" variant="outline" className="w-full h-12 rounded-2xl font-bold" onClick={handleGoogleLogin} disabled={!roleSelection || isLoggingIn}>
                       {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign in with Google'}
                     </Button>
-                    <Button type="button" variant="ghost" className="w-full text-white/62 rounded-full hover:bg-white/10 hover:text-white" onClick={() => setAuthMode('selection')}>Back to Options</Button>
+                    <Button type="button" variant="ghost" className="w-full text-muted-foreground rounded-full" onClick={() => setAuthMode('selection')}>Back to Options</Button>
                   </motion.form>
                 )}
               </AnimatePresence>
@@ -973,31 +988,45 @@ function AppContent() {
 
   return (
     <DemoModeProvider>
-    <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden text-foreground beos-grid-canvas md:flex-row">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0" />
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col rounded-[30px] m-2 beos-glass transform transition-transform duration-300 ease-in-out md:sticky md:top-0 md:h-[calc(100dvh-16px)] md:my-2 md:ml-2 md:w-[288px] md:shrink-0 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col gap-y-4 p-7 overflow-y-auto">
-          <div className="flex items-center justify-between shrink-0">
+    <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-all duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:shrink-0 md:translate-x-0 ${isSidebarCollapsed ? 'md:w-[84px]' : 'md:w-[288px]'} ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`h-full flex flex-col gap-y-4 overflow-y-auto overflow-x-hidden p-7 ${isSidebarCollapsed ? 'md:px-3' : ''}`}>
+          <div className={`flex items-center justify-between shrink-0 ${isSidebarCollapsed ? 'md:justify-center' : ''}`}>
             <div className="flex items-center gap-3">
               <Logo iconClassName="h-14 w-14 object-contain sm:h-16 sm:w-16" textClassName="hidden" />
-              <div>
-                <p className="font-sans text-[1.35rem] font-black tracking-[-0.055em] text-white">Architex OS</p>
-                <p className="beos-label-caps text-[#abc8c0]">Project Coordination</p>
+              <div className={isSidebarCollapsed ? 'md:hidden' : ''}>
+                <p className="font-sans text-[1.35rem] font-black tracking-[-0.055em] text-primary">Architex OS</p>
+                <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
               </div>
             </div>
-            <DemoRoleSwitcher />
+            <div className={isSidebarCollapsed ? 'md:hidden' : ''}>
+              <DemoRoleSwitcher />
+            </div>
             <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-primary/10" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
           </div>
 
-          <div className="rounded-[1.25rem] border border-[rgba(157,247,219,0.22)] p-4 shadow-[0_10px_26px_rgba(0,0,0,0.12)]" style={{ background: 'linear-gradient(135deg, rgba(157,247,219,0.17), rgba(255,255,255,0.03))' }}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`hidden md:inline-flex rounded-full hover:bg-primary/10 self-end shrink-0 ${isSidebarCollapsed ? 'md:self-center' : ''}`}
+            onClick={toggleSidebarCollapsed}
+            aria-label={isSidebarCollapsed ? 'Expand navigation menu' : 'Collapse navigation menu'}
+            aria-expanded={!isSidebarCollapsed}
+            title={isSidebarCollapsed ? 'Expand menu' : 'Collapse menu'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+          </Button>
+
+          <div className={`rounded-[1.25rem] border border-border/70 bg-muted/70 p-4 shadow-[0_10px_26px_rgba(20,71,63,0.06)] ${isSidebarCollapsed ? 'md:hidden' : ''}`} style={{ borderTop: `4px solid ${roleVisual.accent}` }}>
             <div className="flex items-center justify-between gap-3">
-              <span className="beos-label-caps text-[#abc8c0]">Current Role</span>
+              <span className="beos-label-caps text-muted-foreground">Current Role</span>
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: roleVisual.accent, boxShadow: `0 0 18px ${roleVisual.accent}` }} />
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-black text-white">{roleVisual.label}</p>
-                <p className="mt-1 text-[0.72rem] leading-snug text-[#abc8c0]">{roleVisual.description}</p>
+                <p className="text-sm font-black text-primary">{roleVisual.label}</p>
+                <p className="mt-1 text-[0.72rem] leading-snug text-muted-foreground">{roleVisual.description}</p>
               </div>
             </div>
           </div>
@@ -1009,37 +1038,43 @@ function AppContent() {
                 icon={navKeyIcon(item.key)}
                 label={item.label}
                 active={activeNavKey === item.key}
+                collapsed={isSidebarCollapsed}
                 onClick={() => navigateDashboard(getDefaultPageForNavKey(item.key), 'sidebar')}
               />
             ))}
           </nav>
 
-            <div className="mt-4 rounded-[1rem] border border-[rgba(190,228,216,0.18)] bg-[rgba(255,255,255,0.04)] p-3 text-xs text-[#abc8c0]" data-testid="dashboard-keyboard-shortcuts">
-              <p className="font-bold text-white">Keyboard shortcuts</p>
+            <div className={`mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground ${isSidebarCollapsed ? 'md:hidden' : ''}`} data-testid="dashboard-keyboard-shortcuts">
+              <p className="font-bold text-foreground">Keyboard shortcuts</p>
               <p className="mt-1">Alt+1–9 opens your first visible pages. Alt+K Command, Alt+A AI, Alt+P Profile, Alt+F Files, Alt+I Invoicing.</p>
               <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Visible page shortcut map">
                 {visibleShortcutPages.slice(0, 5).map((page, index) => <Badge key={page.id} variant="outline" className="rounded-full bg-background/70">Alt+{index + 1}: {page.label}</Badge>)}
               </div>
             </div>
 
-          <div className="pt-5 mt-auto border-t border-[rgba(190,228,216,0.18)] shrink-0">
-            <Button variant="ghost" className="w-full justify-start gap-3 text-[#abc8c0] hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold" onClick={handleLogout}>
-              <LogOut size={20} /> <span className="font-bold">Logout</span>
+          <div className="pt-5 mt-auto border-t border-border/70 shrink-0">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold ${isSidebarCollapsed ? 'md:justify-center md:gap-0 md:px-0' : ''}`}
+              onClick={handleLogout}
+              title={isSidebarCollapsed ? 'Logout' : undefined}
+            >
+              <LogOut size={20} /> <span className={`font-bold ${isSidebarCollapsed ? 'md:hidden' : ''}`}>Logout</span>
             </Button>
           </div>
         </div>
       </aside>
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between rounded-[30px] mx-2 mt-2 px-3 beos-glass sm:min-h-20 sm:px-8">
+        <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between border-b border-border/70 px-3 beos-glass sm:min-h-20 sm:px-8">
           <div className="flex items-center gap-4 min-w-0">
             <Button variant="ghost" size="icon" className="md:hidden rounded-full" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation menu" aria-expanded={isSidebarOpen}><Menu size={24} /></Button>
             <div className="min-w-0 py-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-[#abc8c0]">
-                <span className="font-bold text-[#abc8c0]">Architex</span>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-bold text-primary">Architex</span>
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span>{currentSectionLabel}</span>
                 <ChevronRight className="h-3.5 w-3.5" />
-                <span className="font-bold text-white">{currentPageLabel}</span>
+                <span className="font-bold text-foreground">{currentPageLabel}</span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-3">
                 <h1 className="font-sans text-xl sm:text-2xl font-black tracking-[-0.045em] text-foreground">{currentPageLabel}</h1>
@@ -1049,12 +1084,12 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {activeTab !== 'ai' && pageById('ai')?.roles.includes(user.role) && (
-              <Button variant="outline" size="sm" className="hidden rounded-full border-[rgba(157,247,219,0.4)] bg-[rgba(157,247,219,0.06)] font-black text-white hover:bg-[rgba(157,247,219,0.16)] hover:border-[rgba(157,247,219,0.6)] sm:inline-flex" onClick={() => navigateDashboard('ai', 'header_cta')}>
+              <Button variant="outline" size="sm" className="hidden rounded-full border-[#7046a8]/25 bg-[#7046a8]/10 font-black text-[#7046a8] hover:bg-[#7046a8] hover:text-white sm:inline-flex" onClick={() => navigateDashboard('ai', 'header_cta')}>
                 <Bot className="mr-2 h-4 w-4" /> Ask AI
               </Button>
             )}
             <NotificationBell userId={user.uid} />
-            <div className="h-10 w-10 rounded-full bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-white border border-[rgba(190,228,216,0.18)]">
+            <div className="h-10 w-10 rounded-full bg-card flex items-center justify-center text-primary border border-border beos-soft-shadow">
               <UserIcon size={20} />
             </div>
           </div>
@@ -1546,18 +1581,18 @@ function AuthRoleCard({ icon, title, description, active, onClick, ...props }: {
   return (
     <button
       onClick={onClick}
-      className={`group flex min-h-[118px] gap-4 rounded-3xl border p-4 text-left shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5 ${active ? 'border-[#aeefe3] bg-[rgba(174,239,227,0.10)] ring-2 ring-[rgba(174,239,227,0.30)]' : 'border-[rgba(174,239,227,0.18)] bg-white/[0.05] hover:border-[#aeefe3] hover:bg-white/[0.08]'}`}
+      className={`group flex min-h-[118px] gap-4 rounded-3xl border p-4 text-left shadow-sm transition-all duration-300 hover:shadow-xl sm:min-h-[176px] sm:flex-col sm:gap-5 sm:p-5 ${active ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border bg-white hover:border-primary hover:bg-primary/5'}`}
       {...props}
     >
-      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all group-hover:scale-105 sm:h-14 sm:w-14 ${active ? 'bg-[rgba(174,239,227,0.22)] text-[#aeefe3]' : 'bg-[rgba(174,239,227,0.14)] text-[#aeefe3]'}`}>
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all group-hover:scale-105 sm:h-14 sm:w-14 ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary group-hover:bg-primary/10 group-hover:text-primary'}`}>
         {icon}
       </div>
       <div className="min-w-0 space-y-1.5 sm:space-y-2">
-        <h3 className="font-heading text-xl font-bold text-white sm:text-2xl">{title}</h3>
-        <p className="text-sm text-white/62 leading-relaxed">{description}</p>
+        <h3 className="font-heading text-xl font-bold sm:text-2xl">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </div>
-      <div className="mt-auto hidden w-full border-t border-[rgba(174,239,227,0.18)] pt-3 sm:block">
-        <span className="text-[10px] uppercase tracking-widest font-black text-[#aeefe3] flex items-center gap-2 group-hover:gap-4 transition-all">
+      <div className="mt-auto hidden w-full border-t border-border/50 pt-3 sm:block">
+        <span className="text-[10px] uppercase tracking-widest font-black text-primary flex items-center gap-2 group-hover:gap-4 transition-all">
           {active ? 'Selected' : 'Select Role'} <ArrowRight className="w-4 h-4" />
         </span>
       </div>
@@ -1569,18 +1604,18 @@ function NavSectionLabel({ children }: { children: React.ReactNode }) {
   return <div className="px-3 pt-4 pb-1 beos-label-caps text-muted-foreground/80">{children}</div>;
 }
 
-function NavItem({ icon, label, active, onClick, ...props }: any) {
+function NavItem({ icon, label, active, onClick, collapsed, ...props }: any) {
   return (
     <button
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`group w-full flex items-center gap-3 rounded-[1.05rem] px-3 py-2.5 text-left text-sm transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${active ? 'text-[#061b17] translate-x-[5px]' : 'text-[#abc8c0] hover:text-[#9df7db]'}`}
-      style={active ? { background: '#9df7db' } : undefined}
+      title={collapsed ? label : undefined}
+      className={`group w-full flex items-center gap-3 rounded-[1.05rem] px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${collapsed ? 'md:justify-center md:gap-0 md:px-0' : ''} ${active ? 'bg-[#dff1fa] text-primary shadow-[0_12px_30px_rgba(20,71,63,0.10)]' : 'text-muted-foreground hover:bg-muted hover:text-primary'}`}
       {...props}
     >
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[0.7rem] border transition-all ${active ? 'border-transparent bg-[#061b17]/20 text-[#061b17]' : 'border-transparent bg-[rgba(255,255,255,0.06)] text-[#abc8c0] group-hover:text-[#9df7db] group-hover:border-[rgba(157,247,219,0.2)]'}`}>{icon}</span>
-      <span className="min-w-0 flex-1 truncate font-bold tracking-[0.01em]">{label}</span>
-      {active && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#061b17]" />}
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[0.7rem] border transition-all ${active ? 'border-primary/15 bg-white text-primary' : 'border-transparent bg-white/70 text-muted-foreground group-hover:border-primary/15 group-hover:text-primary'}`}>{icon}</span>
+      <span className={`min-w-0 flex-1 truncate font-bold tracking-[0.01em] ${collapsed ? 'md:hidden' : ''}`}>{label}</span>
+      {active && <span aria-hidden="true" className={`h-2 w-2 rounded-full bg-primary ${collapsed ? 'md:hidden' : ''}`} />}
     </button>
   );
 }

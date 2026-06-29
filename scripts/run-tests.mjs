@@ -4,7 +4,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const vitestBin = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'vitest.cmd' : 'vitest');
+const vitestEntry = path.join(root, 'node_modules', 'vitest', 'vitest.mjs');
+const vitestBinFallback = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'vitest.cmd' : 'vitest');
+const useNodeEntry = existsSync(vitestEntry);
 const userArgs = process.argv.slice(2).filter(arg => arg !== '--run');
 const reporterArgs = userArgs.some(arg => arg.startsWith('--reporter')) ? [] : ['--reporter=dot'];
 
@@ -26,10 +28,17 @@ function rel(filePath) {
 function runVitest(label, environment, testFiles) {
   if (testFiles.length === 0) return;
   console.log(`\n[tests] ${label}: ${testFiles.length} file(s) in ${environment} environment`);
+  // Prefer spawning Node against vitest's JS entry directly. This avoids two
+  // Windows pitfalls: (1) spawning the vitest.cmd shim throws EINVAL on Node 20+
+  // without a shell, and (2) using a shell overflows cmd's 8191-char arg limit
+  // with large file lists. Spawning node directly sidesteps both, and behaves
+  // identically on POSIX/CI.
+  const command = useNodeEntry ? process.execPath : vitestBinFallback;
+  const baseArgs = useNodeEntry ? [vitestEntry] : [];
   const result = spawnSync(
-    vitestBin,
-    ['run', '--environment', environment, ...reporterArgs, ...testFiles, ...userArgs],
-    { stdio: 'inherit', cwd: root, env: process.env },
+    command,
+    [...baseArgs, 'run', '--environment', environment, ...reporterArgs, ...testFiles, ...userArgs],
+    { stdio: 'inherit', cwd: root, env: process.env, shell: !useNodeEntry && process.platform === 'win32' },
   );
 
   if (result.error) {

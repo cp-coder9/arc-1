@@ -10,6 +10,10 @@
     "e2e/**",
     "dist/**",
     "release/**",
-    "specforge-pack"
+    "arc-1-harness/**",
+    "packs/**",
+    "tmp/**",
+    "arc-1/**",
+    ".claude/**"
   ]
 }

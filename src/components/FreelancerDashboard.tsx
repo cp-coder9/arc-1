@@ -11,9 +11,17 @@ import { CheckCircle2, Clock, AlertCircle, FileText, LayoutDashboard, History, B
 import ProfileEditor from './ProfileEditor';
 import { safeFormat } from '@/lib/utils';
 import { Chat } from './Chat';
-
-
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
+
+// ─── Glass system & design components ────────────────────────────────────────
+import { RoleAwareSidebar } from '@/components/navigation/RoleAwareSidebar';
+import { MobileMenuTrigger } from '@/components/navigation/MobileMenuTrigger';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { GlassButton } from '@/components/ui/GlassButton';
+import { StatCardAnimated } from '@/components/animated/StatCardAnimated';
+import { DashboardSection } from '@/components/composite/DashboardSection';
+import { GlassTable } from '@/components/composite/GlassTable';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 const taskStatusStyles: Record<'pending' | 'in-progress' | 'completed', string> = {
   pending: 'bg-primary/5 text-primary border-primary/10',
   'in-progress': 'bg-accent/10 text-primary border-accent/20',
@@ -27,6 +35,7 @@ const priorityStyles: Record<'low' | 'medium' | 'high', string> = {
 };
 
 export default function FreelancerDashboard({ user }: { user: UserProfile }) {
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const [assignedTasks, setAssignedTasks] = useState<JobCard[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,47 +60,57 @@ export default function FreelancerDashboard({ user }: { user: UserProfile }) {
   };
 
   return (
-    <div className="space-y-12">
-      <div className="dashboard-header flex flex-col lg:flex-row lg:items-end justify-between gap-8" style={{ borderTopColor: '#165a4c' }}>
-        <div>
-          <div className="flex items-center gap-4 mb-2">
-            <h1 className="text-3xl md:text-5xl font-heading font-black tracking-[-0.055em] text-foreground">Freelancer Portal</h1>
-            <ProfileEditor user={user} />
-          </div>
-          <p className="text-muted-foreground text-base md:text-lg max-w-2xl leading-relaxed">Collaborate with architects on high-end architectural projects.</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Fixed left sidebar (hidden on mobile, visible md+) */}
+      <RoleAwareSidebar user={user} activeTab="overview" onNavigate={() => {}} />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard label="Assigned Tasks" value={stats.total} icon={<LayoutDashboard size={20} />} />
-        <StatCard label="Pending" value={stats.pending} icon={<Clock size={20} />} tone="muted" />
-        <StatCard label="In Progress" value={stats.inProgress} icon={<History size={20} />} tone="accent" />
-        <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 size={20} />} tone="success" />
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-heading font-bold tracking-tight">Active Job Cards</h2>
-          <Badge variant="outline" className="rounded-full px-4">{assignedTasks.length} Assigned</Badge>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {assignedTasks.map(task => (
-            <FreelancerJobCard key={task.id} task={task} user={user} />
-          ))}
-          {assignedTasks.length === 0 && !loading && (
-            <div className="empty-state col-span-full py-20 px-6">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 text-primary">
-                <Briefcase className="w-10 h-10" />
+      {/* Main content — shifted right on desktop for sidebar */}
+      <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
+        {/* ── Page header ────────────────────────────────────────────────── */}
+        <header className="glass-panel rounded-2xl p-5 md:p-6">
+          <div className="flex items-start gap-3">
+            <MobileMenuTrigger user={user} className="mt-1 shrink-0" />
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground tracking-tight">Freelancer Portal</h1>
+                <ProfileEditor user={user} />
               </div>
-              <h3 className="text-2xl font-heading font-bold mb-2">No assigned tasks yet</h3>
-              <p className="text-muted-foreground max-w-sm mx-auto">
-                Once an architect assigns you to a project, your job cards will appear here.
-              </p>
+              <p className="text-sm text-foreground-muted mt-1 max-w-xl leading-relaxed">Collaborate with architects on high-end architectural projects.</p>
+              <Breadcrumbs className="mt-2" />
             </div>
-          )}
+          </div>
+        </header>
+
+        {/* ── Stats ──────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCardAnimated label="Assigned Tasks" value={stats.total} icon={<LayoutDashboard size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 0 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Pending" value={stats.pending} icon={<Clock size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 1 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="In Progress" value={stats.inProgress} icon={<History size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 2 * 0.05} prefersReducedMotion={prefersReducedMotion} />
+          <StatCardAnimated label="Completed" value={stats.completed} icon={<CheckCircle2 size={20} aria-hidden="true" />} delay={prefersReducedMotion ? 0 : 3 * 0.05} prefersReducedMotion={prefersReducedMotion} />
         </div>
-      </div>
+
+        {/* ── Job Cards ──────────────────────────────────────────────────── */}
+        <DashboardSection
+          title="Active Job Cards"
+          icon={<Briefcase size={18} aria-hidden="true" />}
+          action={<Badge variant="outline" className="rounded-full px-4">{assignedTasks.length} Assigned</Badge>}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {assignedTasks.map(task => (
+              <FreelancerJobCard key={task.id} task={task} user={user} />
+            ))}
+            {assignedTasks.length === 0 && !loading && (
+              <div className="col-span-full text-center py-16 text-foreground-muted">
+                <Briefcase className="w-10 h-10 mx-auto mb-4 opacity-50" aria-hidden="true" />
+                <h3 className="text-xl font-heading font-bold mb-2">No assigned tasks yet</h3>
+                <p className="text-sm max-w-sm mx-auto">
+                  Once an architect assigns you to a project, your job cards will appear here.
+                </p>
+              </div>
+            )}
+          </div>
+        </DashboardSection>
+      </main>
     </div>
   );
 }
@@ -222,29 +241,6 @@ function FreelancerJobCard({ task, user }: { task: JobCard, user: UserProfile, k
           onClose={() => setIsChatOpen(false)}
         />
       )}
-    </Card>
-  );
-}
-
-function StatCard({ label, value, icon, tone = "default" }: { label: string, value: string | number, icon: React.ReactNode, tone?: 'default' | 'muted' | 'accent' | 'success' }) {
-  const toneClass = {
-    default: 'bg-primary/10 text-primary',
-    muted: 'bg-secondary text-secondary-foreground',
-    accent: 'bg-accent/10 text-primary',
-    success: 'bg-primary-light/10 text-primary-light',
-  }[tone];
-
-  return (
-    <Card className="beos-stat-card group">
-      <CardContent className="p-6 flex items-center gap-4">
-        <div className={`p-3 rounded-2xl ${toneClass}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="beos-label-caps text-muted-foreground">{label}</p>
-          <p className="text-2xl font-heading font-black tracking-[-0.04em]">{value}</p>
-        </div>
-      </CardContent>
     </Card>
   );
 }

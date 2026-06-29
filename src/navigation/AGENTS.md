@@ -10,6 +10,22 @@ Central navigation configuration and routing infrastructure that determines what
 - **Owner:** Frontend / UX Architecture Team
 - **Key files:** `architexNavigationConfig.ts`, `navTypes.ts`, `navDashboardAdapter.ts`, `contextualMessagingService.ts`, `example.ts`
 
+### RoleAwareSidebar (`src/components/navigation/RoleAwareSidebar.tsx`)
+- Glass navigation sidebar rendered by all authenticated dashboard pages
+- Calls `getNavigationForRole(user.role)` from `architexNavigationConfig.ts` — must be the single source of truth for role filtering
+- Accepts `activeTab` + `onNavigate` for page-tab routing (not URL-based); these match App.tsx's `activeTab`/`navigateDashboard` contract
+- `getNavigationForRole` exported from `architexNavigationConfig.ts` — filters both module-level and section-level `roles` arrays
+- Requirement 5.8: hidden on mobile via `hidden md:flex` classes; mobile access provided by `MobileMenuTrigger` + `GlassDrawer` (separate component)
+
+### MobileMenuTrigger (`src/components/navigation/MobileMenuTrigger.tsx`)
+- Renders a hamburger button (Menu icon from lucide-react) visible only on mobile (`block md:hidden`)
+- On click, opens a `GlassDrawer` that slides in from the left containing `RoleAwareSidebar`
+- Accepts `user: UserProfile`, `onSignOut?: () => void`, `className?: string`
+- Manages `isOpen` state internally; closing via Escape, backdrop click, or Sign Out
+- Accessible: `aria-label="Open navigation menu"`, `aria-expanded` reflects open state
+- Sign Out inside the drawer calls `onSignOut` callback and then closes the drawer
+- Requirement: 5.8
+
 ## Local Contracts
 
 ### Navigation Type System (`navTypes.ts`)
@@ -25,11 +41,19 @@ Central navigation configuration and routing infrastructure that determines what
 - Each module specifies: role access list, key sections, phase awareness
 - Modules include: Command Centre, Inbox/Action Centre, Projects, Toolboxes, CPD & Learning, Documents/Knowledge Hub, People, Marketplace, Payments/Finance, Compliance Hub, Admin/Governance
 - Navigation is consumed by `src/App.tsx` for sidebar rendering
+- **Role visibility contract:** `App.tsx` `visibleNavItems` filters strictly by `item.roles.includes(user.role)` with **no** role normalization. Every `UserRole` that should reach a surface must be listed explicitly in that module's `roles` array. All 17 roles now share the workflow spine (`command_centre`, `inbox`, `projects`, `messages`); `documents` is granted to all design/governance roles. `finance`, `settings`, `cpd_learning`, `marketplace`, `user_settings` remain intentionally role-restricted — extend deliberately, not by default.
 
 ### Dashboard Adapter (`navDashboardAdapter.ts`)
 - Maps navigation modules to their corresponding dashboard components
 - Provides `getDashboardForRole()` — returns the correct dashboard component for a given user role
 - Supports role-specific dashboards: Client, Architect, Admin, Contractor, BEP, Freelancer, Subcontractor, Supplier
+
+### Toolbox Framework Integration
+- Tools in the Toolboxes module now link to the Toolbox Capability Framework via `calculatorDefinitionId`
+- When a tool has a `CalculatorDefinition` (`status: 'full'`), `DefinitionToolRunner` renders it with Zod-validated forms, live recomputation, clause panels, and report export
+- When a tool is `status: 'preview'`, the legacy `StandaloneToolRunner` fallback renders it
+- Navigation does not gate tool status — all 54 tools remain routable; the runner determines rendering mode at runtime
+- Tool registry entries carry `calculatorDefinitionId` linking them to their definition in `src/services/toolbox/definitions/`
 
 ### Contextual Messaging (`contextualMessagingService.ts`)
 - Determines when contextual messaging UI surfaces based on navigation context

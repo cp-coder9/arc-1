@@ -8,7 +8,7 @@ Architex repository deployments are now routed through the owned test host inste
 - API host used by the static frontend: `https://api.architex.co.za`
 - Deployment branch: `main`
 
-Feature branches and pull requests should run verification only. They must not create Vercel preview deployments or any other public deployment. Merge reviewed work into `main`; the `Deploy test.architex.co.za` GitHub Actions workflow builds and uploads the static bundle for the test site.
+Feature branches and pull requests should run verification only. They must not create Vercel preview deployments or any other public deployment. Merge reviewed work into `main`; the `Deploy test.architex.co.za` GitHub Actions workflow builds and uploads the SPA to `test.architex.co.za` and the PHP API gateway to `api.architex.co.za`.
 
 ## Required GitHub Actions secrets
 

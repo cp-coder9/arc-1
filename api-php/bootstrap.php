@@ -6,7 +6,7 @@
 
 declare(strict_types=1);
 
-const ARCHITEX_API_VERSION = 'php-gateway-v0.1.0';
+const ARCHITEX_API_VERSION = 'php-gateway-v0.1.1-20260623';
 
 function architex_allowed_origins(): array
 {

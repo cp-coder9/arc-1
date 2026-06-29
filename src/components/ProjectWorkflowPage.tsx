@@ -4,7 +4,6 @@ import { Briefcase, Loader2 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import type { Job, Project, UserProfile } from '../types';
 import { Badge } from './ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import GanttChart from './GanttChart';
 import RFIManager from './RFIManager';
 import SiteLogManager from './SiteLogManager';
@@ -107,7 +106,7 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
   const activeJob = useMemo(() => jobs.find((job) => job.id === activeProject?.jobId) ?? jobs[0], [activeProject?.jobId, jobs]);
 
   if (state === 'loading') {
-    return <WorkflowFrame pageId={pageId} user={user}><div className="flex items-center gap-3 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project workflow...</div></WorkflowFrame>;
+    return <WorkflowFrame pageId={pageId} user={user}><div className="flex items-center gap-3 text-foreground-muted"><Loader2 className="h-4 w-4 animate-spin" /> Loading live project workflow...</div></WorkflowFrame>;
   }
 
   if ((pageId === 'payments' || pageId === 'escrow')) {
@@ -168,18 +167,18 @@ export default function ProjectWorkflowPage({ pageId, user }: Props) {
 function WorkflowFrame({ pageId, user, project, job, children }: React.PropsWithChildren<{ pageId: string; user: UserProfile; project?: Project; job?: Job }>) {
   return (
     <div className="space-y-6" data-testid={`workflow-page-${pageId}`}>
-      <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 border-b border-border">
+      <section className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-border/40">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
-              <Badge variant="secondary" className="uppercase tracking-widest">{pageId.replaceAll('-', ' ')}</Badge>
-              <CardTitle className="font-heading text-3xl mt-3">{job?.title ?? project?.id ?? 'Live workflow'}</CardTitle>
-              <CardDescription className="mt-2 max-w-3xl text-base">Production workflow composed from existing services and live Firestore records for {user.role}. Unsafe approvals, payments, signatures, and submissions remain human-confirmed.</CardDescription>
+              <span className="glass-pill text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-widest text-foreground-muted">{pageId.replaceAll('-', ' ')}</span>
+              <h1 className="font-heading text-3xl font-bold tracking-[-0.04em] text-foreground mt-3">{job?.title ?? project?.id ?? 'Live workflow'}</h1>
+              <p className="mt-2 max-w-3xl text-base leading-relaxed text-foreground-muted">Production workflow composed from existing services and live Firestore records for {user.role}. Unsafe approvals, payments, signatures, and submissions remain human-confirmed.</p>
             </div>
             <Badge className="capitalize w-fit">{user.role}</Badge>
           </div>
-        </CardHeader>
-      </Card>
+        </div>
+      </section>
       {children}
     </div>
   );
@@ -187,14 +186,12 @@ function WorkflowFrame({ pageId, user, project, job, children }: React.PropsWith
 
 function EmptyWorkflow({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <Card className="rounded-2xl border-border bg-card/90">
-      <CardContent className="p-8 flex items-start gap-4">
-        <div className="rounded-2xl bg-primary/10 text-primary p-3 [&>svg]:h-6 [&>svg]:w-6">{icon}</div>
-        <div>
-          <h3 className="font-heading text-xl font-bold">{title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{description}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="glass-panel rounded-2xl p-8 flex items-start gap-4">
+      <div className="glass-icon-box p-3 text-primary [&>svg]:h-6 [&>svg]:w-6">{icon}</div>
+      <div>
+        <h3 className="font-heading text-xl font-bold text-foreground">{title}</h3>
+        <p className="mt-2 text-sm text-foreground-muted leading-relaxed">{description}</p>
+      </div>
+    </div>
   );
 }
