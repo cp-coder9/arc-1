@@ -15,9 +15,7 @@
 // `phase` to 'landing' and `actionError` to null — the exact pre-activation
 // snapshot.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { vi } from 'vitest';
 import fc from 'fast-check';
 import {
   useFlockActivation,

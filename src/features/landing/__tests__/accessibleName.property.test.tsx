@@ -21,7 +21,6 @@
 // uses) is a non-empty, purpose-conveying string.
 
 import { render, cleanup, type RenderResult } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { computeAccessibleName } from 'dom-accessibility-api';
 import fc from 'fast-check';
 

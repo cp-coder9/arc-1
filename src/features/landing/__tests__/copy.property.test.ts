@@ -3,7 +3,6 @@
 // Property-based tests for the Hero copy clamp helper (`clampCopy`) and the
 // static `HERO_COPY` config. Validates Requirements 11.1, 11.4.
 
-import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import {
   clampCopy,

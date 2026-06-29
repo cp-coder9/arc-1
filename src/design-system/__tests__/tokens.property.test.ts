@@ -26,7 +26,6 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import * as Tokens from '../tokens';
 

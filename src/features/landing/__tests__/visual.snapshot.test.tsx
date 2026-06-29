@@ -27,7 +27,6 @@
 //       with a 1x/2x `srcSet` and explicit `width`/`height` for both the Top_Bar
 //       and hero rendered sizes.
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render, within } from '@testing-library/react';
 
 import { LandingPage } from '../LandingPage';

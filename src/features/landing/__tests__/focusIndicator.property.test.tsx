@@ -41,7 +41,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, cleanup, type RenderResult } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 
 import { LandingPage } from '../LandingPage';

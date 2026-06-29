@@ -1,5 +1,4 @@
 // Feature: website-ui-redesign — unit tests for pure flock geometry (task 7.1)
-import { describe, it, expect } from 'vitest';
 import {
   buildNodeLattice,
   planFlock,
