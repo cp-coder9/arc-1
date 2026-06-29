@@ -1,783 +1,681 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architex OS — SANS 10400-XA Energy Compliance Tool</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
-            surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' },
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .glass-card { background: rgba(30,41,59,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(148,163,184,0.1); border-radius: 0.5rem; }
-    .status-pass { color: #22c55e; }
-    .status-fail { color: #ef4444; }
-    .status-pending { color: #f59e0b; }
-    .status-na { color: #64748b; }
-    input[type="number"], select, input[type="text"] { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 0.375rem; }
-    input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-    .tab-trigger { padding: 0.5rem 1rem; font-size: 0.75rem; font-weight: 500; color: #94a3b8; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; }
-    .tab-trigger:hover { color: #e2e8f0; }
-    .tab-trigger.active { color: #3b82f6; border-bottom-color: #3b82f6; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SANS 10400-XA Energy Compliance — Architex OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d2520; --bg-deep: #081a16; --bg-os-nav: #061410;
+  --primary: #005b4e; --primary-light: #007666; --secondary: #aeefe3;
+  --text-primary: #ffffff; --text-muted: rgba(255,255,255,0.62);
+  --text-low: rgba(255,255,255,0.42);
+  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(174,239,227,0.24);
+  --glass-glow: rgba(0,118,102,0.38);
+  --panel-bg: rgba(255,255,255,0.05); --card-bg: #11302a;
+  --btn-gradient: linear-gradient(180deg, #c5f6d4, #aeefe3); --btn-text: #00201b;
+  --gold: #F1D39A; --danger: #d95747; --green: #4ADE80; --amber: #F5A623;
+  --grid-lines: rgba(174,239,227,0.06); --radius: 10px; --radius-sm: 6px;
+  --font-heading: 'Space Grotesk', sans-serif; --font-body: 'Inter', sans-serif;
+  --os-nav-width: 56px; --tool-nav-width: 220px; --topbar-height: 40px;
+  --input-bg: rgba(255,255,255,0.06); --input-border: rgba(174,239,227,0.2);
+  --input-focus: rgba(174,239,227,0.5);
+  --ai-gradient: linear-gradient(135deg, rgba(0,91,78,0.3), rgba(174,239,227,0.08));
+  --ai-border: rgba(174,239,227,0.3);
+  --verified-bg: rgba(74,222,128,0.06); --verified-border: rgba(74,222,128,0.2);
+  --unverified-bg: rgba(241,211,154,0.06); --unverified-border: rgba(241,211,154,0.2);
+}
+html, body { height:100%; background:var(--bg); color:var(--text-primary); font-family:var(--font-body); font-size:15px; line-height:1.6; overflow:hidden; }
+body::before { content:''; position:fixed; inset:0; background: radial-gradient(ellipse 60% 50% at 30% 40%, var(--glass-glow) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 75% 60%, rgba(174,239,227,0.04) 0%, transparent 60%); pointer-events:none; z-index:0; }
+body::after { content:''; position:fixed; inset:0; background-image: linear-gradient(var(--grid-lines) 1px, transparent 1px), linear-gradient(90deg, var(--grid-lines) 1px, transparent 1px); background-size:56px 56px; pointer-events:none; z-index:0; }
+.app-shell { display:grid; grid-template-columns:var(--os-nav-width) var(--tool-nav-width) 1fr; grid-template-rows:var(--topbar-height) 1fr; height:100vh; position:relative; z-index:1; }
+.os-nav { grid-row:1/-1; background:var(--bg-os-nav); border-right:1px solid rgba(174,239,227,0.12); display:flex; flex-direction:column; align-items:center; padding:12px 0; }
+.os-nav-logo { width:32px; height:32px; margin-bottom:20px; color:var(--secondary); }
+.os-nav-logo svg { width:100%; height:100%; }
+.os-nav-items { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+.os-nav-item { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--text-low); cursor:pointer; transition:all 0.2s; position:relative; }
+.os-nav-item:hover { background:rgba(174,239,227,0.08); color:var(--text-primary); }
+.os-nav-item.active { color:var(--secondary); }
+.os-nav-item.active::after { content:''; position:absolute; right:-2px; top:50%; transform:translateY(-50%); width:4px; height:4px; border-radius:50%; background:var(--secondary); box-shadow:0 0 6px var(--secondary); }
+.os-nav-item svg { width:20px; height:20px; }
+.os-nav-item .tip { position:absolute; left:52px; top:50%; transform:translateY(-50%); background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:3px 8px; font-size:10px; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity 0.2s; z-index:200; }
+.os-nav-item:hover .tip { opacity:1; }
+.tool-nav { grid-row:1/-1; background:var(--glass-bg); border-right:1px solid var(--glass-border); backdrop-filter:blur(16px); display:flex; flex-direction:column; overflow-y:auto; padding:10px 0; position:relative; }
+.tool-nav::-webkit-scrollbar { width:4px; }
+.tool-nav::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:2px; }
+.tool-nav-header { padding:6px 12px 12px; border-bottom:1px solid var(--glass-border); margin-bottom:6px; }
+.tool-nav-header h2 { font-family:var(--font-heading); font-size:17px; font-weight:700; color:var(--secondary); }
+.tool-nav-header .sub { font-size:11px; color:var(--text-low); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+.nav-section-label { padding:10px 12px 4px; font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-low); font-weight:600; }
+.nav-item { display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer; color:var(--text-muted); font-size:13px; transition:all 0.2s; border-left:3px solid transparent; }
+.nav-item:hover { color:var(--text-primary); background:rgba(174,239,227,0.05); border-left-color:rgba(174,239,227,0.3); }
+.nav-item.active { color:var(--secondary); background:rgba(174,239,227,0.08); border-left-color:var(--secondary); font-weight:500; }
+.nav-item svg { width:15px; height:15px; flex-shrink:0; opacity:0.7; }
+.nav-item.active svg { opacity:1; }
+.nav-item .nav-badge { margin-left:auto; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:600; }
+.nav-badge-pass { background:rgba(74,222,128,0.15); color:var(--green); }
+.nav-badge-fail { background:rgba(217,87,71,0.15); color:var(--danger); }
+.nav-badge-check { background:rgba(245,166,35,0.15); color:var(--amber); }
+.top-bar { background:var(--bg-os-nav); border-bottom:1px solid var(--glass-border); display:flex; align-items:center; padding:0 16px; gap:10px; font-size:13px; }
+.breadcrumb { color:var(--text-low); } .breadcrumb .sep { color:rgba(174,239,227,0.3); margin:0 4px; } .breadcrumb .cur { color:var(--secondary); font-weight:500; }
+.top-bar-spacer { flex:1; }
+.btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:var(--radius-sm); font-size:12px; font-weight:500; font-family:var(--font-body); cursor:pointer; transition:all 0.2s; border:none; white-space:nowrap; }
+.btn-primary { background:var(--btn-gradient); color:var(--btn-text); font-weight:600; }
+.btn-primary:hover { box-shadow:0 0 14px rgba(174,239,227,0.4); transform:translateY(-1px); }
+.btn-secondary { background:transparent; color:var(--text-muted); border:1px solid var(--glass-border); }
+.btn-secondary:hover { border-color:var(--secondary); color:var(--text-primary); }
+.btn-ai { background:var(--ai-gradient); color:var(--secondary); border:1px solid var(--ai-border); }
+.btn-ai:hover { box-shadow:0 0 14px rgba(174,239,227,0.3); }
+.main-content { overflow-y:auto; padding:18px; position:relative; }
+.main-content::-webkit-scrollbar { width:5px; }
+.main-content::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:3px; }
+.panel { background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius); backdrop-filter:blur(16px); padding:20px; margin-bottom:16px; transition:border-color 0.3s; }
+.panel:hover { border-color:rgba(174,239,227,0.4); }
+.panel-title { font-family:var(--font-heading); font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.panel-title .dot { width:6px; height:6px; border-radius:50%; background:var(--secondary); }
+.chip { display:inline-flex; align-items:center; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+.chip-pass { background:rgba(74,222,128,0.15); color:var(--green); }
+.chip-fail { background:rgba(217,87,71,0.15); color:var(--danger); }
+.chip-check { background:rgba(245,166,35,0.2); color:var(--amber); }
+.chip-na { background:rgba(255,255,255,0.08); color:var(--text-muted); }
+.badge { display:inline-flex; align-items:center; padding:3px 7px; border-radius:4px; font-size:11px; font-weight:500; background:rgba(174,239,227,0.1); color:var(--secondary); border:1px solid rgba(174,239,227,0.15); }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
+.stat-card { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:14px; text-align:center; }
+.stat-value { font-family:var(--font-heading); font-size:24px; font-weight:700; color:var(--secondary); }
+.stat-value.fail { color:var(--danger); } .stat-value.warn { color:var(--amber); }
+.stat-label { font-size:11px; color:var(--text-low); margin-top:3px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:10px 12px; color:var(--text-low); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--glass-border); font-weight:600; }
+td { padding:10px 12px; border-bottom:1px solid rgba(174,239,227,0.08); }
+tr:hover td { background:rgba(174,239,227,0.03); }
+.form-label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-low); margin-bottom:5px; font-weight:500; }
+.form-input, .form-select { width:100%; background:var(--input-bg); border:1px solid var(--input-border); border-radius:8px; padding:10px 14px; color:var(--text-primary); font-size:14px; font-family:var(--font-body); outline:none; transition:border-color 0.2s, box-shadow 0.2s; }
+.form-input:focus, .form-select:focus { border-color:var(--input-focus); box-shadow:0 0 0 3px rgba(174,239,227,0.1); }
+.form-select option { background:var(--card-bg); color:var(--text-primary); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.inline-input { background:var(--input-bg); border:1px solid var(--input-border); border-radius:4px; padding:6px 8px; color:var(--text-primary); font-size:13px; font-family:var(--font-body); outline:none; width:70px; }
+.inline-input:focus { border-color:var(--input-focus); }
+.view-panel { display:none; } .view-panel.active { display:block; animation:fadeIn 0.2s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+/* ═══ AI INTELLIGENCE LAYER ═══ */
+.ai-card { background:var(--ai-gradient); border:1px solid var(--ai-border); border-radius:var(--radius); padding:16px; margin-bottom:14px; position:relative; overflow:hidden; }
+.ai-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--btn-gradient); opacity:0.6; }
+.ai-card-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.ai-card-header .ai-icon { font-size:14px; }
+.ai-card-header .ai-label { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--secondary); font-weight:600; }
+.ai-card-header .ai-conf { margin-left:auto; font-size:11px; padding:3px 7px; border-radius:4px; font-weight:600; }
+.ai-conf-high { background:rgba(74,222,128,0.15); color:var(--green); }
+.ai-conf-med { background:rgba(245,166,35,0.15); color:var(--amber); }
+.ai-conf-low { background:rgba(217,87,71,0.15); color:var(--danger); }
+.ai-source { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-low); margin-top:8px; padding-top:8px; border-top:1px solid rgba(174,239,227,0.1); }
+.ai-source .src-icon { font-size:10px; }
+.ai-source a { color:var(--secondary); text-decoration:none; }
+.ai-source a:hover { text-decoration:underline; }
+
+/* Verification States */
+.verify-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:5px; transition:all 0.2s; }
+.verify-row.verified { background:var(--verified-bg); border:1px solid var(--verified-border); }
+.verify-row.unverified { background:var(--unverified-bg); border:1px solid var(--unverified-border); }
+.verify-row.manual { background:var(--panel-bg); border:1px solid var(--glass-border); }
+.verify-icon { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+.verify-icon.verified { background:var(--green); color:var(--btn-text); }
+.verify-icon.unverified { background:var(--amber); color:var(--btn-text); }
+.verify-icon.manual { background:rgba(174,239,227,0.2); color:var(--secondary); }
+.verify-label { flex:1; font-size:13px; }
+.verify-label .field-name { color:var(--text-primary); font-weight:500; }
+.verify-label .field-value { color:var(--text-muted); margin-left:4px; }
+.verify-label .field-source { display:block; font-size:10px; color:var(--text-low); margin-top:2px; }
+.verify-actions { display:flex; gap:3px; }
+.verify-btn { padding:4px 8px; border-radius:4px; font-size:10px; font-weight:600; cursor:pointer; border:none; transition:all 0.15s; }
+.verify-btn-confirm { background:rgba(74,222,128,0.15); color:var(--green); }
+.verify-btn-confirm:hover { background:rgba(74,222,128,0.3); }
+.verify-btn-edit { background:rgba(174,239,227,0.1); color:var(--secondary); }
+.verify-btn-edit:hover { background:rgba(174,239,227,0.2); }
+.verify-btn-reject { background:rgba(217,87,71,0.1); color:var(--danger); }
+.verify-btn-reject:hover { background:rgba(217,87,71,0.2); }
+
+/* Drawing Source Cards */
+.drawing-source { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); margin-bottom:6px; font-size:12px; cursor:pointer; transition:all 0.2s; }
+.drawing-source:hover { border-color:rgba(174,239,227,0.4); }
+.drawing-source .ds-icon { width:28px; height:28px; background:rgba(174,239,227,0.08); border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.drawing-source .ds-info { flex:1; }
+.drawing-source .ds-name { font-weight:500; color:var(--text-primary); font-size:12px; }
+.drawing-source .ds-meta { font-size:10px; color:var(--text-low); margin-top:2px; }
+.drawing-source .ds-extracted { font-size:10px; color:var(--secondary); margin-left:auto; }
+
+/* Layer with AI state */
+.layer-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:var(--radius-sm); margin-bottom:5px; font-size:12px; transition:all 0.2s; }
+.layer-row.ai-populated { background:rgba(174,239,227,0.04); border:1px solid rgba(174,239,227,0.15); }
+.layer-row.user-entered { background:var(--panel-bg); border:1px solid var(--glass-border); }
+.layer-row .name { flex:1; font-weight:500; }
+.layer-row .meta { color:var(--text-low); }
+.layer-row .ai-tag { font-size:9px; padding:2px 5px; border-radius:3px; background:rgba(174,239,227,0.12); color:var(--secondary); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+.layer-row .manual-tag { font-size:9px; padding:2px 5px; border-radius:3px; background:rgba(255,255,255,0.08); color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+.layer-row .remove { color:var(--danger); cursor:pointer; font-size:12px; }
+
+/* Progress/confidence bar */
+.conf-bar { height:3px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; margin-top:4px; }
+.conf-bar-fill { height:100%; border-radius:2px; transition:width 0.3s; }
+.conf-bar-fill.high { background:var(--green); }
+.conf-bar-fill.med { background:var(--amber); }
+.conf-bar-fill.low { background:var(--danger); }
+
+/* Advisory */
+.advisory-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(241,211,154,0.06); border:1px solid rgba(241,211,154,0.15); border-radius:var(--radius-sm); font-size:12px; color:var(--gold); margin-bottom:16px; }
+
+/* Signal sweep */
+@keyframes signalSweep { 0%{transform:translateY(-100%);opacity:0} 50%{opacity:0.06} 100%{transform:translateY(100%);opacity:0} }
+.tool-nav::after { content:''; position:absolute; top:0; left:0; right:0; height:200px; background:linear-gradient(180deg, transparent, var(--secondary), transparent); opacity:0; animation:signalSweep 8s ease-in-out infinite; pointer-events:none; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+.pulse-dot { animation:pulse 2s infinite; }
+</style>
 </head>
-<body class="bg-surface-950 text-surface-200 min-h-screen">
+<body>
+<div class="app-shell">
 
-  <!-- ═══════════════════════════════════════════════════════════
-       ARCHITEX OS SHELL (provided by App.tsx — simulated here)
-       ═══════════════════════════════════════════════════════════ -->
-
-  <!-- OS Header (sticky) — breadcrumb shows module > tool -->
-  <header class="border-b border-surface-700/50 bg-surface-900/80 backdrop-blur-sm sticky top-0 z-50">
-    <div class="max-w-[1600px] mx-auto px-4 h-12 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-md bg-primary-600 flex items-center justify-center">
-          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-        </div>
-        <span class="text-sm font-semibold text-white">Architex<span class="text-primary-400">OS</span></span>
-        <!-- Breadcrumb -->
-        <span class="text-surface-500 text-xs ml-3">/</span>
-        <span class="text-surface-400 text-xs ml-1">Compliance Hub</span>
-        <span class="text-surface-500 text-xs ml-1">/</span>
-        <span class="text-surface-200 text-xs ml-1 font-medium">SANS 10400-XA Energy</span>
-      </div>
-      <div class="flex items-center gap-3">
-        <span class="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Advisory Only</span>
-        <span class="text-xs text-surface-400">Sandton Mixed-Use Complex</span>
-        <div class="w-7 h-7 rounded-full bg-primary-600/20 border border-primary-500/30 flex items-center justify-center text-[10px] text-primary-300">GT</div>
-      </div>
+  <!-- OS NAV -->
+  <nav class="os-nav">
+    <div class="os-nav-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
+    <div class="os-nav-items">
+      <div class="os-nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span class="tip">Command Centre</span></div>
+      <div class="os-nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg><span class="tip">Projects</span></div>
+      <div class="os-nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg><span class="tip">SpecForge</span></div>
+      <div class="os-nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg><span class="tip">Compliance Hub</span></div>
+      <div class="os-nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><span class="tip">Documents</span></div>
+      <div class="os-nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg><span class="tip">Procurement</span></div>
     </div>
-  </header>
+  </nav>
 
-  <div class="max-w-[1600px] mx-auto flex">
+  <!-- TOOL NAV -->
+  <aside class="tool-nav">
+    <div class="tool-nav-header">
+      <h2>XA Energy</h2>
+      <div class="sub">SANS 10400-XA:2021</div>
+    </div>
+    <div class="nav-section-label">Assessment</div>
+    <div class="nav-item active" data-view="overview" onclick="switchView('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"/></svg>Overview</div>
+    <div class="nav-item" data-view="basics" onclick="switchView('basics')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Project Basics<span class="nav-badge nav-badge-pass">✓</span></div>
+    <div class="nav-section-label">Envelope</div>
+    <div class="nav-item" data-view="fenestration" onclick="switchView('fenestration')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>Fenestration<span class="nav-badge nav-badge-fail">!</span></div>
+    <div class="nav-item" data-view="walls" onclick="switchView('walls')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4V5zm4 0v14m4-14v14m4-14v14"/></svg>Walls R/CR<span class="nav-badge nav-badge-pass">✓</span></div>
+    <div class="nav-item" data-view="roof" onclick="switchView('roof')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10"/></svg>Roof<span class="nav-badge nav-badge-pass">✓</span></div>
+    <div class="nav-section-label">Services</div>
+    <div class="nav-item" data-view="hotwater" onclick="switchView('hotwater')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg>Hot Water<span class="nav-badge nav-badge-pass">✓</span></div>
+    <div class="nav-item" data-view="lighting" onclick="switchView('lighting')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>Lighting<span class="nav-badge nav-badge-check">?</span></div>
+    <div class="nav-section-label">Output</div>
+    <div class="nav-item" data-view="results" onclick="switchView('results')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Results & Report</div>
+    <div style="margin-top:auto;padding:8px 12px;border-top:1px solid var(--glass-border)">
+      <div style="font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--text-low);margin-bottom:4px;font-weight:600">AI Status</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--secondary)"><span class="pulse-dot" style="width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5)"></span>4 drawings scanned</div>
+      <div style="font-size:8px;color:var(--text-low);margin-top:2px">12 fields auto-populated</div>
+      <div style="font-size:8px;color:var(--amber);margin-top:1px">3 awaiting verification</div>
+    </div>
+  </aside>
 
-    <!-- ═══════════════════════════════════════════════
-         MINIMISED PRIMARY NAV (module-scoped)
-         Shows sibling tools in the Compliance Hub module
-         ═══════════════════════════════════════════════ -->
-    <aside class="w-12 min-h-[calc(100vh-3rem)] border-r border-surface-700/50 bg-surface-900/50 py-3 flex-shrink-0 sticky top-12 h-[calc(100vh-3rem)] flex flex-col items-center gap-3">
-      <!-- Module icon (Compliance Hub) -->
-      <div class="w-8 h-8 rounded-lg bg-primary-600/20 border border-primary-500/30 flex items-center justify-center" title="Compliance Hub">
-        <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-      </div>
-      <div class="w-6 border-t border-surface-700/50"></div>
-      <!-- Sibling tools in module (minimised icons) -->
-      <div class="w-8 h-8 rounded-lg bg-primary-500/10 border border-primary-500/20 flex items-center justify-center" title="XA Energy (active)">
-        <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-      </div>
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="SANS 10400-K Walls">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16v14H4V5zm4 0v14m4-14v14m4-14v14"/></svg>
-      </div>
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="SANS 10400-N Fenestration">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/></svg>
-      </div>
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="SANS 10400-T Fire">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg>
-      </div>
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="Municipal Readiness">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      </div>
-    </aside>
-
-    <!-- ═══════════════════════════════════════════════
-         TOOL CONTENT AREA (rendered by the tool component)
-         Follows: Header Card → Tabs → Active Content
-         ═══════════════════════════════════════════════ -->
-    <main class="flex-1 p-6 overflow-y-auto space-y-6">
-
-      <!-- ─── TOOL HEADER CARD ─── -->
-      <div class="glass-card p-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <div class="flex items-center gap-3">
-              <h1 class="text-xl font-bold text-white">SANS 10400-XA Energy Compliance</h1>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-medium">NOT COMPLIANT</span>
-            </div>
-            <p class="text-xs text-surface-400 mt-1">Prescriptive compliance pathway — XA:2021 edition • Zone 5 — Johannesburg • NFA 2,450 m²</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="px-3 py-1.5 text-xs rounded bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-600 transition">Import from Drawing</button>
-            <button class="px-3 py-1.5 text-xs rounded bg-primary-600 hover:bg-primary-500 text-white transition">Export Report</button>
-          </div>
-        </div>
-        <!-- Advisory -->
-        <div class="mt-3 flex items-center gap-2 text-[10px] text-amber-300 bg-amber-500/5 border border-amber-500/10 rounded px-3 py-1.5">
-          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-          Advisory tool only — results require sign-off by a registered Energy Professional. SANS clause references are paraphrased.
-        </div>
-      </div>
-
-      <!-- ─── TAB NAVIGATION (shadcn Tabs pattern) ─── -->
-      <div class="border-b border-surface-700/50">
-        <div class="flex gap-0" id="tabList">
-          <button class="tab-trigger active" onclick="switchTab('overview')" data-tab="overview">Overview</button>
-          <button class="tab-trigger" onclick="switchTab('basics')" data-tab="basics">Basics</button>
-          <button class="tab-trigger" onclick="switchTab('shading')" data-tab="shading">Shading</button>
-          <button class="tab-trigger" onclick="switchTab('fenestration')" data-tab="fenestration">Fenestration</button>
-          <button class="tab-trigger" onclick="switchTab('walls')" data-tab="walls">Walls</button>
-          <button class="tab-trigger" onclick="switchTab('roof')" data-tab="roof">Roof</button>
-          <button class="tab-trigger" onclick="switchTab('floors')" data-tab="floors">Floors</button>
-          <button class="tab-trigger" onclick="switchTab('hotwater')" data-tab="hotwater">Hot Water</button>
-          <button class="tab-trigger" onclick="switchTab('lighting')" data-tab="lighting">Lighting</button>
-          <button class="tab-trigger" onclick="switchTab('aircon')" data-tab="aircon">Air Con</button>
-          <button class="tab-trigger" onclick="switchTab('results')" data-tab="results">Results</button>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB CONTENT PANELS
-           ═══════════════════════════════════════════════ -->
-
-      <!-- ─── OVERVIEW TAB ─── -->
-      <div id="tab-overview" class="tab-panel space-y-6">
-        <!-- Status Cards -->
-        <div class="grid grid-cols-4 gap-4">
-          <div class="glass-card p-4">
-            <div class="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Zone</div>
-            <div class="text-sm font-semibold text-white mt-1">5 — Cold Interior</div>
-          </div>
-          <div class="glass-card p-4">
-            <div class="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Occupancy</div>
-            <div class="text-sm font-semibold text-white mt-1">A1 — Entertainment</div>
-          </div>
-          <div class="glass-card p-4">
-            <div class="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Total NFA</div>
-            <div class="text-sm font-semibold text-white mt-1">2,450 m²</div>
-          </div>
-          <div class="glass-card p-4">
-            <div class="text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Compliance</div>
-            <div class="text-sm font-semibold text-red-400 mt-1">7 / 8 Pass</div>
-          </div>
-        </div>
-
-        <!-- Component Status Table -->
-        <div class="glass-card overflow-hidden">
-          <div class="px-4 py-3 border-b border-surface-700/50 flex items-center justify-between">
-            <h3 class="text-xs font-semibold text-white uppercase tracking-wider">Component Status</h3>
-            <div class="flex items-center gap-3 text-[10px]">
-              <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>Pass</span>
-              <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Fail</span>
-              <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Check</span>
-              <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-surface-500"></span>N/A</span>
-            </div>
-          </div>
-          <table class="w-full text-xs">
-            <thead class="bg-surface-800/50">
-              <tr class="text-left text-[10px] text-surface-500 uppercase tracking-wider">
-                <th class="px-4 py-2">#</th>
-                <th class="px-4 py-2">Component</th>
-                <th class="px-4 py-2">Clause</th>
-                <th class="px-4 py-2">Status</th>
-                <th class="px-4 py-2">Summary</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-700/30">
-              <tr class="hover:bg-surface-800/30 cursor-pointer" onclick="switchTab('shading')">
-                <td class="px-4 py-2.5 text-surface-500">1</td>
-                <td class="px-4 py-2.5 text-white">Shading</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 5.2</td>
-                <td class="px-4 py-2.5"><span class="status-pass font-medium">● Pass</span></td>
-                <td class="px-4 py-2.5 text-surface-400">All openings shaded (P ≥ H × 0.35)</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer bg-red-500/5" onclick="switchTab('fenestration')">
-                <td class="px-4 py-2.5 text-surface-500">2</td>
-                <td class="px-4 py-2.5 text-white font-medium">Fenestration</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 5.3</td>
-                <td class="px-4 py-2.5"><span class="status-fail font-medium">● Fail</span></td>
-                <td class="px-4 py-2.5 text-red-300">Storey 2 solar SHGC 0.56 > 0.50 limit</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer" onclick="switchTab('walls')">
-                <td class="px-4 py-2.5 text-surface-500">3</td>
-                <td class="px-4 py-2.5 text-white">External Walls</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 5.5</td>
-                <td class="px-4 py-2.5"><span class="status-pass font-medium">● Pass</span></td>
-                <td class="px-4 py-2.5 text-surface-400">Heavy wall R 2.20 ≥ 1.90</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer" onclick="switchTab('roof')">
-                <td class="px-4 py-2.5 text-surface-500">4</td>
-                <td class="px-4 py-2.5 text-white">Roof Assembly</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 5.6</td>
-                <td class="px-4 py-2.5"><span class="status-pass font-medium">● Pass</span></td>
-                <td class="px-4 py-2.5 text-surface-400">Total R 3.85 ≥ 3.70</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer" onclick="switchTab('floors')">
-                <td class="px-4 py-2.5 text-surface-500">5</td>
-                <td class="px-4 py-2.5 text-white">Floors</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 5.4</td>
-                <td class="px-4 py-2.5"><span class="status-pass font-medium">● Pass</span></td>
-                <td class="px-4 py-2.5 text-surface-400">UFH insulation R 1.20 ≥ 1.00</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer" onclick="switchTab('hotwater')">
-                <td class="px-4 py-2.5 text-surface-500">6</td>
-                <td class="px-4 py-2.5 text-white">Hot Water</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 6.1</td>
-                <td class="px-4 py-2.5"><span class="status-pass font-medium">● Pass</span></td>
-                <td class="px-4 py-2.5 text-surface-400">Heat pump + 30% electric</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer bg-amber-500/5" onclick="switchTab('lighting')">
-                <td class="px-4 py-2.5 text-surface-500">7</td>
-                <td class="px-4 py-2.5 text-white">Lighting / LPD</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 6.2</td>
-                <td class="px-4 py-2.5"><span class="status-pending font-medium">● Check</span></td>
-                <td class="px-4 py-2.5 text-amber-300">LPD 7.2 W/m² OK — sensors pending</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 cursor-pointer" onclick="switchTab('aircon')">
-                <td class="px-4 py-2.5 text-surface-500">8</td>
-                <td class="px-4 py-2.5 text-white">Air Conditioning</td>
-                <td class="px-4 py-2.5 text-surface-400">XA 6.3</td>
-                <td class="px-4 py-2.5"><span class="status-na font-medium">● N/A</span></td>
-                <td class="px-4 py-2.5 text-surface-400">No HVAC system specified</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ─── BASICS TAB ─── -->
-      <div id="tab-basics" class="tab-panel hidden space-y-6">
-        <div class="glass-card p-5">
-          <h3 class="text-xs font-semibold text-white uppercase tracking-wider mb-1">Project Context</h3>
-          <p class="text-[10px] text-surface-500 mb-4">XA Clause 4 — Building classification, climate zone, floor areas. Auto-fills from Project Passport when available.</p>
-          <div class="grid grid-cols-2 gap-6">
-            <!-- Location -->
-            <div class="space-y-3">
-              <div>
-                <label class="block text-[10px] uppercase tracking-wider text-surface-500 font-semibold mb-1">City / Town</label>
-                <select class="w-full px-3 py-2 text-sm">
-                  <option>Johannesburg</option><option>Cape Town</option><option>Durban</option><option>Pretoria</option><option>Bloemfontein</option><option>Port Elizabeth / Gqeberha</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase tracking-wider text-surface-500 font-semibold mb-1">Energy Zone (auto)</label>
-                <div class="flex items-center gap-2">
-                  <input type="text" value="Zone 5 — Cold Interior" class="w-full px-3 py-2 text-sm opacity-70" readonly />
-                  <span class="text-xs text-green-400">✓</span>
-                </div>
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase tracking-wider text-surface-500 font-semibold mb-1">Occupancy (SANS 10400-A)</label>
-                <select class="w-full px-3 py-2 text-sm">
-                  <option>A1 — Entertainment & Public Assembly</option><option>G1 — Offices</option><option>F1 — Large Shop</option><option>H3 — Domestic Residence</option><option>H4 — Dwelling House</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[10px] uppercase tracking-wider text-surface-500 font-semibold mb-1">Primary Façade Orientation</label>
-                <select class="w-full px-3 py-2 text-sm">
-                  <option>North</option><option>North-East</option><option>East</option><option>South-East</option><option>South</option><option>South-West</option><option>West</option><option>North-West</option>
-                </select>
-              </div>
-            </div>
-            <!-- Storeys -->
-            <div class="space-y-3">
-              <label class="block text-[10px] uppercase tracking-wider text-surface-500 font-semibold">Storeys & NFA</label>
-              <p class="text-[10px] text-surface-500">Fenestration is checked per storey. Define each level.</p>
-              <table class="w-full text-xs">
-                <thead><tr class="text-[10px] text-surface-500 border-b border-surface-700/30"><th class="text-left py-1.5">Storey</th><th class="text-left py-1.5">NFA (m²)</th><th class="text-left py-1.5">Use</th><th></th></tr></thead>
-                <tbody class="divide-y divide-surface-700/20">
-                  <tr><td class="py-1.5 text-white">Ground</td><td><input type="number" value="950" class="w-20 px-2 py-1 text-xs" /></td><td class="text-surface-400">Retail</td><td><button class="text-red-400 text-[10px]">✕</button></td></tr>
-                  <tr><td class="py-1.5 text-white">First</td><td><input type="number" value="800" class="w-20 px-2 py-1 text-xs" /></td><td class="text-surface-400">Offices</td><td><button class="text-red-400 text-[10px]">✕</button></td></tr>
-                  <tr><td class="py-1.5 text-white">Second</td><td><input type="number" value="700" class="w-20 px-2 py-1 text-xs" /></td><td class="text-surface-400">Offices</td><td><button class="text-red-400 text-[10px]">✕</button></td></tr>
-                </tbody>
-              </table>
-              <div class="flex items-center justify-between pt-1">
-                <button class="text-[10px] text-primary-400 hover:text-primary-300">+ Add Storey</button>
-                <span class="text-xs text-white font-medium">Total: <span class="text-primary-300">2,450 m²</span></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── SHADING TAB ─── -->
-      <div id="tab-shading" class="tab-panel hidden space-y-6">
-        <div class="glass-card p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-xs font-semibold text-white uppercase tracking-wider">Shading Assessment</h3>
-              <p class="text-[10px] text-surface-500 mt-0.5">XA 5.2 / Table 3 — Overhang projection P ≥ H × multiplier for latitude</p>
-            </div>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">PASS</span>
-          </div>
-          <div class="flex items-center gap-4 text-[10px] text-surface-400 mb-4 bg-surface-800/50 rounded px-3 py-2">
-            <span>Latitude: <span class="text-white">-26.2°</span></span>
-            <span>Multiplier: <span class="text-white">0.35</span></span>
-            <span>Formula: <span class="text-primary-300">P ≥ H × 0.35</span></span>
-          </div>
-          <table class="w-full text-xs">
-            <thead>
-              <tr class="text-[10px] text-surface-500 uppercase tracking-wider border-b border-surface-700/30">
-                <th class="text-left py-2">Opening</th>
-                <th class="text-left py-2">Orient.</th>
-                <th class="text-left py-2">H (mm)</th>
-                <th class="text-left py-2">P req (mm)</th>
-                <th class="text-left py-2">P actual (mm)</th>
-                <th class="text-left py-2">Screen ≥80%</th>
-                <th class="text-left py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-700/20">
-              <tr>
-                <td class="py-2 text-white">W-GF-01 (Shopfront)</td>
-                <td class="py-2">N</td>
-                <td class="py-2"><input type="number" value="2400" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="py-2 text-surface-400">840</td>
-                <td class="py-2"><input type="number" value="900" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="py-2 text-surface-500">—</td>
-                <td class="py-2"><span class="status-pass font-medium">Pass</span></td>
-              </tr>
-              <tr>
-                <td class="py-2 text-white">W-GF-02 (Side entry)</td>
-                <td class="py-2">E</td>
-                <td class="py-2"><input type="number" value="2100" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="py-2 text-surface-400">735</td>
-                <td class="py-2"><input type="number" value="800" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="py-2 text-surface-500">—</td>
-                <td class="py-2"><span class="status-pass font-medium">Pass</span></td>
-              </tr>
-              <tr>
-                <td class="py-2 text-white">W-F1-01 (Curtain wall)</td>
-                <td class="py-2">NW</td>
-                <td class="py-2"><input type="number" value="1800" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="py-2 text-surface-400">630</td>
-                <td class="py-2"><input type="number" value="450" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="py-2"><select class="px-1.5 py-0.5 text-[10px]"><option>No</option><option selected>Yes — Louvres</option></select></td>
-                <td class="py-2"><span class="status-pass font-medium">Pass</span></td>
-              </tr>
-            </tbody>
-          </table>
-          <button class="text-[10px] text-primary-400 hover:text-primary-300 mt-3">+ Add Opening</button>
-        </div>
-      </div>
-
-      <!-- ─── FENESTRATION TAB ─── -->
-      <div id="tab-fenestration" class="tab-panel hidden space-y-6">
-        <!-- Summary stats -->
-        <div class="grid grid-cols-4 gap-3">
-          <div class="glass-card p-3 text-center"><div class="text-[10px] text-surface-500 uppercase">Glazed Area</div><div class="text-sm font-bold text-white mt-0.5">386 m²</div></div>
-          <div class="glass-card p-3 text-center"><div class="text-[10px] text-surface-500 uppercase">Glazing %</div><div class="text-sm font-bold text-amber-400 mt-0.5">15.8%</div></div>
-          <div class="glass-card p-3 text-center"><div class="text-[10px] text-surface-500 uppercase">Σ U·A</div><div class="text-sm font-bold text-white mt-0.5">1,234</div></div>
-          <div class="glass-card p-3 text-center"><div class="text-[10px] text-surface-500 uppercase">Σ SHGC·A</div><div class="text-sm font-bold text-white mt-0.5">198.4</div></div>
-        </div>
-
-        <!-- Storey 1 -->
-        <div class="glass-card p-5">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-xs font-semibold text-white">Storey 1 — Ground Floor (NFA: 950 m²)</h4>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">COMPLIANT</span>
-          </div>
-          <div class="grid grid-cols-4 gap-3 mb-3 text-[10px]">
-            <div><span class="text-surface-500">Glazed:</span> <span class="text-white">142 m²</span></div>
-            <div><span class="text-surface-500">Glazing %:</span> <span class="text-white">14.9%</span></div>
-            <div><span class="text-surface-500">U:</span> <span class="status-pass">Pass (≤20% → any)</span></div>
-            <div><span class="text-surface-500">SHGC:</span> <span class="status-pass">Pass (any solution)</span></div>
-          </div>
-          <table class="w-full text-[10px]">
-            <thead><tr class="text-surface-500 border-b border-surface-700/30"><th class="text-left py-1">Ref</th><th class="text-left py-1">Orient.</th><th class="text-left py-1">W (mm)</th><th class="text-left py-1">H (mm)</th><th class="text-left py-1">Area</th><th class="text-left py-1">U</th><th class="text-left py-1">SHGC</th></tr></thead>
-            <tbody class="divide-y divide-surface-700/20">
-              <tr><td class="py-1 text-white">W-GF-01</td><td>N</td><td>6000</td><td>2400</td><td>14.40</td><td>5.7</td><td>0.42</td></tr>
-              <tr><td class="py-1 text-white">W-GF-02</td><td>E</td><td>1800</td><td>2100</td><td>3.78</td><td>5.7</td><td>0.42</td></tr>
-              <tr><td class="py-1 text-white">D-GF-01</td><td>N</td><td>2400</td><td>2400</td><td>5.76</td><td>5.7</td><td>0.52</td></tr>
-            </tbody>
-          </table>
-          <button class="text-[10px] text-primary-400 hover:text-primary-300 mt-2">+ Add window/door</button>
-        </div>
-
-        <!-- Storey 2 (FAILING) -->
-        <div class="glass-card p-5 border border-red-500/20">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-xs font-semibold text-white">Storey 2 — First Floor (NFA: 800 m²)</h4>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-medium">FAIL — SHGC</span>
-          </div>
-          <div class="grid grid-cols-4 gap-3 mb-3 text-[10px]">
-            <div><span class="text-surface-500">Glazed:</span> <span class="text-white">168 m²</span></div>
-            <div><span class="text-surface-500">Glazing %:</span> <span class="text-red-300">21.0%</span></div>
-            <div><span class="text-surface-500">U:</span> <span class="status-pass">Pass (avg 4.8 ≤ 5.0)</span></div>
-            <div><span class="text-surface-500">SHGC:</span> <span class="status-fail">Fail (0.56 > 0.50)</span></div>
-          </div>
-          <div class="bg-red-500/5 border border-red-500/20 rounded px-3 py-2 text-[10px] text-red-300 mb-3">
-            <strong>Non-compliance:</strong> Solar-facing glazing average SHGC 0.56 exceeds Table 4 limit of 0.50 for >20% glazing in Zone 5. Consider low-e glass or additional shading.
-          </div>
-          <table class="w-full text-[10px]">
-            <thead><tr class="text-surface-500 border-b border-surface-700/30"><th class="text-left py-1">Ref</th><th class="text-left py-1">Orient.</th><th class="text-left py-1">W</th><th class="text-left py-1">H</th><th class="text-left py-1">Area</th><th class="text-left py-1">U</th><th class="text-left py-1">SHGC</th></tr></thead>
-            <tbody class="divide-y divide-surface-700/20">
-              <tr><td class="py-1 text-white">W-F1-01</td><td>N</td><td>12000</td><td>1800</td><td>21.60</td><td>5.0</td><td class="text-red-300">0.58</td></tr>
-              <tr><td class="py-1 text-white">W-F1-02</td><td>NW</td><td>6000</td><td>1800</td><td>10.80</td><td>5.0</td><td class="text-red-300">0.55</td></tr>
-              <tr><td class="py-1 text-white">W-F1-03</td><td>S</td><td>4000</td><td>1800</td><td>7.20</td><td>4.5</td><td>0.42</td></tr>
-            </tbody>
-          </table>
-          <button class="text-[10px] text-primary-400 hover:text-primary-300 mt-2">+ Add window/door</button>
-        </div>
-      </div>
-
-      <!-- ─── WALLS TAB ─── -->
-      <div id="tab-walls" class="tab-panel hidden space-y-6">
-        <div class="grid grid-cols-3 gap-4">
-          <!-- Context -->
-          <div class="glass-card p-5 space-y-3">
-            <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Compliance Context</h3>
-            <div class="space-y-2">
-              <div><label class="block text-[10px] text-surface-500 mb-0.5">Energy Zone</label><input type="text" value="Zone 5" class="w-full px-2 py-1.5 text-xs opacity-70" readonly /></div>
-              <div class="flex items-center gap-2"><input type="checkbox" checked class="rounded w-3 h-3" /><label class="text-[10px] text-surface-300">Include Rsi/Rse (0.13 + 0.04)</label></div>
-              <div class="flex items-center gap-2"><input type="checkbox" class="rounded w-3 h-3" /><label class="text-[10px] text-surface-300">Metal framing present?</label></div>
-              <div><label class="block text-[10px] text-surface-500 mb-0.5">Thermal break R</label><input type="number" value="0.00" step="0.01" class="w-full px-2 py-1.5 text-xs" /><p class="text-[9px] text-surface-600 mt-0.5">Min 0.20 between metal elements</p></div>
-              <div class="flex items-center gap-2"><input type="checkbox" checked class="rounded w-3 h-3" /><label class="text-[10px] text-surface-300">Cat 1 single-leaf masonry?</label></div>
-              <div><label class="block text-[10px] text-surface-500 mb-0.5">Nominal thickness (mm)</label><input type="number" value="220" class="w-full px-2 py-1.5 text-xs" /><p class="text-[9px] text-surface-600 mt-0.5">Must be ≥140mm for Cat 1</p></div>
-            </div>
-          </div>
-
-          <!-- Assembly -->
-          <div class="glass-card p-5 space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Assembly (in → out)</h3>
-              <div class="flex gap-1">
-                <button class="text-[9px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 hover:text-white border border-surface-700">Preset: Heavy</button>
-                <button class="text-[9px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 hover:text-white border border-surface-700">Clear</button>
-              </div>
-            </div>
-            <div class="space-y-1.5">
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Plaster (int)</span><span class="text-surface-400">15mm k=0.72 ρ=1800</span></div>
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Block (inner)</span><span class="text-surface-400">140mm k=1.13 ρ=2000</span></div>
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Cavity</span><span class="text-surface-400">50mm R=0.18</span></div>
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Block (outer)</span><span class="text-surface-400">90mm k=1.13 ρ=2000</span></div>
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Plaster (ext)</span><span class="text-surface-400">15mm k=0.72 ρ=1800</span></div>
-            </div>
-            <button class="text-[10px] text-primary-400 hover:text-primary-300">+ Add Layer</button>
-          </div>
-
-          <!-- Results -->
-          <div class="glass-card p-5 space-y-3">
-            <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Results</h3>
-            <div class="space-y-1.5 text-xs">
-              <div class="flex justify-between"><span class="text-surface-400">Total R (incl. Rsi/Rse)</span><span class="text-white font-semibold">2.20 m²·K/W</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Surface density Σ(ρ·t)</span><span class="text-white">532 kg/m²</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Areal heat capacity</span><span class="text-white">447 kJ/m²·K</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">CR-value</span><span class="text-white">94.4 h</span></div>
-            </div>
-            <div class="border-t border-surface-700/50 pt-2 space-y-1.5 text-xs">
-              <div class="flex justify-between"><span class="text-surface-400">Classification</span><span class="text-white">HEAVY (≥270)</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Zone 5 req</span><span class="text-white">R ≥ 1.90</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Result</span><span class="status-pass font-bold">PASS ✓</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Metal break</span><span class="status-na">N/A</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Cat 1 (≥140)</span><span class="status-pass">OK (220mm)</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── ROOF TAB ─── -->
-      <div id="tab-roof" class="tab-panel hidden space-y-6">
-        <div class="grid grid-cols-2 gap-4">
-          <!-- Assembly -->
-          <div class="glass-card p-5 space-y-3">
-            <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Roof Assembly (Table 8)</h3>
-            <div class="grid grid-cols-2 gap-2 text-[10px] bg-surface-800/50 rounded px-3 py-2">
-              <div><span class="text-surface-500">Zone:</span> <span class="text-white">5</span></div>
-              <div><span class="text-surface-500">Required R:</span> <span class="text-white font-semibold">3.70 m²·K/W</span></div>
-              <div><span class="text-surface-500">Heat flow:</span> <span class="text-white">Up ↑</span></div>
-              <div><span class="text-surface-500">Type:</span> <span class="text-white">Ceiling-level bulk</span></div>
-            </div>
-            <div class="space-y-1.5">
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">IBR Sheeting</span><span class="text-surface-400">R = 0.00</span></div>
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Air space (pitched)</span><span class="text-surface-400">R = 0.16</span></div>
-              <div class="bg-surface-800/50 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white">Gypsum ceiling (6.4mm)</span><span class="text-surface-400">R = 0.04</span></div>
-              <div class="bg-primary-500/10 border border-primary-500/20 rounded px-2 py-1.5 text-[10px] flex justify-between"><span class="text-white font-medium">Aerolite 135mm</span><span class="text-primary-300 font-medium">R = 3.50</span></div>
-            </div>
-            <button class="text-[10px] text-primary-400 hover:text-primary-300">+ Add Layer</button>
-          </div>
-
-          <!-- Results + Visual -->
-          <div class="glass-card p-5 space-y-4">
-            <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Results</h3>
-            <div class="space-y-1.5 text-xs">
-              <div class="flex justify-between"><span class="text-surface-400">Base R (roof + ceiling)</span><span class="text-white">0.35</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Added insulation R</span><span class="text-white">3.50</span></div>
-              <div class="flex justify-between font-semibold"><span class="text-surface-300">Total R-value</span><span class="text-green-400">3.85 m²·K/W</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Required (Zone 5)</span><span class="text-white">3.70</span></div>
-            </div>
-            <div class="bg-green-500/5 border border-green-500/20 rounded p-3 text-center">
-              <span class="status-pass font-bold">PASS ✓</span>
-              <p class="text-[10px] text-surface-400 mt-0.5">Margin +0.15 m²·K/W</p>
-            </div>
-            <!-- Visual stack -->
-            <div class="space-y-0.5 mt-2">
-              <div class="text-[9px] text-surface-500 mb-1">Build-up (ext → int):</div>
-              <div class="h-3 bg-gray-600 rounded-sm text-[8px] text-center text-white leading-3">IBR</div>
-              <div class="h-5 bg-blue-900/40 border border-blue-500/20 rounded-sm text-[8px] text-center text-blue-300 leading-5">Air</div>
-              <div class="h-3 bg-gray-600 rounded-sm text-[8px] text-center text-white leading-3">Gypsum</div>
-              <div class="h-14 bg-yellow-500/10 border border-yellow-500/20 rounded-sm text-[9px] text-center text-yellow-200 flex items-center justify-center">Aerolite 135mm (R=3.50)</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── FLOORS TAB ─── -->
-      <div id="tab-floors" class="tab-panel hidden space-y-6">
-        <div class="glass-card p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Floor Insulation</h3>
-              <p class="text-[10px] text-surface-500 mt-0.5">XA 5.4 — Heated slab (UFH) and suspended floor requirements</p>
-            </div>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-medium">PASS</span>
-          </div>
-          <div class="grid grid-cols-3 gap-3 mb-4">
-            <div><label class="block text-[10px] text-surface-500 mb-0.5">Energy Zone</label><input type="text" value="Zone 5" class="w-full px-2 py-1.5 text-xs opacity-70" readonly /></div>
-            <div><label class="block text-[10px] text-surface-500 mb-0.5">UFH installed?</label><select class="w-full px-2 py-1.5 text-xs"><option selected>Yes</option><option>No</option></select></div>
-            <div><label class="block text-[10px] text-surface-500 mb-0.5">Suspended floor (envelope)?</label><select class="w-full px-2 py-1.5 text-xs"><option>Yes</option><option selected>No</option></select></div>
-          </div>
-          <table class="w-full text-xs">
-            <thead><tr class="text-[10px] text-surface-500 border-b border-surface-700/30"><th class="text-left py-1.5">Floor Type</th><th class="text-left py-1.5">R (m²·K/W)</th><th class="text-left py-1.5">Thickness</th><th class="text-left py-1.5">k (W/m·K)</th><th class="text-left py-1.5">Required</th><th class="text-left py-1.5">Status</th></tr></thead>
-            <tbody>
-              <tr class="border-b border-surface-700/20">
-                <td class="py-2 text-white">Heated slab (UFH)</td>
-                <td><input type="number" value="1.20" step="0.01" class="w-14 px-1.5 py-0.5 text-xs" /></td>
-                <td><input type="number" value="30" class="w-14 px-1.5 py-0.5 text-xs" /></td>
-                <td><input type="number" value="0.025" step="0.001" class="w-16 px-1.5 py-0.5 text-xs" /></td>
-                <td class="text-surface-400">≥ 1.00</td>
-                <td><span class="status-pass font-medium">Pass</span></td>
-              </tr>
-              <tr>
-                <td class="py-2 text-white">Suspended</td>
-                <td colspan="4" class="text-surface-500 text-[10px]">N/A — not part of envelope</td>
-                <td><span class="status-na">N/A</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ─── HOT WATER TAB ─── -->
-      <div id="tab-hotwater" class="tab-panel hidden space-y-6">
-        <div class="grid grid-cols-2 gap-4">
-          <!-- Config -->
-          <div class="space-y-4">
-            <div class="glass-card p-5 space-y-3">
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Project Context & Technology</h3>
-              <div class="grid grid-cols-2 gap-2">
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">Building type</label><select class="w-full px-2 py-1.5 text-xs"><option>Commercial</option><option selected>Mixed-use</option></select></div>
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">Occupants</label><input type="number" value="120" class="w-full px-2 py-1.5 text-xs" /></div>
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">L/occupant·day</label><input type="number" value="80" class="w-full px-2 py-1.5 text-xs" /></div>
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">ΔT (°C)</label><input type="number" value="44" class="w-full px-2 py-1.5 text-xs" /></div>
-              </div>
-              <div class="border-t border-surface-700/50 pt-2 space-y-2">
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">Primary technology</label><select class="w-full px-2 py-1.5 text-xs"><option selected>Heat Pump</option><option>Solar Water Heater</option><option>Gas (Instant)</option><option>Electric</option></select></div>
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">Supplementary electric (%)</label><input type="number" value="30" class="w-full px-2 py-1.5 text-xs" /><p class="text-[9px] text-surface-600">Must be ≤ 50%</p></div>
-                <div><label class="block text-[10px] text-surface-500 mb-0.5">EER estimate</label><input type="number" value="0.6" step="0.1" class="w-full px-2 py-1.5 text-xs" /></div>
-              </div>
-            </div>
-          </div>
-          <!-- Results -->
-          <div class="space-y-4">
-            <div class="glass-card p-5 space-y-3">
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Demand</h3>
-              <div class="grid grid-cols-2 gap-2 text-xs">
-                <div class="flex justify-between"><span class="text-surface-400">Daily volume</span><span class="text-white">9,600 L/d</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">Daily thermal</span><span class="text-white">491 kWh</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">Annual thermal</span><span class="text-white">179,345 kWh</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">Grid kWh/y</span><span class="text-white">107,607</span></div>
-              </div>
-            </div>
-            <div class="glass-card p-5 space-y-2">
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider mb-2">Compliance</h3>
-              <div class="space-y-1.5 text-xs">
-                <div class="flex justify-between"><span class="text-surface-400">Electric ≤ 50%</span><span class="status-pass">Compliant (30%)</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">Storage (T10)</span><span class="status-pass">Compliant</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">Pipes R (T11)</span><span class="status-pass">Compliant</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">Technology</span><span class="status-pass">Allowed</span></div>
-                <div class="flex justify-between"><span class="text-surface-400">EER (≥0.5)</span><span class="status-pass">Good (0.6)</span></div>
-              </div>
-              <div class="bg-green-500/5 border border-green-500/20 rounded p-2 text-center mt-2">
-                <span class="status-pass font-bold text-xs">ALL PASS ✓</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── LIGHTING TAB ─── -->
-      <div id="tab-lighting" class="tab-panel hidden space-y-6">
-        <div class="grid grid-cols-2 gap-4">
-          <div class="glass-card p-5 space-y-3">
-            <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Configuration</h3>
-            <div class="grid grid-cols-2 gap-2">
-              <div><label class="block text-[10px] text-surface-500 mb-0.5">Occupancy</label><select class="w-full px-2 py-1.5 text-xs"><option selected>G1 — Offices</option><option>A1 — Entertainment</option></select></div>
-              <div><label class="block text-[10px] text-surface-500 mb-0.5">LPD limit (W/m²)</label><input type="number" value="8" class="w-full px-2 py-1.5 text-xs" /></div>
-              <div><label class="block text-[10px] text-surface-500 mb-0.5">Project NFA</label><input type="number" value="2450" class="w-full px-2 py-1.5 text-xs opacity-70" readonly /></div>
-              <div><label class="block text-[10px] text-surface-500 mb-0.5"># Sensors</label><input type="number" value="20" class="w-full px-2 py-1.5 text-xs" /></div>
-            </div>
-            <h4 class="text-[10px] text-surface-400 font-medium pt-2">Internal Fixtures</h4>
-            <table class="w-full text-[10px]">
-              <thead><tr class="text-surface-500 border-b border-surface-700/30"><th class="text-left py-1">Zone</th><th class="text-left py-1">W</th><th class="text-left py-1">Qty</th><th class="text-left py-1">Total</th></tr></thead>
-              <tbody class="divide-y divide-surface-700/20">
-                <tr><td class="py-1 text-white">Open plan</td><td>40</td><td>180</td><td>7,200</td></tr>
-                <tr><td class="py-1 text-white">Meeting rooms</td><td>36</td><td>48</td><td>1,728</td></tr>
-                <tr><td class="py-1 text-white">Corridors</td><td>18</td><td>120</td><td>2,160</td></tr>
-                <tr><td class="py-1 text-white">Restrooms</td><td>18</td><td>36</td><td>648</td></tr>
-              </tbody>
-              <tfoot><tr class="border-t border-surface-700/50"><td class="py-1 text-white font-medium" colspan="3">Total Internal</td><td class="text-white font-medium">17,640 W</td></tr></tfoot>
-            </table>
-            <button class="text-[10px] text-primary-400 hover:text-primary-300">+ Add zone</button>
-          </div>
-          <div class="glass-card p-5 space-y-3">
-            <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Results</h3>
-            <div class="space-y-1.5 text-xs">
-              <div class="flex justify-between"><span class="text-surface-400">Internal</span><span class="text-white">17,640 W</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">External</span><span class="text-white">960 W</span></div>
-              <div class="flex justify-between font-semibold"><span class="text-surface-300">Total</span><span class="text-white">18,600 W</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">LPD</span><span class="text-white">7.2 W/m²</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Limit</span><span class="text-white">8.0 W/m²</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">LPD status</span><span class="status-pass font-medium">Pass (7.2 ≤ 8.0)</span></div>
-            </div>
-            <div class="border-t border-surface-700/50 pt-2 space-y-1.5 text-xs">
-              <div class="flex justify-between"><span class="text-surface-400">Sensors</span><span class="text-white">20</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Area/sensor</span><span class="text-white">122.5 m²</span></div>
-              <div class="flex justify-between"><span class="text-surface-400">Max (≤100)</span><span class="status-pending font-medium">CHECK</span></div>
-            </div>
-            <div class="bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 text-[10px] text-amber-200 mt-2">
-              <strong>Action:</strong> Area/sensor exceeds 100 m². Add 5+ sensors.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── AIR CON TAB ─── -->
-      <div id="tab-aircon" class="tab-panel hidden space-y-6">
-        <div class="glass-card p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Air Conditioning (Table 13)</h3>
-              <p class="text-[10px] text-surface-500 mt-0.5">XA 6.3 — Minimum EER/COP verification</p>
-            </div>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-700 text-surface-400 border border-surface-600 font-medium">N/A</span>
-          </div>
-          <div class="flex items-center gap-3 mb-4">
-            <label class="text-[10px] text-surface-300">AC system installed?</label>
-            <select class="px-2 py-1 text-xs"><option selected>No</option><option>Yes</option></select>
-          </div>
-          <div class="bg-surface-800/50 rounded p-6 text-center">
-            <p class="text-xs text-surface-400">No HVAC system specified.</p>
-            <p class="text-[10px] text-surface-500 mt-1">Add units to verify Table 13 EER/COP when AC is installed.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── RESULTS TAB ─── -->
-      <div id="tab-results" class="tab-panel hidden space-y-6">
-        <!-- Project header -->
-        <div class="glass-card p-4">
-          <div class="grid grid-cols-4 gap-3 text-xs">
-            <div><span class="text-[10px] text-surface-500 uppercase">Project</span><div class="text-white font-medium mt-0.5">Sandton Mixed-Use Complex</div></div>
-            <div><span class="text-[10px] text-surface-500 uppercase">Client</span><div class="text-white mt-0.5">Greenfield Developments (Pty) Ltd</div></div>
-            <div><span class="text-[10px] text-surface-500 uppercase">Location / Zone</span><div class="text-white mt-0.5">Johannesburg — Zone 5</div></div>
-            <div><span class="text-[10px] text-surface-500 uppercase">Total NFA</span><div class="text-white mt-0.5">2,450 m²</div></div>
-          </div>
-        </div>
-
-        <!-- Status -->
-        <div class="glass-card p-4 border-l-4 border-l-red-500">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full border-2 border-red-400 flex items-center justify-center flex-shrink-0">
-              <span class="text-red-400 text-[10px] font-bold">7/8</span>
-            </div>
-            <div>
-              <div class="text-sm font-bold text-red-400">NOT COMPLIANT</div>
-              <p class="text-[10px] text-surface-400">1 fail (Fenestration SHGC), 1 check (Lighting sensors). Resolve before submission.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Full table -->
-        <div class="glass-card overflow-hidden">
-          <table class="w-full text-xs">
-            <thead class="bg-surface-800/50">
-              <tr class="text-[10px] text-surface-500 uppercase tracking-wider">
-                <th class="px-3 py-2 text-left">#</th>
-                <th class="px-3 py-2 text-left">Component</th>
-                <th class="px-3 py-2 text-left">Clause</th>
-                <th class="px-3 py-2 text-left">Value</th>
-                <th class="px-3 py-2 text-left">Required</th>
-                <th class="px-3 py-2 text-left">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-700/30">
-              <tr><td class="px-3 py-2">1</td><td class="px-3 py-2 text-white">Orientation</td><td class="px-3 py-2 text-surface-400">XA 4</td><td class="px-3 py-2">North</td><td class="px-3 py-2 text-surface-400">Documented</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr><td class="px-3 py-2">2</td><td class="px-3 py-2 text-white">Shading</td><td class="px-3 py-2 text-surface-400">XA 5.2</td><td class="px-3 py-2">P ≥ H×0.35</td><td class="px-3 py-2 text-surface-400">Table 3</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr class="bg-red-500/5"><td class="px-3 py-2">3</td><td class="px-3 py-2 text-white font-medium">Fenestration</td><td class="px-3 py-2 text-surface-400">XA 5.3</td><td class="px-3 py-2 text-red-300">SHGC 0.56</td><td class="px-3 py-2 text-surface-400">≤ 0.50</td><td class="px-3 py-2"><span class="status-fail font-medium">● Fail</span></td></tr>
-              <tr><td class="px-3 py-2">4</td><td class="px-3 py-2 text-white">Rooflights</td><td class="px-3 py-2 text-surface-400">XA 5.3.8</td><td class="px-3 py-2">3% Band A</td><td class="px-3 py-2 text-surface-400">Table 5</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr><td class="px-3 py-2">5</td><td class="px-3 py-2 text-white">Floors</td><td class="px-3 py-2 text-surface-400">XA 5.4</td><td class="px-3 py-2">R 1.20</td><td class="px-3 py-2 text-surface-400">≥ 1.00</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr><td class="px-3 py-2">6</td><td class="px-3 py-2 text-white">Walls</td><td class="px-3 py-2 text-surface-400">XA 5.5</td><td class="px-3 py-2">R 2.20</td><td class="px-3 py-2 text-surface-400">≥ 1.90</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr><td class="px-3 py-2">7</td><td class="px-3 py-2 text-white">Roof</td><td class="px-3 py-2 text-surface-400">XA 5.6</td><td class="px-3 py-2">R 3.85</td><td class="px-3 py-2 text-surface-400">≥ 3.70</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr><td class="px-3 py-2">8</td><td class="px-3 py-2 text-white">Sealing</td><td class="px-3 py-2 text-surface-400">XA 5.7</td><td class="px-3 py-2">Complete</td><td class="px-3 py-2 text-surface-400">All items</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr><td class="px-3 py-2">9</td><td class="px-3 py-2 text-white">Hot Water</td><td class="px-3 py-2 text-surface-400">XA 6.1</td><td class="px-3 py-2">HP 30%</td><td class="px-3 py-2 text-surface-400">≤ 50%</td><td class="px-3 py-2"><span class="status-pass">● Pass</span></td></tr>
-              <tr class="bg-amber-500/5"><td class="px-3 py-2">10</td><td class="px-3 py-2 text-white">Lighting</td><td class="px-3 py-2 text-surface-400">XA 6.2</td><td class="px-3 py-2 text-amber-300">7.2 W/m²</td><td class="px-3 py-2 text-surface-400">≤ 8 + sensors</td><td class="px-3 py-2"><span class="status-pending">● Check</span></td></tr>
-              <tr><td class="px-3 py-2">11</td><td class="px-3 py-2 text-white">Air Con</td><td class="px-3 py-2 text-surface-400">XA 6.3</td><td class="px-3 py-2">None</td><td class="px-3 py-2 text-surface-400">Table 13</td><td class="px-3 py-2"><span class="status-na">● N/A</span></td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Integration Panel -->
-        <div class="glass-card p-4">
-          <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider mb-3">Platform Integration</h3>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="bg-surface-800/50 rounded p-2.5">
-              <div class="flex items-center gap-1.5 mb-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span><span class="text-[10px] text-surface-300 font-medium">Project Passport</span></div>
-              <p class="text-[9px] text-surface-500">XA status synced. Last: 29 Jun 2026 18:30</p>
-            </div>
-            <div class="bg-surface-800/50 rounded p-2.5">
-              <div class="flex items-center gap-1.5 mb-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span><span class="text-[10px] text-surface-300 font-medium">SpecForge</span></div>
-              <p class="text-[9px] text-surface-500">Issue #XA-003 raised (SHGC fail)</p>
-            </div>
-            <div class="bg-surface-800/50 rounded p-2.5">
-              <div class="flex items-center gap-1.5 mb-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span><span class="text-[10px] text-surface-300 font-medium">Municipal Readiness</span></div>
-              <p class="text-[9px] text-surface-500">Not submission-ready. Resolve FAILs.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sign-off Gate -->
-        <div class="glass-card p-4 border-t-2 border-t-primary-500">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-[10px] font-semibold text-white uppercase tracking-wider">Professional Sign-off Gate</h3>
-              <p class="text-[9px] text-surface-500 mt-0.5">Must be reviewed by a registered Energy Professional before submission.</p>
-            </div>
-            <button class="px-3 py-1.5 text-[10px] rounded bg-primary-600/50 text-primary-200 cursor-not-allowed opacity-60" disabled>Request Sign-off (resolve FAILs)</button>
-          </div>
-        </div>
-      </div>
-
-    </main>
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="breadcrumb">Compliance Hub <span class="sep">/</span> <span class="cur">SANS 10400-XA Energy</span></div>
+    <div class="top-bar-spacer"></div>
+    <!-- Project Switcher -->
+    <select class="form-select" style="width:240px;padding:5px 10px;font-size:12px;background:var(--card-bg);border-color:var(--glass-border)">
+      <option selected>Sandton Mixed-Use Complex</option>
+      <option>Rosebank Office Fit-out</option>
+      <option>Menlyn Park Residence</option>
+      <option disabled>──────────</option>
+      <option>+ New Standalone Assessment</option>
+    </select>
+    <button class="btn btn-ai">🤖 Re-scan Drawings</button>
+    <button class="btn btn-primary">Export Report</button>
   </div>
 
-  <!-- ═══════════════════════════════════════════════
-       TAB SWITCHING LOGIC
-       ═══════════════════════════════════════════════ -->
-  <script>
-    function switchTab(tabId) {
-      // Hide all tab panels
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-      // Show target
-      const target = document.getElementById('tab-' + tabId);
-      if (target) target.classList.remove('hidden');
-      // Update tab triggers
-      document.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
-      const active = document.querySelector(`[data-tab="${tabId}"]`);
-      if (active) active.classList.add('active');
-    }
-    // Default to overview
-    switchTab('overview');
-  </script>
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <div class="advisory-bar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      Advisory tool — AI-populated data requires human verification. Professional sign-off required before submission.
+    </div>
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <div id="view-overview" class="view-panel active">
+      <!-- AI Intelligence Summary -->
+      <div class="ai-card">
+        <div class="ai-card-header">
+          <span class="ai-icon">🤖</span>
+          <span class="ai-label">AI Drawing Intelligence</span>
+          <span class="ai-conf ai-conf-high">4 Drawings Scanned</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:10px">
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--secondary)">12</div><div style="font-size:8px;color:var(--text-low)">Fields populated</div></div>
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--green)">9</div><div style="font-size:8px;color:var(--text-low)">Verified ✓</div></div>
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--amber)">3</div><div style="font-size:8px;color:var(--text-low)">Awaiting review</div></div>
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--text-muted)">87%</div><div style="font-size:8px;color:var(--text-low)">Avg confidence</div></div>
+        </div>
+        <div class="ai-source"><span class="src-icon">📄</span>Sources: <a href="#">A-001 Site Plan</a>, <a href="#">A-420 Elevations</a>, <a href="#">M-100 Mech Layout</a>, <a href="#">E-210 RCP</a></div>
+      </div>
+
+      <!-- Drawing Sources Panel -->
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Connected Project Drawings</div>
+        <div class="drawing-source">
+          <div class="ds-icon">📐</div>
+          <div class="ds-info"><div class="ds-name">A-001 Site Plan Rev P02</div><div class="ds-meta">Uploaded 25 Jun 2026 · Drawing Register #DR-014</div></div>
+          <div class="ds-extracted">→ Zone, orientation, NFA</div>
+        </div>
+        <div class="drawing-source">
+          <div class="ds-icon">🏢</div>
+          <div class="ds-info"><div class="ds-name">A-420 Building Elevations Rev P01</div><div class="ds-meta">Uploaded 22 Jun 2026 · Drawing Register #DR-028</div></div>
+          <div class="ds-extracted">→ Window schedule, shading dims</div>
+        </div>
+        <div class="drawing-source">
+          <div class="ds-icon">🔧</div>
+          <div class="ds-info"><div class="ds-name">M-100 Mechanical Layout Rev P01</div><div class="ds-meta">Uploaded 20 Jun 2026 · Drawing Register #DR-035</div></div>
+          <div class="ds-extracted">→ Hot water system, AC layout</div>
+        </div>
+        <div class="drawing-source">
+          <div class="ds-icon">💡</div>
+          <div class="ds-info"><div class="ds-name">E-210 Reflected Ceiling Plan Rev P02</div><div class="ds-meta">Uploaded 26 Jun 2026 · Drawing Register #DR-041</div></div>
+          <div class="ds-extracted">→ Lighting fixtures, sensor count</div>
+        </div>
+        <button class="btn btn-secondary" style="margin-top:8px">+ Connect Drawing</button>
+      </div>
+
+      <!-- Status Grid -->
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">5</div><div class="stat-label">Energy Zone</div></div>
+        <div class="stat-card"><div class="stat-value">A1</div><div class="stat-label">Occupancy</div></div>
+        <div class="stat-card"><div class="stat-value">2,450</div><div class="stat-label">NFA (m²)</div></div>
+        <div class="stat-card"><div class="stat-value fail">7/8</div><div class="stat-label">Pass</div></div>
+      </div>
+
+      <!-- Component Table -->
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Component Status</div>
+        <table>
+          <thead><tr><th>#</th><th>Component</th><th>Clause</th><th>Data Source</th><th>Status</th><th>Summary</th></tr></thead>
+          <tbody>
+            <tr onclick="switchView('fenestration')" style="cursor:pointer"><td>1</td><td>Shading</td><td>XA 5.2</td><td><span style="font-size:8px;color:var(--secondary)">🤖 A-420</span></td><td><span class="chip chip-pass">Pass</span></td><td style="color:var(--text-muted)">P ≥ H × 0.35</td></tr>
+            <tr onclick="switchView('fenestration')" style="cursor:pointer;background:rgba(217,87,71,0.04)"><td>2</td><td style="font-weight:600">Fenestration</td><td>XA 5.3</td><td><span style="font-size:8px;color:var(--amber)">🤖 Unverified</span></td><td><span class="chip chip-fail">Fail</span></td><td style="color:var(--danger)">SHGC 0.56 > 0.50</td></tr>
+            <tr onclick="switchView('walls')" style="cursor:pointer"><td>3</td><td>Walls</td><td>XA 5.5</td><td><span style="font-size:8px;color:var(--green)">✋ Manual</span></td><td><span class="chip chip-pass">Pass</span></td><td style="color:var(--text-muted)">R 2.20 ≥ 1.90</td></tr>
+            <tr onclick="switchView('roof')" style="cursor:pointer"><td>4</td><td>Roof</td><td>XA 5.6</td><td><span style="font-size:8px;color:var(--secondary)">🤖 Verified</span></td><td><span class="chip chip-pass">Pass</span></td><td style="color:var(--text-muted)">R 3.85 ≥ 3.70</td></tr>
+            <tr><td>5</td><td>Floors</td><td>XA 5.4</td><td><span style="font-size:8px;color:var(--secondary)">🤖 Verified</span></td><td><span class="chip chip-pass">Pass</span></td><td style="color:var(--text-muted)">R 1.20 ≥ 1.00</td></tr>
+            <tr onclick="switchView('hotwater')" style="cursor:pointer"><td>6</td><td>Hot Water</td><td>XA 6.1</td><td><span style="font-size:8px;color:var(--secondary)">🤖 M-100</span></td><td><span class="chip chip-pass">Pass</span></td><td style="color:var(--text-muted)">HP + 30% elec</td></tr>
+            <tr onclick="switchView('lighting')" style="cursor:pointer;background:rgba(245,166,35,0.04)"><td>7</td><td>Lighting</td><td>XA 6.2</td><td><span style="font-size:8px;color:var(--amber)">🤖 Unverified</span></td><td><span class="chip chip-check">Check</span></td><td style="color:var(--amber)">Sensors pending</td></tr>
+            <tr><td>8</td><td>Air Con</td><td>XA 6.3</td><td><span style="font-size:8px;color:var(--text-low)">—</span></td><td><span class="chip chip-na">N/A</span></td><td style="color:var(--text-muted)">No system</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Unverified Items -->
+      <div class="panel" style="border-color:rgba(245,166,35,0.3)">
+        <div class="panel-title"><span class="dot" style="background:var(--amber)"></span>Awaiting Your Verification</div>
+        <div class="verify-row unverified">
+          <div class="verify-icon unverified">?</div>
+          <div class="verify-label"><span class="field-name">Storey 2 window W-F1-01 SHGC:</span><span class="field-value">0.58</span><span class="field-source">🤖 Extracted from A-420 window schedule · Confidence 72%</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-confirm">✓ Confirm</button><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+        <div class="verify-row unverified">
+          <div class="verify-icon unverified">?</div>
+          <div class="verify-label"><span class="field-name">Lighting sensor count:</span><span class="field-value">20</span><span class="field-source">🤖 Counted from E-210 RCP · Confidence 68%</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-confirm">✓ Confirm</button><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+        <div class="verify-row unverified">
+          <div class="verify-icon unverified">?</div>
+          <div class="verify-label"><span class="field-name">Roof insulation R-value:</span><span class="field-value">3.50 (Aerolite 135mm)</span><span class="field-source">🤖 Matched from spec note on A-001 · Confidence 81%</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-confirm">✓ Confirm</button><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ BASICS ═══ -->
+    <div id="view-basics" class="view-panel">
+      <div class="ai-card">
+        <div class="ai-card-header"><span class="ai-icon">🤖</span><span class="ai-label">AI Auto-populated from Drawings</span><span class="ai-conf ai-conf-high">94% confidence</span></div>
+        <p style="font-size:10px;color:var(--text-muted)">Project basics extracted from A-001 Site Plan and Project Passport record. All fields are editable — confirm or override below.</p>
+        <div class="ai-source"><span class="src-icon">📄</span>A-001 Site Plan Rev P02 · Project Passport #PP-2026-047</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Project Context — Verified Data</div>
+        <div class="verify-row verified">
+          <div class="verify-icon verified">✓</div>
+          <div class="verify-label"><span class="field-name">City:</span><span class="field-value">Johannesburg</span><span class="field-source">🤖 from Project Passport · Verified by GT 28 Jun</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+        <div class="verify-row verified">
+          <div class="verify-icon verified">✓</div>
+          <div class="verify-label"><span class="field-name">Energy Zone:</span><span class="field-value">Zone 5 — Cold Interior</span><span class="field-source">🤖 Auto-derived from city · Confidence 99%</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+        <div class="verify-row verified">
+          <div class="verify-icon verified">✓</div>
+          <div class="verify-label"><span class="field-name">Occupancy:</span><span class="field-value">A1 — Entertainment & Public Assembly</span><span class="field-source">🤖 from A-001 title block · Verified by GT 28 Jun</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+        <div class="verify-row verified">
+          <div class="verify-icon verified">✓</div>
+          <div class="verify-label"><span class="field-name">Primary Façade:</span><span class="field-value">North</span><span class="field-source">🤖 from A-001 north point · Confidence 96%</span></div>
+          <div class="verify-actions"><button class="verify-btn verify-btn-edit">✎ Edit</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Storeys & NFA</div>
+        <table>
+          <thead><tr><th>Storey</th><th>NFA (m²)</th><th>Use</th><th>Source</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>Ground</td><td><input class="inline-input" type="number" value="950"/></td><td style="color:var(--text-muted)">Retail</td><td><span style="font-size:8px;color:var(--secondary)">🤖 A-001</span></td><td><span style="color:var(--green);font-size:9px">✓ Verified</span></td><td><button class="verify-btn verify-btn-edit">✎</button></td></tr>
+            <tr><td>First</td><td><input class="inline-input" type="number" value="800"/></td><td style="color:var(--text-muted)">Offices</td><td><span style="font-size:8px;color:var(--secondary)">🤖 A-001</span></td><td><span style="color:var(--green);font-size:9px">✓ Verified</span></td><td><button class="verify-btn verify-btn-edit">✎</button></td></tr>
+            <tr><td>Second</td><td><input class="inline-input" type="number" value="700"/></td><td style="color:var(--text-muted)">Offices</td><td><span style="font-size:8px;color:var(--secondary)">🤖 A-001</span></td><td><span style="color:var(--green);font-size:9px">✓ Verified</span></td><td><button class="verify-btn verify-btn-edit">✎</button></td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <button class="btn btn-secondary">+ Add Storey (manual)</button>
+          <span style="font-size:11px;font-weight:600;color:var(--secondary)">Total: 2,450 m²</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ FENESTRATION ═══ -->
+    <div id="view-fenestration" class="view-panel">
+      <div class="ai-card">
+        <div class="ai-card-header"><span class="ai-icon">🤖</span><span class="ai-label">Window schedule extracted from A-420</span><span class="ai-conf ai-conf-med">72–89% confidence</span></div>
+        <p style="font-size:10px;color:var(--text-muted)">AI scanned elevation drawings and extracted window dimensions, orientations, and glazing types. <b style="color:var(--amber)">Some SHGC values need verification</b> — manufacturer datasheets not yet linked.</p>
+        <div class="conf-bar"><div class="conf-bar-fill med" style="width:78%"></div></div>
+        <div class="ai-source"><span class="src-icon">📄</span><a href="#">A-420 Building Elevations Rev P01</a> · Window schedule table page 3</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">386</div><div class="stat-label">Glazed Area (m²)</div></div>
+        <div class="stat-card"><div class="stat-value warn">15.8%</div><div class="stat-label">Glazing %</div></div>
+        <div class="stat-card"><div class="stat-value">1,234</div><div class="stat-label">Σ U·A</div></div>
+        <div class="stat-card"><div class="stat-value">198.4</div><div class="stat-label">Σ SHGC·A</div></div>
+      </div>
+      <!-- Storey 2 FAIL with AI verification -->
+      <div class="panel" style="border-color:rgba(217,87,71,0.4)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="panel-title" style="margin-bottom:0"><span class="dot" style="background:var(--danger)"></span>Storey 2 — First Floor (800 m²)</div>
+          <span class="chip chip-fail">Fail — SHGC</span>
+        </div>
+        <div style="padding:8px 10px;background:rgba(217,87,71,0.08);border:1px solid rgba(217,87,71,0.2);border-radius:var(--radius-sm);font-size:9px;color:var(--danger);margin-bottom:10px">
+          <b>Non-compliance:</b> Solar-facing glazing avg SHGC 0.56 > Table 4 limit 0.50 for >20% glazing in Zone 5.
+        </div>
+        <table>
+          <thead><tr><th>Ref</th><th>Orient.</th><th>W×H</th><th>Area</th><th>U</th><th>SHGC</th><th>Source</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:500">W-F1-01</td><td>N</td><td>12000×1800</td><td>21.60</td><td>5.0</td>
+              <td style="color:var(--danger)">0.58</td>
+              <td><span style="font-size:8px;color:var(--amber)">🤖 72%</span></td>
+              <td><div style="display:flex;gap:2px"><button class="verify-btn verify-btn-confirm">✓</button><button class="verify-btn verify-btn-edit">✎</button></div></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">W-F1-02</td><td>NW</td><td>6000×1800</td><td>10.80</td><td>5.0</td>
+              <td style="color:var(--danger)">0.55</td>
+              <td><span style="font-size:8px;color:var(--amber)">🤖 75%</span></td>
+              <td><div style="display:flex;gap:2px"><button class="verify-btn verify-btn-confirm">✓</button><button class="verify-btn verify-btn-edit">✎</button></div></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">W-F1-03</td><td>S</td><td>4000×1800</td><td>7.20</td><td>4.5</td>
+              <td>0.42</td>
+              <td><span style="font-size:8px;color:var(--green)">🤖 ✓ 89%</span></td>
+              <td><span style="font-size:8px;color:var(--green)">Verified</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn btn-secondary">+ Add window (manual)</button>
+          <button class="btn btn-ai">🤖 Link manufacturer datasheet</button>
+        </div>
+      </div>
+      <!-- AI Recommendation -->
+      <div class="ai-card" style="border-color:rgba(74,222,128,0.3)">
+        <div class="ai-card-header"><span class="ai-icon">💡</span><span class="ai-label">AI Recommendation</span></div>
+        <p style="font-size:10px;color:var(--text-muted)">To achieve compliance: Replace W-F1-01 and W-F1-02 glazing with low-e coated units (SHGC ≤ 0.45). Alternatively, add external louvres to reclassify as shaded openings. Estimated cost delta: R42,000–R65,000.</p>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-primary">Apply fix to SpecForge</button>
+          <button class="btn btn-secondary">Request supplier alternatives</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ WALLS ═══ -->
+    <div id="view-walls" class="view-panel">
+      <div class="panel" style="background:var(--panel-bg);border-left:3px solid rgba(174,239,227,0.4)">
+        <div style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--text-low);margin-bottom:4px"><span style="font-size:11px">✋</span><b style="color:var(--text-muted)">Manually Entered</b> — No drawing source linked for wall assembly. You can connect a drawing for AI auto-population.</div>
+        <button class="btn btn-ai" style="margin-top:4px">🤖 Scan drawings for wall spec</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Context</div>
+          <div class="verify-row verified" style="margin-bottom:6px"><div class="verify-icon verified" style="width:14px;height:14px;font-size:8px">✓</div><div class="verify-label"><span class="field-name">Zone 5</span><span class="field-source">From Project Basics</span></div></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:10px"><input type="checkbox" checked style="accent-color:var(--secondary)"/><span>Rsi/Rse (0.17)</span></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:10px"><input type="checkbox" style="accent-color:var(--secondary)"/><span>Metal framing?</span></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:10px"><input type="checkbox" checked style="accent-color:var(--secondary)"/><span>Cat 1 single-leaf?</span></div>
+          <div><label class="form-label">Thickness (mm)</label><input class="form-input" type="number" value="220"/></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Assembly (in→out)</div>
+          <div class="layer-row user-entered"><span class="name">Plaster (int)</span><span class="meta">15mm k=0.72</span><span class="manual-tag">Manual</span><span class="remove">✕</span></div>
+          <div class="layer-row user-entered"><span class="name">Block (inner)</span><span class="meta">140mm k=1.13</span><span class="manual-tag">Manual</span><span class="remove">✕</span></div>
+          <div class="layer-row user-entered"><span class="name">Cavity</span><span class="meta">50mm R=0.18</span><span class="manual-tag">Manual</span><span class="remove">✕</span></div>
+          <div class="layer-row user-entered"><span class="name">Block (outer)</span><span class="meta">90mm k=1.13</span><span class="manual-tag">Manual</span><span class="remove">✕</span></div>
+          <div class="layer-row user-entered"><span class="name">Plaster (ext)</span><span class="meta">15mm k=0.72</span><span class="manual-tag">Manual</span><span class="remove">✕</span></div>
+          <button class="btn btn-secondary" style="margin-top:6px">+ Add Layer</button>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Results</div>
+          <div style="font-size:10px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Total R</span><b>2.20 m²·K/W</b></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Density</span><span>532 kg/m²</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">CR-value</span><span>94.4 h</span></div>
+            <div style="border-top:1px solid var(--glass-border);padding-top:6px;margin-top:4px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--text-muted)">Class</span><span>HEAVY</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--text-muted)">Required</span><span>R ≥ 1.90</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Result</span><span style="color:var(--green);font-weight:700">PASS ✓</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ROOF ═══ -->
+    <div id="view-roof" class="view-panel">
+      <div class="ai-card">
+        <div class="ai-card-header"><span class="ai-icon">🤖</span><span class="ai-label">Insulation spec matched from drawing note</span><span class="ai-conf ai-conf-med">81% confidence</span></div>
+        <p style="font-size:10px;color:var(--text-muted)">AI identified "Aerolite 135mm" specification note on A-001 site plan general notes. Matched to manufacturer R-value of 3.50 m²·K/W.</p>
+        <div class="conf-bar"><div class="conf-bar-fill med" style="width:81%"></div></div>
+        <div class="ai-source"><span class="src-icon">📄</span><a href="#">A-001 Site Plan Rev P02</a> · General Notes, item 14</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Roof Assembly</div>
+          <div class="layer-row ai-populated"><span class="name">IBR Sheeting</span><span class="meta">R=0.00</span><span class="ai-tag">AI</span><span class="remove">✕</span></div>
+          <div class="layer-row ai-populated"><span class="name">Air space (pitched)</span><span class="meta">R=0.16</span><span class="ai-tag">AI</span><span class="remove">✕</span></div>
+          <div class="layer-row ai-populated"><span class="name">Gypsum ceiling</span><span class="meta">R=0.04</span><span class="ai-tag">AI</span><span class="remove">✕</span></div>
+          <div class="layer-row ai-populated" style="border-color:var(--secondary)"><span class="name" style="color:var(--secondary)">Aerolite 135mm</span><span class="meta" style="color:var(--secondary)">R=3.50</span><span class="ai-tag">AI 81%</span><span class="remove">✕</span></div>
+          <button class="btn btn-secondary" style="margin-top:6px">+ Add Layer</button>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Results</div>
+          <div style="font-size:10px;display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Total R</span><span style="color:var(--green);font-weight:700">3.85 m²·K/W</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Required</span><span>3.70</span></div>
+          </div>
+          <div style="text-align:center;padding:10px;background:rgba(74,222,128,0.06);border:1px solid rgba(74,222,128,0.2);border-radius:var(--radius-sm);margin-top:10px">
+            <span style="color:var(--green);font-weight:700;font-family:var(--font-heading);font-size:14px">PASS ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ HOT WATER ═══ -->
+    <div id="view-hotwater" class="view-panel">
+      <div class="ai-card">
+        <div class="ai-card-header"><span class="ai-icon">🤖</span><span class="ai-label">System identified from M-100 Mech Layout</span><span class="ai-conf ai-conf-high">91% confidence</span></div>
+        <p style="font-size:10px;color:var(--text-muted)">AI identified heat pump system with electric backup from mechanical drawing schedule. Occupant count derived from Project Passport brief.</p>
+        <div class="ai-source"><span class="src-icon">📄</span><a href="#">M-100 Mechanical Layout Rev P01</a> · Equipment schedule</div>
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="panel-title" style="margin-bottom:0"><span class="dot"></span>Hot Water — XA 6.1</div>
+          <span class="chip chip-pass">All Pass</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div class="verify-row verified"><div class="verify-icon verified" style="width:14px;height:14px;font-size:8px">✓</div><div class="verify-label"><span class="field-name">Technology:</span><span class="field-value">Heat Pump</span><span class="field-source">🤖 M-100 · Verified</span></div></div>
+            <div class="verify-row verified"><div class="verify-icon verified" style="width:14px;height:14px;font-size:8px">✓</div><div class="verify-label"><span class="field-name">Electric suppl:</span><span class="field-value">30%</span><span class="field-source">🤖 M-100 · Verified</span></div></div>
+            <div class="verify-row verified"><div class="verify-icon verified" style="width:14px;height:14px;font-size:8px">✓</div><div class="verify-label"><span class="field-name">Occupants:</span><span class="field-value">120</span><span class="field-source">🤖 Project Brief</span></div></div>
+          </div>
+          <div style="font-size:10px;display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Electric ≤50%</span><span style="color:var(--green)">✓ 30%</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Storage</span><span style="color:var(--green)">✓ Compliant</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Pipes R</span><span style="color:var(--green)">✓ Compliant</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">EER</span><span style="color:var(--green)">✓ Good (0.6)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LIGHTING ═══ -->
+    <div id="view-lighting" class="view-panel">
+      <div class="ai-card">
+        <div class="ai-card-header"><span class="ai-icon">🤖</span><span class="ai-label">Fixtures counted from E-210 RCP</span><span class="ai-conf ai-conf-med">68% confidence</span></div>
+        <p style="font-size:10px;color:var(--text-muted)">AI counted fixture symbols from reflected ceiling plan. <b style="color:var(--amber)">Sensor count needs verification</b> — some symbols were ambiguous (could be smoke detectors).</p>
+        <div class="conf-bar"><div class="conf-bar-fill med" style="width:68%"></div></div>
+        <div class="ai-source"><span class="src-icon">📄</span><a href="#">E-210 Reflected Ceiling Plan Rev P02</a> · Fixture schedule</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Fixture Schedule</div>
+          <table>
+            <thead><tr><th>Zone</th><th>W</th><th>Qty</th><th>Total</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td>Open plan</td><td>40</td><td>180</td><td>7,200</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td></tr>
+              <tr><td>Meeting rooms</td><td>36</td><td>48</td><td>1,728</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td></tr>
+              <tr><td>Corridors</td><td>18</td><td>120</td><td>2,160</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td></tr>
+              <tr><td>Restrooms</td><td>18</td><td>36</td><td>648</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td></tr>
+            </tbody>
+          </table>
+          <div class="verify-row unverified" style="margin-top:10px">
+            <div class="verify-icon unverified">?</div>
+            <div class="verify-label"><span class="field-name">Sensor count:</span><span class="field-value">20</span><span class="field-source">🤖 E-210 symbol count · 68% conf — may include smoke detectors</span></div>
+            <div class="verify-actions"><button class="verify-btn verify-btn-confirm">✓</button><button class="verify-btn verify-btn-edit">✎</button></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span class="dot"></span>Results</div>
+          <div style="font-size:10px;display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Total W</span><span>18,600</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">LPD</span><span>7.2 W/m²</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Limit (Table 12)</span><span>8.0</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">LPD</span><span style="color:var(--green);font-weight:600">Pass</span></div>
+            <div style="border-top:1px solid var(--glass-border);padding-top:6px;margin-top:4px">
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Sensors</span><span>20</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Area/sensor</span><span style="color:var(--amber)">122.5 m²</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--text-muted)">Max (≤100)</span><span style="color:var(--amber);font-weight:600">CHECK</span></div>
+            </div>
+          </div>
+          <div style="padding:8px;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:var(--radius-sm);font-size:9px;color:var(--amber);margin-top:10px">
+            <b>Action:</b> Verify sensor count from electrical engineer. If confirmed at 20, add 5+ sensors.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RESULTS ═══ -->
+    <div id="view-results" class="view-panel">
+      <div class="panel">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;font-size:10px">
+          <div><span class="form-label">Project</span><div style="margin-top:2px;font-weight:500">Sandton Mixed-Use Complex</div></div>
+          <div><span class="form-label">Client</span><div style="margin-top:2px">Greenfield Developments</div></div>
+          <div><span class="form-label">Location</span><div style="margin-top:2px">Johannesburg — Zone 5</div></div>
+          <div><span class="form-label">NFA</span><div style="margin-top:2px">2,450 m²</div></div>
+        </div>
+      </div>
+
+      <div class="panel" style="border-left:3px solid var(--danger)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:44px;height:44px;border-radius:50%;border:2px solid var(--danger);display:flex;align-items:center;justify-content:center"><span style="color:var(--danger);font-size:11px;font-weight:700;font-family:var(--font-heading)">7/8</span></div>
+          <div>
+            <div style="font-family:var(--font-heading);font-size:14px;font-weight:700;color:var(--danger)">NOT COMPLIANT</div>
+            <p style="font-size:9px;color:var(--text-muted);margin-top:2px">1 fail · 1 check · 3 fields unverified. Resolve before requesting sign-off.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Integrity Summary -->
+      <div class="ai-card">
+        <div class="ai-card-header"><span class="ai-icon">🛡️</span><span class="ai-label">Data Integrity Summary</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:10px">
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:14px;font-weight:700;color:var(--green)">9</div><div style="font-size:8px;color:var(--text-low)">AI-verified fields</div></div>
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:14px;font-weight:700;color:var(--amber)">3</div><div style="font-size:8px;color:var(--text-low)">Awaiting verification</div></div>
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:14px;font-weight:700;color:var(--text-muted)">5</div><div style="font-size:8px;color:var(--text-low)">Manually entered</div></div>
+          <div style="text-align:center"><div style="font-family:var(--font-heading);font-size:14px;font-weight:700;color:var(--secondary)">87%</div><div style="font-size:8px;color:var(--text-low)">Overall confidence</div></div>
+        </div>
+      </div>
+
+      <!-- Full Report -->
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Full Compliance Report</div>
+        <table>
+          <thead><tr><th>#</th><th>Component</th><th>Value</th><th>Required</th><th>Source</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Orientation</td><td>North</td><td style="color:var(--text-muted)">Documented</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td><td><span class="chip chip-pass">Pass</span></td></tr>
+            <tr><td>2</td><td>Shading</td><td>P≥H×0.35</td><td style="color:var(--text-muted)">Table 3</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td><td><span class="chip chip-pass">Pass</span></td></tr>
+            <tr style="background:rgba(217,87,71,0.04)"><td>3</td><td style="font-weight:600">Fenestration</td><td style="color:var(--danger)">SHGC 0.56</td><td style="color:var(--text-muted)">≤ 0.50</td><td><span style="font-size:8px;color:var(--amber)">🤖 72%</span></td><td><span class="chip chip-fail">Fail</span></td></tr>
+            <tr><td>4</td><td>Floors</td><td>R 1.20</td><td style="color:var(--text-muted)">≥ 1.00</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td><td><span class="chip chip-pass">Pass</span></td></tr>
+            <tr><td>5</td><td>Walls</td><td>R 2.20</td><td style="color:var(--text-muted)">≥ 1.90</td><td><span style="font-size:8px;color:var(--text-muted)">✋ Manual</span></td><td><span class="chip chip-pass">Pass</span></td></tr>
+            <tr><td>6</td><td>Roof</td><td>R 3.85</td><td style="color:var(--text-muted)">≥ 3.70</td><td><span style="font-size:8px;color:var(--amber)">🤖 81%</span></td><td><span class="chip chip-pass">Pass</span></td></tr>
+            <tr><td>7</td><td>Hot Water</td><td>HP 30%</td><td style="color:var(--text-muted)">≤ 50%</td><td><span style="font-size:8px;color:var(--green)">🤖✓</span></td><td><span class="chip chip-pass">Pass</span></td></tr>
+            <tr style="background:rgba(245,166,35,0.04)"><td>8</td><td>Lighting</td><td style="color:var(--amber)">7.2 W/m²</td><td style="color:var(--text-muted)">≤ 8 + sensors</td><td><span style="font-size:8px;color:var(--amber)">🤖 68%</span></td><td><span class="chip chip-check">Check</span></td></tr>
+            <tr><td>9</td><td>Air Con</td><td>None</td><td style="color:var(--text-muted)">Table 13</td><td><span style="font-size:8px;color:var(--text-low)">—</span></td><td><span class="chip chip-na">N/A</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Integration + Sign-off -->
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Platform Integration</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div style="background:var(--panel-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px">
+            <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--secondary);margin-bottom:4px"><span class="pulse-dot" style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5)"></span>Project Passport</div>
+            <p style="font-size:8px;color:var(--text-low)">XA status synced. Last: 29 Jun 2026</p>
+          </div>
+          <div style="background:var(--panel-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px">
+            <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--secondary);margin-bottom:4px"><span class="pulse-dot" style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5)"></span>SpecForge</div>
+            <p style="font-size:8px;color:var(--text-low)">Issue #XA-003 raised (SHGC)</p>
+          </div>
+          <div style="background:var(--panel-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px">
+            <div style="display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--secondary);margin-bottom:4px"><span class="pulse-dot" style="width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 5px rgba(245,166,35,0.5)"></span>Municipal</div>
+            <p style="font-size:8px;color:var(--text-low)">Not ready. Resolve FAILs + verify.</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="border-top:2px solid var(--secondary)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-low);font-weight:600">Professional Sign-off Gate</div>
+            <p style="font-size:9px;color:var(--text-muted);margin-top:2px">All fields must be verified and FAILs resolved before requesting sign-off.</p>
+          </div>
+          <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Request Sign-off (3 unverified)</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+<script>
+function switchView(viewId) {
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const panel = document.getElementById('view-' + viewId);
+  if (panel) panel.classList.add('active');
+  const nav = document.querySelector('.nav-item[data-view="' + viewId + '"]');
+  if (nav) nav.classList.add('active');
+}
+</script>
 </body>
 </html>
