@@ -1,6 +1,21 @@
 import type { BomTradePackage, TenderBidder, TenderPackage } from './types';
 import { getProject } from './bomBuilderService';
 
+// ── Policy Configuration ────────────────────────────────────────────────────
+
+export interface TenderEvaluationPolicy {
+  priceWeight: number;     // default 90
+  bbbeeWeight: number;     // default 10
+  sector: 'public' | 'private';
+  customCriteria?: Array<{ name: string; weight: number }>;
+}
+
+export const DEFAULT_EVALUATION_POLICY: TenderEvaluationPolicy = {
+  priceWeight: 90,
+  bbbeeWeight: 10,
+  sector: 'public',
+};
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 let seq = 0;
@@ -103,6 +118,10 @@ export function issueToTenderers(projectId: string, packageId: string): TenderPa
   const pkg = project.tenderPackages.find((p) => p.id === packageId);
   if (!pkg) throw new Error(`Package ${packageId} not found`);
 
+  if (!project.qsSignOff) {
+    throw new Error('Cannot issue tender: QS sign-off has not been completed');
+  }
+
   if (pkg.bidders.length === 0) {
     throw new Error('Cannot issue: no bidders added to package');
   }
@@ -162,7 +181,7 @@ export interface BidEvaluation {
   recommendedBidderId: string;
 }
 
-export function evaluateBids(projectId: string, packageId: string): BidEvaluation {
+export function evaluateBids(projectId: string, packageId: string, policy: TenderEvaluationPolicy = DEFAULT_EVALUATION_POLICY): BidEvaluation {
   const project = getProject(projectId);
   if (!project) throw new Error(`Project ${projectId} not found`);
 
@@ -174,13 +193,13 @@ export function evaluateBids(projectId: string, packageId: string): BidEvaluatio
     throw new Error('No bid returns to evaluate');
   }
 
-  // 90/10 price/B-BBEE scoring (standard SA public procurement weighting)
+  // Price/B-BBEE scoring using configurable policy weights
   const lowestBid = Math.min(...respondedBidders.map((b) => b.bidAmount!));
 
   const evaluations = respondedBidders.map((bidder) => {
-    const priceScore = money((lowestBid / bidder.bidAmount!) * 90);
-    // B-BBEE: Level 1 = 10 points, descending
-    const bbbeeScore = Math.max(0, money((9 - bidder.bbbeeLevel + 1) * (10 / 9)));
+    const priceScore = money((lowestBid / bidder.bidAmount!) * policy.priceWeight);
+    // B-BBEE: Level 1 = max points, descending
+    const bbbeeScore = Math.max(0, money((9 - bidder.bbbeeLevel + 1) * (policy.bbbeeWeight / 9)));
     const totalScore = money(priceScore + bbbeeScore);
 
     return {

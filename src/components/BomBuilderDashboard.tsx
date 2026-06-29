@@ -32,6 +32,7 @@ interface BomBuilderDashboardProps {
 }
 
 // ── Mock data for scaffold rendering ────────────────────────────────────────
+// TODO: Replace with Firestore query using projectId once API wired
 
 const DEMO_PROJECT: BomProject = {
   id: 'bom_demo_001',
@@ -93,7 +94,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function BomBuilderDashboard({ user }: BomBuilderDashboardProps) {
+export default function BomBuilderDashboard({ user, projectId }: BomBuilderDashboardProps) {
   const [activeTab, setActiveTab] = useState('takeoff');
   const [project] = useState<BomProject>({ ...DEMO_PROJECT, lineItems: DEMO_ITEMS });
 
@@ -127,7 +128,7 @@ export default function BomBuilderDashboard({ user }: BomBuilderDashboardProps) 
         </CardHeader>
         <CardContent>
           <p className="text-xs text-slate-500 uppercase tracking-wider">
-            Project: {project.name} • Stage: {project.stage} • Sources: {project.sources.length}
+            Project: {project.name}{projectId ? ` • ID: ${projectId}` : ''} • Stage: {project.stage} • Sources: {project.sources.length}
           </p>
         </CardContent>
       </Card>

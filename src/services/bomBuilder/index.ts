@@ -58,8 +58,9 @@ export {
   issueToTenderers,
   recordBidReturn,
   evaluateBids,
+  DEFAULT_EVALUATION_POLICY,
 } from './tenderService';
-export type { BidEvaluation } from './tenderService';
+export type { BidEvaluation, TenderEvaluationPolicy } from './tenderService';
 
 // ── Export Service ──────────────────────────────────────────────────────────
 export {
