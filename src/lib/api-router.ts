@@ -62,7 +62,7 @@ import {
 import { assertAppointmentPreconditions } from "../services/appointmentWorkflowService";
 import { getApplicationProfessionalId, withProfessionalJobAliases, withProfessionalProjectAliases } from "./professionalRoleCompatibility";
 
-import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType } from "../types";
+import { UserRole, MunicipalityType, type Discipline, type UserVerification, type VerificationSubjectType, type Severity, type SnagStatus, type PhotoAnnotation, type FieldReport, type QueuedCapture } from "../types";
 
 // ── Environment variables ─────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -4287,6 +4287,121 @@ router.post("/files/upload", async (req, res) => {
   }
 });
 
+// Photo upload (25MB limit, fast FieldEvidence creation per Task 11.1)
+router.post("/photos/upload", async (req, res) => {
+  const { fileName, fileType, fileSize, evidenceId, projectId, fileBase64, retry, attempt } = req.body;
+  let decoded;
+  try {
+    decoded = await verifyAuth(req.headers);
+  } catch (err: any) {
+    return res.status(err.status || 401).json({ error: err.message });
+  }
+
+  // Photo-specific validation per Requirement 2.6
+  const MAX_PHOTO_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+  const SUPPORTED_PHOTO_FORMATS = ['image/jpeg', 'image/png'];
+
+  if (!evidenceId) return res.status(400).json({ error: "evidenceId field is required for photo uploads" });
+  if (!projectId) return res.status(400).json({ error: "projectId field is required" });
+  
+  // Validate photo format (Req 2.6)
+  if (!SUPPORTED_PHOTO_FORMATS.includes(fileType)) {
+    return res.status(400).json({ 
+      error: "Unsupported format", 
+      details: `Only JPEG and PNG files are supported. Got: ${fileType}` 
+    });
+  }
+
+  // Validate photo size (Req 2.6)
+  if (Number(fileSize || 0) > MAX_PHOTO_SIZE_BYTES) {
+    return res.status(413).json({ 
+      error: "File is too large", 
+      details: `Maximum photo size is 25 MB. Got: ${((fileSize || 0) / 1024 / 1024).toFixed(1)} MB` 
+    });
+  }
+
+  if (!fileBase64) return res.status(400).json({ error: "fileBase64 field is required" });
+
+  try {
+    const safeFileName = fileName || `photo-${Date.now()}`;
+    const fileBuffer = Buffer.from(fileBase64, 'base64');
+
+    // Double-check buffer size (Req 2.6)
+    if (fileBuffer.byteLength > MAX_PHOTO_SIZE_BYTES) {
+      return res.status(413).json({ 
+        error: "File is too large", 
+        details: "Maximum photo size is 25 MB" 
+      });
+    }
+
+    console.log(`[API] Uploading photo ${safeFileName} (${fileBuffer.byteLength} bytes) for evidence: ${evidenceId}`);
+
+    // Check environment variables
+    const token = process.env.VITE_BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      console.error("[API] Missing VITE_BLOB_READ_WRITE_TOKEN");
+      return res.status(500).json({ error: "Server configuration error", details: "Missing blob storage token" });
+    }
+
+    // Upload to Vercel Blob with photo-specific path
+    const blob = await put(`photos/${evidenceId}/${safeFileName}`, fileBuffer, {
+      access: "public",
+      token,
+      contentType: fileType || "image/jpeg",
+    });
+
+    console.log(`[API] Blob upload successful: ${blob.url}`);
+
+    // Track in Firestore with photo context
+    const photoRef = await adminDb.collection("uploaded_files").add({
+      fileName: safeFileName,
+      url: blob.url,
+      fileType: fileType || "image/jpeg",
+      fileSize: fileSize || fileBuffer.byteLength,
+      uploadedBy: decoded.uid,
+      context: 'field_evidence_photo',
+      evidenceId,
+      projectId,
+      isRetry: retry || false,
+      attempt: attempt || 1,
+      uploadedAt: new Date().toISOString(),
+    });
+
+    console.log(`[API] Photo tracking successful: ${photoRef.id}`);
+
+    // Audit log for photo upload
+    await recordAuditEvent(req, {
+      category: 'document',
+      action: retry ? 'photo.upload.retry' : 'photo.uploaded',
+      actor: decodedAuditActor(decoded),
+      target: { type: 'field_evidence', id: evidenceId, projectId },
+      metadata: { 
+        photoFileName: safeFileName, 
+        fileType: fileType || 'image/jpeg', 
+        fileSize: fileSize || fileBuffer.byteLength,
+        blobUrl: blob.url,
+        isRetry: retry || false,
+        attempt: attempt || 1,
+      },
+    });
+
+    res.json({ 
+      url: blob.url, 
+      fileId: photoRef.id,
+      evidenceId,
+      success: true,
+    });
+
+  } catch (err: any) {
+    console.error("[API] ❌ Photo upload failed:", err);
+    res.status(500).json({
+      error: "Photo upload failed",
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
+});
+
 // File delete
 router.post("/files/delete", async (req, res) => {
   const { fileId, fileUrl } = req.body;
@@ -7520,6 +7635,717 @@ router.post("/projects/:id/submission-readiness", async (req, res) => {
     res.status(201).json({ submissionReadiness: result });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Forma Build Site Tools: Field Issues API ──────────────────────────────
+
+// POST /api/field-issues — Create a Field_Issue (snag) with role-aware access
+// control and lifecycle defaults.
+//
+// Flow: fieldAccessService.assertFieldAction (pure gate) → fieldIssueService
+// status/responsible-party normalization → drawing-pin validation →
+// persistence composing snagService.snagBlocksPayment.
+//
+// Defaults: status → 'open', responsible party → 'unassigned'.
+// Returns the created FieldIssue with its ID, or an authorization error.
+//
+// Requirements: 5.1, 6.2
+router.post(["/field-issues", "/api/field-issues"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const {
+      projectId,
+      location,
+      drawingPin,
+      description,
+      severity,
+      responsiblePartyId,
+      status,
+      dueDate,
+      evidenceIds,
+    } = req.body ?? {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+
+    // 1. Access control — pure permit/deny decision (Req 6.2). Denied actions
+    //    return an authorization error and leave the target unchanged.
+    const { assertFieldAction } = await import("../services/fieldAccessService");
+    const decision = assertFieldAction(role, "create", projectId);
+    if (decision.outcome === "denied") {
+      return res.status(403).json({
+        error: decision.error?.message ?? "Not authorized to create field issues",
+        code: decision.error?.code ?? "unauthorized",
+      });
+    }
+
+    // 2. Validate description + severity.
+    if (typeof description !== "string" || description.trim() === "") {
+      return res.status(400).json({ error: "description is required" });
+    }
+    const VALID_SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
+    if (!VALID_SEVERITIES.includes(severity)) {
+      return res.status(400).json({
+        error: `Invalid severity. Expected one of: ${VALID_SEVERITIES.join(", ")}`,
+      });
+    }
+
+    // 3. Validate location / drawing pin (Req 1.1, 1.4, 1.7).
+    if (drawingPin !== undefined && drawingPin !== null) {
+      const { validateDrawingPin } = await import("../services/drawingPinService");
+      const pinErrors = validateDrawingPin(drawingPin);
+      if (pinErrors.length > 0) {
+        return res.status(400).json({ error: "Invalid drawing pin", details: pinErrors });
+      }
+    }
+    if (typeof location !== "string" || location.length < 1 || location.length > 500) {
+      return res.status(400).json({
+        error: "location is required and must be between 1 and 500 characters",
+      });
+    }
+
+    // 4. Normalize lifecycle status (default 'open') and responsible party
+    //    (default 'unassigned') against the canonical snag enum (Req 5.1).
+    const { normalizeFieldIssueStatus } = await import("../services/fieldIssueService");
+    const normalized = normalizeFieldIssueStatus({ status, responsiblePartyId });
+    if (!normalized.ok || !normalized.value) {
+      return res.status(400).json({
+        error: normalized.error?.message ?? "Invalid status",
+        code: normalized.error?.code ?? "invalid_status",
+      });
+    }
+
+    // 5. Persist — compose snagService's payment-blocking rule (Req 5.7).
+    const { snagBlocksPayment } = await import("../services/snagService");
+    const isClosedOrRejected =
+      normalized.value.status === "closed" || normalized.value.status === "rejected";
+
+    const now = new Date().toISOString();
+    const fieldIssue: Record<string, unknown> = {
+      projectId,
+      location,
+      description,
+      priority: severity,
+      responsiblePartyId: normalized.value.responsiblePartyId,
+      status: normalized.value.status,
+      blocksPayment: snagBlocksPayment(severity) && !isClosedOrRejected,
+      dueDate: typeof dueDate === "string" ? dueDate : "",
+      evidenceIds: Array.isArray(evidenceIds) ? evidenceIds : [],
+      createdBy: authContext.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (drawingPin) {
+      fieldIssue.drawingPin = {
+        drawingId: drawingPin.drawingId,
+        x: drawingPin.x,
+        y: drawingPin.y,
+      };
+    }
+
+    const ref = await adminDb
+      .collection("projects")
+      .doc(projectId)
+      .collection("snags")
+      .add(fieldIssue);
+
+    return res.status(201).json({ fieldIssue: { id: ref.id, ...fieldIssue } });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH /api/field-issues/:id — Update a Field_Issue (snag) with role-aware
+// access control, status-transition guarding, and payment-blocking maintenance.
+//
+// Flow: fieldAccessService.assertFieldAction (pure gate) → load existing issue
+// → optional location/drawingPin update → fieldIssueService.guardStatusTransition
+// against the canonical snag state machine → responsible-party normalization →
+// payment-blocking flag maintained via snagService.snagBlocksPayment, cleared on
+// transition to closed/rejected.
+//
+// Rejections leave the issue's existing data unchanged (no partial writes):
+//  - invalid status value → 400 naming the invalid value (Req 5.2)
+//  - disallowed transition → 409 naming source + target (Req 5.3)
+//  - unauthorized role     → 403 authorization error (Req 6.2)
+//
+// Requirements: 5.2, 5.3, 5.7, 5.8, 6.2
+router.patch(["/field-issues/:id", "/api/field-issues/:id"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const { id } = req.params;
+    const {
+      projectId,
+      location,
+      drawingPin,
+      description,
+      severity,
+      responsiblePartyId,
+      status,
+      dueDate,
+      evidenceIds,
+    } = req.body ?? {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (!id) {
+      return res.status(400).json({ error: "field issue id is required" });
+    }
+
+    // 1. Access control — pure permit/deny decision (Req 6.2). A status change
+    //    is a status_transition action; otherwise it is a plain edit. Denied
+    //    actions return an authorization error and leave the target unchanged.
+    const hasStatusChange =
+      status !== undefined && status !== null && String(status).trim() !== "";
+    const action: "edit" | "status_transition" = hasStatusChange
+      ? "status_transition"
+      : "edit";
+    const { assertFieldAction } = await import("../services/fieldAccessService");
+    const decision = assertFieldAction(role, action, id);
+    if (decision.outcome === "denied") {
+      return res.status(403).json({
+        error: decision.error?.message ?? "Not authorized to update field issues",
+        code: decision.error?.code ?? "unauthorized",
+      });
+    }
+
+    // 2. Load the existing issue — updates apply against current state.
+    const docRef = adminDb
+      .collection("projects")
+      .doc(projectId)
+      .collection("snags")
+      .doc(id);
+    const snapshot = await docRef.get();
+    if (!snapshot.exists) {
+      return res.status(404).json({ error: "Field issue not found" });
+    }
+    const existing = snapshot.data() ?? {};
+    const existingStatus = existing.status as SnagStatus;
+
+    const updates: Record<string, unknown> = {};
+
+    // 3. Optional location / drawing-pin update (Req 1.1, 1.4, 1.7). On any
+    //    validation error the existing location data is left unchanged.
+    if (drawingPin !== undefined && drawingPin !== null) {
+      const { validateDrawingPin } = await import("../services/drawingPinService");
+      const pinErrors = validateDrawingPin(drawingPin);
+      if (pinErrors.length > 0) {
+        return res.status(400).json({ error: "Invalid drawing pin", details: pinErrors });
+      }
+      updates.drawingPin = {
+        drawingId: drawingPin.drawingId,
+        x: drawingPin.x,
+        y: drawingPin.y,
+      };
+    }
+    if (location !== undefined) {
+      if (typeof location !== "string" || location.length < 1 || location.length > 500) {
+        return res.status(400).json({
+          error: "location must be between 1 and 500 characters",
+        });
+      }
+      updates.location = location;
+    }
+
+    if (description !== undefined) {
+      if (typeof description !== "string" || description.trim() === "") {
+        return res.status(400).json({ error: "description must be a non-empty string" });
+      }
+      updates.description = description;
+    }
+
+    // 4. Optional severity update — validated against the canonical enum.
+    let effectiveSeverity = existing.priority as Severity;
+    if (severity !== undefined) {
+      const VALID_SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
+      if (!VALID_SEVERITIES.includes(severity)) {
+        return res.status(400).json({
+          error: `Invalid severity. Expected one of: ${VALID_SEVERITIES.join(", ")}`,
+        });
+      }
+      updates.priority = severity;
+      effectiveSeverity = severity;
+    }
+
+    // 5. Responsible-party change — defaults to 'unassigned' (Req 5.1).
+    if (responsiblePartyId !== undefined) {
+      const { normalizeResponsibleParty } = await import("../services/fieldIssueService");
+      updates.responsiblePartyId = normalizeResponsibleParty(responsiblePartyId);
+    }
+
+    // 6. Status transition — guard against the existing snag state machine
+    //    (Req 5.2, 5.3). Invalid value → 400; disallowed transition → 409.
+    //    Both leave the source status unchanged.
+    let effectiveStatus = existingStatus;
+    if (hasStatusChange) {
+      const { normalizeFieldIssueStatus, guardStatusTransition } = await import(
+        "../services/fieldIssueService"
+      );
+      const normalized = normalizeFieldIssueStatus({ status }, existingStatus);
+      if (!normalized.ok || !normalized.value) {
+        return res.status(400).json({
+          error: normalized.error?.message ?? "Invalid status",
+          code: normalized.error?.code ?? "invalid_status",
+        });
+      }
+      const target = normalized.value.status;
+      if (target !== existingStatus) {
+        const guard = guardStatusTransition(existingStatus, target);
+        if (!guard.ok || !guard.value) {
+          return res.status(409).json({
+            error: guard.error?.message ?? "Invalid status transition",
+            code: guard.error?.code ?? "invalid_transition",
+            from: guard.error?.from,
+            to: guard.error?.to,
+          });
+        }
+        effectiveStatus = guard.value;
+        updates.status = effectiveStatus;
+      }
+    }
+
+    // 7. Maintain the payment-blocking flag (Req 5.7, 5.8): blocking iff
+    //    severity is high/critical and the status is neither closed nor
+    //    rejected; the flag is cleared on transition to closed/rejected.
+    const { snagBlocksPayment } = await import("../services/snagService");
+    const isClosedOrRejected =
+      effectiveStatus === "closed" || effectiveStatus === "rejected";
+    updates.blocksPayment = snagBlocksPayment(effectiveSeverity) && !isClosedOrRejected;
+
+    if (dueDate !== undefined) {
+      updates.dueDate = typeof dueDate === "string" ? dueDate : "";
+    }
+    if (evidenceIds !== undefined) {
+      updates.evidenceIds = Array.isArray(evidenceIds) ? evidenceIds : [];
+    }
+
+    updates.updatedAt = new Date().toISOString();
+    updates.updatedBy = authContext.uid;
+
+    await docRef.update(updates);
+
+    return res.status(200).json({ fieldIssue: { id, ...existing, ...updates } });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/photo-annotations — Save a Photo_Annotation for a captured photo
+// (FieldEvidence) with role-aware access control.
+//
+// Flow: fieldAccessService.assertFieldAction (pure gate) → validate payload →
+// photoAnnotationService.saveAnnotation persists structured shapes + flattened
+// render reference to the `photo_annotations` collection, linked via evidenceId.
+//
+// Payload: projectId, evidenceId, shapes[], flattenedUri (optional).
+// Returns the saved annotation, or an authorization/validation error.
+//
+// Requirements: 2.2
+router.post(["/photo-annotations", "/api/photo-annotations"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const { projectId, evidenceId, shapes, flattenedUri } = req.body ?? {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (typeof evidenceId !== "string" || evidenceId.trim() === "") {
+      return res.status(400).json({ error: "evidenceId is required" });
+    }
+    if (!Array.isArray(shapes)) {
+      return res.status(400).json({ error: "shapes must be an array" });
+    }
+    if (flattenedUri !== undefined && typeof flattenedUri !== "string") {
+      return res.status(400).json({ error: "flattenedUri must be a string" });
+    }
+
+    // Access control — annotating a photo is a field-evidence edit (Req 6.2).
+    // Denied actions return an authorization error and leave the target unchanged.
+    const { assertFieldAction } = await import("../services/fieldAccessService");
+    const decision = assertFieldAction(role, "create", evidenceId);
+    if (decision.outcome === "denied") {
+      return res.status(403).json({
+        error: decision.error?.message ?? "Not authorized to save photo annotations",
+        code: decision.error?.code ?? "unauthorized",
+      });
+    }
+
+    // Persist the structured annotation + flattened render reference (Req 2.2).
+    const { saveAnnotation } = await import("../services/photoAnnotationService");
+    const annotation: PhotoAnnotation = {
+      evidenceId,
+      shapes,
+      ...(flattenedUri !== undefined && { flattenedUri }),
+    };
+    await saveAnnotation(projectId, annotation);
+
+    return res.status(201).json({ annotation });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/checklist-instances — Start a Checklist_Instance from a template
+// with role-aware access control.
+//
+// Flow: fieldAccessService.assertFieldAction (pure gate) → validate payload →
+// checklistService.startInstance copies the template's items in their defined
+// order and initializes responses empty in the `checklist_instances` collection.
+//
+// Payload: projectId, templateId, location.
+// Returns the created ChecklistInstance with its items, or an
+// authorization/validation error.
+//
+// Requirements: 3.2
+router.post(["/checklist-instances", "/api/checklist-instances"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const { projectId, templateId, location } = req.body ?? {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (typeof templateId !== "string" || templateId.trim() === "") {
+      return res.status(400).json({ error: "templateId is required" });
+    }
+    if (typeof location !== "string" || location.trim() === "") {
+      return res.status(400).json({ error: "location is required" });
+    }
+
+    // Access control — starting an inspection is a create action (Req 6.2).
+    // Denied actions return an authorization error and leave the target unchanged.
+    const { assertFieldAction } = await import("../services/fieldAccessService");
+    const decision = assertFieldAction(role, "create", templateId);
+    if (decision.outcome === "denied") {
+      return res.status(403).json({
+        error: decision.error?.message ?? "Not authorized to start checklist instances",
+        code: decision.error?.code ?? "unauthorized",
+      });
+    }
+
+    // Create the instance — copies template items in order, responses empty (Req 3.2).
+    const { startInstance } = await import("../services/checklistService");
+    const instance = await startInstance(templateId, projectId, location);
+
+    return res.status(201).json({ instance });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH /api/checklist-instances/:id/responses — Record a response against a
+// Checklist_Instance item with role-aware access control and response
+// validation.
+//
+// Flow: fieldAccessService.assertFieldAction (pure gate) → validate payload →
+// checklistService.recordResponse validates the value against the item's
+// response type and, on success, persists it to the instance. An invalid
+// response is rejected and the existing response is left unchanged.
+//
+// Payload: projectId, itemId, value.
+// Returns the updated ChecklistInstance, or an authorization/validation error.
+//
+// Requirements: 3.3, 3.8
+router.patch(["/checklist-instances/:id/responses", "/api/checklist-instances/:id/responses"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const { id } = req.params;
+    const { projectId, itemId, value } = req.body ?? {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (!id) {
+      return res.status(400).json({ error: "checklist instance id is required" });
+    }
+    if (typeof itemId !== "string" || itemId.trim() === "") {
+      return res.status(400).json({ error: "itemId is required" });
+    }
+    if (value === undefined) {
+      return res.status(400).json({ error: "value is required" });
+    }
+
+    // Access control — recording a response is an edit action (Req 6.2).
+    // Denied actions return an authorization error and leave the target unchanged.
+    const { assertFieldAction } = await import("../services/fieldAccessService");
+    const decision = assertFieldAction(role, "edit", id);
+    if (decision.outcome === "denied") {
+      return res.status(403).json({
+        error: decision.error?.message ?? "Not authorized to record checklist responses",
+        code: decision.error?.code ?? "unauthorized",
+      });
+    }
+
+    // Record the response — validates against the item's response type and
+    // persists on success; an invalid response is rejected (400) and the
+    // existing response is left unchanged (Req 3.3, 3.8).
+    const { recordResponse } = await import("../services/checklistService");
+    const instance = await recordResponse(projectId, id, itemId, value);
+
+    return res.status(200).json({ instance });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/field-reports — Generate a dated Field_Report for a project with
+// role-aware access control.
+//
+// Flow: getAuthContext → role-aware view gate (editor roles and client may
+// view reports; all other roles denied) → fieldReportService.generateReport
+// aggregates issues, evidence, and weather for the date in the project time
+// zone (00:00–23:59), counts payment-blocking issues, and persists the report
+// to the `field_reports` collection.
+//
+// Query params: projectId, date (YYYY-MM-DD), timeZone, optional lifecycleStage.
+// Returns the generated FieldReport, or an authorization/validation error.
+//
+// Requirements: 7.1
+router.get(["/field-reports", "/api/field-reports"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const projectId = req.query.projectId as string | undefined;
+    const date = req.query.date as string | undefined;
+    const timeZone = req.query.timeZone as string | undefined;
+    const lifecycleStage = req.query.lifecycleStage as string | undefined;
+
+    if (typeof projectId !== "string" || projectId.trim() === "") {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (typeof date !== "string" || date.trim() === "") {
+      return res.status(400).json({ error: "date is required" });
+    }
+    if (typeof timeZone !== "string" || timeZone.trim() === "") {
+      return res.status(400).json({ error: "timeZone is required" });
+    }
+
+    // Access control — generating/viewing a report is a view action. Editor
+    // roles and the client may view Field_Reports; all other roles are denied
+    // an authorization error and the target is unchanged (Req 6.2).
+    const { EDITOR_ROLES } = await import("../services/fieldAccessService");
+    const canView = EDITOR_ROLES.includes(role) || role === "client";
+    if (!canView) {
+      return res.status(403).json({
+        error: `User with role '${role}' is not permitted to view field reports`,
+        code: "unauthorized",
+      });
+    }
+
+    // Generate the report — aggregates issues/evidence/weather for the date in
+    // the project time zone and persists to `field_reports` (Req 7.1).
+    const { generateReport } = await import("../services/fieldReportService");
+    const report = await generateReport(
+      projectId,
+      date,
+      timeZone,
+      lifecycleStage ? { lifecycleStage } : undefined,
+    );
+
+    return res.status(200).json({ report });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/field-reports/:id/export — Export a persisted Field_Report to a
+// shareable document (PDF/DOCX-ready) with role-aware access control.
+//
+// Flow: getAuthContext → role-aware view gate (editor roles and client may
+// export reports; all other roles denied) → load the persisted FieldReport by
+// id from the `field_reports` collection → fieldReportService.exportReport
+// produces the ExportDocument containing the date, project ID, issue summary
+// (id, status, severity), and evidence references.
+//
+// Path param: id (field report document id). Body: projectId.
+// Returns the ExportDocument, or an authorization/validation error.
+//
+// Requirements: 7.4
+router.post(["/field-reports/:id/export", "/api/field-reports/:id/export"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const { id } = req.params;
+    const { projectId } = req.body ?? {};
+
+    if (typeof projectId !== "string" || projectId.trim() === "") {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (!id) {
+      return res.status(400).json({ error: "field report id is required" });
+    }
+
+    // Access control — exporting a report is a view action. Editor roles and
+    // the client may export Field_Reports; all other roles are denied an
+    // authorization error and the target is unchanged (Req 6.2).
+    const { EDITOR_ROLES } = await import("../services/fieldAccessService");
+    const canView = EDITOR_ROLES.includes(role) || role === "client";
+    if (!canView) {
+      return res.status(403).json({
+        error: `User with role '${role}' is not permitted to export field reports`,
+        code: "unauthorized",
+      });
+    }
+
+    // Load the persisted FieldReport by id from `field_reports`.
+    const docRef = adminDb
+      .collection("projects")
+      .doc(projectId)
+      .collection("field_reports")
+      .doc(id);
+    const snapshot = await docRef.get();
+    if (!snapshot.exists) {
+      return res.status(404).json({ error: "Field report not found" });
+    }
+    const report = snapshot.data() as FieldReport;
+
+    // Produce the export document (pure) (Req 7.4).
+    const { exportReport } = await import("../services/fieldReportService");
+    const document = exportReport(report);
+
+    return res.status(200).json({ document });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/sync-queue/flush — Drain a device's offline capture queue to
+// Firestore with role-aware access control.
+//
+// Flow: getAuthContext → fieldAccessService.assertFieldAction (pure gate;
+// syncing creates field records) → syncEngineService.flush transmits the
+// transmitted captures in creation order, persisting each by its client-
+// generated identifier (idempotent), retrying on failure up to 5 attempts then
+// marking the capture failed, and surfaces the failed count.
+//
+// syncEngineService.flush reads/writes the offline queue from localStorage,
+// which only exists on the device. On the server we install a request-scoped
+// in-memory localStorage shim seeded with the transmitted captures so flush
+// runs unchanged, then read the remaining queue back from the shim.
+//
+// Payload: projectId, captures (QueuedCapture[]).
+// Returns { flushed, failed, remaining }, or an authorization/validation error.
+//
+// Requirements: 4.2, 4.3, 4.4, 4.5
+router.post(["/sync-queue/flush", "/api/sync-queue/flush"], async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const role = (authContext.normalizedRole || authContext.role) as UserRole;
+
+    const { projectId, captures } = req.body ?? {};
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+    if (!Array.isArray(captures)) {
+      return res.status(400).json({ error: "captures must be an array" });
+    }
+
+    // Access control — syncing offline captures creates field records (Req 6.2).
+    // Denied actions return an authorization error and persist nothing.
+    const { assertFieldAction } = await import("../services/fieldAccessService");
+    const decision = assertFieldAction(role, "create", projectId);
+    if (decision.outcome === "denied") {
+      return res.status(403).json({
+        error: decision.error?.message ?? "Not authorized to sync offline captures",
+        code: decision.error?.code ?? "unauthorized",
+      });
+    }
+
+    const { flush, serializeQueue, deserializeQueue } = await import(
+      "../services/syncEngineService"
+    );
+
+    // Request-scoped localStorage shim seeded with the transmitted queue.
+    const storageKey = `architex:syncQueue:${projectId}`;
+    const memory = new Map<string, string>();
+    memory.set(storageKey, serializeQueue(captures as QueuedCapture[]));
+    const shim = {
+      getItem: (k: string) => (memory.has(k) ? (memory.get(k) as string) : null),
+      setItem: (k: string, v: string) => {
+        memory.set(k, v);
+      },
+      removeItem: (k: string) => {
+        memory.delete(k);
+      },
+      clear: () => {
+        memory.clear();
+      },
+      key: (i: number) => Array.from(memory.keys())[i] ?? null,
+      get length() {
+        return memory.size;
+      },
+    };
+
+    // persistFn transmits each capture to Firestore keyed by its client-generated
+    // identifier so a capture synced more than once yields a single record
+    // (idempotent), routed by capture kind (Req 4.8).
+    const collectionByKind: Record<QueuedCapture["kind"], string> = {
+      field_issue: "snags",
+      photo_annotation: "photo_annotations",
+      checklist_response: "checklist_instances",
+    };
+    const persistFn = async (capture: QueuedCapture) => {
+      const collection = collectionByKind[capture.kind];
+      if (!collection) {
+        throw new Error(`Unknown capture kind: ${String(capture.kind)}`);
+      }
+      const payload =
+        capture.payload && typeof capture.payload === "object"
+          ? (capture.payload as Record<string, unknown>)
+          : { value: capture.payload };
+      await adminDb
+        .collection("projects")
+        .doc(projectId)
+        .collection(collection)
+        .doc(capture.clientId)
+        .set(
+          {
+            ...payload,
+            clientId: capture.clientId,
+            syncedAt: new Date().toISOString(),
+            syncedBy: authContext.uid,
+          },
+          { merge: true },
+        );
+    };
+
+    // Install the shim for the duration of the flush, then restore the prior
+    // global so concurrent requests are not affected.
+    const previousLocalStorage = (globalThis as any).localStorage;
+    (globalThis as any).localStorage = shim;
+    let result: { flushed: number; failed: number };
+    let remaining: QueuedCapture[];
+    try {
+      result = await flush(projectId, persistFn);
+      const remainingRaw = shim.getItem(storageKey);
+      remaining = remainingRaw ? deserializeQueue(remainingRaw) : [];
+    } finally {
+      (globalThis as any).localStorage = previousLocalStorage;
+    }
+
+    return res.status(200).json({
+      flushed: result.flushed,
+      failed: result.failed,
+      remaining,
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message });
   }
 });
 
