@@ -4,7 +4,7 @@
  * Budget & Risk, BoM/BoQ, Issue & Distribute, Procurement Pipeline.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import type { UserProfile } from '@/types';
 import type {
   SpecForgeRole,
@@ -28,6 +28,7 @@ import {
   advanceProcurementStatus,
 } from '@/services/specforge/specforgeService';
 import { SAMPLE_WORKSPACE, SAMPLE_PROCUREMENT_ENTRIES } from '@/services/specforge/specforgeSampleData';
+import { getSpecForgeRepository } from '@/services/specforge/specforgeRepository';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,18 @@ export default function SpecForgeWorkspace({ user }: Props) {
   const [roomFilter, setRoomFilter] = useState('all');
   const [pkgFilter, setPkgFilter] = useState('all');
   const [procurement, setProcurement] = useState<SpecProcurementEntry[]>(SAMPLE_PROCUREMENT_ENTRIES);
+
+  // Load workspace from repository (falls back to SAMPLE_WORKSPACE if null)
+  const projectId = SAMPLE_WORKSPACE.projectId;
+  useEffect(() => {
+    const repo = getSpecForgeRepository();
+    repo.getWorkspace(projectId).then((ws) => {
+      if (ws) setWorkspace(ws);
+    });
+    repo.getProcurementEntries(projectId).then((entries) => {
+      if (entries.length > 0) setProcurement(entries);
+    });
+  }, [projectId]);
   const [issuedSnapshot, setIssuedSnapshot] = useState<string | null>(null);
   const [issueError, setIssueError] = useState<string | null>(null);
 
