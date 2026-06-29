@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Architex SpecForge Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Architex toolset pack</p>
+        <h1>SpecForge</h1>
+        <p>Interactive pictorial specifications, approvals and planning bridge.</p>
+      </div>
+      <div class="actions">
+        <button id="issueBtn">Issue snapshot</button>
+        <button id="printBtn">Print / PDF</button>
+      </div>
+    </header>
+
+    <section class="controls" aria-label="Filters">
+      <label>Role view <select id="role"></select></label>
+      <label>Room <select id="room"></select></label>
+      <label>Package <select id="package"></select></label>
+      <strong id="count"></strong>
+    </section>
+
+    <section class="capability-panel">
+      <h2>Role capability check</h2>
+      <div id="capabilities"></div>
+    </section>
+
+    <div id="document"></div>
+
+    <section id="snapshotPanel" hidden class="code-panel">
+      <h2>Issued immutable snapshot</h2>
+      <pre id="snapshot"></pre>
+    </section>
+
+    <section class="code-panel">
+      <h2>OpenProject planning mirror payloads</h2>
+      <pre id="openProject"></pre>
+    </section>
+  </main>
+  <script type="module" src="../src/demoApp.mjs"></script>
+</body>
+</html>
