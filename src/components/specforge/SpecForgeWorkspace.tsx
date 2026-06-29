@@ -49,6 +49,7 @@ export default function SpecForgeWorkspace({ user }: Props) {
   const [pkgFilter, setPkgFilter] = useState('all');
   const [procurement, setProcurement] = useState<SpecProcurementEntry[]>(SAMPLE_PROCUREMENT_ENTRIES);
   const [issuedSnapshot, setIssuedSnapshot] = useState<string | null>(null);
+  const [issueError, setIssueError] = useState<string | null>(null);
 
   // Derived state
   const visibleItems = useMemo((): SpecItem[] => {
@@ -135,15 +136,20 @@ export default function SpecForgeWorkspace({ user }: Props) {
 
   // Issue workflow
   const handleIssue = useCallback(() => {
-    const issuer = { userId: user.uid, name: user.displayName, role };
-    const recipients: SpecIssueRecipient[] = (workspace.team ?? []).map((m) => ({
-      userId: m.userId,
-      name: m.name,
-      role: m.role,
-      scope: m.responsibility,
-    }));
-    const result = issueSpecification(workspace, issuer, recipients);
-    setIssuedSnapshot(result.snapshot.snapshotId);
+    try {
+      setIssueError(null);
+      const issuer = { userId: user.uid, name: user.displayName, role };
+      const recipients: SpecIssueRecipient[] = (workspace.team ?? []).map((m) => ({
+        userId: m.userId,
+        name: m.name,
+        role: m.role,
+        scope: m.responsibility,
+      }));
+      const result = issueSpecification(workspace, issuer, recipients);
+      setIssuedSnapshot(result.snapshot.snapshotId);
+    } catch (err: unknown) {
+      setIssueError(err instanceof Error ? err.message : 'Issue failed');
+    }
   }, [workspace, user, role]);
 
   // Procurement status advance
@@ -520,9 +526,12 @@ export default function SpecForgeWorkspace({ user }: Props) {
 
               {/* Issue button */}
               {canIssue && !issuedSnapshot && (
-                <Button onClick={handleIssue} disabled={readiness.some((f) => f.severity === 'blocker')}>
+                <Button onClick={handleIssue} disabled={readiness.some((f) => f.severity === 'blocker' || f.severity === 'high')}>
                   Issue Specification
                 </Button>
+              )}
+              {issueError && (
+                <p className="text-sm font-medium text-red-400">{issueError}</p>
               )}
               {issuedSnapshot && (
                 <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">

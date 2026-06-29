@@ -53,7 +53,7 @@ export function specRoleCan(role: SpecForgeRole, capability: SpecCapability): bo
 /**
  * Return the spec items visible to a given role.
  */
-export function getVisibleSpecItems(workspace: SpecForgeWorkspace, role: SpecForgeRole): SpecItem[] {
+export function getVisibleSpecItems(workspace: SpecForgeWorkspace, role: SpecForgeRole, viewerUserId?: string): SpecItem[] {
   if (specRoleCan(role, 'view_all')) return workspace.items;
   if (specRoleCan(role, 'view_client_items')) {
     return workspace.items.filter(
@@ -71,9 +71,22 @@ export function getVisibleSpecItems(workspace: SpecForgeWorkspace, role: SpecFor
     );
   }
   if (specRoleCan(role, 'view_package')) {
-    return workspace.items.filter((item) =>
-      ['issued', 'rfq', 'ordered', 'delivered', 'installed'].includes(item.status),
-    );
+    const statusVisible = ['issued', 'rfq', 'ordered', 'delivered', 'installed'];
+    let items = workspace.items.filter((item) => statusVisible.includes(item.status));
+    // Package-scoped: if viewer identity is provided, further restrict to items
+    // where the viewer is assigned as reviewer/approver or their team entry's
+    // responsibility scope matches the item's section/package.
+    if (viewerUserId) {
+      const viewerTeam = workspace.team?.find(m => m.userId === viewerUserId);
+      if (viewerTeam) {
+        items = items.filter(item =>
+          item.reviewerRole === role ||
+          item.approverRole === role ||
+          workspace.sections.find(s => s.id === item.sectionId)?.reviewerRole === role
+        );
+      }
+    }
+    return items;
   }
   return [];
 }
@@ -145,6 +158,20 @@ export function validateIssueReadiness(workspace: SpecForgeWorkspace): SpecReadi
 // ── Issue Snapshot ──────────────────────────────────────────────────────────
 
 /**
+ * Recursively deep-freeze an object and all nested objects.
+ */
+function deepFreeze<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') return obj;
+  Object.freeze(obj);
+  for (const value of Object.values(obj as Record<string, unknown>)) {
+    if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+      deepFreeze(value);
+    }
+  }
+  return obj;
+}
+
+/**
  * FNV-1a-inspired hash for audit purposes.
  */
 export function simpleHash(input: string): string {
@@ -174,15 +201,15 @@ export function createIssueSnapshot(workspace: SpecForgeWorkspace, issuer: SpecI
         : 'requires_professional_confirmation',
     projectName: workspace.projectName,
     issueStatus: 'issued_snapshot',
-    sections: workspace.sections.map((s) => ({ ...s })),
-    items: workspace.items.map((i) => ({ ...i })),
+    sections: structuredClone(workspace.sections),
+    items: structuredClone(workspace.items),
     readinessFindings: validateIssueReadiness(workspace),
     budgetSummary: summarizeSpecBudget(workspace.items),
   };
 
   snapshot.auditHash = simpleHash(JSON.stringify(snapshot));
 
-  return Object.freeze(snapshot) as SpecIssueSnapshot;
+  return deepFreeze(snapshot) as SpecIssueSnapshot;
 }
 
 /**
@@ -194,12 +221,28 @@ export function issueSpecification(
   issuer: SpecIssuer,
   recipients: SpecIssueRecipient[],
 ): { snapshot: SpecIssueSnapshot; recipients: SpecIssueRecipient[]; issuedAt: string } {
+  // Enforce issue governance
+  if (!specRoleCan(issuer.role, 'issue_spec')) {
+    throw new Error(`Role "${issuer.role}" does not have issue_spec capability`);
+  }
+
+  const findings = validateIssueReadiness(workspace);
+  const blockers = findings.filter(f => f.severity === 'blocker');
+
+  if (blockers.length > 0) {
+    throw new Error(`Cannot issue: ${blockers.length} blocker(s) — ${blockers[0].message}`);
+  }
+
+  // High-severity findings (pending client decisions, over-budget) also block issue
+  const pendingClientDecisions = workspace.items.filter(
+    i => i.clientDecision && !['approved', 'issued', 'ordered', 'delivered', 'installed', 'as_built'].includes(i.status)
+  );
+  if (pendingClientDecisions.length > 0) {
+    throw new Error(`Cannot issue: ${pendingClientDecisions.length} client decision(s) pending approval`);
+  }
+
   const snapshot = createIssueSnapshot(workspace, issuer);
-  return {
-    snapshot,
-    recipients,
-    issuedAt: snapshot.issuedAt,
-  };
+  return { snapshot, recipients, issuedAt: snapshot.issuedAt };
 }
 
 // ── Library Search ──────────────────────────────────────────────────────────

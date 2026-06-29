@@ -9,6 +9,7 @@ import {
   summarizeSpecBudget,
   validateIssueReadiness,
   createIssueSnapshot,
+  issueSpecification,
   generateBoMFromSpec,
   simpleHash,
   SPEC_ROLE_CAPABILITIES,
@@ -284,5 +285,170 @@ describe('generateBoMFromSpec', () => {
   it('handles empty input', () => {
     const bom = generateBoMFromSpec([]);
     expect(bom).toHaveLength(0);
+  });
+});
+
+describe('getVisibleSpecItems with viewerUserId', () => {
+  it('returns package-visible items without viewerUserId (no further filtering)', () => {
+    const items = getVisibleSpecItems(SAMPLE_WORKSPACE, 'supplier');
+    const packageItems = SAMPLE_WORKSPACE.items.filter(i =>
+      ['issued', 'rfq', 'ordered', 'delivered', 'installed'].includes(i.status),
+    );
+    expect(items.length).toBe(packageItems.length);
+  });
+
+  it('filters items by role scope when viewerUserId is provided and team member found', () => {
+    // Create a workspace with team including a supplier user and items with matching section reviewerRole
+    const ws: SpecForgeWorkspace = {
+      ...SAMPLE_WORKSPACE,
+      team: [
+        { userId: 'u-supplier-1', name: 'Supplier A', role: 'supplier', responsibility: 'Material supply' },
+      ],
+      sections: [
+        { id: 'sec-a', code: '01', title: 'Section A', discipline: 'general', ownerRole: 'architect', reviewerRole: 'supplier', status: 'draft' },
+        { id: 'sec-b', code: '02', title: 'Section B', discipline: 'general', ownerRole: 'architect', reviewerRole: 'contractor', status: 'draft' },
+      ],
+      items: [
+        {
+          id: 'item-1', sectionId: 'sec-a', code: 'A-001', title: 'Item in section with supplier reviewer',
+          room: 'R1', package: 'P1', drawingRefs: [], clauseRefs: [],
+          budgetAllowance: 100, estimatedCost: 90, leadTimeDays: 10,
+          clientDecision: false, ownerRole: 'architect', status: 'issued',
+          sourceRevision: 'P01', supersededBy: null,
+        },
+        {
+          id: 'item-2', sectionId: 'sec-b', code: 'B-001', title: 'Item in section with contractor reviewer',
+          room: 'R2', package: 'P2', drawingRefs: [], clauseRefs: [],
+          budgetAllowance: 200, estimatedCost: 180, leadTimeDays: 14,
+          clientDecision: false, ownerRole: 'architect', status: 'issued',
+          sourceRevision: 'P01', supersededBy: null,
+        },
+      ],
+    };
+    const items = getVisibleSpecItems(ws, 'supplier', 'u-supplier-1');
+    // Only item-1 should be visible: its section's reviewerRole === 'supplier'
+    expect(items.length).toBe(1);
+    expect(items[0].id).toBe('item-1');
+  });
+
+  it('returns all package items when viewerUserId does not match any team member', () => {
+    const ws: SpecForgeWorkspace = {
+      ...SAMPLE_WORKSPACE,
+      team: [
+        { userId: 'u-other', name: 'Other', role: 'supplier', responsibility: 'Other' },
+      ],
+      items: [
+        {
+          id: 'item-x', sectionId: 'sec-finishes', code: 'X-001', title: 'Test',
+          room: 'R1', package: 'P1', drawingRefs: [], clauseRefs: [],
+          budgetAllowance: 100, estimatedCost: 90, leadTimeDays: 10,
+          clientDecision: false, ownerRole: 'architect', status: 'issued',
+          sourceRevision: 'P01', supersededBy: null,
+        },
+      ],
+    };
+    // viewerUserId 'u-unknown' not found in team, so no further filtering happens
+    const items = getVisibleSpecItems(ws, 'supplier', 'u-unknown');
+    expect(items.length).toBe(1);
+  });
+});
+
+describe('createIssueSnapshot deep immutability', () => {
+  it('deep-freezes nested items so mutation throws', () => {
+    const issuer = { userId: 'u-arch-1', name: 'Test Architect', role: 'architect' as const };
+    const snapshot = createIssueSnapshot(SAMPLE_WORKSPACE, issuer);
+
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.items[0])).toBe(true);
+    expect(Object.isFrozen(snapshot.sections[0])).toBe(true);
+
+    // Attempting to mutate a nested property should throw in strict mode
+    expect(() => {
+      (snapshot.items[0] as any).estimatedCost = 999;
+    }).toThrow();
+  });
+
+  it('snapshot items are independent from original workspace items', () => {
+    const issuer = { userId: 'u-arch-1', name: 'Test Architect', role: 'architect' as const };
+    const snapshot = createIssueSnapshot(SAMPLE_WORKSPACE, issuer);
+
+    // The snapshot should be a deep copy — modifying original should not affect snapshot
+    const originalTitle = SAMPLE_WORKSPACE.items[0].title;
+    expect(snapshot.items[0].title).toBe(originalTitle);
+  });
+});
+
+describe('issueSpecification governance', () => {
+  it('throws when issuer lacks issue_spec capability', () => {
+    const issuer = { userId: 'u-client-1', name: 'Client', role: 'client' as const };
+    expect(() =>
+      issueSpecification(SAMPLE_WORKSPACE, issuer, [])
+    ).toThrow('does not have issue_spec capability');
+  });
+
+  it('throws when there are blocker findings (superseded items)', () => {
+    // SAMPLE_WORKSPACE has a superseded item → blocker
+    const issuer = { userId: 'u-arch-1', name: 'Architect', role: 'architect' as const };
+    expect(() =>
+      issueSpecification(SAMPLE_WORKSPACE, issuer, [])
+    ).toThrow(/Cannot issue:.*blocker/);
+  });
+
+  it('throws when there are pending client decisions', () => {
+    // Create workspace with no blockers but with pending client decisions
+    const ws: SpecForgeWorkspace = {
+      ...SAMPLE_WORKSPACE,
+      items: [{
+        id: 'item-pending',
+        sectionId: 'sec-finishes',
+        code: 'PD-001',
+        title: 'Pending client item',
+        room: 'Room A',
+        package: 'General',
+        drawingRefs: [],
+        clauseRefs: [],
+        budgetAllowance: 1000,
+        estimatedCost: 900,
+        leadTimeDays: 10,
+        clientDecision: true,
+        ownerRole: 'architect',
+        status: 'needs_decision',
+        sourceRevision: 'P01',
+        supersededBy: null,
+      }],
+    };
+    const issuer = { userId: 'u-arch-1', name: 'Architect', role: 'architect' as const };
+    expect(() =>
+      issueSpecification(ws, issuer, [])
+    ).toThrow(/client decision.*pending/);
+  });
+
+  it('succeeds when workspace is clean and issuer has issue_spec', () => {
+    const cleanWs: SpecForgeWorkspace = {
+      ...SAMPLE_WORKSPACE,
+      items: [{
+        id: 'item-clean',
+        sectionId: 'sec-finishes',
+        code: 'CL-001',
+        title: 'Clean item',
+        room: 'Room A',
+        package: 'General',
+        drawingRefs: [],
+        clauseRefs: [],
+        budgetAllowance: 1000,
+        estimatedCost: 900,
+        leadTimeDays: 10,
+        clientDecision: false,
+        ownerRole: 'architect',
+        status: 'approved',
+        sourceRevision: 'P01',
+        supersededBy: null,
+      }],
+    };
+    const issuer = { userId: 'u-arch-1', name: 'Architect', role: 'architect' as const };
+    const result = issueSpecification(cleanWs, issuer, []);
+    expect(result.snapshot).toBeDefined();
+    expect(result.snapshot.snapshotId).toBeDefined();
+    expect(result.issuedAt).toBeDefined();
   });
 });

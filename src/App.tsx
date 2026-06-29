@@ -825,11 +825,18 @@ function AppContent() {
 
   if (!user && !showLogin) {
     return (
-      <LandingExperience
-        onSignUp={() => { setShowLogin(true); setAuthMode('selection'); }}
-        onSignIn={handleLandingSignIn}
-        onNavigate={(route) => window.location.assign(route)}
-      />
+      <>
+        <LandingExperience
+          onSignUp={() => { setShowLogin(true); setAuthMode('selection'); }}
+          onSignIn={handleLandingSignIn}
+          onNavigate={(route) => {
+            // QuickNav routes require authentication — open login with context
+            setShowLogin(true);
+            setAuthMode('selection');
+          }}
+        />
+        <Toaster />
+      </>
     );
   }
 
