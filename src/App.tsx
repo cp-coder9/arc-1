@@ -174,6 +174,7 @@ const TimesheetEntryPage = lazyWithChunkRetry(() => import('./components/Timeshe
 const PipelineKanbanPage = lazyWithChunkRetry(() => import('./components/PipelineKanban'));
 const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/TemplateLibrary'));
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
+const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -248,6 +249,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'bep-marketplace', label: 'Client Marketplace', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Search size={18} />, summary: 'Live client opportunity marketplace for design-team proposal submissions.', backedBy: ['jobs', 'applications'] },
   { id: 'bep-team', label: 'Design Team Matrix', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Users size={18} />, summary: 'Discipline responsibility matrix and consultant invitation workspace.', backedBy: ['projects.teamMembers', 'teamService'] },
   { id: 'bep-freelancers', label: 'Freelancer Jobs', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Plus size={18} />, summary: 'Controlled BEP-to-freelancer work package shell.', backedBy: ['delegatedTasks'] },
+  { id: 'specforge', label: 'SpecForge Specifications', roles: ['client', 'developer', 'bep', 'architect', 'engineer', 'quantity_surveyor', 'energy_professional', 'fire_engineer', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Interactive pictorial specifications, product schedules, approvals, RFQs, planning and closeout.', backedBy: ['SpecForgeWorkspace', 'specforgeService'] },
   { id: 'snagging', label: 'Snagging / Close-Out', roles: [...DESIGN_TEAM_ROLES, 'contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <CheckCircle2 size={18} />, summary: 'Project and package close-out shell backed by existing closeout workflows and package evidence records.', backedBy: ['CloseoutWizard', 'PackageCloseoutPage'] },
   { id: 'construction', label: 'Construction OS', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Construction size={18} />, summary: 'Construction operations shell for site logs, RFIs, programme, and delivery controls.', backedBy: ['SiteLogManager', 'RFIManager'] },
   { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management workspace for staff, wage evidence, and plant records.', backedBy: ['contractor profile/compliance records'] },
@@ -302,6 +304,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'pipeline',
   'templates',
   'registrations',
+  'specforge',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1094,6 +1097,7 @@ function AppContent() {
               {activeTab === 'pipeline' && <PipelineKanbanPage user={user} />}
               {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
+              {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
