@@ -71,7 +71,7 @@ describe('XaComplianceEngine', () => {
   });
 
   describe('evaluateStoreyFenestration', () => {
-    it('passes when glazing ≤ 20% (any solution)', () => {
+    it('passes when glazing ≤ zone maxGlazingPct (any solution)', () => {
       const storey: StoreyFenestration = {
         storeyId: 'gf', storeyLabel: 'Ground', nfa: 950,
         openings: [
@@ -81,12 +81,12 @@ describe('XaComplianceEngine', () => {
         uStatus: 'pending', shgcSolarStatus: 'pending', shgcNonSolarStatus: 'pending', overallStatus: 'pending',
       };
       const result = engine.evaluateStoreyFenestration(storey);
-      // 14.4 m² / 950 = 1.5% < 20% → any solution allowed
+      // 14.4 m² / 950 = 1.5% < 15% (zone 5 maxGlazingPct) → any solution allowed
       expect(result.glazingPct).toBeCloseTo(1.5, 0);
       expect(result.overallStatus).toBe('pass');
     });
 
-    it('fails when glazing > 20% and SHGC exceeds limit', () => {
+    it('fails when glazing > zone maxGlazingPct and SHGC exceeds limit', () => {
       const storey: StoreyFenestration = {
         storeyId: 'f1', storeyLabel: 'First', nfa: 100,
         openings: [
@@ -96,7 +96,7 @@ describe('XaComplianceEngine', () => {
         uStatus: 'pending', shgcSolarStatus: 'pending', shgcNonSolarStatus: 'pending', overallStatus: 'pending',
       };
       const result = engine.evaluateStoreyFenestration(storey);
-      // 25 m² / 100 = 25% > 20%, SHGC 0.60 > 0.50 limit
+      // 25 m² / 100 = 25% > 15% (zone 5 maxGlazingPct), SHGC 0.60 > 0.50 limit
       expect(result.glazingPct).toBe(25);
       expect(result.shgcSolarStatus).toBe('fail');
       expect(result.overallStatus).toBe('fail');

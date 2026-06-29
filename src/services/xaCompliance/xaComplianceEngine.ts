@@ -138,12 +138,13 @@ export class XaComplianceEngine {
     let shgcSolarStatus: ComplianceStatus = 'pass';
     let shgcNonSolarStatus: ComplianceStatus = 'pass';
 
-    if (glazingPct > 20) {
+    // If glazing % exceeds the zone maximum, U-value and SHGC limits apply
+    if (glazingPct > this.thresholds.maxGlazingPct) {
       if (avgU > this.thresholds.maxUValue) uStatus = 'fail';
       if (avgShgcSolar > this.thresholds.maxShgcSolar) shgcSolarStatus = 'fail';
       if (avgShgcNonSolar > this.thresholds.maxShgcNonSolar) shgcNonSolarStatus = 'fail';
     }
-    // ≤ 20% → "any solution" for U and SHGC
+    // ≤ maxGlazingPct → "any solution" for U and SHGC
 
     const overallStatus: ComplianceStatus =
       uStatus === 'fail' || shgcSolarStatus === 'fail' || shgcNonSolarStatus === 'fail'
@@ -270,6 +271,16 @@ export class XaComplianceEngine {
 
     const electricPass = assessment.supplementaryElectricPct.value <= 50;
     const eerPass = assessment.eer.value >= 0.5;
+    const technologyPass = assessment.technology.value !== 'electric';
+
+    const electricSupplStatus: ComplianceStatus = electricPass ? 'pass' : 'fail';
+    const technologyStatus: ComplianceStatus = technologyPass ? 'pass' : 'fail';
+    const eerStatus: ComplianceStatus = eerPass ? 'pass' : 'check';
+
+    // Overall fails if any critical check fails; 'check' if EER is marginal
+    const hasFail = !electricPass || !technologyPass;
+    const hasCheck = !eerPass;
+    const overallStatus: ComplianceStatus = hasFail ? 'fail' : (hasCheck ? 'check' : 'pass');
 
     return {
       ...assessment,
@@ -277,12 +288,12 @@ export class XaComplianceEngine {
       dailyThermalKwh: Number(dailyKwh.toFixed(2)),
       annualThermalKwh: Number(annualKwh.toFixed(2)),
       gridKwhYear: Number(gridKwh.toFixed(2)),
-      electricSupplStatus: electricPass ? 'pass' : 'fail',
+      electricSupplStatus,
       storageStatus: 'pass', // simplified — full impl checks Table 10
       pipeRStatus: 'pass', // simplified — full impl checks Table 11
-      technologyStatus: assessment.technology.value !== 'electric' ? 'pass' : 'fail',
-      eerStatus: eerPass ? 'pass' : 'check',
-      overallStatus: electricPass ? 'pass' : 'fail',
+      technologyStatus,
+      eerStatus,
+      overallStatus,
     };
   }
 
