@@ -115,6 +115,20 @@ describe('qsReviewService', () => {
     expect(readiness.blockers.some((b) => b.includes('rejected'))).toBe(true);
   });
 
+  it('validates sign-off readiness - blocks when items have info_required status', () => {
+    const project = seedProject();
+    submitForReview(project.id);
+
+    // Approve 2, request info on 1
+    reviewItem(project.id, project.lineItems[0].id, 'approve', 'qs@firm.co.za');
+    reviewItem(project.id, project.lineItems[1].id, 'approve', 'qs@firm.co.za');
+    reviewItem(project.id, project.lineItems[2].id, 'request_info', 'qs@firm.co.za');
+
+    const readiness = validateSignOffReadiness(project.id);
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers.some((b) => b.includes('awaiting information'))).toBe(true);
+  });
+
   it('signs off when all conditions met', () => {
     const project = seedProject();
     submitForReview(project.id);

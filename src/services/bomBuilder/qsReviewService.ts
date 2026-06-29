@@ -150,6 +150,9 @@ export function validateSignOffReadiness(projectId: string): SignOffReadiness {
   const rejectedItems = project.lineItems.filter((i) => i.status === 'rejected');
   if (rejectedItems.length > 0) blockers.push(`${rejectedItems.length} rejected item(s) need resolution`);
 
+  const infoRequiredItems = project.lineItems.filter((i) => i.status === 'info_required');
+  if (infoRequiredItems.length > 0) blockers.push(`${infoRequiredItems.length} item(s) awaiting information`);
+
   return {
     ready: blockers.length === 0,
     totalItems,
