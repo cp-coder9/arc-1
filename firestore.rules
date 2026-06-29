@@ -192,7 +192,7 @@ service cloud.firestore {
 
     function isEligibleContractorForTender(tenderData) {
       return isAuthenticated() && tenderData.status == 'published' && !isTenderParticipant(tenderData) && (
-        getUserData() != null && getUserData().role in ['contractor', 'subcontractor', 'supplier']
+        hasRole('contractor') || hasRole('subcontractor') || hasRole('supplier')
       );
     }
 
