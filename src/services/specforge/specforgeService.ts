@@ -241,6 +241,16 @@ export function issueSpecification(
     throw new Error(`Cannot issue: ${pendingClientDecisions.length} client decision(s) pending approval`);
   }
 
+  // Over-budget items exceeding 10% also block issue until QS review
+  const materialOverBudget = workspace.items.filter(
+    i => i.estimatedCost > i.budgetAllowance * 1.1
+  );
+  if (materialOverBudget.length > 0) {
+    throw new Error(
+      `Cannot issue: ${materialOverBudget.length} item(s) exceed budget allowance by >10% — QS review required`
+    );
+  }
+
   const snapshot = createIssueSnapshot(workspace, issuer);
   return { snapshot, recipients, issuedAt: snapshot.issuedAt };
 }

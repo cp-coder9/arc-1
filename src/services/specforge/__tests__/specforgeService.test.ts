@@ -423,6 +423,34 @@ describe('issueSpecification governance', () => {
     ).toThrow(/client decision.*pending/);
   });
 
+  it('throws when items exceed budget allowance by more than 10%', () => {
+    const ws: SpecForgeWorkspace = {
+      ...SAMPLE_WORKSPACE,
+      items: [{
+        id: 'item-overbudget',
+        sectionId: 'sec-finishes',
+        code: 'OB-001',
+        title: 'Over-budget item',
+        room: 'Room A',
+        package: 'General',
+        drawingRefs: [],
+        clauseRefs: [],
+        budgetAllowance: 1000,
+        estimatedCost: 1200, // 20% over → exceeds 10% threshold
+        leadTimeDays: 10,
+        clientDecision: false,
+        ownerRole: 'architect',
+        status: 'approved',
+        sourceRevision: 'P01',
+        supersededBy: null,
+      }],
+    };
+    const issuer = { userId: 'u-arch-1', name: 'Architect', role: 'architect' as const };
+    expect(() =>
+      issueSpecification(ws, issuer, [])
+    ).toThrow(/exceed budget allowance.*QS review required/);
+  });
+
   it('succeeds when workspace is clean and issuer has issue_spec', () => {
     const cleanWs: SpecForgeWorkspace = {
       ...SAMPLE_WORKSPACE,

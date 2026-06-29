@@ -53,7 +53,7 @@ export default function SpecForgeWorkspace({ user }: Props) {
 
   // Derived state
   const visibleItems = useMemo((): SpecItem[] => {
-    let items = getVisibleSpecItems(workspace, role);
+    let items = getVisibleSpecItems(workspace, role, user.uid);
     if (roomFilter !== 'all') items = items.filter((i) => i.room === roomFilter);
     if (pkgFilter !== 'all') items = items.filter((i) => i.package === pkgFilter);
     return items;
@@ -526,7 +526,7 @@ export default function SpecForgeWorkspace({ user }: Props) {
 
               {/* Issue button */}
               {canIssue && !issuedSnapshot && (
-                <Button onClick={handleIssue} disabled={readiness.some((f) => f.severity === 'blocker' || f.severity === 'high')}>
+                <Button onClick={handleIssue} disabled={readiness.some((f) => f.severity === 'blocker' || f.severity === 'high' || f.severity === 'medium')}>
                   Issue Specification
                 </Button>
               )}
