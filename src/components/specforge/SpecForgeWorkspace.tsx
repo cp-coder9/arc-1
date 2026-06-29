@@ -36,6 +36,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+const DEMO_PROJECTS = [
+  { projectId: 'architex-demo-project-rosebank-fitout', projectName: 'Rosebank Mixed-Use Lobby + Office Fit-out' },
+  { projectId: 'proj-sandton-tower', projectName: 'Sandton Tower Block A — Interior Fit-out' },
+  { projectId: 'proj-capetown-restaurant', projectName: 'Cape Town Waterfront Restaurant' },
+] as const;
 
 interface Props {
   user: UserProfile;
@@ -45,6 +52,9 @@ export default function SpecForgeWorkspace({ user }: Props) {
   const role: SpecForgeRole = toSpecForgeRole(user.role) ?? 'client';
   const [workspace, setWorkspace] = useState(SAMPLE_WORKSPACE);
   const [activeView, setActiveView] = useState('overview');
+  const [activeProjectId, setActiveProjectId] = useState(SAMPLE_WORKSPACE.projectId);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [roomFilter, setRoomFilter] = useState('all');
   const [pkgFilter, setPkgFilter] = useState('all');
@@ -200,6 +210,31 @@ export default function SpecForgeWorkspace({ user }: Props) {
           <p className="text-sm text-muted-foreground">
             {workspace.profile} · Rev {workspace.revision} · {workspace.stage}
           </p>
+          <div className="mt-3 flex items-center gap-3">
+            <select
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+              value={activeProjectId}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '__new__') {
+                  setShowNewProject(true);
+                } else {
+                  setActiveProjectId(val);
+                  const project = DEMO_PROJECTS.find((p) => p.projectId === val);
+                  if (project) {
+                    setWorkspace((ws) => ({ ...ws, projectId: project.projectId, projectName: project.projectName }));
+                  }
+                }
+              }}
+              aria-label="Select project"
+            >
+              {DEMO_PROJECTS.map((p) => (
+                <option key={p.projectId} value={p.projectId}>{p.projectName}</option>
+              ))}
+              <option disabled>──────────</option>
+              <option value="__new__">+ New Project</option>
+            </select>
+          </div>
         </CardHeader>
       </Card>
 
@@ -579,7 +614,7 @@ export default function SpecForgeWorkspace({ user }: Props) {
                   <CardContent className="space-y-2">
                     {entries.map((entry) => (
                       <div key={entry.id} className="rounded-md border border-border/50 p-2">
-                        <p className="text-xs font-medium">{entry.itemCode}</p>
+                        <p className="text-sm font-medium">{entry.itemCode}</p>
                         <p className="text-xs text-muted-foreground">{entry.itemTitle}</p>
                         {entry.supplier && (
                           <p className="text-xs text-muted-foreground">{entry.supplier}</p>
@@ -728,6 +763,44 @@ export default function SpecForgeWorkspace({ user }: Props) {
           </Card>
         </div>
       )}
+
+      {/* ── New Project Modal ──────────────────────────────────────── */}
+      {showNewProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>New Project</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label htmlFor="new-project-name">Project Name</Label>
+                <Input
+                  id="new-project-name"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="e.g. Sandton Tower Block B"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    if (!newProjectName.trim()) return;
+                    const newId = `proj-${Date.now()}`;
+                    setActiveProjectId(newId);
+                    setWorkspace((ws) => ({ ...ws, projectId: newId, projectName: newProjectName.trim() }));
+                    toast.success('Project created');
+                    setNewProjectName('');
+                    setShowNewProject(false);
+                  }}
+                >
+                  Create
+                </Button>
+                <Button variant="outline" onClick={() => setShowNewProject(false)}>Cancel</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
@@ -738,8 +811,8 @@ function StatCard({ label, value, variant }: { label: string; value: string; var
   return (
     <Card>
       <CardContent className="p-4">
-        <p className={cn('text-xl font-bold', variant === 'destructive' && 'text-red-400')}>{value}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={cn('text-2xl font-bold', variant === 'destructive' && 'text-red-400')}>{value}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
       </CardContent>
     </Card>
   );
