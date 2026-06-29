@@ -31,15 +31,19 @@ Central navigation configuration and routing infrastructure that determines what
 ### Navigation Type System (`navTypes.ts`)
 | Type | Purpose |
 |------|---------|
-| `ArchitexNavKey` | Enumerated module keys: command_centre, inbox, projects, toolboxes, cpd_learning, documents, marketplace, finance, messages, settings, user_settings |
-| `WorkspaceSection` | Section definition with key, label, description, role filter, phase awareness, project scope, contextual messaging support |
+| `ArchitexNavKey` | Enumerated module keys: command_centre, inbox, projects, toolboxes, cpd_learning, documents, marketplace, finance, analytics, messages, settings, user_settings |
+| `WorkspaceSection` | Section definition with key, label, description, role filter, phase awareness, project scope, contextual messaging support, optional `component` / `preservesComponents` bindings, and optional `captureStage` / `captureCapabilities` stage-gating |
 | `NavigationItem` | Module-level navigation entry with role filtering and icon |
 | `RoleBasedFilter` | Filter function type for role-aware navigation queries |
 
 ### Navigation Config (`architexNavigationConfig.ts`)
-- Defines 11 top-level navigation modules
+- Defines 12 top-level navigation modules
 - Each module specifies: role access list, key sections, phase awareness
-- Modules include: Command Centre, Inbox/Action Centre, Projects, Toolboxes, CPD & Learning, Documents/Knowledge Hub, People, Marketplace, Payments/Finance, Compliance Hub, Admin/Governance
+- A section may declaratively bind a primary `component` (by stable component name) and list `preservesComponents` for retained legacy UIs. Bindings stay config-only — the consuming surface resolves the name to a React component. Projects → `snags` mounts `IssueDashboard` and preserves `SnagManager` (Requirement 8.1).
+- Stage-specific field-capture entry points are gated declaratively via `captureStage` (a `LifecycleStage` from the 8-stage lifecycle) and `captureCapabilities` on Toolboxes sections. `construction_admin` declares `captureStage: 'build'` with `['field_capture', 'checklists', 'field_reporting']`; `closeout` declares `captureStage: 'closeout'` with `['snag_rectification', 'handover_reporting']`. `resolveStageCapture(stage)` returns `mode: 'capture'` with the matching section's capabilities iff the stage is Build or Close-out, otherwise `mode: 'read_reporting'` (read-and-report Issue Dashboard only) for every other stage (Requirement 8.2, 8.3, 8.4).
+- Role-aware field-tools visibility is resolved by `resolveFieldToolsAccess(role)`, which **defers the permission matrix to `@/services/fieldAccessService`** (`EDITOR_ROLES` / `canPerform`) rather than duplicating it. It returns `access: 'full'` (capture + reporting) for editor roles (site_manager, contractor, subcontractor, architect, engineer, bep), `access: 'read_reporting'` for `client` (view/report only, no mutation), and `access: 'denied'` with the service's `AuthorizationError` for every other role (Requirement 6.1, 6.2). Navigation stays config-driven: this helper is the single role-gate the consuming surface calls to decide field-tool visibility.
+- Modules include: Command Centre, Inbox/Action Centre, Projects, Toolboxes, CPD & Learning, Documents/Knowledge Hub, People, Marketplace, Payments/Finance, Analytics & Reporting, Compliance Hub, Admin/Governance
+- The `analytics` module (key `analytics`, route id `analytics`) is role-scoped to client, architect, admin, contractor, bep, engineer, quantity_surveyor, town_planner, developer, firm_admin, platform_admin. It maps to the `AnalyticsDashboardPage`, which computes the five KPIs from real pack data via `analyticsKpiSourceAdapter` and stores immutable `kpi_metric` records.
 - Navigation is consumed by `src/App.tsx` for sidebar rendering
 - **Role visibility contract:** `App.tsx` `visibleNavItems` filters strictly by `item.roles.includes(user.role)` with **no** role normalization. Every `UserRole` that should reach a surface must be listed explicitly in that module's `roles` array. All 17 roles now share the workflow spine (`command_centre`, `inbox`, `projects`, `messages`); `documents` is granted to all design/governance roles. `finance`, `settings`, `cpd_learning`, `marketplace`, `user_settings` remain intentionally role-restricted — extend deliberately, not by default.
 

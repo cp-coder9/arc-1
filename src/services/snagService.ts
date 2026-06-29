@@ -32,6 +32,12 @@ const SNAG_TRANSITIONS: Record<SnagStatus, SnagStatus[]> = {
   rejected: ['open'],
 };
 
+/**
+ * Canonical snag lifecycle statuses, derived from the snag state machine.
+ * This is the single source of truth for the valid snag/field-issue status enum.
+ */
+export const SNAG_STATUSES = Object.keys(SNAG_TRANSITIONS) as SnagStatus[];
+
 export function isValidSnagTransition(from: SnagStatus, to: SnagStatus): boolean {
   return SNAG_TRANSITIONS[from]?.includes(to) ?? false;
 }

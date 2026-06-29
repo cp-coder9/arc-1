@@ -1861,6 +1861,43 @@ export interface FieldReport {
   outstandingHandoverSnags?: number;
 }
 
+// --- Field Issue view-model (normalizing adapter target) ---
+
+/** The source record type a normalized Field_Issue was adapted from. */
+export type FieldIssueSourceType = 'snag' | 'ncr' | 'inspection';
+
+/**
+ * Uniform view-model the Issue_Dashboard reads across all source record types.
+ *
+ * Existing `SnagItem`, `NonConformanceReport`, and `InspectionRecord` findings
+ * are mapped into this single shape by the `fieldIssueService` adapter, so the
+ * dashboard needs no per-type branching and existing records need no migration.
+ *
+ * `status` is always normalized to the canonical snag lifecycle enum
+ * (`open`, `allocated`, `ready_for_reinspection`, `closed`, `rejected`).
+ */
+export interface FieldIssue {
+  id: string;
+  projectId: string;
+  /** Which source record type this issue was adapted from. */
+  sourceType: FieldIssueSourceType;
+  /** Lifecycle status normalized to the snag state-machine enum. */
+  status: SnagStatus;
+  severity: Severity;
+  /** Responsible-party identifier; `unassigned` when none is recorded. */
+  responsiblePartyId: string;
+  /** Free-text location ( empty string when the source carries none). */
+  location: string;
+  /** Optional pin-on-drawing reference (snags only). */
+  drawingPin?: DrawingPin;
+  description: string;
+  /** Whether the issue currently blocks payment. */
+  blocksPayment: boolean;
+  evidenceIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // --- Field Issue Draft (checklist fail → issue conversion) ---
 
 export interface FieldIssueDraft {

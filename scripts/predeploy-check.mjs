@@ -27,9 +27,43 @@ const requiredEnv = [
   'BLOB_READ_WRITE_TOKEN',
 ];
 
+// Forma Build site-tools (spec: forma-build-site-tools, Req 8.5/8.6):
+// Every role granted field-tools access under Requirement 6 must have its
+// role sheet updated to reference the field-tools capabilities. Deployment is
+// blocked and the stale role sheets are identified if the marker is absent.
+const fieldToolsRoleSheets = [
+  'docs/toolbox-specs/site_manager.md',
+  'docs/toolbox-specs/contractor.md',
+  'docs/toolbox-specs/subcontractor.md',
+  'docs/toolbox-specs/architect.md',
+  'docs/toolbox-specs/engineer.md',
+  'docs/toolbox-specs/bep.md',
+  'docs/toolbox-specs/client.md',
+];
+const fieldToolsMarker = '<!-- forma-build-site-tools:field-tools -->';
+
 const failures = [];
 for (const file of requiredFiles) {
   if (!existsSync(resolve(root, file))) failures.push(`Missing required file: ${file}`);
+}
+
+const staleRoleSheets = [];
+for (const sheet of fieldToolsRoleSheets) {
+  const sheetPath = resolve(root, sheet);
+  if (!existsSync(sheetPath)) {
+    staleRoleSheets.push(`${sheet} (missing)`);
+    continue;
+  }
+  if (!readFileSync(sheetPath, 'utf8').includes(fieldToolsMarker)) {
+    staleRoleSheets.push(sheet);
+  }
+}
+if (staleRoleSheets.length > 0) {
+  failures.push(
+    'Forma Build field tools changed but the following role sheets have not been updated ' +
+      `(expected marker "${fieldToolsMarker}"):`,
+  );
+  for (const sheet of staleRoleSheets) failures.push(`  - ${sheet}`);
 }
 
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));

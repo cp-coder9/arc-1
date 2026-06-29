@@ -358,6 +358,12 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
   },
   {
     "authExpectation": "authenticated",
+    "canonicalPath": "/photos/upload",
+    "domain": "files",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
     "canonicalPath": "/files/delete",
     "domain": "files",
     "method": "post",
@@ -899,6 +905,54 @@ exports[`api-router route inventory > categorizes canonical routes by implemente
   {
     "authExpectation": "authenticated",
     "canonicalPath": "/projects/:id/submission-readiness",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/field-issues",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/field-issues/:id",
+    "domain": "projects",
+    "method": "patch",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/photo-annotations",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/checklist-instances",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/checklist-instances/:id/responses",
+    "domain": "projects",
+    "method": "patch",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/field-reports",
+    "domain": "projects",
+    "method": "get",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/field-reports/:id/export",
+    "domain": "projects",
+    "method": "post",
+  },
+  {
+    "authExpectation": "authenticated",
+    "canonicalPath": "/sync-queue/flush",
     "domain": "projects",
     "method": "post",
   },

@@ -110,7 +110,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(150);
+    expect(inventory).toHaveLength(159);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -172,6 +172,7 @@ describe('api-router route inventory', () => {
         "POST /agent/test-settings",
         "POST /agent/search",
         "POST /files/upload",
+        "POST /photos/upload",
         "POST /files/delete",
         "POST /notifications/token",
         "POST /payment/escrow/init",
@@ -263,6 +264,14 @@ describe('api-router route inventory', () => {
         "POST /projects/:id/kickoff/checklist/:itemId",
         "GET /projects/:id/submission-readiness",
         "POST /projects/:id/submission-readiness",
+        "POST /field-issues",
+        "PATCH /field-issues/:id",
+        "POST /photo-annotations",
+        "POST /checklist-instances",
+        "PATCH /checklist-instances/:id/responses",
+        "GET /field-reports",
+        "POST /field-reports/:id/export",
+        "POST /sync-queue/flush",
       ]
     `);
   });
