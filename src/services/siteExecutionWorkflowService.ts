@@ -203,6 +203,8 @@ export async function runSiteExecutionDemo(
       actorId,
       actorRole,
       action: 'site_execution_record_created',
+      actionType: 'create',
+      outcome: 'permitted',
       sourceObjectId: obj.sourceObjectId, sourceObjectType: obj.sourceObjectType,
     }));
   }
