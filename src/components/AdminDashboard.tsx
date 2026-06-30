@@ -944,20 +944,7 @@ export default function AdminDashboard({
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Fixed left sidebar — hidden on mobile, visible md:block */}
-      <RoleAwareSidebar
-        user={user}
-        activeTab={activeTab}
-        onNavigate={onTabChange}
-      />
-
-      {/* Mobile hamburger trigger */}
-      <div className="fixed top-4 left-4 z-50 md:hidden">
-        <MobileMenuTrigger user={user} />
-      </div>
-
-      {/* Main content offset for sidebar */}
-      <main className="md:ml-64 p-4 md:p-6 space-y-6">
+      <main className="p-4 md:p-6 space-y-6">
         {/* Header: glass-panel with title, breadcrumbs, action buttons */}
         <header className="glass-panel rounded-2xl p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

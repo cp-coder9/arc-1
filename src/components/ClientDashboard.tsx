@@ -153,15 +153,7 @@ export default function ClientDashboard({
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* ── Sidebar (desktop) ─────────────────────────────────────────────── */}
-      <RoleAwareSidebar
-        user={user}
-        activeTab={activeTab}
-        onNavigate={onTabChange}
-      />
-
-      {/* ── Main content area ─────────────────────────────────────────────── */}
-      <main className="md:ml-64 p-4 md:p-6 space-y-6">
+      <main className="p-4 md:p-6 space-y-6">
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <header className="glass-panel rounded-2xl p-6">
           <div className="flex items-start justify-between gap-4">
