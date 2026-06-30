@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpecForge V2 — Architex OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d2520; --bg-deep: #081a16; --bg-os-nav: #061410;
+  --primary: #005b4e; --primary-light: #007666; --secondary: #aeefe3;
+  --text-primary: #ffffff; --text-muted: rgba(255,255,255,0.62);
+  --text-low: rgba(255,255,255,0.42);
+  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(174,239,227,0.24);
+  --glass-glow: rgba(0,118,102,0.38);
+  --panel-bg: rgba(255,255,255,0.05); --card-bg: #11302a;
+  --btn-gradient: linear-gradient(180deg, #c5f6d4, #aeefe3); --btn-text: #00201b;
+  --gold: #F1D39A; --danger: #d95747; --green: #4ADE80; --amber: #F5A623;
+  --grid-lines: rgba(174,239,227,0.06); --radius: 10px; --radius-sm: 6px;
+  --font-heading: 'Space Grotesk', sans-serif; --font-body: 'Inter', sans-serif;
+  --os-nav-width: 56px; --tool-nav-width: 200px; --topbar-height: 36px;
+  --input-bg: rgba(255,255,255,0.06); --input-border: rgba(174,239,227,0.2);
+  --input-focus: rgba(174,239,227,0.5);
+}
+html, body { height:100%; background:var(--bg); color:var(--text-primary); font-family:var(--font-body); font-size:14px; line-height:1.5; overflow:hidden; }
+body::before { content:''; position:fixed; inset:0; background: radial-gradient(ellipse 60% 50% at 30% 40%, var(--glass-glow) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 75% 60%, rgba(174,239,227,0.04) 0%, transparent 60%); pointer-events:none; z-index:0; }
+body::after { content:''; position:fixed; inset:0; background-image: linear-gradient(var(--grid-lines) 1px, transparent 1px), linear-gradient(90deg, var(--grid-lines) 1px, transparent 1px); background-size:56px 56px; pointer-events:none; z-index:0; }
+.app-shell { display:grid; grid-template-columns:var(--os-nav-width) var(--tool-nav-width) 1fr; grid-template-rows:var(--topbar-height) 1fr; height:100vh; position:relative; z-index:1; }
+.os-nav { grid-row:1/-1; background:var(--bg-os-nav); border-right:1px solid rgba(174,239,227,0.12); display:flex; flex-direction:column; align-items:center; padding:12px 0; position:relative; z-index:100; }
+.os-nav-logo { width:32px; height:32px; margin-bottom:20px; cursor:pointer; color:var(--secondary); }
+.os-nav-logo svg { width:100%; height:100%; }
+.os-nav-items { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+.os-nav-item { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--text-low); cursor:pointer; transition:all 0.2s; position:relative; }
+.os-nav-item:hover { background:rgba(174,239,227,0.08); color:var(--text-primary); }
+.os-nav-item.active { color:var(--secondary); }
+.os-nav-item.active::after { content:''; position:absolute; right:-2px; top:50%; transform:translateY(-50%); width:4px; height:4px; border-radius:50%; background:var(--secondary); box-shadow:0 0 6px var(--secondary); }
+.os-nav-item svg { width:20px; height:20px; }
+.os-nav-item .tip { position:absolute; left:52px; top:50%; transform:translateY(-50%); background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:3px 8px; font-size:10px; color:var(--text-primary); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity 0.2s; z-index:200; }
+.os-nav-item:hover .tip { opacity:1; }
+.os-nav-expanded-overlay { position:fixed; left:0; top:0; bottom:0; width:240px; background:var(--bg-os-nav); border-right:1px solid rgba(174,239,227,0.15); z-index:500; padding:16px; display:none; flex-direction:column; box-shadow:8px 0 32px rgba(0,0,0,0.5); }
+.os-nav-expanded-overlay.open { display:flex; }
+.os-exp-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid rgba(174,239,227,0.12); }
+.os-exp-header .logo-text { font-family:var(--font-heading); font-size:16px; font-weight:700; color:var(--secondary); }
+.os-exp-close { margin-left:auto; background:none; border:none; color:var(--text-low); cursor:pointer; font-size:18px; }
+.os-exp-user { padding:10px; background:rgba(174,239,227,0.06); border-radius:var(--radius-sm); margin-bottom:14px; border:1px solid rgba(174,239,227,0.1); }
+.os-exp-user .name { font-size:12px; font-weight:600; }
+.os-exp-user .project { font-size:10px; color:var(--text-low); margin-top:2px; }
+.os-exp-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--radius-sm); color:var(--text-muted); cursor:pointer; font-size:12px; transition:all 0.2s; }
+.os-exp-item:hover { background:rgba(174,239,227,0.06); color:var(--text-primary); }
+.os-exp-item.active { color:var(--secondary); background:rgba(174,239,227,0.08); }
+.os-exp-item svg { width:16px; height:16px; flex-shrink:0; }
+.os-backdrop { position:fixed; inset:0; background:rgba(4,12,10,0.4); z-index:499; display:none; }
+.os-backdrop.open { display:block; }
+.tool-nav { grid-row:1/-1; background:var(--glass-bg); border-right:1px solid var(--glass-border); backdrop-filter:blur(16px); display:flex; flex-direction:column; overflow-y:auto; padding:10px 0; position:relative; }
+.tool-nav::-webkit-scrollbar { width:4px; }
+.tool-nav::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:2px; }
+.tool-nav-header { padding:6px 12px 12px; border-bottom:1px solid var(--glass-border); margin-bottom:6px; }
+.tool-nav-header h2 { font-family:var(--font-heading); font-size:15px; font-weight:700; color:var(--secondary); }
+.tool-nav-header .sub { font-size:9px; color:var(--text-low); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+.tool-nav-back { display:flex; align-items:center; gap:5px; padding:5px 12px; font-size:10px; color:var(--text-low); cursor:pointer; transition:color 0.2s; margin-bottom:6px; }
+.tool-nav-back:hover { color:var(--secondary); }
+.nav-role-badge { margin:0 8px 8px; padding:5px 8px; background:rgba(174,239,227,0.08); border:1px solid rgba(174,239,227,0.15); border-radius:var(--radius-sm); font-size:9px; color:var(--secondary); font-weight:500; }
+.nav-section-label { padding:8px 12px 3px; font-size:8px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-low); font-weight:600; }
+.nav-item { display:flex; align-items:center; gap:7px; padding:6px 12px; cursor:pointer; color:var(--text-muted); font-size:11px; transition:all 0.2s; border-left:3px solid transparent; }
+.nav-item:hover { color:var(--text-primary); background:rgba(174,239,227,0.05); border-left-color:rgba(174,239,227,0.3); }
+.nav-item.active { color:var(--secondary); background:rgba(174,239,227,0.08); border-left-color:var(--secondary); font-weight:500; }
+.nav-item svg { width:13px; height:13px; flex-shrink:0; opacity:0.7; }
+.nav-item.active svg { opacity:1; }
+.top-bar { background:var(--bg-os-nav); border-bottom:1px solid var(--glass-border); display:flex; align-items:center; padding:0 16px; gap:10px; font-size:11px; }
+.breadcrumb { color:var(--text-low); }
+.breadcrumb .sep { color:rgba(174,239,227,0.3); margin:0 4px; }
+.breadcrumb .cur { color:var(--secondary); font-weight:500; }
+.top-bar-spacer { flex:1; }
+.filter-select { background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); color:var(--text-muted); padding:3px 7px; font-size:10px; font-family:var(--font-body); cursor:pointer; outline:none; }
+.filter-select:focus { border-color:var(--secondary); }
+.filter-select option { background:var(--card-bg); color:var(--text-primary); }
+.btn { display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:var(--radius-sm); font-size:10px; font-weight:500; font-family:var(--font-body); cursor:pointer; transition:all 0.2s; border:none; white-space:nowrap; }
+.btn-primary { background:var(--btn-gradient); color:var(--btn-text); font-weight:600; }
+.btn-primary:hover { box-shadow:0 0 14px rgba(174,239,227,0.4); transform:translateY(-1px); }
+.btn-gold { background:var(--gold); color:var(--btn-text); font-weight:600; }
+.btn-gold:hover { background:#f8e0b0; box-shadow:0 0 14px rgba(241,211,154,0.4); }
+.btn-secondary { background:transparent; color:var(--text-muted); border:1px solid var(--glass-border); }
+.btn-secondary:hover { border-color:var(--secondary); color:var(--text-primary); }
+.btn-danger { background:rgba(217,87,71,0.15); color:var(--danger); border:1px solid rgba(217,87,71,0.3); }
+.btn-danger:hover { background:rgba(217,87,71,0.25); }
+.main-content { overflow-y:auto; padding:18px; position:relative; }
+.main-content::-webkit-scrollbar { width:5px; }
+.main-content::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:3px; }
+.panel { background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius); backdrop-filter:blur(16px); padding:16px; margin-bottom:14px; transition:border-color 0.3s; position:relative; }
+.panel:hover { border-color:rgba(174,239,227,0.4); }
+.panel-title { font-family:var(--font-heading); font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:10px; display:flex; align-items:center; gap:7px; }
+.panel-title .dot { width:5px; height:5px; border-radius:50%; background:var(--secondary); }
+.panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.chip { display:inline-flex; align-items:center; padding:2px 6px; border-radius:4px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+.chip-draft { background:rgba(255,255,255,0.08); color:var(--text-muted); }
+.chip-approved { background:rgba(74,222,128,0.15); color:var(--green); }
+.chip-needs_decision { background:rgba(241,211,154,0.2); color:var(--gold); }
+.chip-rejected { background:rgba(217,87,71,0.15); color:var(--danger); }
+.chip-blocker { background:rgba(217,87,71,0.2); color:var(--danger); }
+.chip-high { background:rgba(245,166,35,0.2); color:var(--amber); }
+.chip-medium { background:rgba(241,211,154,0.15); color:var(--gold); }
+.chip-ok { background:rgba(74,222,128,0.12); color:var(--green); }
+.badge { display:inline-flex; align-items:center; padding:2px 5px; border-radius:3px; font-size:9px; font-weight:500; background:rgba(174,239,227,0.1); color:var(--secondary); border:1px solid rgba(174,239,227,0.15); }
+.badge-gold { background:rgba(241,211,154,0.1); color:var(--gold); border-color:rgba(241,211,154,0.2); }
+.badge-red { background:rgba(217,87,71,0.1); color:var(--danger); border-color:rgba(217,87,71,0.2); }
+.badge-amber { background:rgba(245,166,35,0.1); color:var(--amber); border-color:rgba(245,166,35,0.2); }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:8px; }
+.stat-card { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:10px; text-align:center; }
+.stat-value { font-family:var(--font-heading); font-size:20px; font-weight:700; color:var(--secondary); }
+.stat-label { font-size:9px; color:var(--text-low); margin-top:2px; }
+.pictorial-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:12px; }
+.pic-card { background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius); overflow:hidden; transition:all 0.25s; cursor:pointer; }
+.pic-card:hover { border-color:rgba(174,239,227,0.4); box-shadow:0 6px 24px rgba(0,118,102,0.15); transform:translateY(-2px); }
+.pic-card-img { width:100%; height:130px; object-fit:cover; display:block; border-bottom:1px solid var(--glass-border); }
+.pic-card-body { padding:10px; }
+.pic-card-title { font-family:var(--font-heading); font-size:12px; font-weight:600; margin-bottom:3px; }
+.pic-card-code { font-size:9px; color:var(--text-low); font-family:monospace; margin-bottom:5px; }
+.pic-card-meta { display:flex; flex-wrap:wrap; gap:3px; margin-bottom:6px; }
+.pic-card-footer { display:flex; align-items:center; justify-content:space-between; padding-top:6px; border-top:1px solid var(--glass-border); }
+.pic-budget { font-size:9px; font-weight:600; }
+.pic-budget.over { color:var(--danger); }
+.pic-budget.under { color:var(--green); }
+.pic-budget.warn { color:var(--amber); }
+.pic-leadtime { font-size:9px; color:var(--text-low); }
+.pic-leadtime.long { color:var(--amber); }
+.risk-flags { display:flex; gap:3px; flex-wrap:wrap; margin-top:5px; }
+.pic-card-add { background:transparent; border:2px dashed rgba(174,239,227,0.25); border-radius:var(--radius); display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; cursor:pointer; transition:all 0.25s; }
+.pic-card-add:hover { border-color:var(--secondary); background:rgba(174,239,227,0.04); }
+.pic-card-add .plus { font-size:32px; color:var(--secondary); margin-bottom:6px; font-weight:300; }
+.pic-card-add .add-label { font-size:11px; color:var(--text-low); }
+.modal-overlay { position:fixed; inset:0; background:rgba(4,12,10,0.85); backdrop-filter:blur(8px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal-content { background:var(--card-bg); border:1px solid var(--secondary); border-radius:var(--radius); max-width:780px; width:100%; max-height:88vh; overflow-y:auto; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(174,239,227,0.08); transform:translateY(10px); transition:transform 0.25s; }
+.modal-overlay.open .modal-content { transform:translateY(0); }
+.modal-content::-webkit-scrollbar { width:4px; }
+.modal-content::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:2px; }
+.modal-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
+.modal-title { font-family:var(--font-heading); font-size:16px; font-weight:700; }
+.modal-close { background:none; border:none; color:var(--text-low); cursor:pointer; font-size:18px; padding:2px 6px; border-radius:4px; }
+.modal-close:hover { color:var(--text-primary); }
+.modal-field { margin-bottom:10px; }
+.modal-field-label { font-size:9px; color:var(--text-low); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px; }
+.modal-field-value { font-size:12px; color:var(--text-primary); }
+.modal-actions { display:flex; gap:6px; margin-top:14px; padding-top:12px; border-top:1px solid var(--glass-border); flex-wrap:wrap; }
+.form-group { margin-bottom:12px; }
+.form-label { display:block; font-size:9px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-low); margin-bottom:4px; font-weight:500; }
+.form-input,.form-select,.form-textarea { width:100%; background:var(--input-bg); border:1px solid var(--input-border); border-radius:8px; padding:9px 12px; color:var(--text-primary); font-size:12px; font-family:var(--font-body); outline:none; transition:border-color 0.2s, box-shadow 0.2s; }
+.form-input:focus,.form-select:focus,.form-textarea:focus { border-color:var(--input-focus); box-shadow:0 0 0 3px rgba(174,239,227,0.1); }
+.form-input::placeholder,.form-textarea::placeholder { color:var(--text-low); }
+.form-select { cursor:pointer; }
+.form-select option { background:var(--card-bg); color:var(--text-primary); }
+.form-textarea { min-height:60px; resize:vertical; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.form-check { display:flex; align-items:center; gap:7px; }
+.form-check input[type="checkbox"] { width:14px; height:14px; accent-color:var(--secondary); }
+.form-check label { font-size:11px; color:var(--text-muted); }
+.section-row { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--glass-border); border-radius:var(--radius-sm); margin-bottom:5px; background:var(--panel-bg); cursor:pointer; transition:all 0.2s; }
+.section-row:hover { border-color:rgba(174,239,227,0.4); }
+.section-code { font-family:var(--font-heading); font-size:15px; font-weight:700; color:var(--primary-light); min-width:28px; }
+.section-info { flex:1; }
+.section-title { font-weight:500; font-size:11px; }
+.section-discipline { font-size:9px; color:var(--text-low); }
+.section-count { font-size:9px; color:var(--text-muted); background:var(--card-bg); padding:2px 6px; border-radius:3px; }
+.section-items { display:none; padding:4px 0 4px 40px; }
+.section-row.expanded + .section-items { display:block; }
+.section-item-row { display:flex; align-items:center; gap:7px; padding:4px 8px; font-size:10px; border-left:2px solid var(--glass-border); margin-bottom:2px; cursor:pointer; }
+.section-item-row:hover { background:rgba(174,239,227,0.04); }
+.kanban-board { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:10px; }
+.kanban-column { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius); padding:10px; min-height:120px; }
+.kanban-col-title { font-family:var(--font-heading); font-size:9px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid var(--glass-border); }
+.kanban-card { background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:7px 9px; margin-bottom:5px; font-size:10px; transition:all 0.2s; }
+.kanban-card:hover { border-color:rgba(174,239,227,0.4); }
+.kanban-card-title { font-weight:500; margin-bottom:2px; }
+.kanban-card-meta { font-size:9px; color:var(--text-low); }
+.integration-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:12px; }
+.integration-card { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius); padding:14px; position:relative; overflow:hidden; transition:all 0.3s; }
+.integration-card:hover { border-color:rgba(174,239,227,0.4); }
+.integration-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--btn-gradient); opacity:0.6; }
+.integration-card-title { font-family:var(--font-heading); font-size:11px; font-weight:600; color:var(--secondary); margin-bottom:6px; display:flex; align-items:center; gap:5px; }
+.integration-card-title .sd { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 5px rgba(74,222,128,0.5); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+.integration-card-title .sd.warn { background:var(--amber); box-shadow:0 0 5px rgba(245,166,35,0.5); }
+.integration-metric { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(174,239,227,0.08); font-size:10px; }
+.integration-metric:last-child { border-bottom:none; }
+.integration-metric .label { color:var(--text-muted); }
+.integration-metric .value { color:var(--text-primary); font-weight:500; }
+.connection-line { position:relative; padding-left:16px; margin:4px 0; font-size:10px; color:var(--text-muted); }
+.connection-line::before { content:''; position:absolute; left:4px; top:0; bottom:0; width:2px; background:var(--glass-border); }
+.connection-line::after { content:''; position:absolute; left:1px; top:50%; transform:translateY(-50%); width:7px; height:7px; border-radius:50%; background:var(--primary-light); border:2px solid var(--secondary); }
+.ai-rec-card { background:linear-gradient(135deg, rgba(0,91,78,0.3), rgba(174,239,227,0.08)); border:1px solid rgba(174,239,227,0.3); border-radius:var(--radius-sm); padding:8px 10px; margin-top:5px; }
+.ai-rec-card .ai-label { font-size:8px; text-transform:uppercase; letter-spacing:1px; color:var(--secondary); margin-bottom:2px; font-weight:600; }
+.toast { position:fixed; bottom:18px; right:18px; background:var(--card-bg); border:1px solid var(--secondary); border-radius:var(--radius-sm); padding:9px 16px; color:var(--secondary); font-size:11px; font-weight:500; z-index:2000; box-shadow:0 8px 32px rgba(0,0,0,0.4); opacity:0; transform:translateY(10px); transition:all 0.3s; pointer-events:none; }
+.toast.show { opacity:1; transform:translateY(0); }
+.view-panel { display:none; }
+.view-panel.active { display:block; animation:fadeIn 0.2s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+/* V2 SMART SEARCH */
+.smart-search-container { position:relative; margin-bottom:16px; }
+.smart-search-bar { display:flex; align-items:center; gap:8px; background:var(--input-bg); border:1px solid var(--input-border); border-radius:10px; padding:10px 14px; transition:all 0.3s; }
+.smart-search-bar:focus-within { border-color:var(--secondary); box-shadow:0 0 0 3px rgba(174,239,227,0.12), 0 4px 20px rgba(0,118,102,0.2); }
+.smart-search-bar input { flex:1; background:none; border:none; color:var(--text-primary); font-size:13px; font-family:var(--font-body); outline:none; }
+.smart-search-bar input::placeholder { color:var(--text-low); }
+.smart-search-bar .search-icon { color:var(--secondary); font-size:16px; }
+.smart-search-actions { display:flex; gap:4px; }
+.smart-search-actions .btn { padding:4px 8px; font-size:9px; }
+.search-dropdown { position:absolute; top:100%; left:0; right:0; margin-top:4px; background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius); max-height:420px; overflow-y:auto; z-index:50; box-shadow:0 12px 40px rgba(0,0,0,0.5); display:none; }
+.search-dropdown.open { display:block; }
+.search-dropdown::-webkit-scrollbar { width:4px; }
+.search-dropdown::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:2px; }
+.search-section-title { padding:8px 12px 4px; font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--text-low); font-weight:600; display:flex; align-items:center; gap:6px; }
+.search-result-card { display:flex; align-items:center; gap:10px; padding:8px 12px; cursor:pointer; transition:background 0.15s; border-bottom:1px solid rgba(174,239,227,0.06); }
+.search-result-card:hover { background:rgba(174,239,227,0.06); }
+.search-result-card:last-child { border-bottom:none; }
+.search-result-info { flex:1; }
+.search-result-info .name { font-size:11px; font-weight:500; color:var(--text-primary); }
+.search-result-info .meta { font-size:9px; color:var(--text-low); margin-top:1px; }
+.search-result-card .use-btn { padding:3px 8px; font-size:9px; background:var(--btn-gradient); color:var(--btn-text); border:none; border-radius:4px; font-weight:600; cursor:pointer; white-space:nowrap; opacity:0; transition:opacity 0.15s; }
+.search-result-card:hover .use-btn { opacity:1; }
+/* URL analysis animation */
+.url-analyzing { padding:12px; display:flex; align-items:center; gap:10px; }
+.url-analyzing .spinner { width:20px; height:20px; border:2px solid var(--glass-border); border-top-color:var(--secondary); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.url-analyzing .text { font-size:11px; color:var(--secondary); }
+/* Issue workflow */
+.issue-checklist-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--glass-border); border-radius:var(--radius-sm); margin-bottom:6px; background:var(--panel-bg); cursor:pointer; transition:all 0.2s; }
+.issue-checklist-item:hover { border-color:rgba(174,239,227,0.4); }
+.issue-checklist-item.checked { border-color:rgba(74,222,128,0.3); background:rgba(74,222,128,0.04); }
+.issue-checklist-item .check-icon { width:20px; height:20px; border-radius:50%; border:2px solid var(--glass-border); display:flex; align-items:center; justify-content:center; font-size:11px; transition:all 0.2s; }
+.issue-checklist-item.checked .check-icon { background:var(--green); border-color:var(--green); color:var(--btn-text); }
+.issue-checklist-item .check-label { flex:1; font-size:11px; }
+.issue-checklist-item .check-detail { font-size:9px; color:var(--text-low); }
+/* Recipient cards */
+.recipient-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:10px; }
+.recipient-card { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius); padding:12px; transition:all 0.2s; }
+.recipient-card:hover { border-color:rgba(174,239,227,0.4); }
+.recipient-card .rc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.recipient-card .rc-name { font-size:11px; font-weight:600; color:var(--text-primary); }
+.recipient-card .rc-scope { font-size:9px; color:var(--text-muted); margin-top:2px; }
+/* Issue actions flow */
+.issue-actions-list { display:flex; flex-direction:column; gap:4px; }
+.issue-action-item { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:var(--radius-sm); font-size:10px; color:var(--text-muted); transition:all 0.3s; }
+.issue-action-item.done { color:var(--green); }
+.issue-action-item .action-check { width:16px; height:16px; border-radius:50%; border:1.5px solid var(--glass-border); display:flex; align-items:center; justify-content:center; font-size:9px; transition:all 0.3s; }
+.issue-action-item.done .action-check { background:var(--green); border-color:var(--green); color:var(--btn-text); }
+/* Procurement pipeline */
+.pipeline-board { display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; overflow-x:auto; }
+.pipeline-col { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius); padding:8px; min-width:140px; }
+.pipeline-col-title { font-size:8px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-low); font-weight:600; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--glass-border); text-align:center; }
+.pipeline-card { background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:6px 8px; margin-bottom:4px; font-size:9px; }
+.pipeline-card .pc-title { font-weight:500; margin-bottom:2px; color:var(--text-primary); }
+.pipeline-card .pc-meta { color:var(--text-low); font-size:8px; }
+.pipeline-card .pc-action { margin-top:4px; }
+/* BoM table */
+.bom-table { width:100%; border-collapse:collapse; font-size:10px; }
+.bom-table th { text-align:left; padding:8px 10px; color:var(--text-low); font-size:9px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--glass-border); font-weight:600; }
+.bom-table td { padding:8px 10px; border-bottom:1px solid rgba(174,239,227,0.08); }
+.bom-table tr:hover td { background:rgba(174,239,227,0.03); }
+.bom-table .code-col { font-family:monospace; color:var(--primary-light); }
+.bom-table .num-col { text-align:right; font-family:'Space Grotesk', monospace; }
+.bom-total-row td { border-top:2px solid var(--glass-border); font-weight:700; color:var(--secondary); }
+/* Drawing intelligence */
+.drawing-list-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--glass-border); border-radius:var(--radius-sm); margin-bottom:6px; background:var(--panel-bg); }
+.drawing-list-item .dl-icon { width:32px; height:32px; background:rgba(174,239,227,0.08); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.drawing-list-item .dl-info { flex:1; }
+.drawing-list-item .dl-name { font-size:11px; font-weight:500; }
+.drawing-list-item .dl-meta { font-size:9px; color:var(--text-low); }
+.drawing-list-item .dl-status { font-size:9px; padding:2px 6px; border-radius:3px; }
+.ai-suggestion-card { display:flex; align-items:center; gap:8px; padding:8px 10px; background:linear-gradient(135deg, rgba(0,91,78,0.2), rgba(174,239,227,0.05)); border:1px solid rgba(174,239,227,0.2); border-radius:var(--radius-sm); margin-bottom:4px; }
+.ai-suggestion-card .conf { font-size:9px; padding:2px 5px; border-radius:3px; font-weight:600; }
+.ai-suggestion-card .conf.high { background:rgba(74,222,128,0.15); color:var(--green); }
+.ai-suggestion-card .conf.med { background:rgba(245,166,35,0.15); color:var(--amber); }
+/* Library panel */
+.library-tabs { display:flex; gap:4px; margin-bottom:12px; }
+.library-tab { padding:5px 10px; border-radius:var(--radius-sm); font-size:10px; cursor:pointer; color:var(--text-muted); border:1px solid transparent; transition:all 0.2s; }
+.library-tab.active { color:var(--secondary); background:rgba(174,239,227,0.08); border-color:rgba(174,239,227,0.2); }
+.library-tab:hover { color:var(--text-primary); }
+.library-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:10px; }
+.library-card { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius); padding:12px; cursor:pointer; transition:all 0.2s; }
+.library-card:hover { border-color:rgba(174,239,227,0.4); transform:translateY(-1px); }
+.library-card .lc-title { font-size:11px; font-weight:600; margin-bottom:4px; }
+.library-card .lc-meta { font-size:9px; color:var(--text-low); }
+.library-card .lc-cost { font-size:10px; color:var(--secondary); font-weight:600; margin-top:4px; }
+/* Responsive + Print + Misc */
+.snapshot-json { background:var(--bg-deep); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:10px; font-family:monospace; font-size:9px; color:var(--secondary); max-height:300px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+@media (max-width:1024px) { .app-shell { grid-template-columns:var(--os-nav-width) 50px 1fr; } .tool-nav .nav-item span,.tool-nav-header .sub,.nav-section-label,.nav-role-badge { display:none; } .nav-item { justify-content:center; padding:8px; } .pipeline-board { grid-template-columns:repeat(3,1fr); } }
+@media (max-width:768px) { .app-shell { grid-template-columns:1fr; grid-template-rows:var(--topbar-height) 1fr; } .os-nav,.tool-nav { display:none; } .pictorial-grid { grid-template-columns:1fr 1fr; } .pipeline-board { grid-template-columns:1fr 1fr; } }
+@media (max-width:480px) { .pictorial-grid { grid-template-columns:1fr; } .stats-grid { grid-template-columns:1fr 1fr; } .pipeline-board { grid-template-columns:1fr; } }
+@keyframes signalSweep { 0%{transform:translateY(-100%);opacity:0} 50%{opacity:0.06} 100%{transform:translateY(100%);opacity:0} }
+.tool-nav::after { content:''; position:absolute; top:0; left:0; right:0; height:200px; background:linear-gradient(180deg, transparent, var(--secondary), transparent); opacity:0; animation:signalSweep 8s ease-in-out infinite; pointer-events:none; }
+@media print { .os-nav,.tool-nav,.top-bar,.modal-overlay,.toast { display:none!important; } .app-shell { grid-template-columns:1fr!important; grid-template-rows:1fr!important; } body::before,body::after { display:none!important; } body { background:white; color:#1a1a1a; } .panel { border:1px solid #ddd; background:white; } }
+@keyframes issueGlow { 0%,100%{box-shadow:0 0 10px rgba(174,239,227,0.2)} 50%{box-shadow:0 0 25px rgba(174,239,227,0.5)} }
+.ready-glow { animation:issueGlow 2s ease-in-out infinite; border-color:var(--secondary)!important; }
+</style>
+</head>
+<body>
+<div class="app-shell" id="appShell"></div>
+<div class="os-nav-expanded-overlay" id="osExpanded"></div>
+<div class="os-backdrop" id="osBackdrop" onclick="closeOsNav()"></div>
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)"><div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+// ===== SAMPLE DATA =====
+const SAMPLE_WORKSPACE = {
+  id:'spec-ws-demo-001', projectId:'architex-demo-project-rosebank-fitout',
+  projectName:'Rosebank Mixed-Use Lobby + Office Fit-out',
+  municipality:'City of Johannesburg', stage:'Design Development / Tender Prep',
+  profile:'Commercial architectural + interior FF&E', revision:'P01', issueStatus:'draft',
+  team:[
+    {userId:'u-arch-1',name:'Project Architect',role:'architect',responsibility:'Lead specification author and issuer'},
+    {userId:'u-int-1',name:'Interior Lead',role:'bep',responsibility:'FF&E and finishes selections'},
+    {userId:'u-qs-1',name:'QS Reviewer',role:'quantity_surveyor',responsibility:'Budget checks and cost deltas'},
+    {userId:'u-client-1',name:'Client Rep',role:'client',responsibility:'Client decision approvals'},
+    {userId:'u-contractor-1',name:'Main Contractor',role:'contractor',responsibility:'Pricing and constructability feedback'},
+    {userId:'u-supplier-1',name:'Tile Supplier',role:'supplier',responsibility:'Product supply and substitution options'},
+    {userId:'u-sub-1',name:'Joinery Sub',role:'subcontractor',responsibility:'Specialist joinery fabrication'}
+  ],
+  sections:[
+    {id:'sec-finishes',code:'09',title:'Internal Finishes',discipline:'architecture',ownerRole:'architect',reviewerRole:'quantity_surveyor',approverRole:'client',status:'draft'},
+    {id:'sec-ffe',code:'12',title:'FF&E and Loose Furniture',discipline:'interiors',ownerRole:'bep',reviewerRole:'client',approverRole:'client',status:'needs_decision'},
+    {id:'sec-lighting',code:'26',title:'Feature Lighting',discipline:'electrical/interiors',ownerRole:'bep',reviewerRole:'engineer',approverRole:'architect',status:'draft'},
+    {id:'sec-joinery',code:'06',title:'Custom Joinery',discipline:'architecture/interiors',ownerRole:'architect',reviewerRole:'contractor',approverRole:'architect',status:'draft'}
+  ],
+  items:[
+    {id:'item-wall-tile-001',sectionId:'sec-finishes',code:'FIN-WT-001',title:'Large format porcelain wall tile',room:'Main Lobby',package:'Finishes',discipline:'architecture',image:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%23d8d2c4"/><path d="M0 80h640M0 160h640M0 240h640M0 320h640M160 0v420M320 0v420M480 0v420" stroke="%23958c7c" stroke-width="6"/><text x="44" y="220" font-size="34" fill="%233d3529">Porcelain wall tile</text></svg>',supplier:'Local tile supplier',model:'600x1200 matte porcelain',finish:'Warm limestone',dimensions:'600 x 1200mm',drawingRefs:['A-420 lobby elevations'],clauseRefs:['SANS/NBR finish subject to professional verification'],budgetAllowance:115000,estimatedCost:128526,leadTimeDays:21,clientDecision:true,ownerRole:'architect',reviewerRole:'quantity_surveyor',approverRole:'client',status:'needs_decision',sourceRevision:'P01',supersededBy:null,sustainability:'Low VOC adhesive required',warranty:'Manufacturer standard tile warranty',notes:'Confirm slip resistance for public lobby.',comments:[{user:'QS Reviewer',role:'quantity_surveyor',text:'Cost exceeds allowance by 11.7%. Can we source alternative?',time:'2026-06-10 09:15'},{user:'Project Architect',role:'architect',text:'Reviewing alternative suppliers. Will update.',time:'2026-06-10 14:30'}]},
+    {id:'item-chair-001',sectionId:'sec-ffe',code:'FFE-CH-001',title:'Reception lounge chair',room:'Reception Lounge',package:'FF&E',discipline:'interiors',image:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%23f3efe8"/><rect x="160" y="180" width="320" height="110" rx="35" fill="%2395a3a7"/><rect x="185" y="110" width="270" height="130" rx="42" fill="%237d8d92"/><text x="142" y="70" font-size="34" fill="%232f3538">Reception chair</text></svg>',supplier:'Furniture vendor',model:'Contract lounge chair',finish:'Sage fabric / oak legs',dimensions:'760W x 720D x 780H',drawingRefs:['ID-301 furniture plan'],clauseRefs:['Fire rating to be confirmed'],budgetAllowance:48000,estimatedCost:46500,leadTimeDays:56,clientDecision:true,ownerRole:'bep',reviewerRole:'quantity_surveyor',approverRole:'client',status:'approved',sourceRevision:'P01',supersededBy:null,sustainability:'FSC timber preference',warranty:'5-year frame warranty requested',notes:'Mock-up sample required before bulk order.',comments:[{user:'Client Rep',role:'client',text:'Approved. Love the sage tone.',time:'2026-06-08 11:00'}]},
+    {id:'item-pendant-001',sectionId:'sec-lighting',code:'LGT-PD-001',title:'Custom reception pendant',room:'Reception Desk',package:'Electrical / Lighting',discipline:'electrical/interiors',image:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%230b1020"/><ellipse cx="320" cy="170" rx="150" ry="58" fill="%23fbbf24" opacity=".85"/><text x="150" y="360" font-size="34" fill="%23fff7ed">Feature pendant</text></svg>',supplier:'Lighting specialist',model:'Bespoke linear pendant',finish:'Brushed brass / opal diffuser',dimensions:'2400L x 180W',drawingRefs:['E-210 reflected ceiling plan','ID-405 reception detail'],clauseRefs:['Electrical engineer approval required'],budgetAllowance:72000,estimatedCost:91000,leadTimeDays:84,clientDecision:false,ownerRole:'bep',reviewerRole:'engineer',approverRole:'architect',status:'draft',sourceRevision:'P01',supersededBy:null,sustainability:'LED driver replaceable; warm dim preferred',warranty:'3-year driver warranty',notes:'Long-lead warning. Coordinate ceiling support.',comments:[{user:'Interior Lead',role:'bep',text:'84-day lead time — needs early procurement decision.',time:'2026-06-09 16:20'}]},
+    {id:'item-counter-001',sectionId:'sec-joinery',code:'JNY-RC-001',title:'Reception counter joinery',room:'Reception Desk',package:'Joinery',discipline:'architecture/interiors',image:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%23e5e7eb"/><path d="M100 260 Q320 170 540 260 L500 340 Q320 280 140 340Z" fill="%236b4f3f"/><text x="138" y="95" font-size="32" fill="%2322211f">Reception counter</text></svg>',supplier:'Joinery subcontractor',model:'Custom curved counter',finish:'Oak veneer / solid surface top',dimensions:'4200L x 850D x 1050H',drawingRefs:['A-550 reception counter details'],clauseRefs:['Shop drawings required before manufacture'],budgetAllowance:185000,estimatedCost:179000,leadTimeDays:42,clientDecision:false,ownerRole:'architect',reviewerRole:'contractor',approverRole:'architect',status:'draft',sourceRevision:'P01',supersededBy:null,sustainability:'FSC certified timber',warranty:'10-year structural warranty',notes:'Shop drawings required before manufacture.',comments:[]}
+  ]
+};
+</script>
+<script>
+// ===== V2 INTELLIGENCE DATA =====
+const LIBRARY_PERSONAL = [
+  {id:'lib-p1',title:'600x600 Porcelain floor tile',supplier:'CTM Trade',cost:680,unit:'m²',leadDays:14,usedOn:3,finish:'Polished concrete look',dimensions:'600x600x10mm'},
+  {id:'lib-p2',title:'Concealed cistern system',supplier:'Geberit SA',cost:4200,unit:'unit',leadDays:21,usedOn:5,finish:'White / chrome flush plate',dimensions:'500x1120x120mm'},
+  {id:'lib-p3',title:'Acoustic ceiling tile',supplier:'Armstrong SA',cost:385,unit:'m²',leadDays:7,usedOn:8,finish:'Micro-perforated white',dimensions:'600x600x15mm'}
+];
+const LIBRARY_PRACTICE = [
+  {id:'lib-pr1',title:'Frameless glass shower door',supplier:'Showerline',cost:12500,unit:'unit',leadDays:28,usedOn:4,finish:'10mm clear tempered',dimensions:'900W x 2000H'},
+  {id:'lib-pr2',title:'LED downlight 10W',supplier:'Radiant Lighting',cost:450,unit:'unit',leadDays:5,usedOn:12,finish:'Warm white 3000K',dimensions:'90mm cutout'},
+  {id:'lib-pr3',title:'Solid surface vanity top',supplier:'DuPont Surfaces',cost:8500,unit:'unit',leadDays:35,usedOn:6,finish:'Glacier white matte',dimensions:'1200x500x12mm'}
+];
+const LIBRARY_PLATFORM = [
+  {id:'lib-pl1',title:'Frameless glass shower door',supplier:'Showerline',cost:12500,unit:'unit',leadDays:28,specifiedBy:23,finish:'10mm clear tempered',dimensions:'900W x 2000H'},
+  {id:'lib-pl2',title:'LED downlight 10W',supplier:'Radiant Lighting',cost:450,unit:'unit',leadDays:5,specifiedBy:156,finish:'Warm white 3000K',dimensions:'90mm cutout'},
+  {id:'lib-pl3',title:'Solid surface vanity top',supplier:'DuPont Surfaces',cost:8500,unit:'unit',leadDays:35,specifiedBy:41,finish:'Glacier white matte',dimensions:'1200x500x12mm'}
+];
+const AI_SEARCH_RESULTS = {
+  'basin mixer':[
+    {name:'Grohe Eurostyle basin mixer',supplier:'grohe.co.za',cost:3800,finish:'Chrome',leadDays:14,dims:'Height: 172mm'},
+    {name:'Hansgrohe Talis E basin mixer',supplier:'hansgrohe.co.za',cost:4200,finish:'Brushed nickel',leadDays:18,dims:'Height: 167mm'},
+    {name:'Vaal Sanitaryware basin mixer',supplier:'builders.co.za',cost:1900,finish:'Chrome',leadDays:7,dims:'Height: 155mm'}
+  ],
+  'porcelain tile':[
+    {name:'Italtile Elysium 600x1200',supplier:'italtile.co.za',cost:720,finish:'Matte grey',leadDays:14,dims:'600x1200x10mm'},
+    {name:'CTM Stone Collection',supplier:'ctm.co.za',cost:580,finish:'Natural stone look',leadDays:10,dims:'600x600x9mm'}
+  ]
+};
+const PROJECT_DRAWINGS = [
+  {id:'drw-1',name:'A-420 Lobby Elevations.pdf',status:'scanned',pages:3},
+  {id:'drw-2',name:'ID-301 Furniture Plan.pdf',status:'scanned',pages:2},
+  {id:'drw-3',name:'E-210 RCP.pdf',status:'pending',pages:4},
+  {id:'drw-4',name:'FIN-100 Finish Schedule.pdf',status:'scanned',pages:6}
+];
+const DRAWING_AI_SUGGESTIONS = {
+  'drw-4':[
+    {item:'Floor tile — Main Lobby',qty:'186m²',confidence:94},
+    {item:'Wall tile — Bathroom',qty:'42m²',confidence:88},
+    {item:'Ceiling system — Open plan',qty:'240m²',confidence:79},
+    {item:'Skirting — All areas',qty:'320lm',confidence:85}
+  ],
+  'drw-1':[
+    {item:'Feature wall cladding — Lobby',qty:'24m²',confidence:91},
+    {item:'Skirting detail — Reception',qty:'18lm',confidence:82}
+  ],
+  'drw-2':[
+    {item:'Lounge chair — Reception',qty:'4 No.',confidence:96},
+    {item:'Coffee table — Waiting area',qty:'2 No.',confidence:89},
+    {item:'Side table — Lounge',qty:'2 No.',confidence:74}
+  ]
+};
+const ISSUE_RECIPIENTS = [
+  {id:'r1',name:'Main Contractor',scope:'Full issued specification for pricing and programme',include:true,items:'All 4 items'},
+  {id:'r2',name:'Tile Supplier',scope:'Product-specific items: FIN-WT-001',include:true,items:'1 item'},
+  {id:'r3',name:'Joinery Subcontractor',scope:'Package-scoped: Custom Joinery section',include:true,items:'1 item'},
+  {id:'r4',name:'QS Reviewer',scope:'Budget reconciliation package',include:true,items:'4 items + budget summary'},
+  {id:'r5',name:'Client Rep',scope:'Approval summary record',include:true,items:'Decision items only'}
+];
+const PROCUREMENT_PIPELINE = {
+  'RFQ Pending':['FIN-WT-001','LGT-PD-001','JNY-RC-001'],
+  'Quoted':['FFE-CH-001'],
+  'PO Raised':[],
+  'Ordered':[],
+  'In Transit':[],
+  'Delivered':[],
+  'Installed':[]
+};
+</script>
+<script>
+// ===== STATE & PERMISSIONS =====
+let currentRole = 'architect';
+let currentRoom = '';
+let currentPackage = '';
+let idCounter = 100;
+let searchTimeout = null;
+let pipelineState = JSON.parse(JSON.stringify(PROCUREMENT_PIPELINE));
+const ROLE_CAPABILITIES = {
+  architect:{canIssue:true,viewAll:true,label:'Project Architect'},
+  bep:{canIssue:true,viewAll:true,label:'Interior Lead (BEP)'},
+  quantity_surveyor:{canIssue:false,viewAll:true,label:'QS Reviewer'},
+  client:{canIssue:false,viewAll:false,label:'Client Rep'},
+  contractor:{canIssue:false,viewAll:false,label:'Main Contractor'},
+  supplier:{canIssue:false,viewAll:false,label:'Supplier'},
+  subcontractor:{canIssue:false,viewAll:false,label:'Subcontractor'}
+};
+const ROLES_LIST = ['architect','bep','quantity_surveyor','client','contractor','supplier','subcontractor','engineer'];
+function canEdit(item){return currentRole===item.ownerRole;}
+function canApprove(item){return currentRole===item.approverRole;}
+function canReview(item){return currentRole===item.reviewerRole;}
+function canRequestSubstitution(){return['contractor','supplier','subcontractor'].includes(currentRole);}
+function visibleItemsForRole(role){
+  const items=getFilteredItems();
+  if(ROLE_CAPABILITIES[role]&&ROLE_CAPABILITIES[role].viewAll) return items;
+  if(role==='client') return items.filter(i=>i.clientDecision||i.approverRole==='client'||i.status==='approved');
+  if(role==='contractor') return items.filter(i=>i.reviewerRole==='contractor'||i.status==='approved');
+  if(role==='supplier') return items.filter(i=>i.status==='approved'||i.reviewerRole==='supplier');
+  if(role==='subcontractor') return items.filter(i=>i.reviewerRole==='subcontractor'||i.status==='approved');
+  return items;
+}
+function getFilteredItems(){
+  let items=[...SAMPLE_WORKSPACE.items];
+  if(currentRoom) items=items.filter(i=>i.room===currentRoom);
+  if(currentPackage) items=items.filter(i=>i.package===currentPackage);
+  return items;
+}
+function budgetSummary(){
+  const items=SAMPLE_WORKSPACE.items;
+  const totalAllowance=items.reduce((s,i)=>s+i.budgetAllowance,0);
+  const totalEstimate=items.reduce((s,i)=>s+i.estimatedCost,0);
+  const delta=totalEstimate-totalAllowance;
+  const deltaPct=((delta/totalAllowance)*100).toFixed(1);
+  return{totalAllowance,totalEstimate,delta,deltaPct,longLeadCount:items.filter(i=>i.leadTimeDays>42).length,staleCount:items.filter(i=>i.supersededBy).length};
+}
+function validateIssueReadiness(){
+  const findings=[]; const items=SAMPLE_WORKSPACE.items;
+  const pendingClient=items.filter(i=>i.clientDecision&&i.status!=='approved');
+  if(pendingClient.length>0) findings.push({severity:'blocker',message:pendingClient.length+' client decision(s) pending',items:pendingClient.map(i=>i.code)});
+  const overBudget=items.filter(i=>i.estimatedCost>i.budgetAllowance);
+  if(overBudget.length>0) findings.push({severity:'high',message:overBudget.length+' item(s) over budget',items:overBudget.map(i=>i.code)});
+  const superseded=items.filter(i=>i.supersededBy);
+  if(superseded.length>0) findings.push({severity:'high',message:superseded.length+' item(s) superseded',items:superseded.map(i=>i.code)});
+  const longLead=items.filter(i=>i.leadTimeDays>60);
+  if(longLead.length>0) findings.push({severity:'medium',message:longLead.length+' item(s) lead >60d',items:longLead.map(i=>i.code)});
+  if(items.filter(i=>i.status==='draft').length===0) findings.push({severity:'ok',message:'All items reviewed',items:[]});
+  return findings;
+}
+function formatCurrency(v){return'R '+v.toLocaleString('en-ZA');}
+function getStatusLabel(s){return{draft:'Draft',approved:'Approved',needs_decision:'Needs Decision',rejected:'Rejected'}[s]||s;}
+function genId(){return'item-gen-'+(++idCounter);}
+function genSectionId(){return'sec-gen-'+(++idCounter);}
+</script>
+<script>
+// ===== UI CORE FUNCTIONS =====
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function openModal(html){document.getElementById('modalContent').innerHTML=html;document.getElementById('modalOverlay').classList.add('open');}
+function closeModal(e){if(!e||e.target===document.getElementById('modalOverlay'))document.getElementById('modalOverlay').classList.remove('open');}
+function openOsNav(){document.getElementById('osExpanded').classList.add('open');document.getElementById('osBackdrop').classList.add('open');}
+function closeOsNav(){document.getElementById('osExpanded').classList.remove('open');document.getElementById('osBackdrop').classList.remove('open');}
+function switchView(viewId){
+  document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const panel=document.getElementById('view-'+viewId);
+  if(panel) panel.classList.add('active');
+  const nav=document.querySelector('.nav-item[data-view="'+viewId+'"]');
+  if(nav) nav.classList.add('active');
+  const titles={overview:'Overview',pictorial:'Pictorial Board',sections:'Sections',products:'Product Register',docpreview:'Document Preview',approvals:'Approval Register',budget:'Budget & Risk',planning:'Planning',procurement:'Procurement Pipeline',issue:'Issue & Distribute',bomboq:'BoM / BoQ',drawings:'Drawing Intelligence',closeout:'Closeout',integration:'Integration Hub'};
+  document.getElementById('viewTitle').textContent=titles[viewId]||viewId;
+  renderCurrentView(viewId);
+}
+function changeRole(role){currentRole=role;document.getElementById('navRoleBadge').textContent=ROLE_CAPABILITIES[role]?ROLE_CAPABILITIES[role].label:role;renderAll();}
+function applyFilters(){currentRoom=document.getElementById('roomFilter').value;currentPackage=document.getElementById('packageFilter').value;renderAll();}
+function renderAll(){renderOverview();renderPictorial();renderSections();renderProducts();renderDocPreview();renderApprovals();renderBudget();renderPlanning();renderProcurement();renderIssue();renderBomBoq();renderDrawings();renderCloseout();renderIntegration();}
+function renderCurrentView(v){const map={overview:renderOverview,pictorial:renderPictorial,sections:renderSections,products:renderProducts,docpreview:renderDocPreview,approvals:renderApprovals,budget:renderBudget,planning:renderPlanning,procurement:renderProcurement,issue:renderIssue,bomboq:renderBomBoq,drawings:renderDrawings,closeout:renderCloseout,integration:renderIntegration};if(map[v])map[v]();}
+function approveItem(id){const i=SAMPLE_WORKSPACE.items.find(x=>x.id===id);if(i)i.status='approved';closeModal();showToast('✓ Item approved');renderAll();}
+function rejectItem(id){const i=SAMPLE_WORKSPACE.items.find(x=>x.id===id);if(i)i.status='rejected';closeModal();showToast('✗ Item rejected');renderAll();}
+function osNavClick(label){showToast('Navigate to: '+label);closeOsNav();}
+</script>
+<script>
+// ===== SMART SEARCH SYSTEM =====
+function handleSmartSearch(query, dropdownId){
+  const dd=document.getElementById(dropdownId);
+  if(!query||query.length<2){dd.classList.remove('open');return;}
+  // Check if URL
+  const urlRegex=/^https?:\/\//i;
+  if(urlRegex.test(query)){showUrlAnalysis(dd,query);return;}
+  // Build search results
+  let html='';
+  // From Your Library
+  const personalMatches=LIBRARY_PERSONAL.filter(l=>l.title.toLowerCase().includes(query.toLowerCase()));
+  if(personalMatches.length){
+    html+='<div class="search-section-title">🔁 From Your Library</div>';
+    personalMatches.forEach(l=>{html+='<div class="search-result-card" onclick="useLibraryItem(\'personal\',\''+l.id+'\')"><div class="search-result-info"><div class="name">'+l.title+'</div><div class="meta">'+l.supplier+' · '+formatCurrency(l.cost)+'/'+l.unit+' · '+l.leadDays+'d lead · Used on '+l.usedOn+' projects</div></div><button class="use-btn">Use this →</button></div>';});
+  }
+  // Platform Library
+  const platformMatches=LIBRARY_PLATFORM.filter(l=>l.title.toLowerCase().includes(query.toLowerCase()));
+  if(platformMatches.length){
+    html+='<div class="search-section-title">🌐 From Platform Library</div>';
+    platformMatches.forEach(l=>{html+='<div class="search-result-card" onclick="useLibraryItem(\'platform\',\''+l.id+'\')"><div class="search-result-info"><div class="name">'+l.title+'</div><div class="meta">'+l.supplier+' · '+formatCurrency(l.cost)+'/'+l.unit+' · '+l.leadDays+'d · Specified by '+l.specifiedBy+' professionals</div></div><button class="use-btn">Use this →</button></div>';});
+  }
+  // AI Web Search
+  const searchKey=Object.keys(AI_SEARCH_RESULTS).find(k=>query.toLowerCase().includes(k));
+  const aiResults=searchKey?AI_SEARCH_RESULTS[searchKey]:AI_SEARCH_RESULTS['basin mixer'].slice(0,2);
+  html+='<div class="search-section-title">🤖 AI Web Search</div>';
+  aiResults.forEach((r,idx)=>{html+='<div class="search-result-card" onclick="useAiResult('+idx+',\''+searchKey+'\')"><div class="search-result-info"><div class="name">'+r.name+'</div><div class="meta">'+r.supplier+' · ~'+formatCurrency(r.cost)+' · '+r.finish+' · '+r.leadDays+'d lead</div></div><button class="use-btn">Use this →</button></div>';});
+  // Manual entry
+  html+='<div class="search-section-title">✏️ Manual Entry</div>';
+  html+='<div class="search-result-card" onclick="openAddItemForm()"><div class="search-result-info"><div class="name">Create from scratch</div><div class="meta">Full manual form — all fields editable</div></div><button class="use-btn">Open →</button></div>';
+  dd.innerHTML=html;
+  dd.classList.add('open');
+}
+function showUrlAnalysis(dd, url){
+  dd.innerHTML='<div class="url-analyzing"><div class="spinner"></div><div class="text">🤖 Analyzing product page...</div></div>';
+  dd.classList.add('open');
+  setTimeout(()=>{
+    dd.innerHTML='<div class="search-section-title">🤖 AI Found Product</div><div class="search-result-card" onclick="useUrlResult()"><div class="search-result-info"><div class="name">Grohe Eurostyle Basin Mixer — Chrome</div><div class="meta">grohe.co.za · R3,800 · Chrome · H172mm · 14 day lead</div></div><button class="use-btn" style="opacity:1">Use this →</button></div><div class="search-result-card" onclick="openAddItemForm()"><div class="search-result-info"><div class="name" style="color:var(--text-muted)">Create from scratch instead</div><div class="meta">Ignore AI suggestion</div></div><button class="use-btn">Manual →</button></div>';
+  },1500);
+}
+function useLibraryItem(source, id){
+  const lib=source==='personal'?LIBRARY_PERSONAL:source==='practice'?LIBRARY_PRACTICE:LIBRARY_PLATFORM;
+  const item=lib.find(l=>l.id===id);
+  if(!item) return;
+  closeSearchDropdowns();
+  openPrefilledForm({title:item.title,supplier:item.supplier,cost:item.cost,finish:item.finish,dimensions:item.dimensions,leadDays:item.leadDays,unit:item.unit});
+}
+function useAiResult(idx, key){
+  const results=key?AI_SEARCH_RESULTS[key]:AI_SEARCH_RESULTS['basin mixer'];
+  const r=results[idx];
+  if(!r) return;
+  closeSearchDropdowns();
+  openPrefilledForm({title:r.name,supplier:r.supplier,cost:r.cost,finish:r.finish,dimensions:r.dims,leadDays:r.leadDays});
+}
+function useUrlResult(){
+  closeSearchDropdowns();
+  openPrefilledForm({title:'Grohe Eurostyle Basin Mixer',supplier:'grohe.co.za',cost:3800,finish:'Chrome',dimensions:'H172mm',leadDays:14});
+}
+function closeSearchDropdowns(){document.querySelectorAll('.search-dropdown').forEach(d=>d.classList.remove('open'));}
+</script>
+<script>
+// ===== CRUD FORMS =====
+function openPrefilledForm(data){
+  const secOpts=SAMPLE_WORKSPACE.sections.map(s=>'<option value="'+s.id+'">'+s.code+' — '+s.title+'</option>').join('');
+  const rolesOpts=ROLES_LIST.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  openModal(`
+    <div class="modal-header"><div><div class="modal-title">Add Specification Item</div><div style="font-size:9px;color:var(--secondary);margin-top:2px">🤖 Pre-filled from intelligence — adjust as needed</div></div><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form onsubmit="submitAddItem(event)" style="max-height:70vh;overflow-y:auto">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Section</label><select class="form-select" id="aiSection" onchange="suggestCode()">${secOpts}</select></div>
+        <div class="form-group"><label class="form-label">Item Code</label><input class="form-input" id="aiCode" placeholder="Auto-suggested" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="aiTitle" value="${data.title||''}" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Room</label><input class="form-input" id="aiRoom" placeholder="Room name"></div>
+        <div class="form-group"><label class="form-label">Package</label><input class="form-input" id="aiPkg" placeholder="Package"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label class="form-label">Supplier</label><input class="form-input" id="aiSupplier" value="${data.supplier||''}"></div>
+        <div class="form-group"><label class="form-label">Model</label><input class="form-input" id="aiModel" value="${data.title||''}"></div>
+        <div class="form-group"><label class="form-label">Finish</label><input class="form-input" id="aiFinish" value="${data.finish||''}"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Dimensions</label><input class="form-input" id="aiDims" value="${data.dimensions||''}"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Drawing References</label><input class="form-input" id="aiDrawings" placeholder="A-100, ID-200"></div>
+        <div class="form-group"><label class="form-label">Clause References</label><input class="form-input" id="aiClauses" placeholder="SANS 10400-K"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label class="form-label">Budget Allowance (R)</label><input class="form-input" id="aiBudget" type="number" value="${data.cost||0}"></div>
+        <div class="form-group"><label class="form-label">Estimated Cost (R)</label><input class="form-input" id="aiCost" type="number" value="${data.cost||0}"></div>
+        <div class="form-group"><label class="form-label">Lead Time (days)</label><input class="form-input" id="aiLead" type="number" value="${data.leadDays||14}"></div>
+      </div>
+      <div class="form-check" style="margin-bottom:12px"><input type="checkbox" id="aiClientDec"><label for="aiClientDec">Requires Client Decision</label></div>
+      <div class="form-row-3">
+        <div class="form-group"><label class="form-label">Owner Role</label><select class="form-select" id="aiOwner">${rolesOpts}</select></div>
+        <div class="form-group"><label class="form-label">Reviewer Role</label><select class="form-select" id="aiReviewer">${rolesOpts}</select></div>
+        <div class="form-group"><label class="form-label">Approver Role</label><select class="form-select" id="aiApprover"><option value="client">client</option>${rolesOpts}</select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Sustainability</label><textarea class="form-textarea" id="aiSustain"></textarea></div>
+      <div class="form-group"><label class="form-label">Warranty</label><textarea class="form-textarea" id="aiWarranty"></textarea></div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="aiNotes"></textarea></div>
+      <div class="modal-actions"><button type="submit" class="btn btn-primary">Create Item</button><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button></div>
+    </form>`);
+  suggestCode();
+}
+function openAddItemForm(preselectedSection){
+  openPrefilledForm({title:'',supplier:'',cost:0,finish:'',dimensions:'',leadDays:14});
+}
+function openAddSectionForm(){
+  const rolesOpts=ROLES_LIST.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  openModal(`
+    <div class="modal-header"><div class="modal-title">Add New Section</div><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form onsubmit="submitAddSection(event)">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Section Code</label><input class="form-input" id="secCode" placeholder="e.g. 14" required></div>
+        <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="secTitle" placeholder="e.g. Sanitaryware" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">Discipline</label><input class="form-input" id="secDisc" placeholder="e.g. architecture/plumbing"></div>
+      <div class="form-row-3">
+        <div class="form-group"><label class="form-label">Owner</label><select class="form-select" id="secOwner">${rolesOpts}</select></div>
+        <div class="form-group"><label class="form-label">Reviewer</label><select class="form-select" id="secReviewer">${rolesOpts}</select></div>
+        <div class="form-group"><label class="form-label">Approver</label><select class="form-select" id="secApprover"><option value="client">client</option>${rolesOpts}</select></div>
+      </div>
+      <div class="modal-actions"><button type="submit" class="btn btn-primary">Create Section</button><button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button></div>
+    </form>`);
+}
+function submitAddSection(e){
+  e.preventDefault();
+  const sec={id:genSectionId(),code:document.getElementById('secCode').value,title:document.getElementById('secTitle').value,discipline:document.getElementById('secDisc').value||'general',ownerRole:document.getElementById('secOwner').value,reviewerRole:document.getElementById('secReviewer').value,approverRole:document.getElementById('secApprover').value,status:'draft'};
+  SAMPLE_WORKSPACE.sections.push(sec);
+  closeModal();showToast('✓ Section "'+sec.title+'" created');renderAll();
+}
+function suggestCode(){
+  const secId=document.getElementById('aiSection').value;
+  const sec=SAMPLE_WORKSPACE.sections.find(s=>s.id===secId);
+  if(!sec) return;
+  const prefix=sec.title.substring(0,3).toUpperCase();
+  const count=SAMPLE_WORKSPACE.items.filter(i=>i.sectionId===secId).length+1;
+  document.getElementById('aiCode').value=prefix+'-XX-'+String(count).padStart(3,'0');
+}
+function submitAddItem(e){
+  e.preventDefault();
+  const placeholder='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%23162e28"/><text x="180" y="220" font-size="28" fill="%23aeefe3">New Item</text></svg>';
+  const item={id:genId(),sectionId:document.getElementById('aiSection').value,code:document.getElementById('aiCode').value,title:document.getElementById('aiTitle').value,room:document.getElementById('aiRoom').value||'TBC',package:document.getElementById('aiPkg').value||'General',discipline:'general',image:placeholder,supplier:document.getElementById('aiSupplier').value||'TBC',model:document.getElementById('aiModel').value||'',finish:document.getElementById('aiFinish').value||'',dimensions:document.getElementById('aiDims').value||'',drawingRefs:(document.getElementById('aiDrawings').value||'').split(',').map(s=>s.trim()).filter(Boolean),clauseRefs:(document.getElementById('aiClauses').value||'').split(',').map(s=>s.trim()).filter(Boolean),budgetAllowance:parseInt(document.getElementById('aiBudget').value)||0,estimatedCost:parseInt(document.getElementById('aiCost').value)||0,leadTimeDays:parseInt(document.getElementById('aiLead').value)||14,clientDecision:document.getElementById('aiClientDec').checked,ownerRole:document.getElementById('aiOwner').value,reviewerRole:document.getElementById('aiReviewer').value,approverRole:document.getElementById('aiApprover').value,status:'draft',sourceRevision:SAMPLE_WORKSPACE.revision,supersededBy:null,sustainability:document.getElementById('aiSustain').value||'',warranty:document.getElementById('aiWarranty').value||'',notes:document.getElementById('aiNotes').value||'',comments:[]};
+  SAMPLE_WORKSPACE.items.push(item);
+  closeModal();showToast('✓ Item "'+item.title+'" created');renderAll();
+}
+</script>
+<script>
+// ===== V2 FEATURE FUNCTIONS =====
+function openFromDrawings(){
+  let html='<div class="modal-header"><div class="modal-title">📄 From Project Drawings</div><button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  html+='<p style="font-size:10px;color:var(--text-muted);margin-bottom:12px">AI scans uploaded project drawings to identify specification items.</p>';
+  PROJECT_DRAWINGS.forEach(d=>{
+    const hasSuggestions=DRAWING_AI_SUGGESTIONS[d.id];
+    html+='<div class="drawing-list-item"><div class="dl-icon">📄</div><div class="dl-info"><div class="dl-name">'+d.name+'</div><div class="dl-meta">'+d.pages+' pages</div></div>';
+    if(d.status==='scanned'){
+      html+='<span class="dl-status" style="background:rgba(74,222,128,0.12);color:var(--green)">✓ Scanned</span>';
+      if(hasSuggestions) html+='<button class="btn btn-secondary" onclick="showDrawingSuggestions(\''+d.id+'\')">View Items</button>';
+    } else {
+      html+='<span class="dl-status" style="background:rgba(245,166,35,0.12);color:var(--amber)">Pending</span>';
+      html+='<button class="btn btn-primary" onclick="simulateAiScan(\''+d.id+'\',this)">AI Scan</button>';
+    }
+    html+='</div>';
+  });
+  openModal(html);
+}
+function simulateAiScan(drawingId, btn){
+  btn.innerHTML='<div class="spinner" style="width:12px;height:12px;border-width:1.5px;display:inline-block"></div> Scanning...';
+  btn.disabled=true;
+  setTimeout(()=>{
+    DRAWING_AI_SUGGESTIONS[drawingId]=[{item:'Ceiling grid — Office area',qty:'180m²',confidence:82},{item:'Light switch plate — Standard',qty:'24 No.',confidence:71}];
+    const drw=PROJECT_DRAWINGS.find(d=>d.id===drawingId);
+    if(drw) drw.status='scanned';
+    openFromDrawings();
+    showToast('✓ AI scan complete — items identified');
+  },1800);
+}
+function showDrawingSuggestions(drawingId){
+  const suggestions=DRAWING_AI_SUGGESTIONS[drawingId]||[];
+  const drw=PROJECT_DRAWINGS.find(d=>d.id===drawingId);
+  let html='<div class="modal-header"><div><div class="modal-title">AI-Identified Items</div><div style="font-size:9px;color:var(--text-low)">From: '+(drw?drw.name:'Drawing')+'</div></div><button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  html+='<p style="font-size:10px;color:var(--text-muted);margin-bottom:12px">Review AI suggestions and add to your specification.</p>';
+  suggestions.forEach((s,i)=>{
+    const confClass=s.confidence>=85?'high':'med';
+    html+='<div class="ai-suggestion-card"><span class="conf '+confClass+'">'+s.confidence+'%</span><div style="flex:1"><div style="font-size:11px;font-weight:500">'+s.item+'</div><div style="font-size:9px;color:var(--text-low)">Qty: '+s.qty+'</div></div><button class="btn btn-primary" onclick="addFromDrawingSuggestion(\''+s.item+'\',\''+s.qty+'\')">Add to spec →</button></div>';
+  });
+  html+='<div class="modal-actions"><button class="btn btn-primary" onclick="addAllDrawingSuggestions(\''+drawingId+'\')">Add all suggested items</button><button class="btn btn-secondary" onclick="openFromDrawings()">← Back</button></div>';
+  openModal(html);
+}
+function addFromDrawingSuggestion(itemName, qty){
+  closeModal();
+  openPrefilledForm({title:itemName,supplier:'TBC',cost:0,finish:'',dimensions:qty,leadDays:14});
+}
+function addAllDrawingSuggestions(drawingId){
+  const suggestions=DRAWING_AI_SUGGESTIONS[drawingId]||[];
+  suggestions.forEach(s=>{
+    const item={id:genId(),sectionId:'sec-finishes',code:'AI-'+String(++idCounter).padStart(3,'0'),title:s.item,room:'Per drawing',package:'General',discipline:'general',image:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%23162e28"/><text x="120" y="220" font-size="24" fill="%23aeefe3">'+s.item.substring(0,20)+'</text></svg>',supplier:'TBC',model:'',finish:'',dimensions:s.qty,drawingRefs:[],clauseRefs:[],budgetAllowance:0,estimatedCost:0,leadTimeDays:14,clientDecision:false,ownerRole:'architect',reviewerRole:'quantity_surveyor',approverRole:'client',status:'draft',sourceRevision:'P01',supersededBy:null,sustainability:'',warranty:'',notes:'Added from AI drawing scan (confidence: '+s.confidence+'%)',comments:[]};
+    SAMPLE_WORKSPACE.items.push(item);
+  });
+  closeModal();showToast('✓ '+suggestions.length+' items added from drawing scan');renderAll();
+}
+function openLibraryPanel(){
+  let html='<div class="modal-header"><div class="modal-title">📚 Specification Library</div><button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  html+='<div class="library-tabs"><div class="library-tab active" onclick="showLibTab(\'personal\',this)">Personal ('+LIBRARY_PERSONAL.length+' items)</div><div class="library-tab" onclick="showLibTab(\'practice\',this)">Practice ('+LIBRARY_PRACTICE.length+' items)</div><div class="library-tab" onclick="showLibTab(\'platform\',this)">Platform ('+LIBRARY_PLATFORM.length+' items)</div></div>';
+  html+='<div id="libraryContent" class="library-grid"></div>';
+  openModal(html);
+  showLibTab('personal',document.querySelector('.library-tab.active'));
+}
+function showLibTab(tab, el){
+  document.querySelectorAll('.library-tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const lib=tab==='personal'?LIBRARY_PERSONAL:tab==='practice'?LIBRARY_PRACTICE:LIBRARY_PLATFORM;
+  const container=document.getElementById('libraryContent');
+  container.innerHTML=lib.map(l=>'<div class="library-card" onclick="useLibraryItem(\''+tab+'\',\''+l.id+'\')"><div class="lc-title">'+l.title+'</div><div class="lc-meta">'+l.supplier+' · '+l.leadDays+'d lead'+(l.usedOn?' · Used on '+l.usedOn+' projects':'')+(l.specifiedBy?' · '+l.specifiedBy+' professionals':'')+'</div><div class="lc-cost">'+formatCurrency(l.cost)+'/'+l.unit+'</div></div>').join('');
+}
+</script>
+<script>
+// ===== ISSUE & DISTRIBUTION =====
+function toggleIssueCheck(el){
+  el.classList.toggle('checked');
+  checkIssueReadiness();
+}
+function checkIssueReadiness(){
+  const checks=document.querySelectorAll('#issueChecklist .issue-checklist-item');
+  const allChecked=[...checks].every(c=>c.classList.contains('checked'));
+  const btn=document.getElementById('issueNowBtn');
+  if(btn){
+    if(allChecked){btn.disabled=false;btn.classList.add('ready-glow');}
+    else{btn.disabled=true;btn.classList.remove('ready-glow');}
+  }
+}
+function issueNow(){
+  openModal(`
+    <div class="modal-header"><div class="modal-title">Issue Specification P01?</div><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:14px">This will distribute the specification to 5 recipients and trigger the following actions:</p>
+    <div id="issueProgressList" class="issue-actions-list">
+      <div class="issue-action-item" id="ia1"><div class="action-check"></div><span>Action Centre cards created for 5 recipients</span></div>
+      <div class="issue-action-item" id="ia2"><div class="action-check"></div><span>Messaging threads opened per package (3 threads)</span></div>
+      <div class="issue-action-item" id="ia3"><div class="action-check"></div><span>Programme milestones created (4 procurement milestones)</span></div>
+      <div class="issue-action-item" id="ia4"><div class="action-check"></div><span>BoM/BoQ updated (4 line items)</span></div>
+      <div class="issue-action-item" id="ia5"><div class="action-check"></div><span>Escrow funding requirements generated (R420,000 + 1% fee)</span></div>
+      <div class="issue-action-item" id="ia6"><div class="action-check"></div><span>Project Passport updated</span></div>
+      <div class="issue-action-item" id="ia7"><div class="action-check"></div><span>Audit trail entries written</span></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-gold" onclick="executeIssue()">Confirm Issue</button><button class="btn btn-secondary" onclick="closeModal()">Cancel</button></div>
+  `);
+}
+function executeIssue(){
+  const items=['ia1','ia2','ia3','ia4','ia5','ia6','ia7'];
+  let i=0;
+  const interval=setInterval(()=>{
+    if(i>=items.length){
+      clearInterval(interval);
+      setTimeout(()=>{
+        const hash='sha256:'+Array.from({length:64},()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+        document.getElementById('issueProgressList').innerHTML='<div style="text-align:center;padding:20px"><div style="font-size:32px;margin-bottom:8px">✓</div><div style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px">Specification P01 Issued Successfully</div><div style="font-size:9px;color:var(--text-low);font-family:monospace;word-break:break-all">Audit: '+hash+'</div><div style="font-size:10px;color:var(--text-muted);margin-top:8px">Distributed to 5 recipients · 7 actions triggered</div></div>';
+        SAMPLE_WORKSPACE.issueStatus='issued';
+        renderAll();
+      },400);
+      return;
+    }
+    const el=document.getElementById(items[i]);
+    if(el){el.classList.add('done');el.querySelector('.action-check').textContent='✓';}
+    i++;
+  },300);
+}
+// ===== PROCUREMENT PIPELINE =====
+function movePipelineItem(code, from, to){
+  const fromArr=pipelineState[from];
+  const idx=fromArr.indexOf(code);
+  if(idx>-1){fromArr.splice(idx,1);pipelineState[to].push(code);}
+  renderProcurement();
+  showToast('✓ '+code+' moved to '+to);
+  if(to==='Installed') showToast('💰 Payment unlock triggered for '+code);
+}
+function createIssueSnapshot(){
+  const budget=budgetSummary();const readiness=validateIssueReadiness();
+  const snapshot={snapshotId:'SNAP-'+Date.now().toString(36).toUpperCase(),workspaceId:SAMPLE_WORKSPACE.id,projectName:SAMPLE_WORKSPACE.projectName,revision:SAMPLE_WORKSPACE.revision,timestamp:new Date().toISOString(),issuer:SAMPLE_WORKSPACE.team.find(t=>t.role===currentRole)?.name||currentRole,issuerRole:currentRole,auditHash:'sha256:'+Array.from({length:64},()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join(''),budgetSummary:budget,readinessFindings:readiness,itemCount:SAMPLE_WORKSPACE.items.length,sectionCount:SAMPLE_WORKSPACE.sections.length};
+  openModal('<div class="modal-header"><div class="modal-title">Issue Snapshot Created</div><button class="modal-close" onclick="closeModal()">&times;</button></div><div class="modal-field"><div class="modal-field-label">Snapshot ID</div><div class="modal-field-value" style="color:var(--secondary);font-family:monospace">'+snapshot.snapshotId+'</div></div><div class="modal-field"><div class="modal-field-label">Timestamp</div><div class="modal-field-value">'+snapshot.timestamp+'</div></div><div class="modal-field"><div class="modal-field-label">Audit Hash</div><div class="modal-field-value" style="font-family:monospace;font-size:9px;word-break:break-all">'+snapshot.auditHash+'</div></div><div class="modal-field"><div class="modal-field-label">JSON</div><div class="snapshot-json">'+JSON.stringify(snapshot,null,2)+'</div></div>');
+}
+</script>
+<script>
+// ===== BUILD SHELL =====
+function buildShell(){
+  const osNavIcons=[
+    {icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',label:'Command Centre'},
+    {icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',label:'Inbox'},
+    {icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',label:'Projects'},
+    {icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>',label:'Tools',active:true},
+    {icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',label:'Messages'},
+    {icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06c.5.5 1.2.67 1.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51c.63.34 1.32.17 1.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06c-.5.5-.67 1.2-.33 1.82V9c.2.63.76 1.08 1.51 1H21a2 2 0 010 4h-.09c-.75.07-1.31.52-1.51 1z"/></svg>',label:'Settings'}
+  ];
+  const navItems=[
+    {view:'overview',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',label:'Overview',section:'spec'},
+    {view:'pictorial',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M2 14l6-6 4 4 6-6 4 4"/></svg>',label:'Pictorial Board',section:'spec'},
+    {view:'sections',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',label:'Sections',section:'spec'},
+    {view:'products',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',label:'Products',section:'spec'},
+    {view:'docpreview',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',label:'Doc Preview',section:'spec'},
+    {view:'approvals',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',label:'Approvals',section:'workflow'},
+    {view:'budget',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',label:'Budget & Risk',section:'workflow'},
+    {view:'bomboq',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',label:'BoM / BoQ',section:'workflow'},
+    {view:'planning',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',label:'Planning',section:'workflow'},
+    {view:'procurement',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>',label:'Procurement',section:'workflow'},
+    {view:'issue',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>',label:'Issue & Distribute',section:'workflow'},
+    {view:'drawings',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',label:'Drawing Intel',section:'intelligence'},
+    {view:'closeout',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',label:'Closeout',section:'intelligence'},
+    {view:'integration',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>',label:'Integration',section:'intelligence'}
+  ];
+  // OS Nav
+  let osNavHtml='<div class="os-nav" onclick="openOsNav()"><div class="os-nav-logo"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4L6 10v12l10 6 10-6V10L16 4z" fill="rgba(174,239,227,0.1)"/><path d="M16 8l-6 4v8l6 4 6-4v-8l-6-4z" fill="rgba(174,239,227,0.2)"/><circle cx="16" cy="16" r="2" fill="currentColor"/></svg></div><div class="os-nav-items">';
+  osNavIcons.forEach(n=>{osNavHtml+='<div class="os-nav-item'+(n.active?' active':'')+'">'+n.icon+'<span class="tip">'+n.label+'</span></div>';});
+  osNavHtml+='</div></div>';
+  // OS Expanded
+  let osExpHtml='<div class="os-exp-header"><svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="var(--secondary)" stroke-width="1.5"><path d="M16 4L6 10v12l10 6 10-6V10L16 4z" fill="rgba(174,239,227,0.1)"/><circle cx="16" cy="16" r="2" fill="var(--secondary)"/></svg><span class="logo-text">Architex OS</span><button class="os-exp-close" onclick="closeOsNav()">&times;</button></div>';
+  osExpHtml+='<div class="os-exp-user"><div class="name">Greg Tarbet</div><div class="project">Rosebank Mixed-Use Fit-out</div></div>';
+  osNavIcons.forEach(n=>{osExpHtml+='<div class="os-exp-item'+(n.active?' active':'')+'" onclick="osNavClick(\''+n.label+'\')">'+n.icon+'<span>'+n.label+'</span></div>';});
+  document.getElementById('osExpanded').innerHTML=osExpHtml;
+  // Tool nav
+  let toolNavHtml='<div class="tool-nav-header"><h2>SpecForge</h2><div class="sub">Intelligence-First Specification Engine</div></div>';
+  toolNavHtml+='<div class="tool-nav-back" onclick="osNavClick(\'Architex Dashboard\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>← Back to OS</span></div>';
+  toolNavHtml+='<div class="nav-role-badge" id="navRoleBadge">Project Architect</div>';
+  toolNavHtml+='<div class="nav-section-label">Specification</div>';
+  navItems.filter(n=>n.section==='spec').forEach((n,i)=>{toolNavHtml+='<div class="nav-item'+(i===0?' active':'')+'" data-view="'+n.view+'" onclick="switchView(\''+n.view+'\')">'+n.icon+'<span>'+n.label+'</span></div>';});
+  toolNavHtml+='<div class="nav-section-label">Workflow</div>';
+  navItems.filter(n=>n.section==='workflow').forEach(n=>{toolNavHtml+='<div class="nav-item" data-view="'+n.view+'" onclick="switchView(\''+n.view+'\')">'+n.icon+'<span>'+n.label+'</span></div>';});
+  toolNavHtml+='<div class="nav-section-label">Intelligence</div>';
+  navItems.filter(n=>n.section==='intelligence').forEach(n=>{toolNavHtml+='<div class="nav-item" data-view="'+n.view+'" onclick="switchView(\''+n.view+'\')">'+n.icon+'<span>'+n.label+'</span></div>';});
+  // Top bar
+  let topBarHtml='<div class="breadcrumb">Architex OS<span class="sep">›</span>Tools<span class="sep">›</span>SpecForge<span class="sep">›</span><span class="cur" id="viewTitle">Overview</span></div><div class="top-bar-spacer"></div>';
+  topBarHtml+='<div style="display:flex;align-items:center;gap:5px"><select class="filter-select" id="roleSelector" onchange="changeRole(this.value)"><option value="architect">Project Architect</option><option value="bep">Interior Lead (BEP)</option><option value="quantity_surveyor">QS Reviewer</option><option value="client">Client Rep</option><option value="contractor">Main Contractor</option><option value="supplier">Supplier</option><option value="subcontractor">Subcontractor</option></select>';
+  topBarHtml+='<select class="filter-select" id="roomFilter" onchange="applyFilters()"><option value="">All Rooms</option><option value="Main Lobby">Main Lobby</option><option value="Reception Lounge">Reception Lounge</option><option value="Reception Desk">Reception Desk</option></select>';
+  topBarHtml+='<select class="filter-select" id="packageFilter" onchange="applyFilters()"><option value="">All Packages</option><option value="Finishes">Finishes</option><option value="FF&E">FF&amp;E</option><option value="Electrical / Lighting">Electrical / Lighting</option><option value="Joinery">Joinery</option></select>';
+  topBarHtml+='<button class="btn btn-gold" onclick="createIssueSnapshot()">Snapshot</button></div>';
+  // Main content
+  let mainHtml=buildMainPanels();
+  document.getElementById('appShell').innerHTML=osNavHtml+'<nav class="tool-nav">'+toolNavHtml+'</nav><header class="top-bar">'+topBarHtml+'</header><main class="main-content" id="mainContent">'+mainHtml+'</main>';
+}
+</script>
+<script>
+// ===== BUILD MAIN PANELS =====
+function buildSmartSearchBar(id){
+  return '<div class="smart-search-container"><div class="smart-search-bar"><span class="search-icon">🔍</span><input type="text" placeholder="Type a product name, paste a URL, or describe what you need..." oninput="clearTimeout(searchTimeout);searchTimeout=setTimeout(()=>handleSmartSearch(this.value,\''+id+'\'),300)" onfocus="if(this.value.length>=2)handleSmartSearch(this.value,\''+id+'\')"><div class="smart-search-actions"><button class="btn btn-secondary" onclick="openFromDrawings()" title="From Drawings">📄</button><button class="btn btn-secondary" onclick="openLibraryPanel()" title="Library">📚</button><button class="btn btn-secondary" onclick="openAddItemForm()" title="Manual">✏️</button></div></div><div class="search-dropdown" id="'+id+'"></div></div>';
+}
+function buildMainPanels(){
+  let h='';
+  // Overview
+  h+='<div class="view-panel active" id="view-overview"><div class="panel"><div class="panel-title"><span class="dot"></span>Project Summary</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"><div><span style="font-size:10px;color:var(--text-low)">Project</span><div style="font-weight:600;margin-top:2px;font-size:12px" id="summaryName"></div></div><div><span style="font-size:10px;color:var(--text-low)">Stage</span><div style="font-weight:600;margin-top:2px;font-size:12px" id="summaryStage"></div></div><div><span style="font-size:10px;color:var(--text-low)">Municipality</span><div style="font-weight:600;margin-top:2px;font-size:12px" id="summaryMunicipality"></div></div><div><span style="font-size:10px;color:var(--text-low)">Revision</span><div style="font-weight:600;margin-top:2px;font-size:12px" id="summaryRevision"></div></div><div><span style="font-size:10px;color:var(--text-low)">Status</span><div style="margin-top:2px" id="summaryStatus"></div></div></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>Budget Summary</div><div id="budgetSummaryOverview"></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>Readiness Findings</div><div id="readinessFindings"></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>Quick Stats</div><div class="stats-grid" id="quickStats"></div></div></div>';
+  // Pictorial Board
+  h+='<div class="view-panel" id="view-pictorial">'+buildSmartSearchBar('searchDropPictorial')+'<div class="pictorial-grid" id="pictorialGrid"></div></div>';
+  // Sections
+  h+='<div class="view-panel" id="view-sections"><div class="panel-header"><div class="panel-title" style="margin:0"><span class="dot"></span>Sections</div><button class="btn btn-primary" onclick="openAddSectionForm()">+ Add Section</button></div><div id="sectionsList"></div></div>';
+  // Products
+  h+='<div class="view-panel" id="view-products">'+buildSmartSearchBar('searchDropProducts')+'<div class="panel"><div class="panel-header"><div class="panel-title" style="margin:0"><span class="dot"></span>Product Register</div></div><div id="productsList"></div></div></div>';
+  // Doc Preview
+  h+='<div class="view-panel" id="view-docpreview"><div class="panel"><div class="panel-title"><span class="dot"></span>Specification Document Preview</div><div id="docPreviewContent"></div></div></div>';
+  // Approvals
+  h+='<div class="view-panel" id="view-approvals"><div class="panel"><div class="panel-title"><span class="dot"></span>Approval Register</div><p style="font-size:10px;color:var(--text-low);margin-bottom:10px" id="approvalRoleNote"></p><div id="approvalsList"></div></div><div class="panel" id="professionalPanel" style="display:none"><div class="panel-title"><span class="dot"></span>Professional Responsibility</div><p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">I confirm this specification prepared with reasonable care and skill.</p><button class="btn btn-primary" onclick="showToast(\'Professional responsibility confirmed\')">Confirm & Sign</button></div></div>';
+  // Budget
+  h+='<div class="view-panel" id="view-budget"><div class="panel"><div class="panel-title"><span class="dot"></span>Budget: Allowance vs Estimate</div><div id="budgetBars"></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>Risk Summary</div><div id="riskSummary"></div></div></div>';
+  // BoM / BoQ
+  h+='<div class="view-panel" id="view-bomboq"><div class="panel"><div class="panel-title"><span class="dot"></span>Bill of Materials / Bill of Quantities</div><p style="font-size:10px;color:var(--text-muted);margin-bottom:12px">Single source of truth — these ARE the spec items, mapped to quantities and rates.</p><div id="bomContent"></div></div></div>';
+  // Planning
+  h+='<div class="view-panel" id="view-planning"><div class="panel"><div class="panel-title"><span class="dot"></span>Work Packages (Kanban)</div><div class="kanban-board" id="kanbanBoard"></div></div></div>';
+  // Procurement Pipeline
+  h+='<div class="view-panel" id="view-procurement"><div class="panel"><div class="panel-title"><span class="dot"></span>Procurement Pipeline</div><p style="font-size:10px;color:var(--text-muted);margin-bottom:12px">Track spec items through procurement lifecycle. Actions move items between stages.</p><div id="pipelineContent"></div></div></div>';
+  // Issue & Distribute
+  h+='<div class="view-panel" id="view-issue"><div class="panel"><div class="panel-title"><span class="dot"></span>Issue Readiness Gate</div><div id="issueChecklist"></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>Recipients & Distribution</div><div id="recipientGrid"></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>Issue Actions (triggered on issue)</div><div id="issueActionsPreview"></div><div style="margin-top:14px;text-align:center"><button class="btn btn-gold" id="issueNowBtn" style="padding:10px 24px;font-size:12px" onclick="issueNow()" disabled>🚀 Issue Now</button></div></div></div>';
+  // Drawing Intelligence
+  h+='<div class="view-panel" id="view-drawings"><div class="panel"><div class="panel-title"><span class="dot"></span>Drawing Intelligence</div><p style="font-size:10px;color:var(--text-muted);margin-bottom:12px">AI scans project drawings to identify specification requirements automatically.</p><div id="drawingsList"></div></div><div class="panel"><div class="panel-title"><span class="dot"></span>AI-Suggested Items</div><div id="allDrawingSuggestions"></div></div></div>';
+  // Closeout
+  h+='<div class="view-panel" id="view-closeout"><div class="panel"><div class="panel-title"><span class="dot"></span>Closeout Status</div><div id="closeoutStatus"></div></div></div>';
+  // Integration
+  h+='<div class="view-panel" id="view-integration"><div class="panel"><div class="panel-title"><span class="dot"></span>Architex OS — Integration Hub</div></div><div class="integration-grid" id="integrationGrid"></div></div>';
+  return h;
+}
+</script>
+<script>
+// ===== RENDER FUNCTIONS =====
+function renderOverview(){
+  const ws=SAMPLE_WORKSPACE;
+  document.getElementById('summaryName').textContent=ws.projectName;
+  document.getElementById('summaryStage').textContent=ws.stage;
+  document.getElementById('summaryMunicipality').textContent=ws.municipality;
+  document.getElementById('summaryRevision').textContent=ws.revision;
+  document.getElementById('summaryStatus').innerHTML='<span class="chip chip-'+ws.issueStatus+'">'+getStatusLabel(ws.issueStatus)+'</span>';
+  const bs=budgetSummary();const dc=bs.delta>0?'var(--danger)':'var(--green)';
+  document.getElementById('budgetSummaryOverview').innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+formatCurrency(bs.totalAllowance)+'</div><div class="stat-label">Allowance</div></div><div class="stat-card"><div class="stat-value">'+formatCurrency(bs.totalEstimate)+'</div><div class="stat-label">Estimate</div></div><div class="stat-card"><div class="stat-value" style="color:'+dc+'">'+(bs.delta>0?'+':'')+bs.deltaPct+'%</div><div class="stat-label">Delta</div></div><div class="stat-card"><div class="stat-value" style="color:var(--amber)">'+bs.longLeadCount+'</div><div class="stat-label">Long-Lead</div></div><div class="stat-card"><div class="stat-value" style="color:var(--danger)">'+bs.staleCount+'</div><div class="stat-label">Stale</div></div></div>';
+  const findings=validateIssueReadiness();
+  document.getElementById('readinessFindings').innerHTML=findings.map(f=>'<div style="display:flex;gap:8px;margin-bottom:8px;padding:8px;background:var(--panel-bg);border-radius:var(--radius-sm);border-left:3px solid '+(f.severity==='blocker'?'var(--danger)':f.severity==='high'?'var(--amber)':'var(--green)')+'"><span class="chip chip-'+f.severity+'">'+f.severity+'</span><div><div style="font-size:11px">'+f.message+'</div>'+(f.items.length?'<div style="font-size:9px;color:var(--text-low);font-family:monospace;margin-top:2px">'+f.items.join(', ')+'</div>':'')+'</div></div>').join('');
+  const items=SAMPLE_WORKSPACE.items;const sc={};items.forEach(i=>{sc[i.status]=(sc[i.status]||0)+1;});
+  let sh='';Object.entries(sc).forEach(([k,v])=>{sh+='<div class="stat-card"><div class="stat-value">'+v+'</div><div class="stat-label">'+getStatusLabel(k)+'</div></div>';});
+  ws.sections.forEach(s=>{const c=items.filter(i=>i.sectionId===s.id).length;sh+='<div class="stat-card"><div class="stat-value">'+c+'</div><div class="stat-label">'+s.title+'</div></div>';});
+  document.getElementById('quickStats').innerHTML=sh;
+}
+function renderPictorial(){
+  const items=visibleItemsForRole(currentRole);
+  const grid=document.getElementById('pictorialGrid');
+  let html=items.map(item=>{
+    const bd=item.estimatedCost-item.budgetAllowance;const bc=bd>0?(bd/item.budgetAllowance>0.1?'over':'warn'):'under';
+    const ll=item.leadTimeDays>42;const flags=[];
+    if(item.supersededBy) flags.push({l:'Superseded',c:'badge-red'});
+    if(ll) flags.push({l:item.leadTimeDays+'d',c:'badge-amber'});
+    if(bd>0) flags.push({l:'Over',c:'badge-red'});
+    if(item.clientDecision&&item.status!=='approved') flags.push({l:'Client',c:'badge-gold'});
+    return'<div class="pic-card" onclick="openItemDetail(\''+item.id+'\')"><img class="pic-card-img" src="'+item.image+'" alt="'+item.title+'"><div class="pic-card-body"><div class="pic-card-title">'+item.title+'</div><div class="pic-card-code">'+item.code+'</div><div class="pic-card-meta"><span class="badge">'+item.room+'</span><span class="badge">'+item.package+'</span><span class="chip chip-'+item.status+'">'+getStatusLabel(item.status)+'</span></div>'+(flags.length?'<div class="risk-flags">'+flags.map(f=>'<span class="badge '+f.c+'">'+f.l+'</span>').join('')+'</div>':'')+'<div class="pic-card-footer"><span class="pic-budget '+bc+'">'+(bd>0?'+':'')+formatCurrency(bd)+'</span><span class="pic-leadtime'+(ll?' long':'')+'">'+item.leadTimeDays+'d</span></div></div></div>';
+  }).join('');
+  html+='<div class="pic-card-add" onclick="openAddItemForm()"><div class="plus">+</div><div class="add-label">Add new item</div></div>';
+  grid.innerHTML=html;
+}
+function openItemDetail(itemId){
+  const item=SAMPLE_WORKSPACE.items.find(i=>i.id===itemId);if(!item) return;
+  let act='';
+  if(canEdit(item)) act+='<button class="btn btn-primary" onclick="showToast(\'Edit mode\')">Edit</button>';
+  if(canApprove(item)){act+='<button class="btn btn-primary" onclick="approveItem(\''+item.id+'\')">Approve</button>';act+='<button class="btn btn-danger" onclick="rejectItem(\''+item.id+'\')">Reject</button>';}
+  if(canReview(item)) act+='<button class="btn btn-secondary" onclick="showToast(\'Flagged\')">Flag</button>';
+  if(canRequestSubstitution()) act+='<button class="btn btn-secondary" onclick="showToast(\'Substitution requested\')">Substitute</button>';
+  act+='<button class="btn btn-secondary" onclick="showToast(\'Comment added\')">💬</button>';
+  const comments=(item.comments||[]).map(c=>'<div style="padding:5px 8px;margin-bottom:3px;background:var(--panel-bg);border-radius:var(--radius-sm);border-left:2px solid var(--glass-border)"><div style="display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:600;color:var(--secondary)">'+c.user+'</span><span style="font-size:8px;color:var(--text-low)">'+c.time+'</span></div><div style="font-size:10px;color:var(--text-muted)">'+c.text+'</div></div>').join('')||'<p style="font-size:9px;color:var(--text-low)">No comments.</p>';
+  openModal('<div class="modal-header"><div><div class="modal-title">'+item.title+'</div><div style="font-size:9px;color:var(--text-low);font-family:monospace">'+item.code+'</div></div><button class="modal-close" onclick="closeModal()">&times;</button></div><img src="'+item.image+'" style="width:100%;height:140px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--glass-border)"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="modal-field"><div class="modal-field-label">Room</div><div class="modal-field-value">'+item.room+'</div></div><div class="modal-field"><div class="modal-field-label">Package</div><div class="modal-field-value">'+item.package+'</div></div><div class="modal-field"><div class="modal-field-label">Supplier</div><div class="modal-field-value">'+item.supplier+'</div></div><div class="modal-field"><div class="modal-field-label">Model</div><div class="modal-field-value">'+(item.model||'—')+'</div></div><div class="modal-field"><div class="modal-field-label">Finish</div><div class="modal-field-value">'+(item.finish||'—')+'</div></div><div class="modal-field"><div class="modal-field-label">Dims</div><div class="modal-field-value">'+(item.dimensions||'—')+'</div></div><div class="modal-field"><div class="modal-field-label">Budget</div><div class="modal-field-value">'+formatCurrency(item.budgetAllowance)+'</div></div><div class="modal-field"><div class="modal-field-label">Estimate</div><div class="modal-field-value" style="color:'+(item.estimatedCost>item.budgetAllowance?'var(--danger)':'inherit')+'">'+formatCurrency(item.estimatedCost)+'</div></div><div class="modal-field"><div class="modal-field-label">Lead Time</div><div class="modal-field-value">'+item.leadTimeDays+' days</div></div><div class="modal-field"><div class="modal-field-label">Status</div><div class="modal-field-value"><span class="chip chip-'+item.status+'">'+getStatusLabel(item.status)+'</span></div></div></div><div class="modal-field" style="margin-top:8px"><div class="modal-field-label">Drawing Refs</div><div class="modal-field-value">'+item.drawingRefs.join(', ')+'</div></div><div class="modal-field"><div class="modal-field-label">Notes</div><div class="modal-field-value">'+(item.notes||'—')+'</div></div><div style="margin-top:8px"><div class="modal-field-label">Comments ('+item.comments.length+')</div><div style="margin-top:4px">'+comments+'</div></div><div class="modal-actions">'+act+'</div>');
+}
+</script>
+<script>
+function renderSections(){
+  const ws=SAMPLE_WORKSPACE;const c=document.getElementById('sectionsList');
+  c.innerHTML=ws.sections.map(s=>{
+    const si=ws.items.filter(i=>i.sectionId===s.id);
+    return'<div class="section-row" onclick="this.classList.toggle(\'expanded\')"><div class="section-code">'+s.code+'</div><div class="section-info"><div class="section-title">'+s.title+'</div><div class="section-discipline">'+s.discipline+' · '+s.ownerRole+'</div></div><span class="chip chip-'+s.status+'">'+getStatusLabel(s.status)+'</span><span class="section-count">'+si.length+'</span></div><div class="section-items">'+si.map(i=>'<div class="section-item-row" onclick="event.stopPropagation();openItemDetail(\''+i.id+'\')"><span style="color:var(--text-low);font-family:monospace;font-size:9px">'+i.code+'</span><span style="flex:1">'+i.title+'</span><span class="chip chip-'+i.status+'">'+getStatusLabel(i.status)+'</span></div>').join('')+'</div>';
+  }).join('');
+}
+function renderProducts(){
+  const items=visibleItemsForRole(currentRole);const c=document.getElementById('productsList');
+  c.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="border-bottom:1px solid var(--glass-border)"><th style="text-align:left;padding:5px;color:var(--text-low)">Code</th><th style="text-align:left;padding:5px;color:var(--text-low)">Title</th><th style="text-align:left;padding:5px;color:var(--text-low)">Room</th><th style="text-align:right;padding:5px;color:var(--text-low)">Budget</th><th style="text-align:right;padding:5px;color:var(--text-low)">Est</th><th style="text-align:center;padding:5px;color:var(--text-low)">Status</th></tr></thead><tbody>'+items.map(i=>'<tr style="border-bottom:1px solid var(--glass-border);cursor:pointer" onclick="openItemDetail(\''+i.id+'\')" onmouseenter="this.style.background=\'rgba(174,239,227,0.03)\'" onmouseleave="this.style.background=\'\'"><td style="padding:5px;font-family:monospace;color:var(--primary-light)">'+i.code+'</td><td style="padding:5px">'+i.title+'</td><td style="padding:5px;color:var(--text-muted)">'+i.room+'</td><td style="padding:5px;text-align:right;color:var(--text-muted)">'+formatCurrency(i.budgetAllowance)+'</td><td style="padding:5px;text-align:right;color:'+(i.estimatedCost>i.budgetAllowance?'var(--danger)':'var(--text-primary)')+'">'+formatCurrency(i.estimatedCost)+'</td><td style="padding:5px;text-align:center"><span class="chip chip-'+i.status+'">'+getStatusLabel(i.status)+'</span></td></tr>').join('')+'</tbody></table></div>';
+}
+function renderDocPreview(){
+  const ws=SAMPLE_WORKSPACE;
+  let h='<div style="border:1px solid var(--glass-border);border-radius:var(--radius);padding:16px;background:var(--bg-deep)"><div style="text-align:center;border-bottom:2px solid var(--primary-light);padding-bottom:10px;margin-bottom:14px"><div style="font-family:var(--font-heading);font-size:14px;font-weight:700;color:var(--secondary)">'+ws.projectName+'</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">SPECIFICATION — Rev '+ws.revision+'</div></div>';
+  ws.sections.forEach(s=>{const si=ws.items.filter(i=>i.sectionId===s.id);h+='<div style="margin-bottom:14px"><div style="font-family:var(--font-heading);font-size:11px;font-weight:700;color:var(--primary-light);border-bottom:1px solid var(--glass-border);padding-bottom:3px;margin-bottom:6px">Section '+s.code+' — '+s.title+'</div>'+si.map(i=>'<div style="margin-bottom:8px;padding-left:10px;border-left:2px solid var(--glass-border)"><div style="font-weight:600;font-size:10px">'+i.code+' · '+i.title+'</div><div style="font-size:9px;color:var(--text-muted);margin-top:2px">'+i.supplier+' · '+i.model+' · '+i.finish+'</div></div>').join('')+'</div>';});
+  h+='</div>';document.getElementById('docPreviewContent').innerHTML=h;
+}
+function renderApprovals(){
+  const items=SAMPLE_WORKSPACE.items;let ai;
+  if(currentRole==='client') ai=items.filter(i=>i.clientDecision&&i.status!=='approved');
+  else if(['contractor','subcontractor'].includes(currentRole)) ai=items.filter(i=>i.reviewerRole===currentRole&&i.status!=='approved');
+  else ai=items.filter(i=>i.status!=='approved');
+  document.getElementById('approvalRoleNote').textContent='Showing items relevant to your role ('+currentRole+').';
+  document.getElementById('approvalsList').innerHTML=ai.length===0?'<p style="font-size:10px;color:var(--green)">✓ No pending approvals.</p>':ai.map(i=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--glass-border);border-radius:var(--radius-sm);margin-bottom:4px;background:var(--panel-bg)"><div style="width:3px;height:26px;border-radius:2px;background:'+(i.status==='needs_decision'?'var(--gold)':'var(--text-low)')+'"></div><div style="flex:1"><div style="font-size:11px;font-weight:500">'+i.title+'</div><div style="font-size:9px;color:var(--text-low)">'+i.code+' · '+i.room+'</div></div><span class="chip chip-'+i.status+'">'+getStatusLabel(i.status)+'</span><div style="display:flex;gap:3px">'+(canApprove(i)?'<button class="btn btn-primary" onclick="approveItem(\''+i.id+'\')">✓</button><button class="btn btn-danger" onclick="rejectItem(\''+i.id+'\')">✗</button>':'')+(canReview(i)?'<button class="btn btn-secondary" onclick="showToast(\'Flagged\')">Flag</button>':'')+'</div></div>').join('');
+  document.getElementById('professionalPanel').style.display=(currentRole==='architect'||currentRole==='bep')?'block':'none';
+}
+function renderBudget(){
+  const items=SAMPLE_WORKSPACE.items;const mx=Math.max(...items.map(i=>Math.max(i.budgetAllowance,i.estimatedCost)));
+  document.getElementById('budgetBars').innerHTML=items.map(i=>{const ap=(i.budgetAllowance/mx*100).toFixed(1);const ep=(i.estimatedCost/mx*100).toFixed(1);const ov=i.estimatedCost>i.budgetAllowance;return'<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:500;font-size:10px">'+i.title+'</span><span style="color:'+(ov?'var(--danger)':'var(--text-muted)')+';font-size:10px">'+formatCurrency(i.estimatedCost)+' / '+formatCurrency(i.budgetAllowance)+'</span></div><div style="position:relative;height:6px;background:var(--card-bg);border-radius:3px;overflow:hidden"><div style="position:absolute;height:100%;width:'+ep+'%;background:'+(ov?'var(--danger)':'var(--primary-light)')+';border-radius:3px"></div><div style="position:absolute;left:'+ap+'%;top:0;height:100%;border-right:2px dashed var(--gold)"></div></div></div>';}).join('');
+  // Risk summary
+  const bs=budgetSummary();const ll=items.filter(i=>i.leadTimeDays>60);const ob=items.filter(i=>i.estimatedCost>i.budgetAllowance);
+  document.getElementById('riskSummary').innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value" style="color:'+(ob.length?'var(--danger)':'var(--green)')+'">'+ob.length+'</div><div class="stat-label">Over Budget</div></div><div class="stat-card"><div class="stat-value" style="color:'+(ll.length?'var(--amber)':'var(--green)')+'">'+ll.length+'</div><div class="stat-label">Long Lead (>60d)</div></div><div class="stat-card"><div class="stat-value" style="color:var(--danger)">'+bs.staleCount+'</div><div class="stat-label">Stale Refs</div></div><div class="stat-card"><div class="stat-value">'+formatCurrency(Math.abs(bs.delta))+'</div><div class="stat-label">'+(bs.delta>0?'Over':'Under')+' Budget</div></div></div>';
+}
+</script>
+<script>
+// ===== V2 RENDER: BoM, Pipeline, Issue, Drawings =====
+function renderBomBoq(){
+  const items=SAMPLE_WORKSPACE.items;
+  const bomData=[
+    {code:'FIN-WT-001',item:'Porcelain wall tile',qty:186,unit:'m²',rate:691,source:'Spec item'},
+    {code:'FFE-CH-001',item:'Reception lounge chair',qty:4,unit:'No.',rate:11625,source:'Spec item'},
+    {code:'LGT-PD-001',item:'Feature pendant',qty:1,unit:'No.',rate:91000,source:'Spec item'},
+    {code:'JNY-RC-001',item:'Reception counter',qty:1,unit:'Item',rate:179000,source:'Spec item'}
+  ];
+  const total=bomData.reduce((s,r)=>s+(r.qty*r.rate),0);
+  let html='<table class="bom-table"><thead><tr><th>Code</th><th>Item</th><th style="text-align:right">Qty</th><th>Unit</th><th style="text-align:right">Rate</th><th style="text-align:right">Total</th><th>Source</th></tr></thead><tbody>';
+  bomData.forEach(r=>{html+='<tr><td class="code-col">'+r.code+'</td><td>'+r.item+'</td><td class="num-col">'+r.qty+'</td><td>'+r.unit+'</td><td class="num-col">'+formatCurrency(r.rate)+'</td><td class="num-col">'+formatCurrency(r.qty*r.rate)+'</td><td><span class="badge">'+r.source+'</span></td></tr>';});
+  html+='<tr class="bom-total-row"><td colspan="5" style="text-align:right;padding:10px">TOTAL</td><td class="num-col" style="padding:10px">'+formatCurrency(total)+'</td><td></td></tr></tbody></table>';
+  html+='<div style="margin-top:12px;padding:10px;background:linear-gradient(135deg,rgba(0,91,78,0.2),rgba(174,239,227,0.05));border:1px solid rgba(174,239,227,0.2);border-radius:var(--radius-sm)"><div style="font-size:9px;text-transform:uppercase;color:var(--secondary);font-weight:600;margin-bottom:3px">💡 Single Source of Truth</div><div style="font-size:10px;color:var(--text-muted)">These quantities are derived from spec items. Changes to specifications automatically update the BoM/BoQ. The QS cost plan and the specification are the SAME data.</div></div>';
+  document.getElementById('bomContent').innerHTML=html;
+}
+function renderProcurement(){
+  const items=SAMPLE_WORKSPACE.items;
+  const cols=['RFQ Pending','Quoted','PO Raised','Ordered','In Transit','Delivered','Installed'];
+  let html='<div class="pipeline-board">';
+  cols.forEach(col=>{
+    const codes=pipelineState[col]||[];
+    html+='<div class="pipeline-col"><div class="pipeline-col-title">'+col+' ('+codes.length+')</div>';
+    codes.forEach(code=>{
+      const item=items.find(i=>i.code===code);
+      const name=item?item.title:code;
+      let actionBtn='';
+      if(col==='RFQ Pending') actionBtn='<button class="btn btn-primary" style="font-size:8px;padding:2px 6px" onclick="event.stopPropagation();movePipelineItem(\''+code+'\',\'RFQ Pending\',\'Quoted\')">Send RFQ</button>';
+      else if(col==='Quoted') actionBtn='<button class="btn btn-primary" style="font-size:8px;padding:2px 6px" onclick="event.stopPropagation();movePipelineItem(\''+code+'\',\'Quoted\',\'PO Raised\')">Accept</button>';
+      else if(col==='PO Raised') actionBtn='<button class="btn btn-primary" style="font-size:8px;padding:2px 6px" onclick="event.stopPropagation();movePipelineItem(\''+code+'\',\'PO Raised\',\'Ordered\')">Order</button>';
+      else if(col==='Ordered') actionBtn='<button class="btn btn-primary" style="font-size:8px;padding:2px 6px" onclick="event.stopPropagation();movePipelineItem(\''+code+'\',\'Ordered\',\'In Transit\')">Shipped</button>';
+      else if(col==='In Transit') actionBtn='<button class="btn btn-primary" style="font-size:8px;padding:2px 6px" onclick="event.stopPropagation();movePipelineItem(\''+code+'\',\'In Transit\',\'Delivered\')">Received</button>';
+      else if(col==='Delivered') actionBtn='<button class="btn btn-gold" style="font-size:8px;padding:2px 6px" onclick="event.stopPropagation();movePipelineItem(\''+code+'\',\'Delivered\',\'Installed\')">Installed</button>';
+      html+='<div class="pipeline-card"><div class="pc-title">'+name+'</div><div class="pc-meta">'+code+(item?' · '+item.leadTimeDays+'d':'')+'</div>'+(actionBtn?'<div class="pc-action">'+actionBtn+'</div>':'')+'</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  document.getElementById('pipelineContent').innerHTML=html;
+}
+function renderIssue(){
+  const items=SAMPLE_WORKSPACE.items;
+  const approved=items.filter(i=>i.status==='approved').length;
+  const total=items.length;
+  const bs=budgetSummary();
+  const checks=[
+    {label:'All items approved',detail:approved+'/'+total+' approved',checked:approved===total,action:'switchView(\'approvals\')'},
+    {label:'Budget confirmed within allowance',detail:(bs.delta>0?'Over by '+formatCurrency(bs.delta):'Within allowance'),checked:bs.delta<=0,action:'switchView(\'budget\')'},
+    {label:'No stale/superseded sources',detail:bs.staleCount+' stale items',checked:bs.staleCount===0,action:'switchView(\'budget\')'},
+    {label:'Professional responsibility confirmed',detail:'Architect sign-off required',checked:false,action:'switchView(\'approvals\')'},
+    {label:'Client decisions complete',detail:items.filter(i=>i.clientDecision&&i.status!=='approved').length+' pending',checked:items.filter(i=>i.clientDecision&&i.status!=='approved').length===0,action:'switchView(\'approvals\')'}
+  ];
+  document.getElementById('issueChecklist').innerHTML=checks.map((ck,i)=>'<div class="issue-checklist-item'+(ck.checked?' checked':'')+'" onclick="toggleIssueCheck(this)"><div class="check-icon">'+(ck.checked?'✓':'')+'</div><div class="check-label">'+ck.label+'</div><div class="check-detail">'+ck.detail+'</div></div>').join('');
+  // Recipients
+  document.getElementById('recipientGrid').innerHTML='<div class="recipient-grid">'+ISSUE_RECIPIENTS.map(r=>'<div class="recipient-card"><div class="rc-header"><span class="rc-name">'+r.name+'</span><input type="checkbox" '+(r.include?'checked':'')+' style="accent-color:var(--secondary)"></div><div class="rc-scope">'+r.scope+'</div><div style="font-size:9px;color:var(--text-low);margin-top:4px">📦 '+r.items+'</div></div>').join('')+'</div>';
+  // Issue actions preview
+  const actions=['Action Centre cards created for 5 recipients','Messaging threads opened per package (3 threads)','Programme milestones created (4 procurement milestones)','BoM/BoQ updated (4 line items)','Escrow funding requirements generated (R420,000 + 1% fee)','Project Passport updated','Audit trail entries written'];
+  document.getElementById('issueActionsPreview').innerHTML='<div class="issue-actions-list">'+actions.map(a=>'<div class="issue-action-item"><div class="action-check">○</div><span>'+a+'</span></div>').join('')+'</div>';
+  checkIssueReadiness();
+}
+</script>
+<script>
+function renderDrawings(){
+  // Drawing list
+  let html='';
+  PROJECT_DRAWINGS.forEach(d=>{
+    const hasSuggestions=DRAWING_AI_SUGGESTIONS[d.id];
+    const sugCount=hasSuggestions?hasSuggestions.length:0;
+    html+='<div class="drawing-list-item"><div class="dl-icon">📄</div><div class="dl-info"><div class="dl-name">'+d.name+'</div><div class="dl-meta">'+d.pages+' pages'+(sugCount?' · '+sugCount+' items identified':'')+'</div></div>';
+    if(d.status==='scanned') html+='<span class="dl-status" style="background:rgba(74,222,128,0.12);color:var(--green)">✓ Scanned</span>';
+    else html+='<span class="dl-status" style="background:rgba(245,166,35,0.12);color:var(--amber)">Pending</span>';
+    if(hasSuggestions) html+='<button class="btn btn-secondary" onclick="showDrawingSuggestions(\''+d.id+'\')">View</button>';
+    else if(d.status!=='scanned') html+='<button class="btn btn-primary" onclick="simulateAiScanInline(\''+d.id+'\')">AI Scan</button>';
+    html+='</div>';
+  });
+  document.getElementById('drawingsList').innerHTML=html;
+  // All suggestions combined
+  let sugHtml='';
+  let totalSuggestions=0;
+  Object.entries(DRAWING_AI_SUGGESTIONS).forEach(([drawingId,suggestions])=>{
+    const drw=PROJECT_DRAWINGS.find(d=>d.id===drawingId);
+    suggestions.forEach(s=>{
+      totalSuggestions++;
+      const confClass=s.confidence>=85?'high':'med';
+      sugHtml+='<div class="ai-suggestion-card"><span class="conf '+confClass+'">'+s.confidence+'%</span><div style="flex:1"><div style="font-size:11px;font-weight:500">'+s.item+'</div><div style="font-size:9px;color:var(--text-low)">'+s.qty+' · From: '+(drw?drw.name:'Drawing')+'</div></div><button class="btn btn-primary" style="font-size:9px" onclick="addFromDrawingSuggestion(\''+s.item+'\',\''+s.qty+'\')">Add →</button></div>';
+    });
+  });
+  if(totalSuggestions>0){
+    sugHtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:10px;color:var(--text-muted)">'+totalSuggestions+' items identified across all drawings</span><button class="btn btn-primary" onclick="addAllDrawingsSuggestions()">Add all ('+totalSuggestions+')</button></div>'+sugHtml;
+  } else {
+    sugHtml='<p style="font-size:10px;color:var(--text-low)">No AI suggestions yet. Scan drawings to identify items.</p>';
+  }
+  document.getElementById('allDrawingSuggestions').innerHTML=sugHtml;
+}
+function simulateAiScanInline(drawingId){
+  showToast('🤖 Scanning drawing...');
+  setTimeout(()=>{
+    DRAWING_AI_SUGGESTIONS[drawingId]=[{item:'Ceiling grid — Office',qty:'180m²',confidence:82},{item:'Switch plate — Standard',qty:'24 No.',confidence:71}];
+    const drw=PROJECT_DRAWINGS.find(d=>d.id===drawingId);
+    if(drw) drw.status='scanned';
+    renderDrawings();
+    showToast('✓ AI scan complete');
+  },1800);
+}
+function addAllDrawingsSuggestions(){
+  let count=0;
+  Object.values(DRAWING_AI_SUGGESTIONS).forEach(suggestions=>{
+    suggestions.forEach(s=>{
+      const item={id:genId(),sectionId:'sec-finishes',code:'AI-'+String(++idCounter).padStart(3,'0'),title:s.item,room:'Per drawing',package:'General',discipline:'general',image:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="%23162e28"/><text x="100" y="220" font-size="22" fill="%23aeefe3">'+s.item.substring(0,22)+'</text></svg>',supplier:'TBC',model:'',finish:'',dimensions:s.qty,drawingRefs:[],clauseRefs:[],budgetAllowance:0,estimatedCost:0,leadTimeDays:14,clientDecision:false,ownerRole:'architect',reviewerRole:'quantity_surveyor',approverRole:'client',status:'draft',sourceRevision:'P01',supersededBy:null,sustainability:'',warranty:'',notes:'AI scan ('+s.confidence+'% confidence)',comments:[]};
+      SAMPLE_WORKSPACE.items.push(item);
+      count++;
+    });
+  });
+  showToast('✓ '+count+' items added from all drawings');
+  renderAll();
+}
+function renderPlanning(){
+  const items=SAMPLE_WORKSPACE.items;
+  const pkgs=items.map(i=>({subject:'Procure: '+i.title,status:i.status==='approved'?'In Progress':'New',priority:i.leadTimeDays>60?'High':'Normal',assignee:i.ownerRole}));
+  const cols={'New':[],'In Progress':[],'Done':[]};
+  pkgs.forEach(p=>{(cols[p.status]||cols['New']).push(p);});
+  document.getElementById('kanbanBoard').innerHTML=Object.entries(cols).map(([s,cards])=>'<div class="kanban-column"><div class="kanban-col-title">'+s+' ('+cards.length+')</div>'+cards.map(c=>'<div class="kanban-card"><div class="kanban-card-title">'+c.subject+'</div><div class="kanban-card-meta"><span class="badge" style="margin-right:3px">'+c.priority+'</span>'+c.assignee+'</div></div>').join('')+'</div>').join('');
+}
+function renderCloseout(){
+  const items=SAMPLE_WORKSPACE.items;const ap=items.filter(i=>i.status==='approved').length;const t=items.length;const pct=((ap/t)*100).toFixed(0);const bs=budgetSummary();
+  const allA=ap===t;const wb=bs.delta<=0;const ns=bs.staleCount===0;const ready=allA&&wb&&ns;
+  document.getElementById('closeoutStatus').innerHTML='<div class="stats-grid" style="margin-bottom:14px"><div class="stat-card"><div class="stat-value" style="color:'+(allA?'var(--green)':'var(--amber)')+'">'+pct+'%</div><div class="stat-label">Approved</div></div><div class="stat-card"><div class="stat-value" style="color:'+(wb?'var(--green)':'var(--danger)')+'">'+(wb?'✓':'✗')+'</div><div class="stat-label">Budget</div></div><div class="stat-card"><div class="stat-value" style="color:'+(ns?'var(--green)':'var(--danger)')+'">'+(ns?'✓':'✗')+'</div><div class="stat-label">No Stale</div></div></div><div style="padding:12px;border-radius:var(--radius-sm);border:1px solid '+(ready?'var(--green)':'var(--amber)')+';background:'+(ready?'rgba(74,222,128,0.06)':'rgba(245,166,35,0.06)')+'"><div style="font-weight:600;font-size:11px;color:'+(ready?'var(--green)':'var(--amber)')+'">'+(ready?'✓ Ready for Issue':'⚠ Not Ready')+'</div><div style="font-size:10px;color:var(--text-muted);margin-top:3px">'+(ready?'All conditions met.':(t-ap)+' item(s) pending approval. '+(bs.delta>0?'Budget over by '+formatCurrency(bs.delta)+'.':''))+'</div></div>';
+}
+</script>
+<script>
+function renderIntegration(){
+  const bs=budgetSummary();const items=SAMPLE_WORKSPACE.items;
+  const pd=items.filter(i=>i.clientDecision&&i.status!=='approved').length;
+  const tc=items.reduce((s,i)=>s+(i.comments||[]).length,0);
+  document.getElementById('integrationGrid').innerHTML=`
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>Project Passport</div><div class="integration-metric"><span class="label">Status</span><span class="value"><span class="chip chip-${SAMPLE_WORKSPACE.issueStatus}">${getStatusLabel(SAMPLE_WORKSPACE.issueStatus)}</span></span></div><div class="integration-metric"><span class="label">Open Decisions</span><span class="value" style="color:var(--gold)">${pd}</span></div><div class="integration-metric"><span class="label">Budget Delta</span><span class="value" style="color:${bs.delta>0?'var(--danger)':'var(--green)'}">${bs.delta>0?'+':''}${bs.deltaPct}%</span></div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>AI Agent Recommendations</div><div class="ai-rec-card"><div class="ai-label">🤖 Recommendation</div><div style="font-size:10px">${pd} client decisions pending — send reminder</div></div><div class="ai-rec-card"><div class="ai-label">🤖 Early Procurement</div><div style="font-size:10px">Feature pendant: 84-day lead — issue RFQ now</div></div><div class="ai-rec-card"><div class="ai-label">🤖 Budget</div><div style="font-size:10px">Wall tile over allowance — alternative supplier found at R580/m²</div></div><div class="ai-rec-card"><div class="ai-label">🤖 Drawing Intelligence</div><div style="font-size:10px">FIN-100 scanned — 4 new items suggested for specification</div></div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd warn"></span>Messaging Centre</div><div class="integration-metric"><span class="label">Comments</span><span class="value">${tc} across items</span></div><div class="integration-metric"><span class="label">Unread</span><span class="value" style="color:var(--gold)">2</span></div><div class="connection-line">Comments → Action Centre cards</div><div class="connection-line">Approvals → inbox notifications</div><div class="connection-line">Issue → distribution threads</div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>Payment & Escrow</div><div class="integration-metric"><span class="label">Total Estimate</span><span class="value">${formatCurrency(bs.totalEstimate)}</span></div><div class="integration-metric"><span class="label">Platform Fee (1%)</span><span class="value">${formatCurrency(Math.round(bs.totalEstimate*0.01))}</span></div><div class="integration-metric"><span class="label">Escrow Required</span><span class="value" style="color:var(--secondary)">${formatCurrency(bs.totalEstimate)}</span></div><div class="integration-metric"><span class="label">Unlock Condition</span><span class="value">Issued + Delivered + Evidence</span></div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>Procurement Pipeline</div><div class="connection-line">Issued specs → RFQ packages</div><div class="connection-line">Quotes → Purchase orders</div><div class="connection-line">PO → Delivery tracking</div><div class="integration-metric"><span class="label">Ready for RFQ</span><span class="value">${items.filter(i=>i.status==='approved').length} items</span></div><div class="integration-metric"><span class="label">Pipeline Active</span><span class="value">${Object.values(pipelineState).flat().length} items</span></div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>Programme / Gantt</div><div class="integration-metric"><span class="label">Sync</span><span class="value" style="color:var(--green)">✓ Connected</span></div><div class="integration-metric"><span class="label">Work Packages</span><span class="value">${items.length*2} generated</span></div><div class="integration-metric"><span class="label">Critical Path</span><span class="value" style="color:var(--amber)">LGT-PD-001 (84d)</span></div><div class="connection-line">Long-lead → planning constraints</div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>BoM / BoQ</div><div class="integration-metric"><span class="label">Line Items</span><span class="value">${items.length}</span></div><div class="integration-metric"><span class="label">Total Value</span><span class="value">${formatCurrency(bs.totalEstimate)}</span></div><div class="connection-line">Spec items = BoM line items</div><div class="connection-line">Quantities from drawings</div><div class="connection-line">Rates from supplier quotes</div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd warn"></span>Drawing Intelligence</div><div class="integration-metric"><span class="label">Drawings Scanned</span><span class="value">${PROJECT_DRAWINGS.filter(d=>d.status==='scanned').length}/${PROJECT_DRAWINGS.length}</span></div><div class="integration-metric"><span class="label">Items Identified</span><span class="value">${Object.values(DRAWING_AI_SUGGESTIONS).flat().length}</span></div><div class="connection-line">Drawing revision → spec review flag</div><div class="connection-line">AI scan → suggested items</div></div>
+    <div class="integration-card"><div class="integration-card-title"><span class="sd"></span>Audit Trail</div><div style="padding:8px;background:var(--bg-deep);border-radius:var(--radius-sm);border:1px solid var(--glass-border);font-family:monospace;font-size:8px;color:var(--secondary);max-height:120px;overflow-y:auto"><div>[${new Date(Date.now()-3600000).toISOString().slice(0,19)}] ITEM_APPROVED · FFE-CH-001</div><div>[${new Date(Date.now()-7200000).toISOString().slice(0,19)}] COMMENT · FIN-WT-001 · QS Reviewer</div><div>[${new Date(Date.now()-10800000).toISOString().slice(0,19)}] AI_SCAN · FIN-100 · 4 items found</div><div>[${new Date(Date.now()-14400000).toISOString().slice(0,19)}] ITEM_CREATED · LGT-PD-001</div><div>[${new Date(Date.now()-18000000).toISOString().slice(0,19)}] SECTION_CREATED · Custom Joinery</div><div>[${new Date(Date.now()-21600000).toISOString().slice(0,19)}] LIBRARY_MATCH · FIN-WT-001 · 94% similar</div></div></div>
+  `;
+}
+</script>
+<script>
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  buildShell();
+  renderAll();
+  // Close search dropdowns on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.smart-search-container')) {
+      closeSearchDropdowns();
+    }
+  });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeSearchDropdowns();
+  }
+});
+</script>
+</body>
+</html>

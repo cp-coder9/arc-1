@@ -18,7 +18,6 @@
 
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import { QuickNav, QUICK_NAV_ITEMS } from '../QuickNav';
 

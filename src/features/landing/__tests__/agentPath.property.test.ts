@@ -9,7 +9,6 @@
 // across the agents.
 //
 // Validates: Requirements 12.5, 13.2, 13.5
-import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import {
   buildNodeLattice,

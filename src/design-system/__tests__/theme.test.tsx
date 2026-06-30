@@ -28,7 +28,6 @@ import { fileURLToPath } from 'node:url';
 
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { GlassSurface } from '../GlassSurface';
 import { ALL_TOKEN_NAMES, getTokenFallback, THEME_TOKENS } from '../tokens';

@@ -7,7 +7,6 @@
 // outward burst target that stays inside the viewport, with a uniform patrol
 // speed across the whole field; and the settled-opacity cap the AgentField uses
 // (SETTLE_MAX_OPACITY) is at most 0.25 and sits below the OS_Reveal card.
-import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import {
   planFlock,

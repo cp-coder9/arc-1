@@ -28,7 +28,6 @@
 //       robust presence / static-branch checks; the hook property (a) carries
 //       the strong guarantee.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, renderHook, screen } from '@testing-library/react';
 import fc from 'fast-check';
 

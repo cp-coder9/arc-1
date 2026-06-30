@@ -24,7 +24,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Hero } from '../Hero';
 import { QuickNav, QUICK_NAV_ITEMS } from '../QuickNav';

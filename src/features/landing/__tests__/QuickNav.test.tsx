@@ -7,7 +7,6 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
 import { QuickNav, QUICK_NAV_ITEMS } from '../QuickNav';
 
 describe('QuickNav', () => {

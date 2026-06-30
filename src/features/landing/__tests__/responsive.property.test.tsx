@@ -25,7 +25,6 @@
 //       uncut) at every generated viewport width.
 
 import { render, within } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 
 import { LandingPage } from '../LandingPage';

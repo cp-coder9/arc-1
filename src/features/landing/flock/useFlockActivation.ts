@@ -87,13 +87,18 @@ export const MIN_SEQUENCE_MS = 1500;
 export const MAX_SEQUENCE_MS = 3500;
 
 /**
- * Default phase durations. The sum (150 + 1450 + 700 = 2300 ms) sits comfortably
- * inside the 1500–3500 ms window mandated by Req 12.8.
+ * Default phase durations, tuned to the mockup's cadence: a brief setup, an
+ * ~1000 ms outward explosion, then a ~1450 ms settle onto the grid before the
+ * OS_Reveal card appears. The fallback timers sit just *after* AgentField's
+ * visual flight durations (explode 0.85 s, settle 1.3 s) so the geometry
+ * callbacks drive the sequence smoothly while the timers guarantee progress.
+ * The sum (100 + 1000 + 1450 = 2550 ms) sits inside the 1500–3500 ms window
+ * mandated by Req 12.8.
  */
 export const DEFAULT_TIMING: Required<FlockTimingConfig> = {
-  activatingMs: 150,
-  dispersingMs: 1450,
-  settlingMs: 700,
+  activatingMs: 100,
+  dispersingMs: 1000,
+  settlingMs: 1450,
   watchdogMs: 5000,
 };
 

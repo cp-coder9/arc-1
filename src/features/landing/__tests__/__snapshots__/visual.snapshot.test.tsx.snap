@@ -39,7 +39,7 @@ exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stab
   <div
     aria-hidden="true"
     class="z-[2]"
-    style="position: absolute; inset: 0px; pointer-events: none; overflow: hidden; opacity: 1; transition: opacity 600ms ease;"
+    style="position: absolute; inset: 0px; pointer-events: none; overflow: hidden; opacity: 0.55; transition: opacity 600ms ease;"
   >
     <span
       aria-hidden="true"
@@ -146,11 +146,11 @@ exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stab
         >
           <div
             class="relative mx-auto flex items-center justify-center"
-            style="width: 360px; height: 360px;"
+            style="width: 540px; height: 540px; max-width: 90vw;"
           >
             <span
               aria-hidden="true"
-              style="position: absolute; top: 50%; left: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); border-radius: 50%; border-style: solid; border-width: 2px; border-color: var(--glass-border); box-shadow: 0 0 40px var(--glass-glow); pointer-events: none;"
+              style="position: absolute; top: 6%; left: 6%; width: 88%; height: 88%; border-radius: 50%; border-style: solid; border-width: 2px; border-color: var(--glass-border); box-shadow: 0 0 70px var(--glass-glow), inset 0 0 90px var(--glass-glow); pointer-events: none;"
             />
             <div
               aria-label="Enter Architex OS"
@@ -164,30 +164,30 @@ exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stab
                 class="object-contain"
                 decoding="async"
                 draggable="false"
-                height="280"
+                height="464"
                 referrerpolicy="no-referrer"
                 src="/logo.png"
                 srcset="/logo.png 1x, /logo.png 2x"
-                style="width: 280px; height: 280px; mix-blend-mode: screen;"
-                width="280"
+                style="width: 464px; height: 464px; mix-blend-mode: screen;"
+                width="464"
               />
             </div>
           </div>
           <h1
-            class="mt-10 max-w-3xl font-heading font-bold leading-tight text-4xl sm:text-5xl lg:text-6xl"
-            style="font-family: var(--font-heading); color: var(--landing-text);"
+            class="mt-8 max-w-3xl font-heading font-bold leading-tight"
+            style="font-family: var(--font-heading); color: var(--landing-text); letter-spacing: -0.01em;"
           >
             The Operating System for the Built Environment
           </h1>
           <p
-            class="mt-5 max-w-xl text-lg sm:text-xl"
+            class="mt-4 max-w-xl"
             style="font-family: var(--font-sans); color: var(--landing-text-muted);"
           >
             Simplify complexity. Deliver with confidence.
           </p>
           <button
-            class="mt-9 inline-flex items-center justify-center rounded-full px-9 py-4 text-base font-semibold font-heading select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-            style="font-family: var(--font-heading); background-color: var(--landing-accent); color: var(--secondary-foreground); box-shadow: 0 10px 30px var(--glass-glow); --tw-ring-color: var(--landing-accent);"
+            class="mt-7 inline-flex items-center justify-center rounded-full px-10 py-4 text-base font-semibold font-heading select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            style="font-family: var(--font-heading); background-image: linear-gradient(180deg, color-mix(in srgb, var(--landing-accent) 70%, white), var(--landing-accent)); color: var(--secondary-foreground); box-shadow: 0 14px 36px var(--glass-glow), inset 0 1px 0 rgba(255,255,255,0.6); --tw-ring-color: var(--landing-accent);"
             tabindex="0"
             type="button"
           >
@@ -448,7 +448,7 @@ exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stab
   <div
     aria-hidden="true"
     class="z-[2]"
-    style="position: absolute; inset: 0px; pointer-events: none; overflow: hidden; opacity: 1; transition: opacity 600ms ease;"
+    style="position: absolute; inset: 0px; pointer-events: none; overflow: hidden; opacity: 0.55; transition: opacity 600ms ease;"
   >
     <span
       aria-hidden="true"
@@ -581,11 +581,11 @@ exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stab
         >
           <div
             class="relative mx-auto flex items-center justify-center"
-            style="width: 360px; height: 360px;"
+            style="width: 540px; height: 540px; max-width: 90vw;"
           >
             <span
               aria-hidden="true"
-              style="position: absolute; top: 50%; left: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); border-radius: 50%; border-style: solid; border-width: 2px; border-color: var(--glass-border); box-shadow: 0 0 40px var(--glass-glow); pointer-events: none;"
+              style="position: absolute; top: 6%; left: 6%; width: 88%; height: 88%; border-radius: 50%; border-style: solid; border-width: 2px; border-color: var(--glass-border); box-shadow: 0 0 70px var(--glass-glow), inset 0 0 90px var(--glass-glow); pointer-events: none;"
             />
             <div
               aria-label="Enter Architex OS"
@@ -599,30 +599,30 @@ exports[`Landing_Page DOM structure snapshot (reduced motion) > matches the stab
                 class="object-contain"
                 decoding="async"
                 draggable="false"
-                height="280"
+                height="464"
                 referrerpolicy="no-referrer"
                 src="/logo.png"
                 srcset="/logo.png 1x, /logo.png 2x"
-                style="width: 280px; height: 280px; mix-blend-mode: screen;"
-                width="280"
+                style="width: 464px; height: 464px; mix-blend-mode: screen;"
+                width="464"
               />
             </div>
           </div>
           <h1
-            class="mt-10 max-w-3xl font-heading font-bold leading-tight text-4xl sm:text-5xl lg:text-6xl"
-            style="font-family: var(--font-heading); color: var(--landing-text);"
+            class="mt-8 max-w-3xl font-heading font-bold leading-tight"
+            style="font-family: var(--font-heading); color: var(--landing-text); letter-spacing: -0.01em;"
           >
             The Operating System for the Built Environment
           </h1>
           <p
-            class="mt-5 max-w-xl text-lg sm:text-xl"
+            class="mt-4 max-w-xl"
             style="font-family: var(--font-sans); color: var(--landing-text-muted);"
           >
             Simplify complexity. Deliver with confidence.
           </p>
           <button
-            class="mt-9 inline-flex items-center justify-center rounded-full px-9 py-4 text-base font-semibold font-heading select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-            style="font-family: var(--font-heading); background-color: var(--landing-accent); color: var(--secondary-foreground); box-shadow: 0 10px 30px var(--glass-glow); --tw-ring-color: var(--landing-accent);"
+            class="mt-7 inline-flex items-center justify-center rounded-full px-10 py-4 text-base font-semibold font-heading select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            style="font-family: var(--font-heading); background-image: linear-gradient(180deg, color-mix(in srgb, var(--landing-accent) 70%, white), var(--landing-accent)); color: var(--secondary-foreground); box-shadow: 0 14px 36px var(--glass-glow), inset 0 1px 0 rgba(255,255,255,0.6); --tw-ring-color: var(--landing-accent);"
             tabindex="0"
             type="button"
           >

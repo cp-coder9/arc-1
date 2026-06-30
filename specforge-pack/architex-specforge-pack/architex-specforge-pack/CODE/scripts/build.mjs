@@ -1,0 +1,10 @@
+import { cp, mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { SAMPLE_WORKSPACE } from '../src/specificationDomain.mjs';
+import { generateInteractiveSpecDocument } from '../src/documentGenerator.mjs';
+await mkdir('dist', { recursive: true });
+await cp('public', 'dist', { recursive: true });
+await cp('src', 'dist/src', { recursive: true });
+await writeFile('dist/specforge-sample-document.json', JSON.stringify(generateInteractiveSpecDocument(SAMPLE_WORKSPACE, { role: 'architect' }), null, 2));
+await writeFile('dist/build-manifest.json', JSON.stringify({ builtAt: new Date().toISOString(), files: ['index.html','styles.css','src/*.mjs','specforge-sample-document.json'] }, null, 2));
+console.log('Built dist/ with standalone SpecForge demo');

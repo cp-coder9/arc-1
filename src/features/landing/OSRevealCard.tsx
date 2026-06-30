@@ -63,10 +63,11 @@ const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-offset-
 
 export interface OSRevealCardProps {
   /**
-   * Invoked when the user submits the sign-in form (via the sign-in control or
-   * pressing Enter in a field). Presentational only — the parent owns auth.
+   * Invoked with the collected credentials when the user submits the sign-in
+   * form (via the sign-in control or pressing Enter in a field). Presentational
+   * only — the parent owns auth. Returning a Promise is allowed (async auth).
    */
-  onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
+  onSignIn?: (email: string, password: string) => void | Promise<void>;
   /** Optional extra classes for positioning/layout by the caller. */
   className?: string;
 }
@@ -79,13 +80,18 @@ export function OSRevealCard({ onSignIn, className }: OSRevealCardProps) {
   const emailId = React.useId();
   const passwordId = React.useId();
 
+  // Controlled credential state so the parent receives the typed values.
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+
   // Shared ring color for all focusable controls (token-driven).
   const ringStyle = { ['--tw-ring-color' as string]: tokenVar(RING) };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    // Stay presentational: prevent a full-page navigation and delegate upward.
+    // Stay presentational: prevent a full-page navigation and delegate the
+    // collected credentials upward (the parent performs the real auth).
     event.preventDefault();
-    onSignIn?.(event);
+    onSignIn?.(email, password);
   };
 
   return (
@@ -120,6 +126,8 @@ export function OSRevealCard({ onSignIn, className }: OSRevealCardProps) {
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className={cn('h-10', FOCUS_RING)}
             style={{
               color: tokenVar(LANDING_TEXT),
@@ -143,6 +151,8 @@ export function OSRevealCard({ onSignIn, className }: OSRevealCardProps) {
             type="password"
             autoComplete="current-password"
             placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className={cn('h-10', FOCUS_RING)}
             style={{
               color: tokenVar(LANDING_TEXT),

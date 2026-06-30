@@ -77,10 +77,11 @@ export interface LandingPageProps {
    */
   onNavigate?: (route: string) => void;
   /**
-   * Submit the OS_Reveal sign-in form (Req 12.7). `App.tsx` supplies the real
-   * auth handler; defaults to a no-op.
+   * Submit the OS_Reveal sign-in form with the collected credentials (Req 12.7).
+   * `App.tsx` (Task 13.1) supplies the real auth handler; defaults to a no-op so
+   * the page renders standalone. Returning a Promise is allowed (async auth).
    */
-  onSignIn?: () => void;
+  onSignIn?: (email: string, password: string) => void | Promise<void>;
   className?: string;
 }
 
@@ -91,6 +92,13 @@ const RESTORE_LABEL = 'Back to landing';
 
 /** Content column max width so the layout never sprawls at large viewports. */
 const CONTENT_MAX_WIDTH = 'max-w-6xl';
+
+/**
+ * Fallback grid step (px) when the `--grid-step` probe resolves to 0. Matches
+ * the mockup's 54px cell so the node lattice + patrol loops stay sensible even
+ * if the token can't be measured.
+ */
+const DEFAULT_STEP_PX = 54;
 
 interface Measurement {
   width: number;
@@ -143,21 +151,33 @@ export function LandingPage({
     if (!el) return undefined;
 
     const measure = () => {
-      const width = el.clientWidth;
-      const height = el.clientHeight;
-      const stepPx = probeRef.current
+      // Robust viewport size: prefer the measured container box, but fall back
+      // to the window so the flock still has a real field even when the
+      // container reports 0 (e.g. before first layout, or in odd embeddings).
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 0;
+      const winH = typeof window !== 'undefined' ? window.innerHeight : 0;
+      const width = el.clientWidth || winW || 0;
+      const height = el.clientHeight || winH || 0;
+
+      // Resolve the `--grid-step` clamp() to px via the hidden probe; if that
+      // measures 0 (token unresolved / pre-layout), fall back to a sane step so
+      // the node lattice + patrol loops never collapse to a degenerate grid.
+      const probedStep = probeRef.current
         ? probeRef.current.getBoundingClientRect().width
         : 0;
+      const stepPx = probedStep > 0 ? probedStep : DEFAULT_STEP_PX;
 
-      // Hero centre relative to the container; fall back to the container centre.
+      // Hero centre relative to the container; fall back to the field centre.
       let heroCenter = { x: width / 2, y: height / 2 };
       if (heroRef.current) {
         const containerRect = el.getBoundingClientRect();
         const heroRect = heroRef.current.getBoundingClientRect();
-        heroCenter = {
-          x: heroRect.left - containerRect.left + heroRect.width / 2,
-          y: heroRect.top - containerRect.top + heroRect.height / 2,
-        };
+        if (heroRect.width > 0 || heroRect.height > 0) {
+          heroCenter = {
+            x: heroRect.left - containerRect.left + heroRect.width / 2,
+            y: heroRect.top - containerRect.top + heroRect.height / 2,
+          };
+        }
       }
 
       setMeasurement({ width, height, stepPx, heroCenter });
@@ -165,12 +185,22 @@ export function LandingPage({
 
     measure();
 
+    // Re-measure on window resize (rebuilds the node lattice + flock geometry to
+    // match the viewport, like the mockup's resize handler).
+    let ro: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(measure);
+      ro = new ResizeObserver(measure);
       ro.observe(el);
-      return () => ro.disconnect();
     }
-    return undefined;
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', measure);
+    }
+    return () => {
+      ro?.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', measure);
+      }
+    };
   }, []);
 
   // ── Phase-derived presentation ─────────────────────────────────────────
@@ -193,9 +223,12 @@ export function LandingPage({
     },
   };
 
-  const handleSignIn = useCallback(() => {
-    onSignIn();
-  }, [onSignIn]);
+  const handleSignIn = useCallback(
+    (email: string, password: string) => {
+      onSignIn(email, password);
+    },
+    [onSignIn],
+  );
 
   return (
     <div

@@ -54,6 +54,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
       { key: 'design_compliance', label: 'Design & Compliance', description: 'NBR/SANS/municipal/drawing checks.', supportsContextualMessaging: true },
       { key: 'costing_procurement', label: 'Costing & Procurement', description: 'BoQ, BoM, RFQs and quote comparisons.', supportsContextualMessaging: true },
+      { key: 'specforge', label: 'SpecForge Specifications', description: 'Pictorial specs, product schedules, approvals, issue and procurement pipeline.', supportsContextualMessaging: true },
       { key: 'construction_admin', label: 'Construction Admin', description: 'Site diary, RFIs, variations and certificates.', supportsContextualMessaging: true, captureStage: 'build', captureCapabilities: ['field_capture', 'checklists', 'field_reporting'] },
       { key: 'closeout', label: 'Closeout', description: 'Snags, handover and closeout packs.', supportsContextualMessaging: true, captureStage: 'closeout', captureCapabilities: ['snag_rectification', 'handover_reporting'] },
       { key: 'full_library', label: 'Full Tool Library', description: 'All available tools with search/filter.' },

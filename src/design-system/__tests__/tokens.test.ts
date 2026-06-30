@@ -11,8 +11,6 @@
  *    document root.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import {
   DEFAULT_TOKEN_FALLBACK,
   GLASS_BLUR,
