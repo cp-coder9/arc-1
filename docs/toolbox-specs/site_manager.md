@@ -58,3 +58,19 @@ All site manager tools now participate in the Toolbox Capability Framework (`Cal
 - **Versioned tables:** PAYE/UIF/SDL tables, plant rates, H&S checklist items
 - **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
 - **Reports:** PDF/CSV export with daily summaries, H&S clause outcomes, source versions, disclaimers
+
+## 8. Forma Build Field Tools (Stage 6 Build / Stage 8 Close-out)
+<!-- forma-build-site-tools:field-tools -->
+
+Extends Pack 9 site execution with Autodesk Build / Forma-style mobile field capture. Reuses the existing snag state machine (`open → allocated → ready_for_reinspection → closed / rejected`) and payment-blocker governance unchanged.
+
+**Granted capabilities (editor role):**
+- **Field capture** — create/edit field issues with pin-on-drawing location referencing (normalized `x,y` 0–1) or text location (1–500 chars); attach photo/video/document evidence.
+- **Issue assignment & lifecycle** — assign a responsible party (defaults to `unassigned`), drive issues through the snag state machine; high/critical open issues block payment.
+- **Issue Dashboard** (Projects → snags) — AND-filtered by status, severity, responsible party, and lifecycle stage, with per-status counts and drawing-pin display.
+- **Field reporting** — generate dated daily/progress reports aggregating issues, evidence, weather, and payment-blocking counts; close-out reports include outstanding-handover snag counts; export with issue summary and evidence references.
+- **Offline capture** — issues, annotations, and checklist responses queue locally (capacity 500) and sync to Firestore in creation order, idempotently, when connectivity returns.
+
+**Governance:** Site manager cannot release payment blocked by an open issue — release requires contractor sign-off. Every field action (create/edit/delete, status transition, payment-release attempt) is audited via `SiteAuditRecord` with a permitted/denied outcome.
+
+_Spec: `forma-build-site-tools` · Requirements 1, 5, 6, 7, 8._

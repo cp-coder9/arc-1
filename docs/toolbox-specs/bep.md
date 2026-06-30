@@ -58,3 +58,17 @@ All BEP tools now participate in the Toolbox Capability Framework (`CalculatorDe
 - **Versioned tables:** Council fee brackets, stage apportionment, XA zone limits, glazing properties, CPD body rules
 - **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
 - **Reports:** PDF/CSV export with clause outcomes, source versions, disclaimers
+
+## 8. Forma Build Field Tools (Stage 6 Build / Stage 8 Close-out)
+<!-- forma-build-site-tools:field-tools -->
+
+Extends Pack 9 site execution with Autodesk Build / Forma-style mobile field capture. Reuses the existing snag state machine (`open → allocated → ready_for_reinspection → closed / rejected`) and payment-blocker governance unchanged.
+
+**Granted capabilities (editor role):**
+- **Checklist templates** — author and validate reusable inspection checklist templates (1–200 items, prompts 1–500 chars, response types pass_fail_na / numeric / text); templates round-trip without loss and seed checklist instances for site teams.
+- **Field reporting** — generate and export dated field reports (issue summary with identifier, status, severity; evidence references; payment-blocking and close-out handover counts).
+- **Issue review & Dashboard** — view/edit field issues and the AND-filtered Issue Dashboard with per-status counts and drawing-pin display.
+
+**Governance:** Checklist authoring and reporting are coordination activities; compliance and municipal sign-off remain explicit and human-verified. Every field action is audited via `SiteAuditRecord` with a permitted/denied outcome.
+
+_Spec: `forma-build-site-tools` · Requirements 3, 5, 6, 7._

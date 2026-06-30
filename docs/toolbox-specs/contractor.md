@@ -60,3 +60,18 @@ All contractor tools have reached full status.
 - **Versioned tables:** Rate libraries, retention/VAT config, PAYE/UIF/SDL tables, plant rates, H&S checklist
 - **Rendering:** `DefinitionToolRunner` for all tools
 - **Reports:** PDF/CSV export with clause outcomes, payroll summaries, source versions, disclaimers
+
+## 8. Forma Build Field Tools (Stage 6 Build / Stage 8 Close-out)
+<!-- forma-build-site-tools:field-tools -->
+
+Extends Pack 9 site execution with Autodesk Build / Forma-style mobile field capture. Reuses the existing snag state machine (`open → allocated → ready_for_reinspection → closed / rejected`) and payment-blocker governance unchanged.
+
+**Granted capabilities (editor role):**
+- **Field capture** — create/edit field issues with pin-on-drawing location referencing or text location; attach evidence with GPS/location.
+- **Inspection checklists** — start checklist instances from templates (items copied in order), record pass/fail/na, numeric, or text responses, view pass/fail/na counts, and convert any failed item into a field issue carrying the item prompt, checklist reference, and attached evidence.
+- **Photo annotation** — capture JPEG/PNG photos (≤ 25 MB), mark them up with structured shapes (arrows, text notes), and store both the structured annotation and a flattened rendered image; annotations round-trip without data loss.
+- **Issue Dashboard & offline capture** — AND-filtered dashboard access; offline captures queue locally and sync in creation order when connectivity returns.
+
+**Governance:** Payment view/preparation only — fund release stays behind the escrow/admin gate, and contractor sign-off is required before a site-manager-blocked payment can release. Every field action is audited via `SiteAuditRecord` with a permitted/denied outcome.
+
+_Spec: `forma-build-site-tools` · Requirements 1, 2, 3, 5, 6._
