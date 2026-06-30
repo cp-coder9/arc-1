@@ -62,6 +62,8 @@ jest.mock('@/lib/firebase', () => ({
     DELETE: 'DELETE',
     LIST: 'LIST',
     UPLOAD: 'UPLOAD',
+    GET: 'GET',
+    WRITE: 'WRITE',
   },
 }));
 
