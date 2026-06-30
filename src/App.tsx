@@ -630,11 +630,17 @@ function AppContent() {
 
       return readJsonResponse(res);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('Expected JSON from auth API') || message.includes('Failed to fetch') || message.includes('NetworkError')) {
-        return createClientProfileFallback(selectedRole, firebaseUser);
+      // Always attempt the client-side Firestore fallback when the secured
+      // API gateway is unavailable or rejects the token (e.g. 401 because
+      // the PHP gateway's Firebase token verification is misconfigured).
+      // createClientProfileFallback itself rejects admin sign-ins, so this
+      // remains safe — only non-admin users get a client-side profile.
+      try {
+        return await createClientProfileFallback(selectedRole, firebaseUser);
+      } catch (fallbackError) {
+        console.warn('Auth API failed and client-side fallback was rejected:', { apiError: error, fallbackError });
+        throw fallbackError;
       }
-      throw error;
     }
   };
 
