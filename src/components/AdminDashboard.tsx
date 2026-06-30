@@ -661,6 +661,7 @@ export default function AdminDashboard({
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [submissionPage, setSubmissionPage] = useState(1);
   const [disputePage, setDisputePage] = useState(1);
+  const [userPage, setUserPage] = useState(1);
   const [submissionModes, setSubmissionModes] = useState<Record<string, ExecutionMode | ''>>({});
   const [reviewingSubmissionId, setReviewingSubmissionId] = useState<string | null>(null);
   const pageSize = 8;
@@ -776,6 +777,14 @@ export default function AdminDashboard({
 
   const pagedSubmissions = paginateItems<Submission>(submissions, submissionPage, pageSize);
   const pagedDisputes = paginateItems<Dispute>(disputes, disputePage, pageSize);
+  const filteredUsers = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return allUsers.filter(u =>
+      (u.displayName || '').toLowerCase().includes(term) ||
+      (u.email || '').toLowerCase().includes(term)
+    );
+  }, [allUsers, searchTerm]);
+  const pagedUsers = paginateItems<UserProfile>(filteredUsers, userPage, pageSize);
   const verificationQueue = useMemo(() => buildVerificationQueueProjection(userVerifications), [userVerifications]);
   const verificationsById = useMemo(() => new Map(userVerifications.map(verification => [verification.id, verification])), [userVerifications]);
   const pendingSubmissionCount = submissions.filter(submission => ['ai_passed', 'admin_reviewing'].includes(submission.status)).length;
@@ -1328,7 +1337,7 @@ export default function AdminDashboard({
                   placeholder="Search users..."
                   className="pl-10 rounded-full w-[260px]"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setUserPage(1); }}
                 />
               </div>
             }
@@ -1354,13 +1363,11 @@ export default function AdminDashboard({
                   </Button>
                 )},
               ]}
-              rows={allUsers.filter(u =>
-                (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-              )}
+              rows={pagedUsers}
               rowKey="uid"
               emptyState={<span className="text-foreground/50 italic">No users found matching your search.</span>}
             />
+            {filteredUsers.length > pageSize && <PaginationControls page={userPage} totalPages={totalPages(filteredUsers.length, pageSize)} onPageChange={setUserPage} />}
           </DashboardSection>
         </TabsContent>
 
