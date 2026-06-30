@@ -59,3 +59,17 @@ All engineer tools now participate in the Toolbox Capability Framework (`Calcula
 - **Versioned tables:** ECSA brackets, SANS 10400-T thresholds, material R-values
 - **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
 - **Reports:** PDF/CSV export with clause outcomes, source versions, disclaimers
+
+## 8. Forma Build Field Tools (Stage 6 Build / Stage 8 Close-out)
+<!-- forma-build-site-tools:field-tools -->
+
+Extends Pack 9 site execution with Autodesk Build / Forma-style mobile field capture. Reuses the existing snag state machine (`open → allocated → ready_for_reinspection → closed / rejected`) and payment-blocker governance unchanged.
+
+**Granted capabilities (editor role):**
+- **Issue review** — view and edit field issues, review pin-on-drawing locations and attached photo/annotation evidence, drive allowed status transitions through the snag state machine, and assign responsible parties.
+- **Field reporting** — generate and export dated field reports (issue summary with identifier, status, severity; evidence references; payment-blocking and close-out handover counts).
+- **Issue Dashboard** — AND-filtered by status, severity, responsible party, and lifecycle stage, with per-status counts and drawing-pin display.
+
+**Governance:** Issue review and reporting do not grant payment-release authority or compliance certification — statutory sign-off remains with the registered professional. Every field action is audited via `SiteAuditRecord` with a permitted/denied outcome.
+
+_Spec: `forma-build-site-tools` · Requirements 1, 5, 6, 7._

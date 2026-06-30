@@ -60,3 +60,17 @@ All subcontractor tools now participate in the Toolbox Capability Framework (`Ca
 - **Versioned tables:** PAYE/UIF/SDL tables, plant rates, revision states
 - **Rendering:** `DefinitionToolRunner` for full tools; legacy fallback for preview stubs
 - **Reports:** PDF/CSV export with timesheet summaries, source versions, disclaimers
+
+## 8. Forma Build Field Tools (Stage 6 Build / Stage 8 Close-out)
+<!-- forma-build-site-tools:field-tools -->
+
+Extends Pack 9 site execution with Autodesk Build / Forma-style mobile field capture. Reuses the existing snag state machine (`open → allocated → ready_for_reinspection → closed / rejected`) and payment-blocker governance unchanged.
+
+**Granted capabilities (editor role, package-scoped):**
+- **Field capture** — create/edit field issues with pin-on-drawing location referencing or text location; attach photo/video/document evidence within the assigned package scope.
+- **Inspection checklists** — start checklist instances from templates (items copied in order), record pass/fail/na, numeric, or text responses, view pass/fail/na counts, and convert failed items into field issues carrying their context.
+- **Offline capture** — issues, annotations, and checklist responses queue locally (capacity 500) and sync to Firestore in creation order, idempotently, when connectivity returns — field work in low-connectivity areas is not lost.
+
+**Governance:** Package-scoped access only; cannot approve own claim or release payment. Every field action is audited via `SiteAuditRecord` with a permitted/denied outcome.
+
+_Spec: `forma-build-site-tools` · Requirements 1, 3, 4, 5, 6._
