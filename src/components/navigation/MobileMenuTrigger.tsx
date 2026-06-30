@@ -60,18 +60,21 @@ export function MobileMenuTrigger({
           'glass-button p-2 rounded-lg',
           // Req 8.9 — minimum 44×44px touch target on mobile.
           // p-2 (16px pad) + icon 20px = 36px → min-h/w-[44px] closes the 8px gap.
-          // flex + items-center + justify-center centre the icon within the larger hit area.
-          'min-h-[44px] min-w-[44px] flex items-center justify-center',
+          // Icon centering handled by inner flex wrapper so `block` survives
+          // tailwind-merge (avoiding display-utility conflict with `flex`).
+          'min-h-[44px] min-w-[44px]',
           'focus-visible:outline-none focus-visible:ring-2',
           'focus-visible:ring-[var(--landing-accent)] focus-visible:ring-offset-1',
           'focus-visible:ring-offset-transparent',
           className
         )}
       >
-        <Menu
-          className="w-5 h-5"
-          aria-hidden="true"
-        />
+        <span className="flex items-center justify-center w-full h-full">
+          <Menu
+            className="w-5 h-5"
+            aria-hidden="true"
+          />
+        </span>
       </button>
 
       {/* Slide-in drawer containing the sidebar navigation */}
