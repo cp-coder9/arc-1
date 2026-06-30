@@ -85,11 +85,7 @@ export default function SupplierDashboard({ user }: { user: UserProfile }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden" data-testid="supplier-dashboard">
-      {/* Fixed left sidebar (hidden on mobile, visible md+) */}
-      <RoleAwareSidebar user={user} activeTab="overview" onNavigate={() => {}} />
-
-      {/* Main content — shifted right on desktop for sidebar */}
-      <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
+      <main className="p-4 md:p-6 space-y-6" id="main-content">
         {/* ── Page header ────────────────────────────────────────────────── */}
         <header className="glass-panel rounded-2xl p-5 md:p-6">
           <div className="flex items-start gap-3">
