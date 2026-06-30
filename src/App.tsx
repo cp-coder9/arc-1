@@ -154,6 +154,7 @@ const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBr
 const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));
 const BEPClientMarketplacePage = lazyWithChunkRetry(() => import('./components/BEPClientMarketplacePage'));
 const DesignTeamMatrixPage = lazyWithChunkRetry(() => import('./components/DesignTeamMatrixPage'));
+const SpecForgeWorkspace = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
 const TechnicalBriefEditor = lazyWithChunkRetry(() => import('./components/TechnicalBriefEditor'));
 const DirectorySearch = lazyWithChunkRetry(() => import('./components/DirectorySearch'));
 const PackageProcurementWorkspace = lazyWithChunkRetry(() => import('./components/PackageProcurementWorkspace'));
@@ -249,6 +250,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'submission-readiness', label: 'Submission Readiness', roles: ['client', 'bep', 'architect', 'contractor', 'admin'], group: 'Client tools', icon: <ClipboardCheck size={18} />, summary: 'Municipal submission readiness assessment — complexity, routing, evidence pack, and score.', backedBy: ['SubmissionReadinessDashboard'] },
   { id: 'client-progress', label: 'Progress Reports', roles: ['client'], group: 'Client tools', icon: <Clock size={18} />, summary: 'Plain-language progress report shell for client decisions and risks.', backedBy: ['StageProgressTracker', 'GanttChart'] },
   { id: 'design', label: 'Design & Compliance', roles: [...DESIGN_TEAM_ROLES, 'freelancer', 'admin'], group: 'BEP tools', icon: <Network size={18} />, summary: 'Design-team deliverables, registers, responsibility matrix, and compliance shell.', backedBy: ['ResponsibilityMatrix', 'TeamBuilder'] },
+  { id: 'specforge', label: 'SpecForge Specifications', roles: ['client', 'developer', 'bep', 'architect', 'engineer', 'quantity_surveyor', 'energy_professional', 'fire_engineer', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Interactive pictorial specifications, product schedules, approvals, RFQs, planning and closeout evidence.', backedBy: ['SpecForgeWorkspace', 'specforgeService'] },
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
   { id: 'drawing-checker', label: 'AI Drawing Checker', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Drawing compliance checker backed by upload/review records and FileManager quick scans.', backedBy: ['FileManager'] },
   { id: 'sans-forms', label: 'SANS / Compliance Forms', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Compliance form autofill shell using project/profile/team data.', backedBy: ['ComplianceReport'] },
@@ -307,6 +309,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'bep-team',
   'bep-freelancers',
   'sans-forms',
+  'specforge',
   'compliance',
   'cpd-assessment',
   'messages',
@@ -1153,6 +1156,7 @@ function AppContent() {
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
               {activeTab === 'compliance' && <ComplianceToolboxHub />}
+              {activeTab === 'specforge' && <SpecForgeWorkspace user={user} />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
               {activeTab === 'timesheets' && <TimesheetEntryPage user={user} />}
               {activeTab === 'pipeline' && <PipelineKanbanPage user={user} />}
