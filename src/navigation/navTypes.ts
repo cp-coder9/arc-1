@@ -9,9 +9,42 @@ export type ArchitexNavKey =
   | 'documents'
   | 'marketplace'
   | 'finance'
+  | 'analytics'
   | 'messages'
   | 'settings'
   | 'user_settings';
+
+/**
+ * The Architex 8-stage project lifecycle. Field-capture entry points are
+ * stage-gated against these stages (Requirement 8.2–8.4). Build and Close-out
+ * are the only stages that unlock stage-specific capture capabilities.
+ */
+export type LifecycleStage =
+  | 'brief'
+  | 'appoint'
+  | 'design'
+  | 'comply'
+  | 'procure'
+  | 'build'
+  | 'pay'
+  | 'closeout';
+
+/**
+ * Stage-specific field-capture entry points surfaced through the Toolboxes
+ * `construction_admin` (Build) and `closeout` (Close-out) sections.
+ */
+export type FieldCaptureCapability =
+  | 'field_capture'
+  | 'checklists'
+  | 'field_reporting'
+  | 'snag_rectification'
+  | 'handover_reporting';
+
+/**
+ * Whether the field tools expose stage-specific capture entry points or only
+ * the read-and-report Issue Dashboard for the active lifecycle stage.
+ */
+export type FieldCaptureMode = 'capture' | 'read_reporting';
 
 export type WorkspaceSection = {
   key: string;
@@ -21,6 +54,28 @@ export type WorkspaceSection = {
   projectScoped?: boolean;
   phaseAware?: boolean;
   supportsContextualMessaging?: boolean;
+  /**
+   * Primary component mounted when this section is opened, referenced by its
+   * stable component name (resolved by the consuming surface). Config stays
+   * declarative — it carries the binding, not the React import.
+   */
+  component?: string;
+  /**
+   * Components whose existing functionality is preserved alongside the primary
+   * `component` (e.g. legacy managers retained for backwards compatibility).
+   */
+  preservesComponents?: string[];
+  /**
+   * Lifecycle stage that unlocks this section's `captureCapabilities`. The
+   * capabilities are enabled only when the active stage equals `captureStage`;
+   * in every other stage the section falls back to read-and-report mode.
+   */
+  captureStage?: LifecycleStage;
+  /**
+   * Field-capture entry points this section surfaces while its `captureStage`
+   * is active (Requirement 8.2, 8.3).
+   */
+  captureCapabilities?: FieldCaptureCapability[];
 };
 
 export type NavigationItem = {

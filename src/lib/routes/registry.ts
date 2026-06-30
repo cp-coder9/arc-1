@@ -106,8 +106,8 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
   {
     domain: 'projects',
     label: API_ROUTE_DOMAIN_LABELS.projects,
-    description: 'Core project command-centre, documents, tasks, approvals, messages, transmittals, AI issues, teams, coordination, and drawing checklist endpoints.',
-    prefixes: ['/projects/'],
+    description: 'Core project command-centre, documents, tasks, approvals, messages, transmittals, AI issues, teams, coordination, drawing checklist, field-issue (site execution), photo-annotation, checklist-instance, field-report, and offline sync-queue endpoints.',
+    prefixes: ['/projects/', '/field-issues', '/photo-annotations', '/checklist-instances', '/field-reports', '/sync-queue'],
   },
   {
     domain: 'marketplace',
@@ -132,7 +132,7 @@ export const API_ROUTE_REGISTRY: readonly ApiRouteDomainRegistryEntry[] = [
     domain: 'files',
     label: API_ROUTE_DOMAIN_LABELS.files,
     description: 'File upload/delete endpoints.',
-    prefixes: ['/files/'],
+    prefixes: ['/files/', '/photos/'],
   },
   {
     domain: 'notifications',

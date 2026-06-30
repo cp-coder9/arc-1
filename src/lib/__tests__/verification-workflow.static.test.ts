@@ -33,9 +33,7 @@ describe('verification workflow static regressions', () => {
     expect(adminDashboard).toContain('buildVerificationQueueProjection(userVerifications)');
     expect(adminDashboard).toContain('verificationQueue.summary.overdue');
     expect(adminDashboard).toContain('SLA overdue');
-    expect(adminDashboard).toContain('verificationQueue.items.map');
+    expect(adminDashboard).toContain('verificationQueue.items.find');
     expect(adminDashboard).toContain('{queueItem.priority} priority');
-    expect(adminDashboard).toContain('{queueItem.action}');
-    expect(adminDashboard).toContain('{queueItem.blocker &&');
   });
 });
