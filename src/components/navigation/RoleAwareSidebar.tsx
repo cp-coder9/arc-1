@@ -2,7 +2,7 @@ import * as React from 'react';
 import { ChevronDown, HelpCircle, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getNavigationForRole } from '@/navigation/architexNavigationConfig';
-import { getDefaultPageForNavKey } from '@/navigation/navDashboardAdapter';
+import { getDefaultPageForNavKey, getPageForNavSection } from '@/navigation/navDashboardAdapter';
 import type { UserProfile } from '@/types';
 import type { ArchitexNavKey } from '@/navigation/navTypes';
 
@@ -73,8 +73,8 @@ export function RoleAwareSidebar({
    * We map at the module level via the adapter; the section key is used
    * for visual highlighting only (sidebar doesn't have per-section routing yet).
    */
-  function pageIdForSection(moduleKey: ArchitexNavKey, _sectionKey: string): string {
-    return getDefaultPageForNavKey(moduleKey);
+  function pageIdForSection(moduleKey: ArchitexNavKey, sectionKey: string): string {
+    return getPageForNavSection(moduleKey, sectionKey);
   }
 
   /**
