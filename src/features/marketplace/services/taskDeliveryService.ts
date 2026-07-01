@@ -214,6 +214,7 @@ async function fetchTaskPosting(taskId: string): Promise<TaskPosting | Marketpla
     return {
       id: doc.id,
       professionalId: data.professionalId,
+      tenantId: data.tenantId || data.professionalId,
       title: data.title,
       description: data.description,
       estimatedHours: data.estimatedHours,
