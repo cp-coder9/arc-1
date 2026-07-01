@@ -263,9 +263,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'create_project_posting')) return;
-      const { id } = req.params;
-      // Stub: In production, call projectMarketplaceService.withdrawPosting(uid, id)
-      return res.status(200).json({ id, status: 'withdrawn' });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -384,15 +382,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'hire_freelancer')) return;
-      const uid = getUserId(req)!;
-      const { id, appId } = req.params;
-      // Stub: In production, call taskMarketplaceService.acceptApplication(uid, id, appId)
-      return res.status(200).json({
-        taskId: id,
-        applicationId: appId,
-        status: 'accepted',
-        acceptedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -405,17 +395,7 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'apply_task')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      const body = req.body;
-      // Stub: In production, call taskMarketplaceService.submitDeliverable(uid, id, body)
-      return res.status(201).json({
-        id: `del_${Date.now()}`,
-        taskId: id,
-        freelancerId: uid,
-        aiReviewStatus: 'pending',
-        submittedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -428,15 +408,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'hire_freelancer')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      // Stub: In production, call taskMarketplaceService.signOff(uid, id)
-      return res.status(200).json({
-        taskId: id,
-        signedOffBy: uid,
-        status: 'completed',
-        signedOffAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -496,18 +468,7 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'request_quote')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      const body = req.body;
-      // Stub: In production, call supplierMarketplaceService.requestQuote(uid, id, body)
-      return res.status(201).json({
-        id: `quote_${Date.now()}`,
-        contractorId: uid,
-        listingId: id,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -520,17 +481,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'respond_quote')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      const body = req.body;
-      // Stub: In production, call supplierMarketplaceService.respondToQuote(uid, id, body)
-      return res.status(200).json({
-        quoteId: id,
-        supplierId: uid,
-        status: 'quoted',
-        quotedAmount: body.quotedAmount,
-        respondedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -543,15 +494,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'request_quote')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      // Stub: In production, call supplierMarketplaceService.acceptQuote(uid, id)
-      return res.status(200).json({
-        quoteId: id,
-        contractorId: uid,
-        status: 'accepted',
-        acceptedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -564,16 +507,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'request_quote')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      const body = req.body;
-      // Stub: In production, call supplierMarketplaceService.uploadDeliveryNote(uid, id, body)
-      return res.status(200).json({
-        quoteId: id,
-        deliveryNoteUploaded: true,
-        uploadedBy: uid,
-        uploadedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -628,14 +562,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'create_freelancer_profile')) return;
-      const uid = getUserId(req)!;
-      const body = req.body;
-      // Stub: In production, call freelancerHubService.updateProfile(uid, body)
-      return res.status(200).json({
-        userId: uid,
-        updatedAt: new Date().toISOString(),
-        ...body,
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -675,8 +602,7 @@ marketplaceRouter.get(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'post_collaboration')) return;
-      // Stub: In production, call firmCollaborationService.listPostings(uid, filters)
-      return res.status(200).json({ collaborations: [], total: 0 });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -689,25 +615,7 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'post_collaboration')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      const { inviteeUserId } = req.body;
-      if (!inviteeUserId) {
-        const error: MarketplaceError = {
-          code: 'VALIDATION_ERROR',
-          message: 'inviteeUserId is required',
-          details: { field: 'inviteeUserId' },
-        };
-        return res.status(400).json(error);
-      }
-      // Stub: In production, call firmCollaborationService.inviteUser(uid, id, inviteeUserId)
-      return res.status(201).json({
-        collaborationId: id,
-        inviteeUserId,
-        invitedBy: uid,
-        status: 'pending',
-        invitedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -720,15 +628,7 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'post_collaboration')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      // Stub: In production, call firmCollaborationService.markComplete(uid, id)
-      return res.status(200).json({
-        collaborationId: id,
-        status: 'completed',
-        completedBy: uid,
-        completedAt: new Date().toISOString(),
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -743,15 +643,7 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'receive_certificate')) return;
-      const uid = getUserId(req)!;
-      const { id } = req.params;
-      // Stub: In production, call complianceCertificateService.generate(uid, id)
-      return res.status(201).json({
-        certificateId: `cert_${Date.now()}`,
-        projectId: id,
-        generatedAt: new Date().toISOString(),
-        requestedBy: uid,
-      });
+      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
     } catch (err) {
       handleServiceError(res, err);
     }

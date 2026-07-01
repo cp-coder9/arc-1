@@ -23,6 +23,12 @@ import {
   Building2,
 } from 'lucide-react';
 import { checkMarketplacePermission } from '../services/marketplaceRbacService';
+import ProjectMarketplace from './ProjectMarketplace';
+import TaskMarketplace from './TaskMarketplace';
+import SupplierMarketplace from './SupplierMarketplace';
+import FreelancerHub from './FreelancerHub';
+import FirmCollaboration from './FirmCollaboration';
+import ComplianceSearch from './ComplianceSearch';
 
 // ─── Section Configuration ────────────────────────────────────────────────────
 
@@ -133,6 +139,17 @@ export function hasMarketplaceAccess(role: UserRole): boolean {
     MARKETPLACE_MODULE_ROLES.includes(effectiveRole)
   );
 }
+
+// ─── Section → Component Map ──────────────────────────────────────────────────
+
+const SECTION_COMPONENTS: Record<string, React.ComponentType<{ user: UserProfile }>> = {
+  projects: ProjectMarketplace,
+  tasks: TaskMarketplace,
+  suppliers: SupplierMarketplace,
+  freelancers: FreelancerHub,
+  collaborations: FirmCollaboration,
+  search: ComplianceSearch,
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -257,32 +274,37 @@ export default function MarketplaceShell({ user }: MarketplaceShellProps) {
         {/* Tab Content */}
         {permittedSections.map((section) => {
           const Icon = section.icon;
+          const SectionComponent = SECTION_COMPONENTS[section.key];
           return (
             <TabsContent
               key={section.key}
               value={section.key}
               className="flex-1 mt-4"
             >
-              <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50 h-full">
-                <CardContent className="p-6">
-                  <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-xl bg-surface-700/50 border border-surface-600/50">
-                      <Icon className="h-8 w-8 text-surface-400" />
+              {SectionComponent ? (
+                <SectionComponent user={user} />
+              ) : (
+                <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50 h-full">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+                      <div className="flex items-center justify-center h-16 w-16 rounded-xl bg-surface-700/50 border border-surface-600/50">
+                        <Icon className="h-8 w-8 text-surface-400" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-sm font-medium text-surface-200">
+                          {section.label}
+                        </h3>
+                        <p className="text-xs text-surface-400 mt-1 max-w-sm">
+                          {section.description}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Coming soon
+                      </Badge>
                     </div>
-                    <div className="text-center">
-                      <h3 className="text-sm font-medium text-surface-200">
-                        {section.label}
-                      </h3>
-                      <p className="text-xs text-surface-400 mt-1 max-w-sm">
-                        {section.description}
-                      </p>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      Coming soon
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           );
         })}

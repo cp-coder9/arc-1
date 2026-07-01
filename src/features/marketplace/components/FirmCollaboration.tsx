@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import type {
   CollaborationMember,
   CollaborationInvite,
 } from '../types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface FirmCollaborationProps {
   user: UserProfile;
@@ -90,7 +91,19 @@ function getCollabStatusColor(status: string): string {
 
 export default function FirmCollaboration({ user }: FirmCollaborationProps) {
   const [activeTab, setActiveTab] = useState('postings');
-  const [_collaborations] = useState<FirmCollaborationPosting[]>(mockCollaborations);
+  const [_collaborations, setCollaborations] = useState<FirmCollaborationPosting[]>(mockCollaborations);
+
+  useEffect(() => {
+    apiFetch('/api/marketplace/collaborations')
+      .then((r) => {
+        if (r.status === 501) return null;
+        return r.json();
+      })
+      .then((d) => {
+        if (d && d.collaborations) setCollaborations(d.collaborations);
+      })
+      .catch(() => { /* keep mock fallback */ });
+  }, []);
 
   return (
     <div className="space-y-6">

@@ -78,7 +78,6 @@ export interface UserNotification {
  * This is the atomic helper; `validateToolIds` uses it internally.
  */
 export async function toolExistsInRegistry(toolId: string): Promise<boolean> {
-  // Stub implementation — assumes tool exists unless overridden in tests
   try {
     const { adminDb } = await import('@/lib/firebase-admin');
     const doc = await adminDb
@@ -87,8 +86,8 @@ export async function toolExistsInRegistry(toolId: string): Promise<boolean> {
       .get();
     return doc.exists;
   } catch {
-    // Fallback: assume exists if Firestore unavailable (test stub behavior)
-    return true;
+    // Fail-closed: if Firestore is unavailable, assume tool does NOT exist
+    return false;
   }
 }
 
@@ -113,13 +112,22 @@ export async function validateToolIds(
 /**
  * Validates user eligibility for marketplace actions.
  * Checks: verified account, terms accepted, not suspended.
- * Stub: In production, this queries user profile and account status.
+ * Uses checkProfessionalVerification from verificationGatesService.
  */
 export async function validateUserEligibility(
   userId: string
 ): Promise<UserEligibilityResult> {
-  // Stub implementation — assumes eligible unless overridden in tests
-  return { eligible: true };
+  try {
+    const { checkProfessionalVerification } = await import('./verificationGatesService');
+    const result = await checkProfessionalVerification(userId);
+    if (!result.verified) {
+      return { eligible: false, reason: result.reason || 'Verification could not be confirmed' };
+    }
+    return { eligible: true };
+  } catch {
+    // Fail-closed: if verification check fails, block the action
+    return { eligible: false, reason: 'Verification could not be confirmed' };
+  }
 }
 
 /**
@@ -248,8 +256,7 @@ export async function fetchProfessionalApplicationData(
  * Creates a project record in the Project Passport.
  * CONTRACT: Must complete within 5 seconds.
  *
- * Stub: In production, writes to Project Passport Firestore collection
- * with tool IDs, SANS references, team members, and milestones.
+ * Calls writeToProjectPassport from platformIntegrationService.
  */
 export async function createProjectInPassport(data: {
   postingId: string;
@@ -261,8 +268,25 @@ export async function createProjectInPassport(data: {
   sansReferences: string[];
   milestones: ProposalMilestone[];
 }): Promise<{ projectId: string }> {
-  // Stub implementation — returns a generated project ID unless overridden in tests
-  return { projectId: `passport-proj-${Date.now()}` };
+  const projectId = `passport-proj-${Date.now()}`;
+  const { writeToProjectPassport } = await import('./platformIntegrationService');
+  await writeToProjectPassport({
+    projectId,
+    postingId: data.postingId,
+    toolIds: data.requiredTools,
+    sansReferences: data.sansReferences,
+    teamMembers: [
+      { userId: data.clientId, role: 'client' },
+      { userId: data.professionalId, role: 'professional' },
+    ],
+    milestones: data.milestones.map((m) => ({
+      title: m.title,
+      targetDate: m.targetDate,
+      amount: m.amount,
+    })),
+    createdBy: data.clientId,
+  });
+  return { projectId };
 }
 
 /**
@@ -1391,6 +1415,25 @@ export async function acceptProposal(
       acceptedAt: now,
     },
   });
+
+  // 8. Surface to Action Centre for the professional
+  try {
+    const { surfaceToActionCentre } = await import('./platformIntegrationService');
+    await surfaceToActionCentre({
+      recipientUserId: proposal.professionalId,
+      recipientRole: 'architect',
+      title: 'Proposal Accepted',
+      description: `Your proposal for "${posting.title}" has been accepted. Project created.`,
+      actionType: 'application_review',
+      sourceEntityId: proposalId,
+      sourceEntityType: 'proposal',
+      priority: 'high',
+      projectId,
+    });
+  } catch (e) {
+    // Non-blocking: best-effort notification
+    console.error('[ProjectMarketplace] Failed to surface acceptance to Action Centre:', e);
+  }
 
   return {
     ...proposal,

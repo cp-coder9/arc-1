@@ -83,13 +83,18 @@ export interface FreelancerApplicationData {
 
 /**
  * Validates that all referenced CalculatorDefinition tool IDs exist in the Toolbox registry.
- * Stub: In production, this queries the Toolbox registry Firestore collection.
+ * Fail-closed: if the registry is unavailable, all IDs are treated as invalid.
  */
 export async function validateToolIds(
   toolIds: string[]
 ): Promise<ToolValidationResult> {
-  // Stub implementation — assumes all IDs are valid unless overridden in tests
-  return { valid: true, invalidIds: [] };
+  try {
+    const { validateToolIds: platformValidateToolIds } = await import('./platformIntegrationService');
+    return platformValidateToolIds(toolIds);
+  } catch {
+    // Fail-closed: if validation fails, return all IDs as invalid
+    return { valid: false, invalidIds: [...toolIds] };
+  }
 }
 
 /**
@@ -391,6 +396,24 @@ export async function createTaskPosting(
       deliverableFormat: posting.deliverableFormat,
     },
   });
+
+  // 6. Surface task creation to Action Centre
+  try {
+    const { surfaceToActionCentre } = await import('./platformIntegrationService');
+    await surfaceToActionCentre({
+      recipientUserId: professionalId,
+      recipientRole: 'architect',
+      title: 'Task Posted',
+      description: `Task "${posting.title}" has been published and is open for freelancer applications.`,
+      actionType: 'general',
+      sourceEntityId: taskId,
+      sourceEntityType: 'task_posting',
+      priority: 'low',
+    });
+  } catch (e) {
+    // Non-blocking: best-effort notification
+    console.error('[TaskMarketplace] Failed to surface task creation to Action Centre:', e);
+  }
 
   return posting;
 }
@@ -744,6 +767,33 @@ export async function acceptApplication(
     ...application,
     status: 'accepted',
   };
+
+  // Surface acceptance to Action Centre and write audit
+  try {
+    const { surfaceToActionCentre, logToAuditTrail } = await import('./platformIntegrationService');
+    await surfaceToActionCentre({
+      recipientUserId: application.freelancerId,
+      recipientRole: 'freelancer',
+      title: 'Application Accepted',
+      description: `Your application for task "${posting.title}" has been accepted. Work may begin.`,
+      actionType: 'application_review',
+      sourceEntityId: applicationId,
+      sourceEntityType: 'task_application',
+      priority: 'high',
+    });
+    await logToAuditTrail({
+      actorId: professionalId,
+      actionType: 'task_application_accepted',
+      entityId: applicationId,
+      entityType: 'task_application',
+      beforeStatus: 'pending',
+      afterStatus: 'accepted',
+      metadata: { taskId, freelancerId: application.freelancerId },
+    });
+  } catch (e) {
+    // Non-blocking
+    console.error('[TaskMarketplace] Failed to surface acceptance to Action Centre:', e);
+  }
 
   return {
     task: updatedTask,

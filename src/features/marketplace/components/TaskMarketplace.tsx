@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import type {
   TaskPostingStatus,
   DeliverableFormat,
 } from '../types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface TaskMarketplaceProps {
   user: UserProfile;
@@ -102,7 +103,14 @@ function getFormatLabel(format: DeliverableFormat): string {
 
 export default function TaskMarketplace({ user }: TaskMarketplaceProps) {
   const [activeTab, setActiveTab] = useState('available');
-  const [_tasks] = useState<TaskPosting[]>(mockTasks);
+  const [_tasks, setTasks] = useState<TaskPosting[]>(mockTasks);
+
+  useEffect(() => {
+    apiFetch('/api/marketplace/tasks')
+      .then((r) => r.json())
+      .then((d) => setTasks(d.tasks || []))
+      .catch(() => setTasks(mockTasks));
+  }, []);
 
   return (
     <div className="space-y-6">

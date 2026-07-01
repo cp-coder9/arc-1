@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { UserProfile } from '@/types';
 import type { FreelancerProfile, FreelancerProfileView, TaskHistoryEntry } from '../types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface FreelancerHubProps {
   user: UserProfile;
@@ -73,7 +74,16 @@ function renderStars(rating: number): string {
 
 export default function FreelancerHub({ user }: FreelancerHubProps) {
   const [activeTab, setActiveTab] = useState('profile');
-  const [_profile] = useState<FreelancerProfileView>(mockProfileView);
+  const [_profile, setProfile] = useState<FreelancerProfileView>(mockProfileView);
+
+  useEffect(() => {
+    apiFetch(`/api/marketplace/freelancer-profile/${user.uid}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.profile) setProfile(d);
+      })
+      .catch(() => { /* keep mock fallback */ });
+  }, [user.uid]);
 
   return (
     <div className="space-y-6">

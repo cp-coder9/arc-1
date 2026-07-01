@@ -82,6 +82,7 @@ import {
   BarChart3,
   PanelLeftClose,
   PanelLeftOpen,
+  Store,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -205,6 +206,7 @@ const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
 
 type DashboardPage = {
   id: string;
+  component?: string;
   label: string;
   roles: UserRole[];
   group: 'Core workflow' | 'Client tools' | 'BEP tools' | 'Construction tools' | 'Freelancer tools' | 'Governance';
@@ -269,6 +271,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'pipeline', label: 'Pipeline', roles: ['architect', 'bep', 'admin'], group: 'Governance', icon: <BarChart3 size={18} />, summary: 'Visual pipeline kanban with win/loss tracking and value forecasting.', backedBy: ['pipelineService'] },
   { id: 'templates', label: 'Templates', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <FileText size={18} />, summary: 'Practice document template library with versioning and role-based access.', backedBy: ['templateLibraryService'] },
   { id: 'registrations', label: 'Registrations', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <ShieldCheck size={18} />, summary: 'Professional registration renewal tracker with CPD monitoring.', backedBy: ['registrationRenewalService'] },
+  { id: 'marketplace', component: 'MarketplaceShell', label: 'Marketplace', roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'], group: 'Core workflow', icon: <Store size={18} />, summary: 'Professional commerce layer — discover, transact, and collaborate across the built environment.', backedBy: ['MarketplaceShell', 'marketplace-api-router'] },
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
