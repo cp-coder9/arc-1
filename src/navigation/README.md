@@ -29,7 +29,7 @@ The sidebar renders `visibleNavItems` (filtered by user role) from the config, r
 4. **Toolboxes** — Role-specific professional tools
 5. **CPD & Learning** — Separate CPD platform
 6. **Documents / Knowledge Hub** — Global document and knowledge hub
-7. **Marketplace / Resource Centre** — Industry network and resource sharing
+7. **Marketplace** — Professional commerce layer for marketplace transactions
 8. **Finance & Commercial** — Commercial controls and financial records
 9. **Messages** — Full persistent messaging centre
 10. **Settings** — User, company and admin configuration
