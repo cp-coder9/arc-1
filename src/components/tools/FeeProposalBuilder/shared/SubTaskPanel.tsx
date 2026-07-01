@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils';
 import { useFeeProposalBuilder } from '../FeeProposalBuilderContext';
 
 export interface SubTaskPanelProps {
-  key?: string;
   stageId: string;
   deliverables: string[];
   className?: string;
@@ -43,7 +42,7 @@ export function SubTaskPanel({ stageId, deliverables, className }: SubTaskPanelP
     const num = parseFloat(value);
     if (isNaN(num)) return;
     const clamped = Math.max(0, Math.min(100, num));
-    dispatch({ type: 'SET_SUB_TASK_WEIGHT', stageId, subtaskId, weight: clamped });
+    dispatch({ type: 'SET_SUBTASK_WEIGHT', stageId, subtaskId, weight: clamped });
   };
 
   if (deliverables.length === 0) return null;

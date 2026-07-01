@@ -4,6 +4,7 @@
 
 import { Clock, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { DemoDataNotice } from '../shared/DemoDataNotice';
 
 export interface TermsVersionHistoryProps {
   templateId: string;
@@ -27,6 +28,7 @@ const MOCK_VERSIONS: VersionEntry[] = [
 export function TermsVersionHistory({ templateId, templateTitle }: TermsVersionHistoryProps) {
   return (
     <div className="space-y-4">
+      <DemoDataNotice className="mb-4" />
       <div className="rounded-xl bg-surface-800/70 backdrop-blur border border-surface-700/50 p-6">
         <div className="flex items-center gap-3 mb-2">
           <Clock className="h-5 w-5 text-primary-400" />

@@ -5,6 +5,7 @@
 import { FileText, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { DemoDataNotice } from '../shared/DemoDataNotice';
 
 // ---------------------------------------------------------------------------
 // Mock data (in production, would come from Firestore persistence)
@@ -39,6 +40,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function ProposalHistoryList() {
   return (
     <div className="space-y-4">
+      <DemoDataNotice className="mb-4" />
       <div className="rounded-xl bg-surface-800/70 backdrop-blur border border-surface-700/50 p-6">
         <div className="flex items-center gap-3 mb-4">
           <Clock className="h-5 w-5 text-primary-400" />

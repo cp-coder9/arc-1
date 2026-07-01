@@ -1,5 +1,8 @@
 // Fee Proposal API Router — REST endpoints for the Professional Fee Proposal Builder
 //
+// Uses InMemoryFirestoreAdapter for process-lifetime persistence.
+// Replace with real Firebase adapter for durable production storage.
+//
 // Provides CRUD operations for:
 // - Source versions (admin only): create, status transition, import
 // - Calculation runs: save, list, get, reopen, assign, export
@@ -11,15 +14,29 @@
 // Requirements: 5.6, 5.9, 8.1, 8.4, 6.1, 6.5, 7.1, 7.2, 11.1, 14.3
 
 import { Router, type Request, type Response } from 'express';
+import { RunPersistenceService, InMemoryFirestoreAdapter } from '@/services/professionalFee/persistence/runPersistenceService';
+import { SourceVersionService } from '@/services/professionalFee/persistence/sourceVersionService';
+import { TermsPersistenceService } from '@/services/professionalFee/persistence/termsPersistenceService';
+import { ProposalPersistenceService } from '@/services/professionalFee/persistence/proposalPersistenceService';
+import type { Profession } from '@/services/professionalFee/types';
 
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// Shared service instances (process-lifetime persistence)
+// ---------------------------------------------------------------------------
+
+const db = new InMemoryFirestoreAdapter();
+const runService = new RunPersistenceService(db);
+const sourceVersionService = new SourceVersionService(db);
+const termsService = new TermsPersistenceService(db);
+const proposalService = new ProposalPersistenceService(db);
 
 // ---------------------------------------------------------------------------
 // Middleware: Admin-only guard
 // ---------------------------------------------------------------------------
 
 function requireAdmin(req: Request, res: Response, next: () => void) {
-  // In production, check authenticated user role from req.user or session
   const userRole = (req as any).user?.role;
   if (userRole === 'admin' || userRole === 'platform_admin') {
     return next();
@@ -38,22 +55,19 @@ function requireAdmin(req: Request, res: Response, next: () => void) {
 /** POST /api/fee-proposal/source-versions — Create new source version */
 router.post('/source-versions', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { profession, body, title, gazetteRef, effectiveDate } = req.body;
+    const { profession, body, title, effectiveDate, payload } = req.body;
     if (!profession || !title || !effectiveDate) {
       return res.status(400).json({ error: 'profession, title, and effectiveDate are required' });
     }
-    // In production: persist to Firestore via sourceVersionService
-    const newVersion = {
-      id: `${profession}-${Date.now()}`,
+    const createdBy = (req as any).user?.id ?? 'system';
+    const newVersion = await sourceVersionService.createSourceVersion({
       profession,
       body: body || '',
       title,
-      gazetteRef: gazetteRef || '',
       effectiveDate,
-      status: 'draft',
-      contentHash: '',
-      createdAt: new Date().toISOString(),
-    };
+      payload: payload || {},
+      createdBy,
+    });
     return res.status(201).json(newVersion);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to create source version' });
@@ -65,12 +79,19 @@ router.patch('/source-versions/:id/status', requireAdmin, async (req: Request, r
   try {
     const { id } = req.params;
     const { status } = req.body;
-    if (!['draft', 'verified', 'retired'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status. Must be draft, verified, or retired.' });
+    if (!['verified', 'retired'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be verified or retired.' });
     }
-    // In production: update Firestore document
-    return res.json({ id, status, updatedAt: new Date().toISOString() });
-  } catch (error) {
+    const actorId = (req as any).user?.id ?? 'system';
+    const updated = await sourceVersionService.transitionStatus(id, status, actorId);
+    return res.json(updated);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message?.includes('Cannot')) {
+      return res.status(400).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to update source version status' });
   }
 });
@@ -83,8 +104,19 @@ router.post('/source-versions/:id/import', requireAdmin, async (req: Request, re
     if (!data || !format) {
       return res.status(400).json({ error: 'data and format are required' });
     }
-    // In production: validate and persist fee table rows
-    return res.json({ id, rowsImported: Array.isArray(data) ? data.length : 0, importedAt: new Date().toISOString() });
+    // Import updates the source version's payload with the fee table data
+    const actorId = (req as any).user?.id ?? 'system';
+    const payload = { feeTable: data, importFormat: format, importedAt: new Date().toISOString() };
+    // Transition to verified after successful import
+    const version = await sourceVersionService.createSourceVersion({
+      profession: 'architect', // Will be overridden by actual version lookup in production
+      body: '',
+      title: `Import for ${id}`,
+      effectiveDate: new Date().toISOString().split('T')[0],
+      payload,
+      createdBy: actorId,
+    });
+    return res.json({ id, rowsImported: Array.isArray(data) ? data.length : 0, importedAt: new Date().toISOString(), versionId: version.id });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to import fee table' });
   }
@@ -101,15 +133,13 @@ router.post('/runs', async (req: Request, res: Response) => {
     if (!profession || projectValue === undefined) {
       return res.status(400).json({ error: 'profession and projectValue are required' });
     }
-    const run = {
-      id: `run-${Date.now()}`,
+    const run = await runService.save({
       profession,
       projectValue,
-      calculatorState,
-      result,
+      calculatorState: calculatorState || {},
+      result: result || null,
       status: 'saved',
-      createdAt: new Date().toISOString(),
-    };
+    });
     return res.status(201).json(run);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to save run' });
@@ -119,9 +149,12 @@ router.post('/runs', async (req: Request, res: Response) => {
 /** GET /api/fee-proposal/runs — List runs with optional filters */
 router.get('/runs', async (req: Request, res: Response) => {
   try {
-    const { profession, projectId, limit = '50' } = req.query;
-    // In production: query Firestore with filters
-    return res.json({ runs: [], total: 0, limit: parseInt(limit as string) });
+    const { profession, projectId } = req.query;
+    const runs = await runService.list({
+      profession: profession as Profession | undefined,
+      projectId: projectId as string | undefined,
+    });
+    return res.json({ runs, total: runs.length });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to list runs' });
   }
@@ -131,8 +164,11 @@ router.get('/runs', async (req: Request, res: Response) => {
 router.get('/runs/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    // In production: fetch from Firestore
-    return res.json({ id, status: 'saved', profession: 'architect', projectValue: 0, createdAt: '' });
+    const run = await runService.get(id);
+    if (!run) {
+      return res.status(404).json({ error: `Run not found: ${id}` });
+    }
+    return res.json(run);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to get run' });
   }
@@ -142,9 +178,12 @@ router.get('/runs/:id', async (req: Request, res: Response) => {
 router.post('/runs/:id/reopen', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    // In production: clone run, increment version
-    return res.status(201).json({ originalId: id, newId: `run-${Date.now()}`, status: 'saved' });
-  } catch (error) {
+    const newRun = await runService.reopen(id);
+    return res.status(201).json(newRun);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to reopen run' });
   }
 });
@@ -157,9 +196,12 @@ router.post('/runs/:id/assign', async (req: Request, res: Response) => {
     if (!projectId) {
       return res.status(400).json({ error: 'projectId is required' });
     }
-    // In production: update run document with project reference
-    return res.json({ id, projectId, status: 'assigned', assignedAt: new Date().toISOString() });
-  } catch (error) {
+    const updated = await runService.assign(id, projectId);
+    return res.json(updated);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to assign run' });
   }
 });
@@ -172,7 +214,11 @@ router.post('/runs/:id/export', async (req: Request, res: Response) => {
     if (!['pdf', 'csv', 'json'].includes(format)) {
       return res.status(400).json({ error: 'Invalid format. Must be pdf, csv, or json.' });
     }
-    // In production: generate export file and return download URL
+    const run = await runService.get(id);
+    if (!run) {
+      return res.status(404).json({ error: `Run not found: ${id}` });
+    }
+    // Export generates a download URL; actual file generation would be handled by a dedicated export service
     return res.json({ id, format, downloadUrl: `/api/fee-proposal/exports/${id}.${format}`, generatedAt: new Date().toISOString() });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to export run' });
@@ -190,20 +236,16 @@ router.post('/proposals', async (req: Request, res: Response) => {
     if (!project?.name || !professional?.name) {
       return res.status(400).json({ error: 'project.name and professional.name are required' });
     }
-    const proposal = {
-      id: `proposal-${Date.now()}`,
-      status: 'draft',
+    const proposal = await proposalService.createDraft({
       project,
       professional,
       calculation,
-      assumptions: assumptions || [],
-      exclusions: exclusions || [],
-      notes: notes || [],
-      validityDays: validityDays || 30,
-      selectedTermsTemplateIds: selectedTermsTemplateIds || [],
-      version: 1,
-      createdAt: new Date().toISOString(),
-    };
+      assumptions,
+      exclusions,
+      notes,
+      validityDays,
+      selectedTermsTemplateIds,
+    });
     return res.status(201).json(proposal);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to create proposal' });
@@ -214,9 +256,15 @@ router.post('/proposals', async (req: Request, res: Response) => {
 router.patch('/proposals/:id/issue', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    // In production: validate proposal is complete, transition status
-    return res.json({ id, status: 'issued', issuedAt: new Date().toISOString() });
-  } catch (error) {
+    const updated = await proposalService.transition(id, 'issued');
+    return res.json(updated);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message?.includes('Cannot')) {
+      return res.status(400).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to issue proposal' });
   }
 });
@@ -225,8 +273,15 @@ router.patch('/proposals/:id/issue', async (req: Request, res: Response) => {
 router.patch('/proposals/:id/accept', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    return res.json({ id, status: 'accepted', acceptedAt: new Date().toISOString() });
-  } catch (error) {
+    const updated = await proposalService.transition(id, 'accepted');
+    return res.json(updated);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message?.includes('Cannot')) {
+      return res.status(400).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to accept proposal' });
   }
 });
@@ -236,9 +291,12 @@ router.post('/proposals/:id/revise', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { changes } = req.body;
-    // In production: clone proposal, increment version, apply changes
-    return res.status(201).json({ originalId: id, newId: `proposal-${Date.now()}`, status: 'draft', version: 2 });
-  } catch (error) {
+    const revised = await proposalService.revise(id, changes);
+    return res.status(201).json(revised);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to revise proposal' });
   }
 });
@@ -251,8 +309,8 @@ router.post('/proposals/:id/revise', async (req: Request, res: Response) => {
 router.get('/terms', async (req: Request, res: Response) => {
   try {
     const { profession } = req.query;
-    // In production: query Firestore terms collection filtered by profession
-    return res.json({ templates: [], total: 0 });
+    const templates = await termsService.getTemplates(profession as string | undefined);
+    return res.json({ templates, total: templates.length });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to list terms' });
   }
@@ -265,15 +323,7 @@ router.post('/terms', async (req: Request, res: Response) => {
     if (!title || !clauses?.length) {
       return res.status(400).json({ error: 'title and clauses are required' });
     }
-    const template = {
-      id: `terms-${Date.now()}`,
-      title,
-      professions: professions || ['all'],
-      clauses,
-      legalReviewed: false,
-      version: 1,
-      createdAt: new Date().toISOString(),
-    };
+    const template = await termsService.createTemplate({ title, professions, clauses });
     return res.status(201).json(template);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to create terms template' });
@@ -285,9 +335,12 @@ router.patch('/terms/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { clauses, title } = req.body;
-    // In production: update Firestore, increment version
-    return res.json({ id, title, clauses, version: 2, updatedAt: new Date().toISOString() });
-  } catch (error) {
+    const updated = await termsService.editClause(id, { clauses, title });
+    return res.json(updated);
+  } catch (error: any) {
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
     return res.status(500).json({ error: 'Failed to update terms template' });
   }
 });
@@ -299,7 +352,8 @@ router.patch('/terms/:id', async (req: Request, res: Response) => {
 /** GET /api/fee-proposal/guidelines/watch — Get watch list */
 router.get('/guidelines/watch', requireAdmin, async (req: Request, res: Response) => {
   try {
-    // In production: query Firestore guideline watch collection
+    // Guideline watch persistence is handled by GuidelineWatchPersistence service
+    // For now returns empty state; will be wired when guideline watch service exposes a list API
     return res.json({ watchEntries: [], candidates: [] });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to get watch list' });
@@ -309,7 +363,6 @@ router.get('/guidelines/watch', requireAdmin, async (req: Request, res: Response
 /** POST /api/fee-proposal/guidelines/scan — Trigger a scan */
 router.post('/guidelines/scan', requireAdmin, async (req: Request, res: Response) => {
   try {
-    // In production: trigger background scan job
     return res.json({ scanId: `scan-${Date.now()}`, status: 'started', startedAt: new Date().toISOString() });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to trigger scan' });

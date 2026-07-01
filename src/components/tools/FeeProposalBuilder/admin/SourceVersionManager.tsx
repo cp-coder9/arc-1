@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { DemoDataNotice } from '../shared/DemoDataNotice';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +50,7 @@ export default function SourceVersionManager() {
 
   return (
     <div className="space-y-6">
+      <DemoDataNotice className="mb-4" />
       {/* Header */}
       <div className="rounded-xl bg-surface-800/70 backdrop-blur border border-surface-700/50 p-6">
         <div className="flex items-center justify-between">

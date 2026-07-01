@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useFeeProposalBuilder } from '../FeeProposalBuilderContext';
 import { ClauseEditor } from './ClauseEditor';
 import { TermsVersionHistory } from './TermsVersionHistory';
+import { DemoDataNotice } from '../shared/DemoDataNotice';
 
 // ---------------------------------------------------------------------------
 // Mock terms templates
@@ -148,6 +149,7 @@ export default function TermsLibraryView() {
 
   return (
     <div className="space-y-6">
+      <DemoDataNotice className="mb-4" />
       <div className="rounded-xl bg-surface-800/70 backdrop-blur border border-surface-700/50 p-6">
         <div className="flex items-center gap-3 mb-4">
           <BookOpen className="h-5 w-5 text-primary-400" />

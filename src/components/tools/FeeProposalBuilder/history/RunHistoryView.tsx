@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useFeeProposalBuilder } from '../FeeProposalBuilderContext';
 import { RunDetailCard } from './RunDetailCard';
 import { ExportDialog } from './ExportDialog';
+import { DemoDataNotice } from '../shared/DemoDataNotice';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -70,6 +71,7 @@ export default function RunHistoryView() {
 
   return (
     <div className="space-y-6">
+      <DemoDataNotice className="mb-4" />
       {/* Header */}
       <div className="rounded-xl bg-surface-800/70 backdrop-blur border border-surface-700/50 p-6">
         <div className="flex items-center gap-3 mb-4">

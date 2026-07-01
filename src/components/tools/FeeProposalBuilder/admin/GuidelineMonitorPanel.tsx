@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Eye, RefreshCw, Check, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DemoDataNotice } from '../shared/DemoDataNotice';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,6 +70,7 @@ export default function GuidelineMonitorPanel() {
 
   return (
     <div className="space-y-6">
+      <DemoDataNotice className="mb-4" />
       {/* Header */}
       <div className="rounded-xl bg-surface-800/70 backdrop-blur border border-surface-700/50 p-6">
         <div className="flex items-center justify-between">
