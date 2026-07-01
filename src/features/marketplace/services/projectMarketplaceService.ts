@@ -523,6 +523,7 @@ export async function createProjectPosting(
   const posting: ProjectPosting = {
     id: postingId,
     clientId: user.userId,
+    tenantId: user.userId, // Default tenant scope to user; overridden if organisation provided
     title: params.title,
     description: params.description,
     location: params.location,
@@ -544,6 +545,8 @@ export async function createProjectPosting(
       .doc(postingId)
       .set({
         clientId: posting.clientId,
+        tenantId: posting.tenantId,
+        organisationId: posting.organisationId ?? null,
         title: posting.title,
         description: posting.description,
         location: posting.location,
@@ -628,6 +631,8 @@ export async function getVisiblePostings(
       return {
         id: doc.id,
         clientId: data.clientId,
+        tenantId: data.tenantId || data.clientId,
+        organisationId: data.organisationId,
         title: data.title,
         description: data.description,
         location: data.location,
@@ -686,6 +691,8 @@ export async function handlePostingExpiry(
     posting = {
       id: doc.id,
       clientId: data.clientId,
+      tenantId: data.tenantId || data.clientId,
+      organisationId: data.organisationId,
       title: data.title,
       description: data.description,
       location: data.location,
@@ -809,6 +816,8 @@ export async function withdrawPosting(
     posting = {
       id: doc.id,
       clientId: data.clientId,
+      tenantId: data.tenantId || data.clientId,
+      organisationId: data.organisationId,
       title: data.title,
       description: data.description,
       location: data.location,
@@ -971,6 +980,8 @@ export async function applyToProject(
     posting = {
       id: doc.id,
       clientId: data.clientId,
+      tenantId: data.tenantId || data.clientId,
+      organisationId: data.organisationId,
       title: data.title,
       description: data.description,
       location: data.location,
@@ -1139,6 +1150,8 @@ export async function acceptProposal(
     posting = {
       id: doc.id,
       clientId: data.clientId,
+      tenantId: data.tenantId || data.clientId,
+      organisationId: data.organisationId,
       title: data.title,
       description: data.description,
       location: data.location,

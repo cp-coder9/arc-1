@@ -98,7 +98,9 @@ const pendingDeliverableQueue: PendingDeliverable[] = [];
 
 /**
  * Writes a marketplace project record into Project Passport within 5 seconds
- * of creation. Includes tool IDs, SANS references, team members, and milestones.
+ * of creation. Writes to `projects/{projectId}/passport/health` to match the
+ * existing Command Centre passport writeback pattern, AND to a marketplace-specific
+ * collection for direct marketplace queries.
  *
  * CONTRACT: Completes within 5 seconds.
  *
@@ -123,8 +125,15 @@ export async function writeToProjectPassport(params: ProjectPassportWriteParams)
       updatedAt: new Date().toISOString(),
     };
 
+    // Write to the existing Command Centre passport pattern:
+    // projects/{projectId}/passport/health
     await adminDb
-      .collection('project_passport_records')
+      .doc(`projects/${params.projectId}/passport/health`)
+      .set(projectRecord, { merge: true });
+
+    // Also write to marketplace-specific subcollection for marketplace queries
+    await adminDb
+      .collection('marketplace_project_passport_records')
       .doc(params.projectId)
       .set(projectRecord, { merge: true });
 
@@ -185,6 +194,10 @@ export function validateToolIds(toolIds: string[]): ToolValidationResult {
  * Checks CPD compliance status for a user. Blocks non-compliant users from
  * new marketplace applications within 5 seconds of status change.
  *
+ * FAIL-CLOSED: When CPD data is unavailable or the service errors, the user is
+ * treated as non-compliant. Regulated marketplace actions require confirmed CPD
+ * compliance — absence of proof is treated as non-compliance.
+ *
  * CONTRACT: Returns within 5 seconds.
  *
  * Validates: Requirement 10.5
@@ -200,9 +213,12 @@ export async function checkCpdCompliance(userId: string): Promise<CpdComplianceR
       .get();
 
     if (!cpdDoc.exists) {
-      // No CPD record — treat as compliant (no CPD requirement applies)
-      console.info(`[PlatformIntegration] No CPD record for user ${userId}, treating as compliant`);
-      return { compliant: true };
+      // Fail-closed: No CPD record means compliance cannot be verified
+      console.info(`[PlatformIntegration] No CPD record for user ${userId}, treating as non-compliant (fail-closed)`);
+      return {
+        compliant: false,
+        blockedReason: 'CPD status could not be verified. Marketplace actions require confirmed CPD compliance.',
+      };
     }
 
     const data = cpdDoc.data() as {
@@ -213,7 +229,10 @@ export async function checkCpdCompliance(userId: string): Promise<CpdComplianceR
     } | undefined;
 
     if (!data) {
-      return { compliant: true };
+      return {
+        compliant: false,
+        blockedReason: 'CPD status could not be verified. Marketplace actions require confirmed CPD compliance.',
+      };
     }
 
     if (data.status === 'non_compliant' || data.status === 'expired' || data.status === 'revoked') {
@@ -225,10 +244,13 @@ export async function checkCpdCompliance(userId: string): Promise<CpdComplianceR
 
     return { compliant: true };
   } catch (error) {
-    console.error('[PlatformIntegration] Failed to check CPD compliance:', error);
-    // Fail-open: if CPD service is unavailable, don't block the user
-    // but log for admin review
-    return { compliant: true };
+    // Fail-closed: if CPD service is unavailable, block the user
+    // Regulated actions must not proceed without confirmed compliance
+    console.error('[PlatformIntegration] Failed to check CPD compliance (fail-closed):', error);
+    return {
+      compliant: false,
+      blockedReason: 'CPD status could not be verified. Marketplace actions require confirmed CPD compliance.',
+    };
   }
 }
 

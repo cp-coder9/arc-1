@@ -108,3 +108,38 @@ export function checkMarketplacePermission(
     reason: `Role '${role}' is not permitted to perform '${action}'. Required roles: ${allowedRoles.join(', ')}`,
   };
 }
+
+/**
+ * Checks whether a user has access within a given tenant scope.
+ *
+ * Returns true if:
+ * - The user's tenantId matches the resource tenantId, OR
+ * - The user has a platform_admin or admin role (cross-tenant access)
+ *
+ * This is a lightweight helper for tenant isolation in listing/search queries.
+ */
+export async function checkTenantAccess(
+  userId: string,
+  tenantId: string
+): Promise<boolean> {
+  try {
+    const { adminDb } = await import('@/lib/firebase-admin');
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) return false;
+
+    const userData = userDoc.data();
+    const userRole = userData?.role as UserRole | undefined;
+
+    // Platform admins have cross-tenant access
+    if (userRole === 'platform_admin' || userRole === 'admin') {
+      return true;
+    }
+
+    // Check if user belongs to the tenant (by userId match or organisationId)
+    const userTenantId = userData?.tenantId || userData?.organisationId || userId;
+    return userTenantId === tenantId;
+  } catch (error) {
+    console.error('[MarketplaceRBAC] Failed to check tenant access:', error);
+    return false;
+  }
+}

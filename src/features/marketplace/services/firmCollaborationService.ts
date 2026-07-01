@@ -377,6 +377,7 @@ export async function createCollaboration(
   const collaboration: FirmCollaborationPosting = {
     id: collaborationId,
     firmId: user.firmId,
+    tenantId: user.firmId, // Tenant scope is the firm
     createdByUserId: user.userId,
     title: params.title,
     description: params.description,
@@ -398,6 +399,7 @@ export async function createCollaboration(
       .doc(collaborationId)
       .set({
         firmId: collaboration.firmId,
+        tenantId: collaboration.tenantId,
         createdByUserId: collaboration.createdByUserId,
         title: collaboration.title,
         description: collaboration.description,

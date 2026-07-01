@@ -87,13 +87,36 @@ export interface SupplierStatusResult {
 
 /**
  * Validates that the supplier account is verified and in good standing.
- * Stub: In production, this queries user profile and verification status.
+ * Checks the supplier's verification status from Firestore.
+ * Fail-closed: rejects if status is unknown or unavailable.
  */
 export async function validateSupplierStatus(
   userId: string
 ): Promise<SupplierStatusResult> {
-  // Stub implementation — assumes verified unless overridden in tests
-  return { verified: true };
+  try {
+    const { adminDb } = await import('@/lib/firebase-admin');
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      // Unknown supplier — fail-closed
+      return { verified: false };
+    }
+
+    const data = userDoc.data();
+    const verificationStatus = data?.verificationStatus || data?.supplierVerified;
+
+    // Only explicitly verified suppliers may list
+    if (verificationStatus === 'verified' || verificationStatus === true) {
+      return { verified: true };
+    }
+
+    // Any other status (pending, rejected, missing) = not verified
+    return { verified: false };
+  } catch (error) {
+    console.error('[SupplierMarketplace] Failed to validate supplier status (fail-closed):', error);
+    // Fail-closed: if we can't verify, reject
+    return { verified: false };
+  }
 }
 
 // ─── Pure Validation ──────────────────────────────────────────────────────────
@@ -312,6 +335,7 @@ export async function createMaterialListing(
   const listing: MaterialListing = {
     id: listingId,
     supplierId: user.userId,
+    tenantId: user.userId, // Default tenant scope to supplier
     productName: params.productName,
     description: params.description,
     sansComplianceReference: params.sansComplianceReference,
@@ -332,6 +356,7 @@ export async function createMaterialListing(
       .doc(listingId)
       .set({
         supplierId: listing.supplierId,
+        tenantId: listing.tenantId,
         productName: listing.productName,
         description: listing.description,
         sansComplianceReference: listing.sansComplianceReference,
@@ -433,6 +458,7 @@ export async function searchMaterials(
       return {
         id: doc.id,
         supplierId: data.supplierId,
+        tenantId: data.tenantId || data.supplierId,
         productName: data.productName,
         description: data.description,
         sansComplianceReference: data.sansComplianceReference,

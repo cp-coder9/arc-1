@@ -31,6 +31,7 @@ const mockTasks: TaskPosting[] = [
   {
     id: 'task-1',
     professionalId: 'prof-1',
+    tenantId: 'prof-1',
     title: 'Structural Load Calculation — Residential Extension',
     description: 'Perform structural load calculations for a 45m² ground-floor extension with suspended slab above. Deliver certified calculation sheet.',
     estimatedHours: 12,
@@ -44,6 +45,7 @@ const mockTasks: TaskPosting[] = [
   {
     id: 'task-2',
     professionalId: 'prof-2',
+    tenantId: 'prof-2',
     title: 'Energy Compliance Report — SANS 10400-XA',
     description: 'Complete XA compliance report and fenestration schedule for a 3-bedroom residential dwelling in Midrand.',
     estimatedHours: 8,
@@ -57,6 +59,7 @@ const mockTasks: TaskPosting[] = [
   {
     id: 'task-3',
     professionalId: 'prof-1',
+    tenantId: 'prof-1',
     title: 'Fire Safety Drawing Review',
     description: 'Review architectural drawings for fire regulation compliance per SANS 10400-T. Mark-up non-compliant areas.',
     estimatedHours: 6,

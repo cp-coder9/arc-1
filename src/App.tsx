@@ -177,6 +177,7 @@ const PipelineKanbanPage = lazyWithChunkRetry(() => import('./components/Pipelin
 const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/TemplateLibrary'));
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
+const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -307,6 +308,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'templates',
   'registrations',
   'specforge',
+  'marketplace',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1146,6 +1148,7 @@ function AppContent() {
               {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
+              {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}

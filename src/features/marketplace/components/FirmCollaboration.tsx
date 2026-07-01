@@ -31,6 +31,7 @@ const mockCollaborations: FirmCollaborationPosting[] = [
   {
     id: 'collab-1',
     firmId: 'firm-1',
+    tenantId: 'firm-1',
     createdByUserId: 'admin-1',
     title: 'Multi-Disciplinary Residential Complex — Phase 1',
     description: 'Seeking structural engineer, MEP engineer, and landscape architect for a 48-unit residential complex. Full compliance package required.',
@@ -53,6 +54,7 @@ const mockCollaborations: FirmCollaborationPosting[] = [
   {
     id: 'collab-2',
     firmId: 'firm-2',
+    tenantId: 'firm-2',
     createdByUserId: 'admin-2',
     title: 'Heritage Building Restoration — Pretoria CBD',
     description: 'Collaboration for heritage restoration requiring NHRA Section 38 expertise. Team to include heritage consultant, structural specialist, and conservation architect.',

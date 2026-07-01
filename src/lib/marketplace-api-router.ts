@@ -121,14 +121,18 @@ marketplaceRouter.get(
         };
         return res.status(400).json(error);
       }
-      // Stub: In production, call trustScoreService.getTrustScore(userId)
-      return res.status(200).json({
-        userId,
-        overallScore: 0,
-        factors: [],
-        calculatedAt: new Date().toISOString(),
-        badges: [],
-      });
+      const { getTrustScore } = await import('../features/marketplace/services/trustScoreService');
+      const score = await getTrustScore(userId);
+      if (!score) {
+        return res.status(200).json({
+          userId,
+          overallScore: 0,
+          factors: [],
+          calculatedAt: new Date().toISOString(),
+          badges: [],
+        });
+      }
+      return res.status(200).json(score);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -150,14 +154,9 @@ marketplaceRouter.post(
         };
         return res.status(400).json(error);
       }
-      // Stub: In production, call trustScoreService.recalculateOnEvent(...)
-      return res.status(200).json({
-        userId,
-        overallScore: 0,
-        factors: [],
-        calculatedAt: new Date().toISOString(),
-        badges: [],
-      });
+      const { recalculateOnEvent } = await import('../features/marketplace/services/trustScoreService');
+      const score = await recalculateOnEvent({ userId, type: 'registration_update' });
+      return res.status(200).json(score);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -173,8 +172,9 @@ marketplaceRouter.post(
     try {
       if (!checkPermission(req, res, 'search_professionals')) return;
       const query = req.body;
-      // Stub: In production, call complianceSearchService.search(query)
-      return res.status(200).json({ results: [], total: 0 });
+      const { search } = await import('../features/marketplace/services/complianceSearchService');
+      const results = await search(query);
+      return res.status(200).json({ results, total: results.length });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -191,8 +191,9 @@ marketplaceRouter.get(
       if (!q || q.length < 2) {
         return res.status(200).json({ suggestions: [] });
       }
-      // Stub: In production, call complianceSearchService.getSuggestions(q)
-      return res.status(200).json({ suggestions: [] });
+      const { getSuggestions } = await import('../features/marketplace/services/complianceSearchService');
+      const suggestions = await getSuggestions(q);
+      return res.status(200).json({ suggestions });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -209,14 +210,13 @@ marketplaceRouter.post(
       if (!checkPermission(req, res, 'create_project_posting')) return;
       const uid = getUserId(req)!;
       const body = req.body;
-      // Stub: In production, call projectMarketplaceService.createPosting(uid, body)
-      return res.status(201).json({
-        id: `proj_${Date.now()}`,
-        clientId: uid,
-        status: 'draft',
-        createdAt: new Date().toISOString(),
-        ...body,
-      });
+      const { createProjectPosting } = await import('../features/marketplace/services/projectMarketplaceService');
+      const result = await createProjectPosting(body, { userId: uid, role: getUserRole(req) || 'client' });
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { VALIDATION_ERROR: 400, USER_INELIGIBLE: 403, INVALID_TOOL_IDS: 400, PERSISTENCE_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(201).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -229,8 +229,10 @@ marketplaceRouter.get(
   async (req: Request, res: Response) => {
     try {
       // Any authenticated user can browse published project postings
-      // Stub: In production, call projectMarketplaceService.listPostings(filters)
-      return res.status(200).json({ postings: [], total: 0 });
+      const uid = getUserId(req)!;
+      const { getVisiblePostings } = await import('../features/marketplace/services/projectMarketplaceService');
+      const postings = await getVisiblePostings(uid);
+      return res.status(200).json({ postings, total: postings.length });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -243,8 +245,12 @@ marketplaceRouter.get(
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      // Stub: In production, call projectMarketplaceService.getPosting(id)
-      return res.status(200).json({ id, status: 'published' });
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const doc = await adminDb.collection('marketplace_project_postings').doc(id).get();
+      if (!doc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Project posting not found' });
+      }
+      return res.status(200).json({ id: doc.id, ...doc.data() });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -275,14 +281,13 @@ marketplaceRouter.post(
       const uid = getUserId(req)!;
       const { id } = req.params;
       const body = req.body;
-      // Stub: In production, call projectMarketplaceService.applyToProject(uid, id, body)
-      return res.status(201).json({
-        id: `prop_${Date.now()}`,
-        postingId: id,
-        professionalId: uid,
-        status: 'submitted',
-        createdAt: new Date().toISOString(),
-      });
+      const { applyToProject } = await import('../features/marketplace/services/projectMarketplaceService');
+      const result = await applyToProject(uid, id, body);
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { NOT_FOUND: 404, INVALID_TRANSITION: 422, APPLICATION_BLOCKED: 422, ELIGIBILITY_BLOCKED: 422, FETCH_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(201).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -297,13 +302,13 @@ marketplaceRouter.put(
       if (!checkPermission(req, res, 'accept_proposal')) return;
       const uid = getUserId(req)!;
       const { id, proposalId } = req.params;
-      // Stub: In production, call projectMarketplaceService.acceptProposal(uid, id, proposalId)
-      return res.status(200).json({
-        postingId: id,
-        proposalId,
-        status: 'accepted',
-        acceptedAt: new Date().toISOString(),
-      });
+      const { acceptProposal } = await import('../features/marketplace/services/projectMarketplaceService');
+      const result = await acceptProposal(uid, id, proposalId);
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { NOT_FOUND: 404, ACCESS_DENIED: 403, INVALID_TRANSITION: 422, FETCH_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(200).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -320,14 +325,13 @@ marketplaceRouter.post(
       if (!checkPermission(req, res, 'create_task')) return;
       const uid = getUserId(req)!;
       const body = req.body;
-      // Stub: In production, call taskMarketplaceService.createTask(uid, body)
-      return res.status(201).json({
-        id: `task_${Date.now()}`,
-        professionalId: uid,
-        status: 'open',
-        createdAt: new Date().toISOString(),
-        ...body,
-      });
+      const { createTaskPosting } = await import('../features/marketplace/services/taskMarketplaceService');
+      const result = await createTaskPosting(uid, body);
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { VALIDATION_ERROR: 400, INVALID_TOOL_IDS: 400, PERSISTENCE_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(201).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -340,8 +344,13 @@ marketplaceRouter.get(
   async (req: Request, res: Response) => {
     try {
       // Any authenticated user can browse open task postings
-      // Stub: In production, call taskMarketplaceService.listTasks(filters)
-      return res.status(200).json({ tasks: [], total: 0 });
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const snapshot = await adminDb
+        .collection('marketplace_task_postings')
+        .where('status', '==', 'open')
+        .get();
+      const tasks = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      return res.status(200).json({ tasks, total: tasks.length });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -356,14 +365,13 @@ marketplaceRouter.post(
       if (!checkPermission(req, res, 'apply_task')) return;
       const uid = getUserId(req)!;
       const { id } = req.params;
-      // Stub: In production, call taskMarketplaceService.applyToTask(uid, id)
-      return res.status(201).json({
-        id: `app_${Date.now()}`,
-        taskId: id,
-        freelancerId: uid,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      });
+      const { applyToTask } = await import('../features/marketplace/services/taskMarketplaceService');
+      const result = await applyToTask(uid, id);
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { NOT_FOUND: 404, INVALID_TRANSITION: 422, APPLICATION_BLOCKED: 422, FETCH_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(201).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -445,14 +453,13 @@ marketplaceRouter.post(
       if (!checkPermission(req, res, 'create_material_listing')) return;
       const uid = getUserId(req)!;
       const body = req.body;
-      // Stub: In production, call supplierMarketplaceService.createListing(uid, body)
-      return res.status(201).json({
-        id: `mat_${Date.now()}`,
-        supplierId: uid,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        ...body,
-      });
+      const { createMaterialListing } = await import('../features/marketplace/services/supplierMarketplaceService');
+      const result = await createMaterialListing(body, { userId: uid, role: getUserRole(req) || 'supplier' });
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { VALIDATION_ERROR: 400, SUPPLIER_NOT_VERIFIED: 403, PERSISTENCE_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(201).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -465,8 +472,18 @@ marketplaceRouter.get(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'search_suppliers')) return;
-      // Stub: In production, call supplierMarketplaceService.searchMaterials(filters)
-      return res.status(200).json({ materials: [], total: 0 });
+      const { searchMaterials } = await import('../features/marketplace/services/supplierMarketplaceService');
+      const query = {
+        sansComplianceReference: req.query.sansComplianceReference as string | undefined,
+        deliveryZone: req.query.deliveryZone as string | undefined,
+        leadTimeMin: req.query.leadTimeMin ? Number(req.query.leadTimeMin) : undefined,
+        leadTimeMax: req.query.leadTimeMax ? Number(req.query.leadTimeMax) : undefined,
+        certificationStatus: req.query.certificationStatus as 'certified' | 'uncertified' | undefined,
+        offset: req.query.offset ? Number(req.query.offset) : undefined,
+        limit: req.query.limit ? Number(req.query.limit) : undefined,
+      };
+      const materials = await searchMaterials(query);
+      return res.status(200).json({ materials, total: materials.length });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -573,14 +590,13 @@ marketplaceRouter.post(
       if (!checkPermission(req, res, 'create_freelancer_profile')) return;
       const uid = getUserId(req)!;
       const body = req.body;
-      // Stub: In production, call freelancerHubService.createProfile(uid, body)
-      return res.status(201).json({
-        userId: uid,
-        availability: body.availability || 'available',
-        skills: body.skills || [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      const { createProfile } = await import('../features/marketplace/services/freelancerHubService');
+      const result = await createProfile(uid, body);
+      if ('code' in result) {
+        const statusMap: Record<string, number> = { VALIDATION_ERROR: 400, INVALID_TOOL_IDS: 400, PERSISTENCE_ERROR: 500 };
+        return res.status(statusMap[result.code] || 400).json(result);
+      }
+      return res.status(201).json(result);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -594,8 +610,12 @@ marketplaceRouter.get(
     try {
       // Any authenticated user can view freelancer profiles
       const { userId } = req.params;
-      // Stub: In production, call freelancerHubService.getProfile(userId)
-      return res.status(200).json({ userId });
+      const { getProfileView } = await import('../features/marketplace/services/freelancerHubService');
+      const profileView = await getProfileView(userId);
+      if (!profileView) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Freelancer profile not found' });
+      }
+      return res.status(200).json(profileView);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -632,14 +652,17 @@ marketplaceRouter.post(
       if (!checkPermission(req, res, 'post_collaboration')) return;
       const uid = getUserId(req)!;
       const body = req.body;
-      // Stub: In production, call firmCollaborationService.createPosting(uid, body)
-      return res.status(201).json({
-        id: `collab_${Date.now()}`,
-        createdByUserId: uid,
-        status: 'draft',
-        createdAt: new Date().toISOString(),
-        ...body,
+      const { createCollaboration } = await import('../features/marketplace/services/firmCollaborationService');
+      const result = await createCollaboration(body, {
+        userId: uid,
+        role: getUserRole(req) || 'firm_admin',
+        firmId: body.firmId || uid,
       });
+      if ('error' in result) {
+        const statusMap: Record<string, number> = { ACCESS_DENIED: 403, VALIDATION_FAILED: 400, PERSISTENCE_FAILED: 500 };
+        return res.status(statusMap[result.error.code] || 400).json(result.error);
+      }
+      return res.status(201).json(result.collaboration);
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -753,15 +776,15 @@ marketplaceRouter.post(
         };
         return res.status(400).json(error);
       }
-      // Stub: In production, call disputeService.fileDispute(uid, body)
-      return res.status(201).json({
-        disputeId: `disp_${Date.now()}`,
+      const { fileDispute } = await import('../features/marketplace/services/verificationGatesService');
+      const dispute = await fileDispute({
         filingPartyId: uid,
+        opposingPartyId: body.opposingPartyId || '',
         relatedEntityId: body.relatedEntityId,
         relatedEntityType: body.relatedEntityType,
-        status: 'open',
-        createdAt: new Date().toISOString(),
+        evidenceRefs: body.evidenceRefs || ['filing-evidence'],
       });
+      return res.status(201).json(dispute);
     } catch (err) {
       handleServiceError(res, err);
     }

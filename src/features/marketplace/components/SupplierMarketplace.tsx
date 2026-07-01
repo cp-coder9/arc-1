@@ -26,6 +26,7 @@ const mockListings: MaterialListing[] = [
   {
     id: 'mat-1',
     supplierId: 'supplier-1',
+    tenantId: 'supplier-1',
     productName: 'Concrete Roof Tiles — Marley Modern',
     description: 'SANS 542 compliant concrete roof tiles. Available in charcoal, terracotta, and slate grey.',
     sansComplianceReference: 'SANS 542',
@@ -42,6 +43,7 @@ const mockListings: MaterialListing[] = [
   {
     id: 'mat-2',
     supplierId: 'supplier-2',
+    tenantId: 'supplier-2',
     productName: 'Structural Steel — IPE 200',
     description: 'Hot-rolled structural steel IPE 200 sections. SANS 1431 grade 300W.',
     sansComplianceReference: 'SANS 1431',
@@ -59,6 +61,7 @@ const mockListings: MaterialListing[] = [
   {
     id: 'mat-3',
     supplierId: 'supplier-3',
+    tenantId: 'supplier-3',
     productName: 'Fire-Rated Drywall — 60min FRL',
     description: 'Fire-rated gypsum board achieving 60-minute fire resistance. SANS 10400-T compliant system.',
     sansComplianceReference: 'SANS 10400-T',

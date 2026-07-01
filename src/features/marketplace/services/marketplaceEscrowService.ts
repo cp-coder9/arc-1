@@ -126,9 +126,61 @@ export interface TransitionAllowedResult {
   blockers: string[];
 }
 
-// ─── In-Memory Store (Firestore in production) ────────────────────────────────
+// ─── Firestore Persistence ────────────────────────────────────────────────────
 
-const escrowHoldings = new Map<string, MarketplaceEscrowHolding>();
+const ESCROW_COLLECTION = 'marketplace_escrow_holdings';
+
+async function getFirestore() {
+  const { adminDb } = await import('@/lib/firebase-admin');
+  return adminDb;
+}
+
+async function persistEscrowHolding(holding: MarketplaceEscrowHolding): Promise<void> {
+  const db = await getFirestore();
+  await db.collection(ESCROW_COLLECTION).doc(holding.escrowId).set({
+    type: holding.type,
+    projectId: holding.projectId,
+    entityId: holding.entityId,
+    fundingSourceId: holding.fundingSourceId,
+    amount: holding.amount,
+    milestones: holding.milestones,
+    state: holding.state,
+    createdAt: holding.createdAt,
+    updatedAt: holding.updatedAt,
+    disputeHold: holding.disputeHold,
+    frozenReleases: holding.frozenReleases,
+  });
+}
+
+async function updateEscrowHolding(
+  escrowId: string,
+  updates: Partial<MarketplaceEscrowHolding>
+): Promise<void> {
+  const db = await getFirestore();
+  await db.collection(ESCROW_COLLECTION).doc(escrowId).update(updates);
+}
+
+async function fetchEscrowHolding(escrowId: string): Promise<MarketplaceEscrowHolding | null> {
+  const db = await getFirestore();
+  const doc = await db.collection(ESCROW_COLLECTION).doc(escrowId).get();
+  if (!doc.exists) return null;
+  const data = doc.data()!;
+  return {
+    escrowId: doc.id,
+    type: data.type,
+    projectId: data.projectId,
+    entityId: data.entityId,
+    fundingSourceId: data.fundingSourceId,
+    amount: data.amount,
+    milestones: data.milestones,
+    state: data.state,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+    disputeHold: data.disputeHold,
+    frozenReleases: data.frozenReleases,
+  };
+}
+
 let escrowIdCounter = 0;
 
 function generateEscrowId(): string {
@@ -255,8 +307,8 @@ export async function createMarketplaceEscrow(
     frozenReleases: false,
   };
 
-  // Persist
-  escrowHoldings.set(escrowId, holding);
+  // Persist to Firestore
+  await persistEscrowHolding(holding);
 
   // Audit log
   await logMarketplaceAction({
@@ -291,7 +343,7 @@ export async function createMarketplaceEscrow(
 export async function requestEscrowRelease(
   params: RequestEscrowReleaseParams
 ): Promise<EscrowReleaseResult> {
-  const holding = escrowHoldings.get(params.escrowId);
+  const holding = await fetchEscrowHolding(params.escrowId);
   if (!holding) {
     return { released: false, blockers: ['Escrow holding not found.'] };
   }
@@ -326,10 +378,13 @@ export async function requestEscrowRelease(
     timestamp,
   };
 
-  // Update holding state
+  // Update holding state in Firestore
   holding.state = 'released';
   holding.updatedAt = timestamp;
-  escrowHoldings.set(params.escrowId, holding);
+  await updateEscrowHolding(params.escrowId, {
+    state: 'released',
+    updatedAt: timestamp,
+  });
 
   // Audit
   await logMarketplaceAction({
@@ -364,7 +419,7 @@ export async function requestEscrowRelease(
 export async function handleEscrowDispute(
   params: HandleEscrowDisputeParams
 ): Promise<EscrowDisputeResult> {
-  const holding = escrowHoldings.get(params.escrowId);
+  const holding = await fetchEscrowHolding(params.escrowId);
   if (!holding) {
     return { transitioned: false, state: 'created', frozenReleases: false, notificationSent: false };
   }
@@ -382,13 +437,18 @@ export async function handleEscrowDispute(
     return { transitioned: false, state: holding.state, frozenReleases: holding.frozenReleases, notificationSent: false };
   }
 
-  // Transition to dispute_hold
+  // Transition to dispute_hold in Firestore
   const now = new Date().toISOString();
   holding.state = 'dispute_hold';
   holding.disputeHold = true;
   holding.frozenReleases = true;
   holding.updatedAt = now;
-  escrowHoldings.set(params.escrowId, holding);
+  await updateEscrowHolding(params.escrowId, {
+    state: 'dispute_hold',
+    disputeHold: true,
+    frozenReleases: true,
+    updatedAt: now,
+  });
 
   // Audit
   await logMarketplaceAction({
@@ -563,11 +623,11 @@ async function notifyPlatformAdminDispute(
 
 /** @internal — Used only for testing to reset state */
 export function _resetEscrowState(): void {
-  escrowHoldings.clear();
   escrowIdCounter = 0;
 }
 
 /** @internal — Used only for testing to inspect holdings */
-export function _getEscrowHolding(escrowId: string): MarketplaceEscrowHolding | undefined {
-  return escrowHoldings.get(escrowId);
+export async function _getEscrowHolding(escrowId: string): Promise<MarketplaceEscrowHolding | undefined> {
+  const holding = await fetchEscrowHolding(escrowId);
+  return holding ?? undefined;
 }

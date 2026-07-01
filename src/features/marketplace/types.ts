@@ -38,6 +38,7 @@ export interface ComplianceSearchQuery {
   disciplines?: string[];
   region?: string;
   minTrustScore?: number;          // defaults to 75
+  tenantId?: string;               // optional scope for tenant-isolated search
 }
 
 export interface ComplianceSearchResult {
@@ -63,6 +64,8 @@ export interface AutoSuggestion {
 export interface ProjectPosting {
   id: string;
   clientId: string;
+  tenantId: string;
+  organisationId?: string;
   title: string;                    // max 150 chars
   description: string;              // max 5000 chars
   location: string;
@@ -114,6 +117,7 @@ export interface RecentProject {
 export interface TaskPosting {
   id: string;
   professionalId: string;
+  tenantId: string;
   title: string;                    // 5–200 chars
   description: string;              // 20–5000 chars
   estimatedHours: number;           // 0.5–200
@@ -164,6 +168,7 @@ export interface DeliverableFile {
 export interface MaterialListing {
   id: string;
   supplierId: string;
+  tenantId: string;
   productName: string;              // max 150 chars
   description: string;              // max 2000 chars
   sansComplianceReference: string;
@@ -247,6 +252,7 @@ export interface DisputeEntry {
 export interface FirmCollaborationPosting {
   id: string;
   firmId: string;
+  tenantId: string;
   createdByUserId: string;
   title: string;                   // 1–150 chars
   description: string;             // 1–5000 chars

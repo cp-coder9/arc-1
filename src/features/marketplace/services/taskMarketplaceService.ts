@@ -335,6 +335,7 @@ export async function createTaskPosting(
   const posting: TaskPosting = {
     id: taskId,
     professionalId,
+    tenantId: professionalId, // Default tenant scope to posting professional
     title: input.title,
     description: input.description,
     estimatedHours: input.estimatedHours,
@@ -354,6 +355,7 @@ export async function createTaskPosting(
       .doc(taskId)
       .set({
         professionalId: posting.professionalId,
+        tenantId: posting.tenantId,
         title: posting.title,
         description: posting.description,
         estimatedHours: posting.estimatedHours,
@@ -430,6 +432,7 @@ export async function applyToTask(
     posting = {
       id: doc.id,
       professionalId: data.professionalId,
+      tenantId: data.tenantId || data.professionalId,
       title: data.title,
       description: data.description,
       estimatedHours: data.estimatedHours,
@@ -565,6 +568,7 @@ export async function acceptApplication(
     posting = {
       id: doc.id,
       professionalId: data.professionalId,
+      tenantId: data.tenantId || data.professionalId,
       title: data.title,
       description: data.description,
       estimatedHours: data.estimatedHours,
@@ -830,6 +834,7 @@ async function fetchTaskPostingById(
     return {
       id: doc.id,
       professionalId: data.professionalId,
+      tenantId: data.tenantId || data.professionalId,
       title: data.title,
       description: data.description,
       estimatedHours: data.estimatedHours,

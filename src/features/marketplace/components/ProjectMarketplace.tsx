@@ -29,6 +29,7 @@ const mockPostings: ProjectPosting[] = [
   {
     id: 'proj-1',
     clientId: 'client-1',
+    tenantId: 'client-1',
     title: 'Residential Development — Sandton Phase 2',
     description: 'Full architectural services for a 24-unit residential complex including structural, MEP, and compliance.',
     location: 'Sandton, Johannesburg',
@@ -44,6 +45,7 @@ const mockPostings: ProjectPosting[] = [
   {
     id: 'proj-2',
     clientId: 'client-2',
+    tenantId: 'client-2',
     title: 'Commercial Office Fit-Out — Cape Town CBD',
     description: 'Interior architecture and compliance sign-off for a 3-floor office conversion.',
     location: 'Cape Town CBD',
