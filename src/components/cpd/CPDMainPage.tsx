@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Award, BarChart3, BookOpen, FileText, GraduationCap, Settings } from 'lucide-react';
+import { Award, BarChart3, BookOpen, GraduationCap } from 'lucide-react';
 import type { UserProfile } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DashboardSection } from '@/components/composite/DashboardSection';
 import CPDHub from './CPDHub';
 import CPDAssessmentRunner from './CPDAssessmentRunner';
 import CPDCertificateViewer from './CPDCertificateViewer';
@@ -40,49 +39,43 @@ export default function CPDMainPage({ user, onNavigate }: CPDMainPageProps) {
 
   return (
     <div className="space-y-6" data-testid="cpd-main-page">
-      {/* CPD Sub-navigation */}
-      <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
-        <CardContent className="p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={view === 'hub' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setView('hub')}
+      {/* Sub-navigation */}
+      <div className="glass-panel rounded-2xl p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            className={view === 'hub' ? 'glass-button-solid' : 'glass-button'}
+            onClick={() => setView('hub')}
+          >
+            <GraduationCap className="h-4 w-4 mr-2 inline-block" /> Compliance Hub
+          </button>
+          {selectedCourseId && (
+            <button
+              className={view === 'assessment' ? 'glass-button-solid' : 'glass-button'}
+              onClick={() => setView('assessment')}
             >
-              <GraduationCap className="h-4 w-4 mr-2" /> CPD Hub
-            </Button>
-            {selectedCourseId && (
-              <Button
-                variant={view === 'assessment' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setView('assessment')}
-              >
-                <BookOpen className="h-4 w-4 mr-2" /> Assessment
-              </Button>
-            )}
-            {selectedCertificateId && (
-              <Button
-                variant={view === 'certificate' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setView('certificate')}
-              >
-                <Award className="h-4 w-4 mr-2" /> Certificate
-              </Button>
-            )}
-            <Button
-              variant={view === 'analytics' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setView('analytics')}
+              <BookOpen className="h-4 w-4 mr-2 inline-block" /> Professional Compliance Learning
+            </button>
+          )}
+          {selectedCertificateId && (
+            <button
+              className={view === 'certificate' ? 'glass-button-solid' : 'glass-button'}
+              onClick={() => setView('certificate')}
             >
-              <BarChart3 className="h-4 w-4 mr-2" /> Analytics
-            </Button>
-            <div className="flex-1" />
-            <Badge variant="secondary">{isAdmin ? 'Admin' : 'Learner'}</Badge>
-          </div>
-        </CardContent>
-      </Card>
+              <Award className="h-4 w-4 mr-2 inline-block" /> Certificate
+            </button>
+          )}
+          <button
+            className={view === 'analytics' ? 'glass-button-solid' : 'glass-button'}
+            onClick={() => setView('analytics')}
+          >
+            <BarChart3 className="h-4 w-4 mr-2 inline-block" /> Analytics
+          </button>
+          <div className="flex-1" />
+          <Badge variant="secondary">{isAdmin ? 'Admin' : 'Learner'}</Badge>
+        </div>
+      </div>
 
-      {/* CPD Views */}
+      {/* Views */}
       {view === 'hub' && <CPDHub user={user} onNavigate={handleNavigate} />}
       {view === 'assessment' && (
         <CPDAssessmentRunner

@@ -4,3 +4,4 @@ export { default as AdminCPDManager } from './AdminCPDManager';
 export { default as CPDCertificateViewer } from './CPDCertificateViewer';
 export { default as CPDAnalyticsDashboard } from './CPDAnalyticsDashboard';
 export { default as CPDMainPage } from './CPDMainPage';
+export { default as XAComplianceLearningPath } from './XAComplianceLearningPath';

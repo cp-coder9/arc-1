@@ -7,7 +7,10 @@ import type { CPDCourse, CPDAssessmentDraft, CPDAttempt, CPDAnswerSubmission } f
 import { scoreAttempt } from '@/services/cpdAccreditationWorkflowService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DashboardSection } from '@/components/composite/DashboardSection';
+import { StatCard } from '@/components/composite/StatCard';
+import { getAccreditationBadge, getCoursePricingLabel } from '@/services/cpdDisplayUtils';
+import { syncXACompletion } from '@/services/xaCompletionSyncService';
 
 type LoadState = 'loading' | 'ready' | 'error';
 type RunnerPhase = 'landing' | 'attempting' | 'submitted';
@@ -16,6 +19,20 @@ interface CPDAssessmentRunnerProps {
   user: UserProfile;
   courseId?: string;
   onCertificateView?: (certId: string) => void;
+}
+
+/**
+ * Determines whether a course is XA-tagged by checking for a `tags` array
+ * on the Firestore document or XA-related content in the title.
+ */
+function isXATaggedCourse(course: CPDCourse): boolean {
+  const docData = course as unknown as Record<string, unknown>;
+  if (Array.isArray(docData.tags)) {
+    return (docData.tags as unknown[]).some(
+      (tag) => typeof tag === 'string' && /XA|SANS.?10400.?XA/i.test(tag)
+    );
+  }
+  return /SANS.?10400.?XA|XA\s+compliance|XA\s+energy/i.test(course.title);
 }
 
 export default function CPDAssessmentRunner({ user, courseId, onCertificateView }: CPDAssessmentRunnerProps) {
@@ -56,7 +73,7 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
 
         setState('ready');
       } catch (err) {
-        console.error('Failed to load CPD course:', err);
+        console.error('Failed to load course:', err);
         setState('error');
       }
     };
@@ -141,6 +158,13 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
 
       if (attempt.passed) {
         setFeedback(`Congratulations! You passed with ${attempt.scorePercent}%. Check your certificates when the course is accredited.`);
+
+        // Fire-and-forget XA completion sync for XA-tagged courses
+        if (isXATaggedCourse(course)) {
+          syncXACompletion(user.uid, course.id, course.title).catch((err) => {
+            console.error('[XA Sync] Fire-and-forget sync failed:', err);
+          });
+        }
       } else {
         setFeedback(`Score: ${attempt.scorePercent}%. Pass mark is ${assessment.passMarkPercent}%. You have ${Math.max(0, remainingAttempts - 1)} attempts remaining.`);
       }
@@ -154,13 +178,17 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
+  // Derived display values
+  const accreditationBadge = course ? getAccreditationBadge(course) : null;
+  const pricingLabel = course ? getCoursePricingLabel(course) : null;
+
   if (!courseId) {
     return (
-      <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
-        <CardContent className="p-8 text-center text-sm text-muted-foreground">
-          Select a CPD course to begin.
-        </CardContent>
-      </Card>
+      <DashboardSection title="Professional Compliance Learning" icon={<BookOpen className="h-5 w-5" />}>
+        <p className="text-center text-sm text-muted-foreground py-4">
+          Select a compliance learning course to begin.
+        </p>
+      </DashboardSection>
     );
   }
 
@@ -168,37 +196,54 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
     return <div className="flex items-center gap-2 text-sm text-muted-foreground p-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading course...</div>;
   }
   if (state === 'error' || !course) {
-    return <div className="p-4 text-sm text-destructive">Unable to load this CPD course.</div>;
+    return <div className="p-4 text-sm text-destructive">Unable to load this compliance learning course.</div>;
   }
 
   return (
     <div className="space-y-6" data-testid="cpd-assessment-runner">
       {/* Course landing page */}
       {phase === 'landing' && (
-        <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-          <CardHeader className="bg-primary/5 border-b border-border">
-            <Badge variant="secondary" className="uppercase tracking-widest">CPD Course</Badge>
-            <CardTitle className="font-heading text-3xl mt-3">{course.title}</CardTitle>
-            <CardDescription className="mt-2 text-base">{course.providerName}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
+        <DashboardSection
+          title={course.title}
+          description={course.providerName}
+          icon={<BookOpen className="h-5 w-5" />}
+          action={
+            accreditationBadge && (
+              <Badge variant={accreditationBadge.variant === 'default' ? 'default' : 'secondary'}>
+                {accreditationBadge.label}
+              </Badge>
+            )
+          }
+        >
+          <div className="space-y-4">
+            {/* Pricing label */}
+            {pricingLabel && (
+              <div className="glass-pill inline-block px-3 py-1 rounded-full text-xs font-semibold">
+                {pricingLabel.label}
+              </div>
+            )}
+
+            {/* Metric tiles */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="rounded-xl border border-border p-4">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Credits</p>
-                <p className="font-heading text-2xl font-black mt-1">{course.approvedCredits}</p>
-              </div>
-              <div className="rounded-xl border border-border p-4">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Accreditation</p>
-                <p className="font-heading text-lg font-semibold mt-1">{course.accreditationReference || 'Pending'}</p>
-              </div>
-              <div className="rounded-xl border border-border p-4">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Status</p>
-                <Badge className="mt-1">{course.status}</Badge>
-              </div>
+              <StatCard
+                label="Compliance Credits"
+                value={course.approvedCredits}
+                icon={<Award className="h-4 w-4" />}
+              />
+              <StatCard
+                label="Accreditation"
+                value={course.accreditationReference || 'Pending'}
+                icon={<CheckCircle2 className="h-4 w-4" />}
+              />
+              <StatCard
+                label="Status"
+                value={course.status}
+                icon={<Clock className="h-4 w-4" />}
+              />
             </div>
 
             {assessment && (
-              <div className="rounded-2xl border border-border p-4 space-y-2">
+              <div className="glass-tile rounded-2xl p-4 space-y-2">
                 <p className="font-semibold">Assessment Details</p>
                 <p className="text-sm text-muted-foreground">{assessment.questions.length} questions · {assessment.passMarkPercent}% pass mark · {assessment.allowedAttempts} attempts allowed</p>
                 {assessment.timeLimitMinutes && <p className="text-sm text-muted-foreground flex items-center gap-1"><Timer className="h-3 w-3" /> {assessment.timeLimitMinutes} minute time limit</p>}
@@ -206,9 +251,9 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
             )}
 
             {latestAttempt && (
-              <div className="rounded-2xl border border-border p-4">
+              <div className="glass-record rounded-2xl p-4">
                 <p className="font-semibold flex items-center gap-2">
-                  {latestAttempt.passed ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-destructive" />}
+                  {latestAttempt.passed ? <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" /> : <XCircle className="h-4 w-4 text-destructive" />}
                   Previous Attempt: {latestAttempt.scorePercent}%
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Submitted {latestAttempt.submittedAt}</p>
@@ -229,118 +274,107 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
                 <p className="text-sm text-muted-foreground">This course is not yet live. Assessment will be available once published.</p>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </DashboardSection>
       )}
 
       {/* Assessment form */}
       {phase === 'attempting' && assessment && (
-        <Card className="rounded-2xl border-border bg-card/90 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="font-heading text-xl">{assessment.title}</CardTitle>
-                <CardDescription>{assessment.questions.length} questions · {assessment.passMarkPercent}% to pass</CardDescription>
-              </div>
-              {secondsLeft !== null && (
-                <Badge variant={secondsLeft < 60 ? 'destructive' : 'secondary'} className="text-lg font-mono">
-                  <Clock className="h-4 w-4 mr-1" /> {formatTime(secondsLeft)}
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {assessment.questions.map((question, index) => {
-                const selectedAnswers = answers[question.id] ?? [];
-                const multi = question.type === 'multiple_select';
-                return (
-                  <div key={question.id} className="rounded-2xl border border-border p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{index + 1}. {question.prompt}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {question.type.replace(/_/g, ' ')} · {question.points} point{question.points > 1 ? 's' : ''} · {question.difficulty}
-                        </p>
-                      </div>
-                      <Badge variant="secondary">{selectedAnswers.length} selected</Badge>
+        <DashboardSection
+          title={assessment.title}
+          description={`${assessment.questions.length} questions · ${assessment.passMarkPercent}% to pass`}
+          icon={<BookOpen className="h-5 w-5" />}
+          action={
+            secondsLeft !== null ? (
+              <Badge variant={secondsLeft < 60 ? 'destructive' : 'secondary'} className="text-lg font-mono">
+                <Clock className="h-4 w-4 mr-1" /> {formatTime(secondsLeft)}
+              </Badge>
+            ) : undefined
+          }
+        >
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {assessment.questions.map((question, index) => {
+              const selectedAnswers = answers[question.id] ?? [];
+              const multi = question.type === 'multiple_select';
+              return (
+                <div key={question.id} className="glass-tile rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{index + 1}. {question.prompt}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {question.type.replace(/_/g, ' ')} · {question.points} point{question.points > 1 ? 's' : ''} · {question.difficulty}
+                      </p>
                     </div>
-                    {question.options.length === 0 ? (
-                      <p className="mt-4 text-sm text-destructive">This question has no options and requires manual review.</p>
-                    ) : (
-                      <div className="mt-4 grid gap-2">
-                        {question.options.map((option) => (
-                          <label key={option.id} className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-3 text-sm cursor-pointer hover:border-primary/30">
-                            <input
-                              type={multi ? 'checkbox' : 'radio'}
-                              name={question.id}
-                              checked={selectedAnswers.includes(option.id)}
-                              onChange={() => toggleAnswer(question.id, option.id, multi)}
-                              className="accent-primary"
-                            />
-                            <span>{option.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                    <Badge variant="secondary">{selectedAnswers.length} selected</Badge>
                   </div>
-                );
-              })}
-              <div className="flex items-center gap-3">
-                <Button type="submit" disabled={saving}>
-                  {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</> : 'Submit Assessment'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setPhase('landing')}>Cancel</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                  {question.options.length === 0 ? (
+                    <p className="mt-4 text-sm text-destructive">This question has no options and requires manual review.</p>
+                  ) : (
+                    <div className="mt-4 grid gap-2">
+                      {question.options.map((option) => (
+                        <label key={option.id} className="flex items-center gap-3 glass-record rounded-xl p-3 text-sm cursor-pointer hover:border-primary/30">
+                          <input
+                            type={multi ? 'checkbox' : 'radio'}
+                            name={question.id}
+                            checked={selectedAnswers.includes(option.id)}
+                            onChange={() => toggleAnswer(question.id, option.id, multi)}
+                            className="accent-primary"
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div className="flex items-center gap-3">
+              <Button type="submit" disabled={saving}>
+                {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</> : 'Submit Assessment'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setPhase('landing')}>Cancel</Button>
+            </div>
+          </form>
+        </DashboardSection>
       )}
 
       {/* Results */}
       {phase === 'submitted' && currentAttempt && (
-        <Card className="rounded-[2rem] border-border bg-card/95 shadow-sm overflow-hidden">
-          <CardHeader className={`border-b border-border ${currentAttempt.passed ? 'bg-green-50 dark:bg-green-950/20' : 'bg-destructive/5'}`}>
-            <div className="text-center">
+        <DashboardSection
+          title={currentAttempt.passed ? 'Assessment Passed!' : 'Assessment Not Passed'}
+          description={`Score: ${currentAttempt.scorePercent}% (Pass mark: ${assessment?.passMarkPercent || 70}%)`}
+          icon={currentAttempt.passed ? <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" /> : <XCircle className="h-5 w-5 text-destructive" />}
+        >
+          <div className="space-y-4">
+            {/* Result icon */}
+            <div className="text-center py-4">
               {currentAttempt.passed ? (
-                <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto mb-3" />
+                <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400 mx-auto" />
               ) : (
-                <XCircle className="h-16 w-16 text-destructive mx-auto mb-3" />
+                <XCircle className="h-16 w-16 text-destructive mx-auto" />
               )}
-              <CardTitle className="font-heading text-3xl">
-                {currentAttempt.passed ? 'Assessment Passed!' : 'Assessment Not Passed'}
-              </CardTitle>
-              <CardDescription className="mt-2 text-lg">
-                Score: {currentAttempt.scorePercent}% (Pass mark: {assessment?.passMarkPercent || 70}%)
-              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
+
             {feedback && (
-              <div className={`rounded-2xl p-4 text-sm ${currentAttempt.passed ? 'border border-green-200 bg-green-50 dark:bg-green-950/10 text-green-800 dark:text-green-200' : 'border border-destructive/20 bg-destructive/5 text-destructive'}`}>
+              <div className={`glass-tile rounded-2xl p-4 text-sm ${currentAttempt.passed ? 'border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : 'border border-destructive/20 text-destructive'}`}>
                 {feedback}
               </div>
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-xl border border-border p-3 text-center">
-                <p className="text-xs text-muted-foreground">Score</p>
-                <p className="font-heading text-xl font-black">{currentAttempt.scorePercent}%</p>
-              </div>
-              <div className="rounded-xl border border-border p-3 text-center">
-                <p className="text-xs text-muted-foreground">Result</p>
-                <Badge variant={currentAttempt.passed ? 'default' : 'destructive'}>{currentAttempt.passed ? 'Passed' : 'Failed'}</Badge>
-              </div>
-              <div className="rounded-xl border border-border p-3 text-center">
-                <p className="text-xs text-muted-foreground">Attempt</p>
-                <p className="font-heading text-xl font-black">{currentAttempt.attemptNumber} / {assessment?.allowedAttempts || '—'}</p>
-              </div>
-              <div className="rounded-xl border border-border p-3 text-center">
-                <p className="text-xs text-muted-foreground">Manual Review</p>
-                <Badge variant={currentAttempt.manualReviewRequired ? 'secondary' : 'outline'}>
-                  {currentAttempt.manualReviewRequired ? 'Required' : 'None'}
-                </Badge>
-              </div>
+              <StatCard label="Score" value={`${currentAttempt.scorePercent}%`} />
+              <StatCard
+                label="Result"
+                value={currentAttempt.passed ? 'Passed' : 'Failed'}
+              />
+              <StatCard
+                label="Attempt"
+                value={`${currentAttempt.attemptNumber} / ${assessment?.allowedAttempts || '—'}`}
+              />
+              <StatCard
+                label="Manual Review"
+                value={currentAttempt.manualReviewRequired ? 'Required' : 'None'}
+              />
             </div>
 
             <div className="flex items-center gap-3">
@@ -356,8 +390,8 @@ export default function CPDAssessmentRunner({ user, courseId, onCertificateView 
               )}
               <Button variant="outline" onClick={() => setPhase('landing')}>Back to Course</Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </DashboardSection>
       )}
     </div>
   );
