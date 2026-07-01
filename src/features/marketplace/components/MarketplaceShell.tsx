@@ -8,7 +8,7 @@
  * Validates: Requirements 13.1, 13.2, 13.3, 13.4, 13.5, 13.6
  */
 
-import { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { UserProfile, UserRole } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';

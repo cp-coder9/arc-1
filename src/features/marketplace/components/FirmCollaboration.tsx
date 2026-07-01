@@ -139,7 +139,7 @@ export default function FirmCollaboration({ user }: FirmCollaborationProps) {
                         </span>
                         <span className="flex items-center gap-1">
                           <DollarSign className="h-3.5 w-3.5" />
-                          {formatCurrency(Object.values(collab.budgetPerRole).reduce((a, b) => a + b, 0))} total budget
+                          {formatCurrency(Object.values(collab.budgetPerRole).reduce<number>((a, b) => a + (b as number), 0))} total budget
                         </span>
                       </div>
 
@@ -157,7 +157,7 @@ export default function FirmCollaboration({ user }: FirmCollaborationProps) {
                         {Object.entries(collab.budgetPerRole).map(([role, amount]) => (
                           <div key={role} className="p-2 rounded bg-surface-900/30 border border-surface-700/20">
                             <p className="text-xs text-surface-400">{role}</p>
-                            <p className="text-sm font-medium text-white">{formatCurrency(amount)}</p>
+                            <p className="text-sm font-medium text-white">{formatCurrency(amount as number)}</p>
                           </div>
                         ))}
                       </div>
