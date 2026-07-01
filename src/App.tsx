@@ -145,7 +145,7 @@ const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingF
 const MunicipalTracker = lazyWithChunkRetry(() => import('./components/MunicipalTracker'));
 const SubmissionReadinessDashboard = lazyWithChunkRetry(() => import('./components/SubmissionReadinessDashboard'));
 const KnowledgeSources = lazyWithChunkRetry(() => import('./components/KnowledgeSources').then((module) => ({ default: module.KnowledgeSources })));
-const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));
+const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/commandCentre/ProjectCommandCentre'));
 const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));
 const ProjectCommunicationCentrePage = lazyWithChunkRetry(() => import('./components/ProjectCommunicationCentrePage'));
 const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBriefWizard'));
@@ -1108,7 +1108,7 @@ function AppContent() {
               {activeTab === 'profile-settings' && <UserSettings user={user} />}
               {activeTab === 'profile' && <ProfileWorkspacePage user={user} />}
               {activeTab === 'firm' && <FirmDashboard user={user} />}
-              {activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />}
+              {activeTab === 'command' && <ProjectCommandCentre user={user} projectId="active-project" />}
               {activeTab === 'client-intake' && <GuidedBriefWizard user={user} />}
               {activeTab === 'client-proposals' && <ClientProposalComparison user={user} />}
               {activeTab === 'bep-marketplace' && <BEPClientMarketplacePage user={user} />}

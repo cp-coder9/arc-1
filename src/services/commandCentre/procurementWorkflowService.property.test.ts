@@ -14,8 +14,8 @@ import type { ProcurementOrder } from './types';
 const nonEmptyStringArb = fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.trim().length > 0);
 const positiveValueArb = fc.double({ min: 1, max: 10_000_000, noNaN: true, noDefaultInfinity: true });
 const bbbeeLevel = fc.integer({ min: 0, max: 8 });
-const timestampArb = fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') }).map((d) => d.toISOString());
-const isoDateArb = fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') }).map((d) => d.toISOString().split('T')[0]);
+const timestampArb = fc.integer({ min: 0, max: 2190 }).map(offset => { const d = new Date('2024-01-01'); d.setDate(d.getDate() + offset); return d.toISOString(); });
+const isoDateArb = fc.integer({ min: 0, max: 2190 }).map(offset => { const d = new Date('2024-01-01'); d.setDate(d.getDate() + offset); return d.toISOString().split('T')[0]; });
 const statusArb = fc.constantFrom<ProcurementOrder['status']>('ordered', 'in_transit', 'delivered', 'evaluating');
 
 const procurementOrderArb: fc.Arbitrary<ProcurementOrder> = fc.record({

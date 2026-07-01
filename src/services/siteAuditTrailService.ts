@@ -1,6 +1,6 @@
 import { collection, doc, addDoc, getDocs, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
-import type { SiteAuditRecord, UserRole } from '@/types';
+import type { SiteAuditRecord, UserRole, FieldActionType } from '@/types';
 
 
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
@@ -28,6 +28,8 @@ export async function recordAudit(input: {
   actorId: string;
   actorRole: UserRole;
   action: string;
+  actionType?: FieldActionType;
+  outcome?: 'permitted' | 'denied';
   sourceObjectId: string;
   sourceObjectType: string;
 }): Promise<string> {
@@ -38,6 +40,8 @@ export async function recordAudit(input: {
       actorId: input.actorId,
       actorRole: input.actorRole,
       action: input.action,
+      actionType: input.actionType ?? 'create',
+      outcome: input.outcome ?? 'permitted',
       sourceObjectId: input.sourceObjectId,
       sourceObjectType: input.sourceObjectType,
       createdAt: now,
