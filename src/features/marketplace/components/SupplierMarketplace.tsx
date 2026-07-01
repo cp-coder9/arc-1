@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { UserProfile } from '@/types';
 import type { MaterialListing, QuoteRequest } from '../types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface SupplierMarketplaceProps {
   user: UserProfile;
@@ -84,7 +85,14 @@ function formatCurrency(amount: number): string {
 export default function SupplierMarketplace({ user }: SupplierMarketplaceProps) {
   const [activeTab, setActiveTab] = useState('browse');
   const [searchText, setSearchText] = useState('');
-  const [_listings] = useState<MaterialListing[]>(mockListings);
+  const [_listings, setListings] = useState<MaterialListing[]>(mockListings);
+
+  useEffect(() => {
+    apiFetch('/api/marketplace/materials')
+      .then((r) => r.json())
+      .then((d) => setListings(d.materials || []))
+      .catch(() => setListings(mockListings));
+  }, []);
 
   const filteredListings = _listings.filter((listing) => {
     if (!searchText) return true;

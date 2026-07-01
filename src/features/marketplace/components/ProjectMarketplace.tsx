@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import type {
   ProjectProposal,
   ProjectPostingStatus,
 } from '../types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface ProjectMarketplaceProps {
   user: UserProfile;
@@ -100,8 +101,15 @@ function getStatusColor(status: ProjectPostingStatus): string {
 
 export default function ProjectMarketplace({ user }: ProjectMarketplaceProps) {
   const [activeTab, setActiveTab] = useState('listings');
-  const [_postings] = useState<ProjectPosting[]>(mockPostings);
+  const [_postings, setPostings] = useState<ProjectPosting[]>(mockPostings);
   const [_selectedProposal] = useState<ProjectProposal | null>(mockProposal);
+
+  useEffect(() => {
+    apiFetch('/api/marketplace/projects')
+      .then((r) => r.json())
+      .then((d) => setPostings(d.postings || []))
+      .catch(() => setPostings(mockPostings));
+  }, []);
 
   return (
     <div className="space-y-6">

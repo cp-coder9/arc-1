@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ import type {
   AutoSuggestion,
   ComplianceSearchQuery,
 } from '../types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface ComplianceSearchProps {
   user: UserProfile;
@@ -94,7 +95,20 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
   const [searchText, setSearchText] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<AutoSuggestion[]>([]);
-  const [results] = useState<ComplianceSearchResult[]>(mockResults);
+  const [results, setResults] = useState<ComplianceSearchResult[]>(mockResults);
+
+  useEffect(() => {
+    apiFetch('/api/marketplace/search/professionals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.results) setResults(d.results);
+      })
+      .catch(() => { /* keep mock fallback */ });
+  }, []);
 
   const filteredSuggestions = searchText.length >= 2
     ? mockSuggestions.filter((s) =>
