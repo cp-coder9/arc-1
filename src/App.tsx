@@ -82,6 +82,7 @@ import {
   BarChart3,
   PanelLeftClose,
   PanelLeftOpen,
+  Store,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -177,6 +178,7 @@ const PipelineKanbanPage = lazyWithChunkRetry(() => import('./components/Pipelin
 const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/TemplateLibrary'));
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
+const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -204,6 +206,7 @@ const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
 
 type DashboardPage = {
   id: string;
+  component?: string;
   label: string;
   roles: UserRole[];
   group: 'Core workflow' | 'Client tools' | 'BEP tools' | 'Construction tools' | 'Freelancer tools' | 'Governance';
@@ -268,6 +271,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'pipeline', label: 'Pipeline', roles: ['architect', 'bep', 'admin'], group: 'Governance', icon: <BarChart3 size={18} />, summary: 'Visual pipeline kanban with win/loss tracking and value forecasting.', backedBy: ['pipelineService'] },
   { id: 'templates', label: 'Templates', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <FileText size={18} />, summary: 'Practice document template library with versioning and role-based access.', backedBy: ['templateLibraryService'] },
   { id: 'registrations', label: 'Registrations', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <ShieldCheck size={18} />, summary: 'Professional registration renewal tracker with CPD monitoring.', backedBy: ['registrationRenewalService'] },
+  { id: 'marketplace', component: 'MarketplaceShell', label: 'Marketplace', roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'], group: 'Core workflow', icon: <Store size={18} />, summary: 'Professional commerce layer — discover, transact, and collaborate across the built environment.', backedBy: ['MarketplaceShell', 'marketplace-api-router'] },
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
@@ -307,6 +311,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'templates',
   'registrations',
   'specforge',
+  'marketplace',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1146,6 +1151,7 @@ function AppContent() {
               {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
+              {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}

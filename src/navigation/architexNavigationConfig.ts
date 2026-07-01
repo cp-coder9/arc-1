@@ -91,7 +91,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'marketplace',
     label: 'Marketplace / Resource Centre',
     description: 'Industry network, resources, suppliers and opportunities.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'supplier'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'],
     sections: [
       { key: 'professionals', label: 'Professionals', description: 'Find consultants and professionals.' },
       { key: 'contractors', label: 'Contractors', description: 'Find contractors and subcontractors.' },
