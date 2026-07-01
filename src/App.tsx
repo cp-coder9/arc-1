@@ -178,6 +178,7 @@ const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/Templa
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
+const FeeProposalBuilder = lazyWithChunkRetry(() => import('./components/tools/FeeProposalBuilder/index'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -1148,6 +1149,7 @@ function AppContent() {
               {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
+              {activeTab === 'fee-proposal-builder' && <FeeProposalBuilder user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}

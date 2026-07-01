@@ -4,6 +4,23 @@
 import type { StandaloneToolDef } from '@/types/standaloneToolTypes'
 
 export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
+  // ===== Fee Proposal Builder (full workspace) =====
+  {
+    id: 'fee_proposal_builder',
+    label: 'Fee Proposal Builder',
+    category: 'fee_calculator',
+    description: 'Multi-profession fee calculator workspace with proposal generation, terms library, run history, and client estimation. Full SACAP/ECSA/SACQSP/SACPLAN guideline support.',
+    roles: ['architect', 'bep', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'freelancer', 'admin', 'platform_admin'],
+    icon: 'FileText',
+    route: 'fee-proposal-builder',
+    standaloneOnly: false,
+    requiresInput: true,
+    canExport: true,
+    canAssignToProject: true,
+    recentRunsCount: 0,
+    tags: ['fee', 'proposal', 'calculator', 'SACAP', 'ECSA', 'SACQSP', 'SACPLAN', 'tariff', 'appointment', 'terms', 'estimate'],
+    calculatorDefinitionId: 'fee_proposal_builder_v1',
+  },
   // ===== Architect / BEP =====
   {
     id: 'fee_calculator',

@@ -52,6 +52,19 @@ app.use('/api/marketplace', async (req, res, next) => {
   }
 });
 
+app.use('/api/fee-proposal', async (req, res, next) => {
+  try {
+    const { default: feeProposalRouter } = await import('./src/lib/fee-proposal-api-router.ts');
+    return feeProposalRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load Fee Proposal API router:', error);
+    return res.status(500).json({
+      error: 'Fee Proposal API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 app.use('/api', async (req, res, next) => {
   try {
     const { default: apiRouter } = await import('./src/lib/api-router.ts');
