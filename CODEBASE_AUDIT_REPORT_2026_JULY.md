@@ -9,18 +9,147 @@ While the frontend is deployed to `test.architex.co.za`, it is currently running
 
 ## 2. Branch & PR Inventory Status
 
-### 2.1 Branch Divergence
-There are over **100 remote branches** currently unmerged into `main`. These branches contain the bulk of the platform's advanced features.
+### 2.1 Complete Branch List (Unmerged)
+There are **121 remote branches** currently unmerged into `main`.
 
-| Category | High-Priority Unmerged Branches |
-| :--- | :--- |
-| **Core Packs** | `origin/feature/pack-8-finance-payment-escrow-commercial`<br>`origin/feature/pack-9-site-execution-field-control`<br>`origin/feature/pack-11-closeout-handover-occupancy`<br>`origin/feature/pack-12-practice-management-office-ops` |
-| **Toolboxes** | Over 50 branches in `origin/toolbox/*` (e.g., `ai-drawing-checker`, `fee-calculator`, `snag-creator`) |
-| **Engine/Spine** | `origin/feat/pack-1-toolbox-engine-spine`<br>`origin/feature/architex-platform-spine-pack` |
-| **UI/UX** | `origin/feat/landing-go-live` (Liquid Glass redesign)<br>`origin/feature/navigation-framework` |
+#### Feature Packs & Core Modules
+*   `feat/pack-1-toolbox-engine-spine`
+*   `feat/pack-2-14-passport-orchestration`
+*   `feat/pack-2-professional-fee-proposal-builder`
+*   `feat/pack-3-compliance-calculators`
+*   `feat/pack-4-document-control-core`
+*   `feat/pack-5-appointment-kickoff`
+*   `feat/pack-5-contractor-commercial-tools`
+*   `feat/pack-6-site-execution-tools`
+*   `feat/pack-6-submission-readiness`
+*   `feat/pack-7-supplier-tools`
+*   `feat/pack-8-admin-governance-tools`
+*   `feature/pack-2-passport-lifecycle-complete`
+*   `feature/pack-3-documents-drawing-intelligence`
+*   `feature/pack-5-appointment-kickoff`
+*   `feature/pack-8-finance-payment-escrow-commercial`
+*   `feature/pack-9-site-execution-field-control`
+*   `feature/pack-10-site-execution-field-control`
+*   `feature/pack-11-closeout-handover-occupancy`
+*   `feature/pack-12-practice-management-office-ops`
+*   `feature/pack-marketplace`
+*   `feat/sans-codified-compliance-engine`
 
-### 2.2 Pull Request Status
-Many PRs have been closed without merging (e.g., #13, #14, #20, #23), leading to "orphaned" functional code that is present in the repository but not active in the production build.
+#### Toolboxes (`toolbox/*`)
+*   `toolbox/admin-governance`
+*   `toolbox/ai-drawing-checker`
+*   `toolbox/ai-review-queue`
+*   `toolbox/audit-trail-viewer`
+*   `toolbox/boq-takeoff`
+*   `toolbox/brief-wizard`
+*   `toolbox/cad-upload-check`
+*   `toolbox/catalogue-manager`
+*   `toolbox/cpd-standalone`
+*   `toolbox/deliverable-submission`
+*   `toolbox/delivery-note`
+*   `toolbox/doc-control-issue`
+*   `toolbox/drawing-register`
+*   `toolbox/energy-certificate`
+*   `toolbox/feasibility-estimator`
+*   `toolbox/fee-calculator`
+*   `toolbox/fee-tariff-editor`
+*   `toolbox/fenestration-calc`
+*   `toolbox/fire-compliance-check`
+*   `toolbox/fire-rational-design`
+*   `toolbox/firm-document-register`
+*   `toolbox/freelancer-resource-centre`
+*   `toolbox/freelancer-timesheet`
+*   `toolbox/hs-compliance`
+*   `toolbox/material-procurement`
+*   `toolbox/package-scope-viewer`
+*   `toolbox/payment-claim-builder`
+*   `toolbox/payment-dashboard`
+*   `toolbox/payment-rate-config`
+*   `toolbox/plant-register`
+*   `toolbox/platform-settings`
+*   `toolbox/progress-viewer`
+*   `toolbox/proposal-comparison`
+*   `toolbox/quote-response`
+*   `toolbox/rfi-response`
+*   `toolbox/rvalue-calc-fix`
+*   `toolbox/sans-forms`
+*   `toolbox/shop-drawing-submission`
+*   `toolbox/site-diary-entry`
+*   `toolbox/snag-creator`
+*   `toolbox/snag-evidence-upload`
+*   `toolbox/soft-cost-estimator`
+*   `toolbox/staff-cpd-tracker`
+*   `toolbox/stage-gate-review`
+*   `toolbox/system-health-monitor`
+*   `toolbox/technical-brief`
+*   `toolbox/tender-bid-bench`
+*   `toolbox/user-verification-console`
+*   `toolbox/valuation-cert`
+*   `toolbox/warranty-upload`
+*   `toolbox/workforce-timesheet`
+*   `toolbox/xa-compliance-calc`
+*   `toolbox/zoning-check`
+
+#### Features & Improvements
+*   `feat/landing-go-live` (Liquid Glass redesign)
+*   `feat/specforge-workspace-integration`
+*   `feat/sprint-1-glassmorphism-overhaul`
+*   `feat-architect-profiles-and-recommendations-13202590410813343651`
+*   `feature/arc-b2-clean`
+*   `feature/architect-dashboard-enhancements-15735110557204953697`
+*   `feature/architect-dashboard-enhancements-1704451157210965987`
+*   `feature/architex-fee-calculator-pack`
+*   `feature/architex-platform-spine-pack`
+*   `feature/bip-role-workflow-9832944944364214636`
+*   `feature/bom-builder-tool`
+*   `feature/comprehensive-professional-toolboxes`
+*   `feature/cpd-aesthetic-refinement`
+*   `feature/cpd-assessment-platform`
+*   `feature/master-product-expansion-integration`
+*   `feature/navigation-framework`
+*   `feature/password-and-compliance-reports-v2-6049199378968999451`
+*   `feature/professional-fee-proposal-builder`
+*   `feature/project-command-centre`
+*   `feature/unified-municipal-tracker-aggregator-4463341113638514032`
+*   `feature/website-ui-redesign-spec`
+*   `feature/xa-compliance-tool`
+*   `integration/all-packs`
+
+#### Phased Lifecycle Foundation
+*   `phase-1/lifecycle-foundation`
+*   `phase-2-verification-workflows`
+*   `phase-2/design-team-coordination`
+*   `phase-3/tender-procurement`
+*   `phase-4/construction-delivery`
+*   `phase-5/payments-escrow`
+*   `phase-6/ai-agents-polish`
+
+#### Fixes & Chores
+*   `All-branch-fixes`
+*   `chore/install-dox-framework`
+*   `codex/fix-and-merge-all-branches-and-prs`
+*   `deploy-restore`
+*   `e2e-chromium-stabilization`
+*   `fix-dashboard-coordination-4747803486613439424`
+*   `fix-types-and-auth-flow-17225465659468592700`
+*   `fix/b1-payfast-secret`
+*   `fix/b2-finance-auth`
+*   `fix/b3-milestone-auth`
+*   `fix/errors-2-txt`
+*   `fix/h1-routes-dir`
+*   `fix/h2-strict-tsconfig`
+*   `fix/h3-threejs-lazy`
+*   `fix/pr-26-sans-compliance-engine`
+
+#### Worktrees & Temporary
+*   `worktree-feature+architex-navigation-framework`
+*   `worktree-feature+pack-4-professional-toolboxes-proposal-builder`
+*   `worktree-pack-11-closeout-handover-occupancy`
+*   `worktree-pack-12-impl`
+*   `worktree-pack-5-appointment-kickoff`
+*   `worktree-pack-7-impl`
+*   `worktree-pack-8-finance-implementation`
+*   `worktree-pack-9-site-execution-field-control`
 
 ---
 
