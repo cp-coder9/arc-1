@@ -20,13 +20,13 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Implement default mode derivation based on contract value threshold (R 5M)
     - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7, 18.8, 16.1, 16.2, 16.3, 16.5_
 
-  - [ ]* 1.3 Write property tests for role-view access control (Property 10)
+  - [x]* 1.3 Write property tests for role-view access control (Property 10)
     - **Property 10: Role-Based View Access Control**
     - For any UserRole, the returned views match exactly the role-view matrix
     - Access attempts outside role scope are denied
     - **Validates: Requirements 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7, 18.8**
 
-  - [ ]* 1.4 Write property tests for complexity mode view gating (Property 11)
+  - [x]* 1.4 Write property tests for complexity mode view gating (Property 11)
     - **Property 11: Complexity Mode View Gating**
     - Simple mode shows only [Task Board, Milestones, Budget summary, Site Diary, Quality/Snags, Documents]
     - Full mode shows all views; toggling preserves data; default mode derived from contract value
@@ -37,7 +37,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Each schema enforces required fields per acceptance criteria
     - _Requirements: 2.2, 3.2, 4.2, 6.2, 7.2, 10.2, 12.2, 13.2, 17.5_
 
-  - [ ]* 1.6 Write property tests for entity creation validation (Property 1)
+  - [x]* 1.6 Write property tests for entity creation validation (Property 1)
     - **Property 1: Entity Creation Validation**
     - For any entity type and any input missing required fields, validation rejects without persisting
     - For any input with all required fields valid, validation succeeds
@@ -51,7 +51,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Implement Firestore persistence under `projects/{projectId}/command_centre_config/settings`
     - _Requirements: 26.1, 26.3, 28.1, 28.2_
 
-  - [ ]* 2.2 Write property tests for audit trail recording (Property 16)
+  - [x]* 2.2 Write property tests for audit trail recording (Property 16)
     - **Property 16: Audit Trail Recording**
     - For any CRUD operation on any entity, an audit entry is recorded with actor, timestamp, action type, entity type, entity ID, and before/after values
     - Audit trail is append-only — no modification or deletion
@@ -65,13 +65,13 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist to Firestore `projects/{projectId}/tasks/`
     - _Requirements: 3.1, 3.2, 3.4, 3.5, 3.7_
 
-  - [ ]* 2.4 Write property tests for task status transitions (Property 8)
+  - [x]* 2.4 Write property tests for task status transitions (Property 8)
     - **Property 8: Task Status Transition Correctness**
     - Moving a task updates persisted status to match target column; audit entry created with previous/new status, timestamp, actor
     - Task data (title, assignee, priority, due date) remains unchanged
     - **Validates: Requirements 3.4**
 
-  - [ ]* 2.5 Write property tests for task board filtering (Property 9)
+  - [x]* 2.5 Write property tests for task board filtering (Property 9)
     - **Property 9: Task Board Filtering**
     - For any list of tasks and any combination of filter criteria, filtered result contains exactly tasks satisfying ALL active conditions
     - No false inclusions, no false exclusions
@@ -86,13 +86,13 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist to Firestore `projects/{projectId}/budget_packages/` and `projects/{projectId}/variations/`
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ]* 2.7 Write property tests for budget variation recalculation (Property 4)
+  - [x]* 2.7 Write property tests for budget variation recalculation (Property 4)
     - **Property 4: Budget Variation Recalculation**
     - For any contract sum and set of approved variations, adjustedContractSum = contractSum + sum(variations)
     - Forecast at completion recalculated accordingly
     - **Validates: Requirements 5.3**
 
-  - [ ]* 2.8 Write property tests for over-budget detection (Property 5)
+  - [x]* 2.8 Write property tests for over-budget detection (Property 5)
     - **Property 5: Over-Budget Detection Threshold**
     - Package flagged when (spent - budget) / budget > 0.05; not flagged when ≤ 0.05
     - Exact 5% threshold — no false positives or missed detections
@@ -127,20 +127,20 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist to Firestore `projects/{projectId}/payment_certificates/`
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-  - [ ]* 4.4 Write property tests for retention calculation (Property 6)
+  - [x]* 4.4 Write property tests for retention calculation (Property 6)
     - **Property 6: Payment Certificate Retention Calculation**
     - For any grossValue and retentionPercent (0-100): retentionAmount = grossValue * retentionPercent / 100
     - Invariant: netCertified + retention = grossValue always holds
     - **Validates: Requirements 11.2**
 
-  - [ ]* 4.5 Write property tests for summary stat aggregation (Property 3)
+  - [x]* 4.5 Write property tests for summary stat aggregation (Property 3)
     - **Property 3: Summary Stat Aggregation**
     - For any collection of entities, computed summary counts equal actual filtered counts
     - Risk counts per severity, quality stats, action centre stats, budget stats all correct
     - **Validates: Requirements 1.1, 5.1, 6.3, 7.3, 8.2, 22.2**
 
-- [ ] 5. Implement programme, procurement, contract, and resource services
-  - [-] 5.1 Implement the programmeService extensions for Gantt, dependencies, and critical path
+- [x] 5. Implement programme, procurement, contract, and resource services
+  - [x] 5.1 Implement the programmeService extensions for Gantt, dependencies, and critical path
     - Create `src/services/commandCentre/programmeService.ts`
     - Implement `createActivity(projectId, data)`, `updateActivity(projectId, activityId, data)`, `deleteActivity(projectId, activityId)`
     - Implement `getActivities(projectId)`, `calculateCriticalPath(activities, dependencies)`
@@ -149,14 +149,14 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Link activities to SpecForge items for bidirectional traceability
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
 
-  - [ ]* 5.2 Write property tests for critical path identification (Property 15)
+  - [x]* 5.2 Write property tests for critical path identification (Property 15)
     - **Property 15: Critical Path Identification**
     - For any DAG of activities with dependencies, critical path is the longest path
     - Modifying critical-path activity duration changes project end date
     - Modifying non-critical activity within float does not change project end date
     - **Validates: Requirements 2.6**
 
-  - [-] 5.3 Implement the procurementWorkflowService with orders, RFQs, and B-BBEE scoring
+  - [x] 5.3 Implement the procurementWorkflowService with orders, RFQs, and B-BBEE scoring
     - Create `src/services/commandCentre/procurementWorkflowService.ts`
     - Implement `createOrder(projectId, data)`, `updateOrder(projectId, orderId, data)`, `getOrders(projectId)`
     - Implement `calculateBBBEEPercentage(orders): BBBEEProcurementSummary`
@@ -166,13 +166,13 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist to Firestore `projects/{projectId}/procurement_orders/`
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
 
-  - [ ]* 5.4 Write property tests for B-BBEE procurement percentage (Property 7)
+  - [x]* 5.4 Write property tests for B-BBEE procurement percentage (Property 7)
     - **Property 7: B-BBEE Procurement Percentage**
     - Aggregate B-BBEE % = sum(values of orders with B-BBEE level ≥ 1) / sum(all order values) * 100
     - Per-supplier breakdown sums to total procurement value
     - **Validates: Requirements 12.5, 25.5**
 
-  - [-] 5.5 Implement the contractRegisterService with JBCC/NEC forms and expiry tracking
+  - [x] 5.5 Implement the contractRegisterService with JBCC/NEC forms and expiry tracking
     - Create `src/services/commandCentre/contractRegisterService.ts`
     - Implement `createContract(projectId, data)`, `updateContract(projectId, contractId, data)`, `getContracts(projectId)`
     - Support JBCC (PBA, N/S, MWA) and NEC (ECC, PSC, TSC) contract forms
@@ -181,7 +181,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist to Firestore `projects/{projectId}/contracts/`
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 25.1_
 
-  - [-] 5.6 Implement the resourceManagerService with team register and utilisation tracking
+  - [x] 5.6 Implement the resourceManagerService with team register and utilisation tracking
     - Create `src/services/commandCentre/resourceManagerService.ts`
     - Implement `getTeamMembers(projectId)`, `addTeamMember(projectId, data)`, `removeTeamMember(projectId, memberId)`
     - Implement `getResourceStats(projectId)` — total members, average utilisation, hours this month vs budget, pending approvals
@@ -197,7 +197,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Generate appropriate Action Centre events on threshold breach
     - _Requirements: 3.6, 4.3, 7.6, 10.5, 12.4, 13.4_
 
-  - [ ]* 6.2 Write property tests for deadline and threshold detection (Property 2)
+  - [x]* 6.2 Write property tests for deadline and threshold detection (Property 2)
     - **Property 2: Deadline and Threshold Detection**
     - For any entity with a deadline field, correctly classify as overdue/triggered when current date exceeds deadline
     - Not triggered when deadline has not passed
@@ -211,7 +211,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist aggregated events to Firestore `projects/{projectId}/calendar_events/`
     - _Requirements: 23.1, 23.2, 23.3_
 
-  - [ ]* 6.4 Write property tests for calendar event aggregation (Property 12)
+  - [x]* 6.4 Write property tests for calendar event aggregation (Property 12)
     - **Property 12: Calendar Event Aggregation**
     - Total event count equals sum of events from all source types, no duplicates, no omissions
     - Each event references source entity type and ID
@@ -227,13 +227,13 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Integrate with existing analyticsReportingEngine service
     - _Requirements: 24.1, 24.2, 24.3, 24.4, 24.5_
 
-  - [ ]* 6.6 Write property tests for KPI formula computation (Property 13)
+  - [x]* 6.6 Write property tests for KPI formula computation (Property 13)
     - **Property 13: KPI Formula Computation**
     - Schedule variance formula produces deterministic results for identical inputs
     - Cost variance = (forecast - contractSum) / contractSum * 100
     - **Validates: Requirements 24.1, 24.3, 24.4**
 
-  - [ ]* 6.7 Write property tests for KPI trend derivation (Property 14)
+  - [x]* 6.7 Write property tests for KPI trend derivation (Property 14)
     - **Property 14: KPI Trend Derivation**
     - For any sequence of KPI values (≥2 data points), trend is "improving" when latest better, "deteriorating" when worse, "stable" when unchanged
     - Classification is deterministic for any pair of consecutive values
@@ -246,7 +246,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Implement `getMunicipalSubmissionChecklist(municipality, type): string[]`
     - _Requirements: 25.2, 25.3, 25.4_
 
-  - [ ]* 6.9 Write property tests for SACAP stage mapping (Property 17)
+  - [x]* 6.9 Write property tests for SACAP stage mapping (Property 17)
     - **Property 17: SACAP Stage Mapping**
     - For any Architex lifecycle stage, mapping to SACAP Work Stage is deterministic and bijective
     - Same Architex stage always produces same SACAP stage label
@@ -283,7 +283,7 @@ The Project Command Centre is implemented as a modular React + TypeScript featur
     - Persist to Firestore `projects/{projectId}/milestones/`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 25.4_
 
-  - [ ]* 8.4 Write property tests for milestone and diary chronological ordering (Property 18)
+  - [x]* 8.4 Write property tests for milestone and diary chronological ordering (Property 18)
     - **Property 18: Milestone and Diary Chronological Ordering**
     - Milestones sorted ascending by due date; diary entries sorted descending by entry date
     - Sort is stable for items with equal dates
