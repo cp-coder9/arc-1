@@ -60,3 +60,17 @@ Client tools are primarily wizard/dashboard surfaces without calculator logic.
 - **Versioned tables:** N/A
 - **Rendering:** Legacy fallback for all preview stubs
 - **Notes:** Client interacts with framework outputs (reports, clause results) produced by professional roles; does not run calculators directly
+
+## 8. Forma Build Field Tools (read-only)
+<!-- forma-build-site-tools:field-tools -->
+
+Extends Pack 9 site execution with Autodesk Build / Forma-style field capture. The client has **read-only** access — no create, edit, delete, or status-transition action is permitted.
+
+**Granted capabilities (view role):**
+- **Issue view** — view field issues, their pin-on-drawing locations, attached photo/annotation evidence, and current lifecycle status.
+- **Issue Dashboard** — view the AND-filtered dashboard with per-status counts (read-only).
+- **Field reporting** — view and export dated field reports (issue summary, evidence references, payment-blocking and close-out handover counts).
+
+**Governance:** Any attempt to create, edit, delete, or transition a field issue is denied with an authorization error and leaves the record unchanged; the denial is audited via `SiteAuditRecord` with outcome `denied`. Payment release remains behind the escrow/admin gate.
+
+_Spec: `forma-build-site-tools` · Requirements 5, 6, 7._

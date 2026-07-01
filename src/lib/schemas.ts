@@ -432,6 +432,50 @@ export const JobSearchFiltersSchema = z.object({
   sortBy: z.enum(['budget_asc', 'budget_desc', 'deadline', 'posted', 'relevance']).default('posted'),
 });
 
+// Field Tools — Drawing Pin schema (Req 1.1, 1.4)
+export const drawingPinSchema = z.object({
+  drawingId: z.string().min(1, 'drawingId is required'),
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+});
+
+// Field Tools — Checklist Template schema (Req 3.1, 3.7)
+export const checklistItemSchema = z.object({
+  id: z.string().min(1),
+  prompt: z.string().min(1).max(500),
+  responseType: z.enum(['pass_fail_na', 'numeric', 'text']),
+  order: z.number().int().min(0),
+});
+
+export const checklistTemplateSchema = z.object({
+  id: z.string().optional(),
+  projectId: z.string().min(1),
+  title: z.string().min(1),
+  items: z.array(checklistItemSchema).min(1).max(200),
+  createdBy: z.string().min(1),
+  createdAt: z.string().optional(),
+});
+
+// Field Tools — Checklist Response schema (Req 3.3, 3.8)
+export const checklistResponseSchema = z.object({
+  itemId: z.string().min(1),
+  value: z.union([
+    z.enum(['pass', 'fail', 'na']),
+    z.number(),
+    z.string().max(1000),
+  ]),
+});
+
+// Field Tools — Queued Capture schema (Req 4.7, 4.12)
+export const queuedCaptureSchema = z.object({
+  clientId: z.string().min(1),
+  kind: z.enum(['field_issue', 'photo_annotation', 'checklist_response']),
+  payload: z.unknown(),
+  createdAt: z.string().min(1), // ISO 8601
+  attempts: z.number().int().min(0),
+  status: z.enum(['queued', 'failed']),
+});
+
 // Form validation helpers
 export const validateForm = <T extends z.ZodType>(schema: T, data: unknown): { success: true; data: z.infer<T> } | { success: false; errors: z.ZodError } => {
   const result = schema.safeParse(data);

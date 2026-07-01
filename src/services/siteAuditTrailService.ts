@@ -59,6 +59,8 @@ export async function recordBulkAudit(
   actorId: string,
   actorRole: UserRole,
   action: string,
+  actionType: FieldActionType,
+  outcome: 'permitted' | 'denied',
   items: Array<{ sourceObjectId: string; sourceObjectType: string }>,
 ): Promise<string[]> {
   const ids: string[] = [];
@@ -68,6 +70,8 @@ export async function recordBulkAudit(
       actorId,
       actorRole,
       action,
+      actionType,
+      outcome,
       sourceObjectId: item.sourceObjectId,
       sourceObjectType: item.sourceObjectType,
     });
