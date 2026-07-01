@@ -86,6 +86,34 @@ async function startServer() {
     return next();
   });
 
+  // Mount marketplace API router
+  app.use("/api/marketplace", async (req, res, next) => {
+    try {
+      const { default: marketplaceRouter } = await import("./src/lib/marketplace-api-router.js");
+      return marketplaceRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load Marketplace API router:", error);
+      return res.status(500).json({
+        error: "Marketplace API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Mount fee proposal API router
+  app.use("/api/fee-proposal", async (req, res, next) => {
+    try {
+      const { default: feeProposalRouter } = await import("./src/lib/fee-proposal-api-router.js");
+      return feeProposalRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load Fee Proposal API router:", error);
+      return res.status(500).json({
+        error: "Fee Proposal API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Mount the shared API router lazily. Firebase Admin / Firestore can add a
   // noticeable cold-start cost locally, so the server should become healthy
   // before those integrations are imported.
