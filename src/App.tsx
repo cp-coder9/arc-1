@@ -1154,7 +1154,7 @@ function AppContent() {
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}

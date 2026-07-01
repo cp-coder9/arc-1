@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { useFeeProposalBuilder } from '../FeeProposalBuilderContext';
 
 export interface SubTaskPanelProps {
+  key?: string;
   stageId: string;
   deliverables: string[];
   className?: string;
