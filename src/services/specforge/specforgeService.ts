@@ -72,21 +72,15 @@ export function getVisibleSpecItems(workspace: SpecForgeWorkspace, role: SpecFor
   }
   if (specRoleCan(role, 'view_package')) {
     const statusVisible = ['issued', 'rfq', 'ordered', 'delivered', 'installed'];
-    let items = workspace.items.filter((item) => statusVisible.includes(item.status));
-    // Package-scoped: if viewer identity is provided, further restrict to items
-    // where the viewer is assigned as reviewer/approver or their team entry's
-    // responsibility scope matches the item's section/package.
-    if (viewerUserId) {
-      const viewerTeam = workspace.team?.find(m => m.userId === viewerUserId);
-      if (viewerTeam) {
-        items = items.filter(item =>
-          item.reviewerRole === role ||
-          item.approverRole === role ||
-          workspace.sections.find(s => s.id === item.sectionId)?.reviewerRole === role
-        );
-      }
-    }
-    return items;
+    // Package-scoped: only items in the issued pipeline AND scoped to
+    // sections/items where the viewer's role is assigned as reviewer or approver.
+    return workspace.items.filter((item) =>
+      statusVisible.includes(item.status) && (
+        item.reviewerRole === role ||
+        item.approverRole === role ||
+        workspace.sections.find(s => s.id === item.sectionId)?.reviewerRole === role
+      )
+    );
   }
   return [];
 }

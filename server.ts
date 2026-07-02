@@ -100,6 +100,20 @@ async function startServer() {
     }
   });
 
+  // Mount SpecForge API router
+  app.use("/api/specforge", async (req, res, next) => {
+    try {
+      const { default: specforgeRouter } = await import("./src/lib/specforge-api-router.js");
+      return specforgeRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load SpecForge API router:", error);
+      return res.status(500).json({
+        error: "SpecForge API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Mount the shared API router lazily. Firebase Admin / Firestore can add a
   // noticeable cold-start cost locally, so the server should become healthy
   // before those integrations are imported.
