@@ -261,14 +261,14 @@ export function persistCalcRun(params: {
   output: CalculatorOutput;
 }): StandaloneToolRun;
 
-/** Assign a run to a project (writes to Project Passport) */
+/** Assign a run to a project (local preview only — live Firestore write deferred) */
 export function assignRunToProject(params: {
   run: StandaloneToolRun;
   projectName: string;
   jobRef: string;
 }): void;
 
-/** Push a run to SpecForge as a spec item */
+/** Push a run to SpecForge as a spec item (local preview only — live Firestore write deferred) */
 export function pushRunToSpecForge(params: {
   run: StandaloneToolRun;
   output: CalculatorOutput;
