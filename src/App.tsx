@@ -83,6 +83,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Store,
+  Scale,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -180,6 +181,7 @@ const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/Re
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
 const EngineersCalcHub = lazyWithChunkRetry(() => import('./components/tools/EngineersCalcHub'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
+const ContractAdminDashboard = lazyWithChunkRetry(() => import('./components/ContractAdminDashboard'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -261,6 +263,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management workspace for staff, wage evidence, and plant records.', backedBy: ['contractor profile/compliance records'] },
   { id: 'procurement', label: 'BoQ / BoM Procurement', roles: ['contractor', 'subcontractor', 'supplier', ...DESIGN_TEAM_ROLES, 'admin'], group: 'Construction tools', icon: <Factory size={18} />, summary: 'BoQ/BoM procurement shell for contractor, package, and supplier workflows.', backedBy: ['package readiness services'] },
   { id: 'packages', label: 'Subcontractor Packages', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Building2 size={18} />, summary: 'Package-layer shell for subcontractor/supplier scopes and progress.', backedBy: ['package readiness services'] },
+  { id: 'contract-admin', label: 'Contract Administration', roles: ['architect', 'bep', 'quantity_surveyor', 'contractor', 'subcontractor', 'client', 'developer', 'site_manager', 'admin', 'platform_admin'], group: 'Construction tools', icon: <Scale size={18} />, summary: 'Contract lifecycle administration — notices, variations, EoT claims, payment schedules, and dispute tracking for JBCC, NEC, GCC, and FIDIC forms.', backedBy: ['ContractAdminDashboard', 'contractAdmin'] },
   { id: 'freelancer-work', label: 'Assigned Work', roles: ['freelancer'], group: 'Freelancer tools', icon: <Briefcase size={18} />, summary: 'Assigned freelancer work surface backed by current freelancer task cards.', backedBy: ['FreelancerDashboard'] },
   { id: 'freelancer-submissions', label: 'Submissions & Feedback', roles: ['freelancer'], group: 'Freelancer tools', icon: <Send size={18} />, summary: 'Submission/revision/feedback shell for freelancer deliverables.', backedBy: ['delegatedTasks', 'FileManager'] },
   { id: 'knowledge', label: 'Knowledge / CPD', roles: ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Governance', icon: <BookOpen size={18} />, summary: 'Knowledge and CPD shell backed by knowledge-source tooling.', backedBy: ['KnowledgeSources', 'AdminKnowledgeUploader'] },
@@ -314,6 +317,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'specforge',
   'standalone/engineers-calc-hub',
   'marketplace',
+  'contract-admin',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1155,6 +1159,7 @@ function AppContent() {
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'standalone/engineers-calc-hub' && <EngineersCalcHub user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
+              {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}

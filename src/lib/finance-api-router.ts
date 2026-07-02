@@ -40,6 +40,9 @@ import {
   approveCertificateForRelease,
 } from '../services/finance/paymentCertificateService';
 import {
+  handlePaymentCertificateEvent,
+} from '../services/contractAdmin/paymentSchedulerService';
+import {
   selectProvider,
   assessProviderReadiness,
   registerProvider,
@@ -354,6 +357,59 @@ router.post(
       }
       const net = calculateNetPayable(certificate, previousPaymentsTotal ?? 0);
       return res.json(net);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Payment Certificate → Contract Admin Integration
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /api/projects/:projectId/payment-certificates/link-to-schedule
+ *
+ * Receives a payment certificate event and attempts to match it to the
+ * contract administration payment schedule by valuation period.
+ * If unmatched, creates a reconciliation action in the Action Centre.
+ *
+ * Requirements: 10.4, 10.10, 7.6
+ */
+router.post(
+  '/api/projects/:projectId/payment-certificates/link-to-schedule',
+  async (req: Request, res: Response) => {
+    try {
+      const { projectId } = req.params;
+      const { certificateId, certifiedAmount, valuationDate, issuedAt } = req.body;
+
+      if (!certificateId || !certifiedAmount || !valuationDate) {
+        return res.status(400).json({
+          error: 'certificateId, certifiedAmount, and valuationDate are required.',
+        });
+      }
+
+      const result = await handlePaymentCertificateEvent({
+        projectId,
+        certificateId,
+        certifiedAmount,
+        valuationDate,
+        issuedAt: issuedAt ?? new Date().toISOString(),
+      });
+
+      if (result.matched) {
+        return res.json({
+          status: 'linked',
+          matchedEntryId: result.matchedEntryId,
+          message: `Certificate ${certificateId} linked to schedule entry ${result.matchedEntryId}`,
+        });
+      }
+
+      return res.status(202).json({
+        status: 'unmatched',
+        reconciliationActionCreated: result.reconciliationActionCreated,
+        message: `Certificate ${certificateId} could not be matched to a schedule entry. Reconciliation action created.`,
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
