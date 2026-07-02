@@ -35,24 +35,77 @@ import {
   Calendar,
 } from 'lucide-react';
 import {
-  getActiveNotices,
-  registerNotice,
-  acknowledgeNotice,
-  respondToNotice,
-  withdrawNotice,
   getNoticeTypesForForm,
-  getContractConfig,
   getRemainingWorkingDays,
   getSouthAfricanHolidays,
   resolveMultiRolePermissions,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   NoticeRecord,
   NoticeStatus,
   NoticeRegistrationInput,
   ContractConfig,
   ContractProjectAssignment,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function getActiveNoticesViaApi(projectId: string): Promise<NoticeRecord[]> {
+  const res = await apiFetch(`/api/contract-admin/notices?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function registerNoticeViaApi(input: NoticeRegistrationInput) {
+  const res = await apiFetch('/api/contract-admin/notices/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Notice registration failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function acknowledgeNoticeViaApi(projectId: string, noticeId: string, userId: string) {
+  const res = await apiFetch('/api/contract-admin/notices/acknowledge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, noticeId, userId }),
+  });
+  if (!res.ok) throw new Error(`Acknowledge failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function respondToNoticeViaApi(projectId: string, noticeId: string, userId: string, response: string) {
+  const res = await apiFetch('/api/contract-admin/notices/respond', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, noticeId, userId, response }),
+  });
+  if (!res.ok) throw new Error(`Respond failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function withdrawNoticeViaApi(projectId: string, noticeId: string, userId: string, reason: string) {
+  const res = await apiFetch('/api/contract-admin/notices/withdraw', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, noticeId, userId, reason }),
+  });
+  if (!res.ok) throw new Error(`Withdraw failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
+  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -122,8 +175,8 @@ export function NoticeRegister({ user, projectId }: NoticeRegisterProps) {
     setLoading(true);
     try {
       const [noticeList, contractConfig] = await Promise.all([
-        getActiveNotices(projectId),
-        getContractConfig(projectId),
+        getActiveNoticesViaApi(projectId),
+        getContractConfigViaApi(projectId),
       ]);
       setNotices(noticeList);
       setConfig(contractConfig);
@@ -141,47 +194,42 @@ export function NoticeRegister({ user, projectId }: NoticeRegisterProps) {
   const handleAcknowledge = useCallback(async (noticeId: string) => {
     setActionLoading(noticeId);
     try {
-      await acknowledgeNotice(projectId, noticeId, user.uid, projectAssignment);
+      await acknowledgeNoticeViaApi(projectId, noticeId, user.uid);
       await loadData();
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, loadData, projectAssignment]);
+  }, [projectId, user.uid, loadData]);
 
   const handleRespond = useCallback(async (noticeId: string) => {
     setActionLoading(noticeId);
     try {
-      await respondToNotice(projectId, noticeId, {
-        responseType: 'formal_response',
-        responseDate: new Date().toISOString().split('T')[0],
-        responseDetails: 'Response submitted via platform',
-        respondedBy: user.uid,
-      }, projectAssignment);
+      await respondToNoticeViaApi(projectId, noticeId, user.uid, 'Response submitted via platform');
       await loadData();
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, loadData, projectAssignment]);
+  }, [projectId, user.uid, loadData]);
 
   const handleWithdraw = useCallback(async (noticeId: string) => {
     setActionLoading(noticeId);
     try {
-      await withdrawNotice(projectId, noticeId, user.uid, projectAssignment);
+      await withdrawNoticeViaApi(projectId, noticeId, user.uid, 'Withdrawn via platform');
       await loadData();
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, loadData, projectAssignment]);
+  }, [projectId, user.uid, loadData]);
 
   const handleRegister = useCallback(async (input: NoticeRegistrationInput) => {
     try {
-      await registerNotice(input, projectAssignment);
+      await registerNoticeViaApi(input);
       setShowForm(false);
       await loadData();
     } catch {
       // Error handling via future toast
     }
-  }, [loadData, projectAssignment]);
+  }, [loadData]);
 
   // Compute remaining days for each notice with a deadline
   const noticesWithCountdown = useMemo(() => {

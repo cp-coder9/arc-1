@@ -27,11 +27,11 @@ import {
 import {
   resolveMultiRolePermissions,
   getDisclaimerBannerText,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
 import type {
   ContractFeature,
   ContractProjectAssignment,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
 import { ContractSetupWizard } from './ContractSetupWizard';
 import { ContractDataSheet } from './ContractDataSheet';
 
@@ -89,7 +89,29 @@ function ContractDisclaimerBanner() {
 // Main Component
 // ══════════════════════════════════════════════════════════════════════════════
 
-export function ContractAdminDashboard({ user, projectId = '' }: ContractAdminDashboardProps) {
+export function ContractAdminDashboard({ user, projectId }: ContractAdminDashboardProps) {
+  // If no project is selected, show a prompt
+  if (!projectId) {
+    return (
+      <div className="space-y-4 w-full">
+        <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
+          <CardContent className="pt-6 text-center py-16">
+            <FileText className="w-12 h-12 text-surface-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-white">Select a project</h3>
+            <p className="text-sm text-surface-400 mt-2 max-w-md mx-auto">
+              Contract administration requires an active project context. Select a project from
+              the Projects section to access notices, variations, claims, and payment schedules.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return <ContractAdminDashboardInner user={user} projectId={projectId} />;
+}
+
+function ContractAdminDashboardInner({ user, projectId }: { user: UserProfile; projectId: string }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [disclaimerVisible, setDisclaimerVisible] = useState(false);
 

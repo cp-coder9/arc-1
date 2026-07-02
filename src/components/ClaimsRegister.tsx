@@ -39,14 +39,10 @@ import {
   DollarSign,
 } from 'lucide-react';
 import {
-  registerClaim,
-  transitionClaim,
-  registerDissatisfaction,
-  getClaimsCumulativeSummary,
-  linkEvidence,
-  getContractConfig,
+  isValidClaimTransition,
   resolveMultiRolePermissions,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   ClaimRecord,
   ClaimStatus,
@@ -55,8 +51,66 @@ import type {
   ClaimsCumulativeSummary,
   ContractConfig,
   ContractProjectAssignment,
-} from '@/services/contractAdmin';
-import { CLAIM_TRANSITIONS } from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { CLAIM_TRANSITIONS } from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function registerClaimViaApi(input: ClaimInput) {
+  const res = await apiFetch('/api/contract-admin/claims/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Claim registration failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function transitionClaimViaApi(projectId: string, claimId: string, newStatus: ClaimStatus, userId: string) {
+  const res = await apiFetch('/api/contract-admin/claims/transition', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, claimId, newStatus, userId }),
+  });
+  if (!res.ok) throw new Error(`Transition failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function registerDissatisfactionViaApi(projectId: string, claimId: string, userId: string, reason: string) {
+  const res = await apiFetch('/api/contract-admin/claims/dissatisfaction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, claimId, userId, reason }),
+  });
+  if (!res.ok) throw new Error(`Dissatisfaction registration failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function getClaimsCumulativeSummaryViaApi(projectId: string): Promise<ClaimsCumulativeSummary> {
+  const res = await apiFetch(`/api/contract-admin/claims/summary?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) throw new Error(`Failed to load summary: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function linkEvidenceViaApi(projectId: string, claimId: string, evidence: unknown) {
+  const res = await apiFetch('/api/contract-admin/claims/link-evidence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, claimId, evidence }),
+  });
+  if (!res.ok) throw new Error(`Evidence link failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
+  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -172,8 +226,8 @@ export function ClaimsRegister({ user, projectId }: ClaimsRegisterProps) {
     setLoading(true);
     try {
       const [contractConfig, cumulativeSummary] = await Promise.all([
-        getContractConfig(projectId),
-        getClaimsCumulativeSummary(projectId),
+        getContractConfigViaApi(projectId),
+        getClaimsCumulativeSummaryViaApi(projectId),
       ]);
       setConfig(contractConfig);
       setSummary(cumulativeSummary);
@@ -209,19 +263,19 @@ export function ClaimsRegister({ user, projectId }: ClaimsRegisterProps) {
 
   const handleRegister = useCallback(async (input: ClaimInput) => {
     try {
-      const result = await registerClaim(input, projectAssignment);
+      const result = await registerClaimViaApi(input);
       setClaims((prev) => [...prev, result.claim]);
       setShowForm(false);
       await loadData();
     } catch {
       // Error handling via future toast
     }
-  }, [projectAssignment, loadData]);
+  }, [loadData]);
 
   const handleTransition = useCallback(async (claimId: string, toStatus: ClaimStatus, reason: string) => {
     setActionLoading(claimId);
     try {
-      await transitionClaim(projectId, claimId, toStatus, user.uid, reason, projectAssignment);
+      await transitionClaimViaApi(projectId, claimId, toStatus, user.uid);
       setClaims((prev) =>
         prev.map((c) => (c.id === claimId ? { ...c, status: toStatus, updatedAt: new Date().toISOString() } : c))
       );
@@ -230,14 +284,13 @@ export function ClaimsRegister({ user, projectId }: ClaimsRegisterProps) {
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, projectAssignment, loadData]);
+  }, [projectId, user.uid, loadData]);
 
   const handleDissatisfaction = useCallback(async (claimId: string, noticeDate: string) => {
     setActionLoading(claimId);
     try {
-      const { adjudicationDeadline } = await registerDissatisfaction(
-        projectId, claimId, noticeDate, user.uid, projectAssignment
-      );
+      const result = await registerDissatisfactionViaApi(projectId, claimId, user.uid, noticeDate);
+      const adjudicationDeadline = result.adjudicationDeadline;
       setClaims((prev) =>
         prev.map((c) =>
           c.id === claimId
@@ -250,12 +303,12 @@ export function ClaimsRegister({ user, projectId }: ClaimsRegisterProps) {
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, projectAssignment, loadData]);
+  }, [projectId, user.uid, loadData]);
 
   const handleLinkEvidence = useCallback(async (claimId: string, evidenceIds: string[]) => {
     setActionLoading(claimId);
     try {
-      await linkEvidence(projectId, claimId, evidenceIds, user.uid, projectAssignment);
+      await linkEvidenceViaApi(projectId, claimId, evidenceIds);
       setClaims((prev) =>
         prev.map((c) =>
           c.id === claimId
@@ -268,7 +321,7 @@ export function ClaimsRegister({ user, projectId }: ClaimsRegisterProps) {
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, projectAssignment, loadData]);
+  }, [projectId, loadData]);
 
   if (loading) {
     return (

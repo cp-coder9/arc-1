@@ -19,7 +19,7 @@ import {
   getDisclaimerBannerText,
   getDocumentDisclaimerFooter,
   isDeemedOutcomeDisclaimer,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ContractDisclaimerBanner

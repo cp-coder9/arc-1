@@ -35,17 +35,44 @@ import {
 import {
   generateSchedule,
   calculateRetention,
-  linkCertificate,
-  runPaymentDeadlineCheck,
-  surfaceToActionCentre,
   getSouthAfricanHolidays,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   PaymentScheduleEntry,
   PaymentCycleStatus,
   ContractConfig,
   PaymentOverdueResult,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function linkCertificateViaApi(projectId: string, entryId: string, certificateRef: string) {
+  const res = await apiFetch('/api/contract-admin/payments/link-certificate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, entryId, certificateRef }),
+  });
+  if (!res.ok) throw new Error(`Link failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function runPaymentDeadlineCheckViaApi(projectId: string): Promise<PaymentOverdueResult[]> {
+  const res = await apiFetch(`/api/contract-admin/payments/deadline-check?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function surfaceToActionCentreViaApi(projectId: string, event: unknown) {
+  const res = await apiFetch('/api/contract-admin/action-centre/surface', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, event }),
+  });
+  if (!res.ok) throw new Error(`Surface to action centre failed: ${res.statusText}`);
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -137,7 +164,7 @@ function CertificateLinkDialog({ open, onClose, entry, projectId, onLinked }: Ce
     setLinking(true);
     setError('');
     try {
-      await linkCertificate(projectId, entry.id, certificateId.trim(), amount);
+      await linkCertificateViaApi(projectId, entry.id, certificateId.trim());
       setCertificateId('');
       setCertifiedAmount('');
       onLinked();
@@ -240,12 +267,12 @@ export function PaymentScheduleView({ user, projectId }: PaymentScheduleViewProp
   const handleOverdueCheck = useCallback(async () => {
     setLoading(true);
     try {
-      const results = await runPaymentDeadlineCheck(projectId);
+      const results = await runPaymentDeadlineCheckViaApi(projectId);
       setOverdueEntries(results);
 
       // Trigger Action Centre notification for overdue items (Req 7.5)
       for (const overdue of results) {
-        await surfaceToActionCentre({
+        await surfaceToActionCentreViaApi(projectId, {
           projectId,
           targetUserId: user.uid,
           priority: 'high',

@@ -42,6 +42,8 @@ const ROLE_COMMAND_VISUALS: Record<UserProfile['role'], { viewLabel: string; hea
   developer: { viewLabel: 'Developer View', headline: 'Govern the portfolio.', description: 'Oversee project health, investment returns, and programme strategy.', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)' },
   firm_admin: { viewLabel: 'Firm View', headline: 'Run the practice.', description: 'Manage staff, CPD, registrations, and practice operations.', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)' },
   platform_admin: { viewLabel: 'Platform View', headline: 'Full platform control.', description: 'Govern system configuration, compliance, and platform-wide operations.', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)' },
+  land_surveyor: { viewLabel: 'Surveyor View', headline: 'Verify boundaries and cadastral records.', description: 'Manage site surveys, SG diagrams, servitudes, and subdivision workflows.', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)' },
+  cpm: { viewLabel: 'CPM View', headline: 'Coordinate programme delivery.', description: 'Oversee construction programme, risk management, and delivery governance.', accent: '#1a237e', accentSoft: 'rgba(26, 35, 126, 0.12)' },
 };
 
 const canListProjectsByRole = (user: UserProfile) => ['client', 'architect', 'bep', 'admin'].includes(user.role);

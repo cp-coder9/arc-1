@@ -25,9 +25,9 @@ import {
 } from 'lucide-react';
 import {
   validateContractSetup,
-  setupContract,
   getDisclaimerBannerText,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   ContractForm,
   ContractParty,
@@ -39,7 +39,18 @@ import type {
   GccParams,
   FidicParams,
   ValidationFieldError,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function setupContractViaApi(input: ContractSetupInput) {
+  const res = await apiFetch('/api/contract-admin/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Contract setup failed: ${res.statusText}`);
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -204,7 +215,7 @@ export function ContractSetupWizard({ user, projectId }: ContractSetupWizardProp
     setSubmitting(true);
     setErrors([]);
     try {
-      await setupContract(input, projectAssignment);
+      await setupContractViaApi(input);
       setSubmitResult('success');
     } catch {
       setSubmitResult('failure');

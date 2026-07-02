@@ -401,6 +401,8 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Oversee project portfolio, investment governance, and programme strategy.' },
   firm_admin: { label: 'Firm Admin', viewLabel: 'Firm View', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)', description: 'Manage practice operations, staff, CPD, and professional registrations.' },
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
+  land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage boundary surveys, SG diagrams, servitudes, and site verification.' },
+  cpm: { label: 'Construction Project Manager', viewLabel: 'CPM View', accent: '#1a237e', accentSoft: 'rgba(26, 35, 126, 0.12)', description: 'Coordinate programme delivery, risk management, and construction oversight.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -463,6 +465,7 @@ function AppContent() {
     });
   }, []);
   const [activeTab, setActiveTab] = useState('command');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
 
   const visibleNavItems = useMemo(() => {
@@ -1159,7 +1162,7 @@ function AppContent() {
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'standalone/engineers-calc-hub' && <EngineersCalcHub user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
-              {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} />}
+              {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} projectId={selectedProjectId ?? undefined} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
