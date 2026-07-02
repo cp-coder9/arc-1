@@ -100,6 +100,7 @@ describe('canonical dashboard page registry', () => {
     expectPage('drawing-checker', 'AI Drawing Checker', ['bep', 'architect', 'freelancer']);
     expectPage('procurement', 'BoQ / BoM Procurement', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
     expectPage('bep-marketplace', 'Client Marketplace', ['bep', 'architect']);
+    expectPage('marketplace', 'Marketplace', ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
     expectPage('bep-team', 'Design Team Matrix', ['bep', 'architect']);
     expectPage('invoicing', 'Invoicing', ['bep', 'architect', 'contractor', 'freelancer', 'admin']);
     expectPage('snagging', 'Snagging / Close-Out', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
@@ -139,18 +140,18 @@ describe('canonical dashboard page registry', () => {
   it('pins the full role navigation matrix for every canonical role and page', () => {
     const sharedPageIds = ['command', 'profile', 'toolbox', 'toolset-review', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai', 'compliance'];
     const expectedPagesByRole: Record<string, string[]> = {
-      client: [...sharedPageIds, 'client-intake', 'client-proposals', 'directory-search', 'municipal-tracker', 'submission-readiness', 'client-progress', 'drawing-register', 'specforge'],
-      bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge'],
-      architect: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge'],
-      contractor: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'snagging', 'construction', 'contractor-staff', 'procurement', 'packages', 'knowledge', 'timesheets', 'specforge'],
-      subcontractor: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'timesheets', 'specforge'],
-      supplier: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'specforge'],
-      freelancer: [...sharedPageIds, 'invoicing', 'design', 'drawing-checker', 'freelancer-work', 'freelancer-submissions', 'knowledge', 'resource-sharing', 'resource-centre', 'timesheets', 'templates', 'registrations', 'specforge'],
-      admin: [...sharedPageIds, 'invoicing', 'submission-readiness', 'design', 'drawing-register', 'sans-forms', 'technical-brief', 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'admin-console', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge'],
+      client: [...sharedPageIds, 'client-intake', 'client-proposals', 'directory-search', 'municipal-tracker', 'submission-readiness', 'client-progress', 'drawing-register', 'specforge', 'marketplace'],
+      bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge', 'marketplace'],
+      architect: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge', 'marketplace'],
+      contractor: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'snagging', 'construction', 'contractor-staff', 'procurement', 'packages', 'knowledge', 'timesheets', 'specforge', 'marketplace'],
+      subcontractor: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'timesheets', 'specforge', 'marketplace'],
+      supplier: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'specforge', 'marketplace'],
+      freelancer: [...sharedPageIds, 'invoicing', 'design', 'drawing-checker', 'freelancer-work', 'freelancer-submissions', 'knowledge', 'resource-sharing', 'resource-centre', 'timesheets', 'templates', 'registrations', 'specforge', 'marketplace'],
+      admin: [...sharedPageIds, 'invoicing', 'submission-readiness', 'design', 'drawing-register', 'sans-forms', 'technical-brief', 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'admin-console', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge', 'marketplace'],
     };
 
     const allPageIds = extractPageIds();
-    expect(allPageIds).toHaveLength(46);
+    expect(allPageIds).toHaveLength(47);
 
     for (const role of canonicalRoles) {
       const actualPagesForRole = allPageIds.filter((pageId) => entryIncludesRole(findPageEntry(pageId), role));
