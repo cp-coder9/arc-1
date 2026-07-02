@@ -358,7 +358,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
     })
 
     setRunHistory((prev) => [run, ...prev])
-  }, [activeCalc, activeCalculatorId, inputs, user.role])
+  }, [activeCalc, activeCalculatorId, inputs, user])
 
   // Restore a run from history
   const handleRestoreRun = useCallback(
@@ -413,7 +413,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
     } catch {
       window.alert('Export failed. Please try again.')
     }
-  }, [activeCalculator, output, runHistory, fieldMeta, inputs, user.role, activeCalculatorId])
+  }, [activeCalculator, output, runHistory, fieldMeta, inputs, user, activeCalculatorId])
 
   // Assign to project
   const handleAssignToProject = useCallback(() => {
@@ -430,20 +430,20 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
         calculatorDefinitionId: activeCalculatorId ?? '',
         projectId: projectName,
       })
-      window.alert(`Assigned to project "${projectName}"`)
+      console.info('[CalcHub Preview] Assignment recorded locally. Full Firestore persistence coming in next release.')
     } catch {
-      window.alert('Assignment failed. Please try again.')
+      console.warn('[CalcHub Preview] Assignment failed.')
     }
-  }, [runHistory, output, user.role, activeCalculatorId])
+  }, [runHistory, output, user, activeCalculatorId])
 
   // Push to SpecForge
   const handlePushToSpecForge = useCallback(() => {
     if (!runHistory[0] || !output) return
     try {
       pushRunToSpecForge({ run: runHistory[0], output })
-      window.alert('Pushed to SpecForge successfully.')
+      console.info('[CalcHub Preview] SpecForge push recorded locally. Full integration coming in next release.')
     } catch {
-      window.alert('Push to SpecForge failed. Please try again.')
+      console.warn('[CalcHub Preview] Push to SpecForge failed.')
     }
   }, [runHistory, output])
 
