@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Engineer's Calculation Hub is a multi-discipline engineering calculator workspace rendered within the Architex OS shell as a Compliance Hub module tool. It provides 53 professional-grade calculators across 8 engineering disciplines (structural, civil, mechanical, fire, electrical, wet services, geotechnical, utilities) — each implemented as a pure TypeScript function with Zod-validated inputs, deterministic computation, step-by-step derivation display, and integration with the platform spine (Project Passport, SpecForge, Audit Trail).
+The Engineer's Calculation Hub is a multi-discipline engineering calculator workspace rendered within the Architex OS shell as a Compliance Hub module tool. It provides 53 professional-grade calculators across 8 engineering disciplines (structural, civil, mechanical, fire, electrical, wet services, geotechnical, utilities) — each implemented as a pure TypeScript function with Zod-validated inputs, deterministic computation, step-by-step derivation display, and local-preview integration contracts for the platform spine (Project Passport, SpecForge, Audit Trail — live Firestore write-back deferred to follow-up PR).
 
 The architecture leverages the existing `CalculatorDefinition` framework and `StandaloneToolRun` persistence, extending them with a discipline-specific engine layer and a custom workspace UI that replaces the generic `DefinitionToolRunner` for this tool's multi-calculator navigation pattern.
 
