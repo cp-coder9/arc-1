@@ -1399,6 +1399,19 @@ export async function acceptProposal(
       status: 'active',
     });
 
+    // Audit entry inside the batch — atomic with state changes
+    const auditRef = adminDb.collection('marketplace_audit_trail').doc();
+    batch.set(auditRef, {
+      actorId: clientId,
+      actionType: 'proposal_accepted',
+      entityId: proposalId,
+      entityType: 'proposal',
+      timestamp: now,
+      beforeStatus: 'submitted',
+      afterStatus: 'accepted',
+      metadata: { postingId, professionalId: proposal.professionalId, feeAmount: proposal.feeAmount },
+    });
+
     // Commit atomically
     await batch.commit();
   } catch (error) {
@@ -1412,26 +1425,6 @@ export async function acceptProposal(
 
   // 7. After batch succeeds, create escrow (separate call, can be retried)
   // (already done in step 5 above)
-
-  // 8. Log acceptance event to audit trail with full context
-  await logMarketplaceAction({
-    actorId: clientId,
-    actionType: 'proposal_accepted',
-    entityId: proposalId,
-    entityType: 'proposal',
-    beforeStatus: proposal.status,
-    afterStatus: 'accepted',
-    metadata: {
-      postingId,
-      projectId,
-      escrowId,
-      feeAmount: proposal.feeAmount,
-      milestonePlan: proposal.milestonePlan,
-      professionalId: proposal.professionalId,
-      clientId,
-      acceptedAt: now,
-    },
-  });
 
   // 9. Surface to Action Centre for the professional (non-critical, fire-and-forget)
   try {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,16 +27,6 @@ interface ComplianceSearchProps {
   user: UserProfile;
 }
 
-const mockSuggestions: AutoSuggestion[] = [
-  { type: 'tool', label: 'Structural Load Calculator', value: 'structural-load-calculator' },
-  { type: 'tool', label: 'Fenestration Analyser', value: 'fenestration-analyser' },
-  { type: 'sans_clause', label: 'SANS 10400-K (Walls)', value: 'SANS 10400-K' },
-  { type: 'sans_clause', label: 'SANS 10400-N (Glazing)', value: 'SANS 10400-N' },
-  { type: 'discipline', label: 'Structural Engineering', value: 'structural-engineering' },
-  { type: 'region', label: 'Gauteng', value: 'gauteng' },
-  { type: 'region', label: 'Western Cape', value: 'western-cape' },
-];
-
 function getSuggestionTypeColor(type: AutoSuggestion['type']): string {
   switch (type) {
     case 'tool': return 'bg-primary-500/20 text-primary-400 border-primary-500/30';
@@ -58,9 +48,11 @@ function getSuggestionTypeLabel(type: AutoSuggestion['type']): string {
 export default function ComplianceSearch({ user }: ComplianceSearchProps) {
   const [searchText, setSearchText] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<AutoSuggestion[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<AutoSuggestion[]>([]);
   const [results, setResults] = useState<ComplianceSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     apiFetch('/api/marketplace/search/professionals', {
@@ -76,11 +68,27 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredSuggestions = searchText.length >= 2
-    ? mockSuggestions.filter((s) =>
-        s.label.toLowerCase().includes(searchText.toLowerCase())
-      ).slice(0, 10)
-    : [];
+  // Fetch live suggestions on input change (debounced)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (searchText.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      apiFetch(`/api/marketplace/search/suggestions?q=${encodeURIComponent(searchText)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d && Array.isArray(d.suggestions)) {
+            setSuggestions(d.suggestions.slice(0, 10));
+          } else {
+            setSuggestions([]);
+          }
+        })
+        .catch(() => setSuggestions([]));
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchText]);
 
   const handleSelectSuggestion = (suggestion: AutoSuggestion) => {
     if (!selectedFilters.find((f) => f.value === suggestion.value)) {
@@ -125,9 +133,9 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
             />
 
             {/* Auto-suggestion dropdown */}
-            {showSuggestions && filteredSuggestions.length > 0 && (
+            {showSuggestions && suggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-surface-800 border border-surface-700/50 rounded-lg shadow-xl overflow-hidden">
-                {filteredSuggestions.map((suggestion) => (
+                {suggestions.map((suggestion) => (
                   <button
                     key={suggestion.value}
                     type="button"

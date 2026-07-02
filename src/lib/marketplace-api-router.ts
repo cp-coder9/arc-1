@@ -426,52 +426,69 @@ marketplaceRouter.put(
       const uid = getUserId(req)!;
       const { id, appId } = req.params;
       const { adminDb } = await import('@/lib/firebase-admin');
-      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
-      const { createMarketplaceEscrow } = await import('../features/marketplace/services/marketplaceEscrowService');
 
-      // Fetch task
+      // Entity-level authorization: verify the authenticated user is the task owner
       const taskDoc = await adminDb.collection('marketplace_task_postings').doc(id).get();
       if (!taskDoc.exists) {
-        return res.status(404).json({ code: 'NOT_FOUND', message: 'Task posting not found' });
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Task not found' });
       }
-      const task = taskDoc.data()!;
+      const taskData = taskDoc.data();
+      if (taskData?.professionalId !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the task owner can accept applications', details: { reason: 'Entity-level authorization failed' } });
+      }
 
       // Fetch application
       const appDoc = await adminDb.collection('marketplace_task_applications').doc(appId).get();
       if (!appDoc.exists) {
         return res.status(404).json({ code: 'NOT_FOUND', message: 'Application not found' });
       }
-      const application = appDoc.data()!;
+      const appData = appDoc.data()!;
 
       const now = new Date().toISOString();
 
-      // Create escrow holding for the task payment
-      const escrow = await createMarketplaceEscrow({
-        type: 'task_acceptance',
-        projectId: id,
-        entityId: appId,
-        fundingSourceId: uid,
-        amount: { amount: task.paymentAmount || 0, currency: 'ZAR' },
-        milestones: [{ title: 'Task Delivery', targetDate: task.deadline || now }],
-        actorId: uid,
-      });
+      // Atomic batch: escrow + task status + application status + audit
+      const batch = adminDb.batch();
 
-      // Update task status to in_progress and assign freelancer
-      await adminDb.collection('marketplace_task_postings').doc(id).update({
+      // Update task status
+      batch.update(adminDb.collection('marketplace_task_postings').doc(id), {
         status: 'in_progress',
-        assignedFreelancerId: application.freelancerId || application.userId,
-        escrowId: escrow.escrowId,
+        assignedFreelancerId: appData.freelancerId,
         updatedAt: now,
       });
 
-      // Update application to accepted
-      await adminDb.collection('marketplace_task_applications').doc(appId).update({
+      // Update application status
+      batch.update(adminDb.collection('marketplace_task_applications').doc(appId), {
         status: 'accepted',
         updatedAt: now,
       });
 
-      await logMarketplaceAction({ actorId: uid, actionType: 'task_application_accepted', entityId: appId, entityType: 'task_application', beforeStatus: 'pending', afterStatus: 'accepted' });
-      return res.status(200).json({ taskId: id, applicationId: appId, status: 'accepted', escrowId: escrow.escrowId });
+      // Create escrow holding (within batch)
+      const escrowRef = adminDb.collection('marketplace_escrow_holdings').doc();
+      batch.set(escrowRef, {
+        escrowId: escrowRef.id,
+        type: 'task',
+        entityId: id,
+        amount: { value: taskData.paymentAmount, currency: 'ZAR' },
+        state: 'funded_held',
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Create audit entry (within batch)
+      const auditRef = adminDb.collection('marketplace_audit_trail').doc();
+      batch.set(auditRef, {
+        actorId: uid,
+        actionType: 'task_application_accepted',
+        entityId: id,
+        entityType: 'task_posting',
+        timestamp: now,
+        afterStatus: 'in_progress',
+        metadata: { applicationId: appId, freelancerId: appData.freelancerId, escrowId: escrowRef.id },
+      });
+
+      await batch.commit();
+
+      return res.status(200).json({ taskId: id, applicationId: appId, status: 'accepted', escrowId: escrowRef.id });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -745,42 +762,30 @@ marketplaceRouter.put(
       const uid = getUserId(req)!;
       const { id } = req.params;
       const { adminDb } = await import('@/lib/firebase-admin');
-      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
-      const { createMarketplaceEscrow } = await import('../features/marketplace/services/marketplaceEscrowService');
 
-      // Fetch quote
+      // Fetch quote and verify entity-level authorization
       const quoteDoc = await adminDb.collection('marketplace_quote_requests').doc(id).get();
-      if (!quoteDoc.exists) {
-        return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote request not found' });
+      if (!quoteDoc.exists) return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote not found' });
+      const quoteData = quoteDoc.data();
+      if (quoteData?.contractorId !== uid && quoteData?.requesterId !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the requesting contractor can accept this quote' });
       }
-      const quote = quoteDoc.data()!;
-      if (quote.status !== 'quoted') {
-        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot accept quote with status "${quote.status}"` });
+      if (quoteData?.status !== 'quoted') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: 'Quote must be in "quoted" status to accept' });
       }
 
       const now = new Date().toISOString();
 
-      // Create escrow holding for quoted amount
-      const escrow = await createMarketplaceEscrow({
-        type: 'supplier_quote_acceptance',
-        projectId: quote.projectId || id,
-        entityId: id,
-        fundingSourceId: uid,
-        amount: { amount: quote.quotedAmount || 0, currency: 'ZAR' },
-        milestones: [{ title: 'Material Delivery', targetDate: now }],
-        actorId: uid,
-      });
+      // Atomic batch: escrow + status update + audit
+      const batch = adminDb.batch();
+      const escrowRef = adminDb.collection('marketplace_escrow_holdings').doc();
+      batch.update(quoteDoc.ref, { status: 'accepted', updatedAt: now });
+      batch.set(escrowRef, { escrowId: escrowRef.id, type: 'quote', entityId: id, amount: { value: quoteData.quotedAmount, currency: 'ZAR' }, state: 'funded_held', createdAt: now, updatedAt: now });
+      const auditRef = adminDb.collection('marketplace_audit_trail').doc();
+      batch.set(auditRef, { actorId: uid, actionType: 'quote_accepted', entityId: id, entityType: 'quote_request', timestamp: now, beforeStatus: 'quoted', afterStatus: 'accepted', metadata: { escrowId: escrowRef.id, amount: quoteData.quotedAmount } });
+      await batch.commit();
 
-      // Update quote status to accepted
-      await adminDb.collection('marketplace_quote_requests').doc(id).update({
-        status: 'accepted',
-        escrowId: escrow.escrowId,
-        acceptedAt: now,
-        updatedAt: now,
-      });
-
-      await logMarketplaceAction({ actorId: uid, actionType: 'quote_accepted', entityId: id, entityType: 'quote_request', beforeStatus: 'quoted', afterStatus: 'accepted' });
-      return res.status(200).json({ quoteRequestId: id, status: 'accepted', escrowId: escrow.escrowId });
+      return res.status(200).json({ quoteId: id, status: 'accepted', escrowId: escrowRef.id, acceptedAt: now });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -1160,13 +1165,21 @@ marketplaceRouter.post(
         };
         return res.status(400).json(error);
       }
+      // Evidence is REQUIRED — no placeholder fallback
+      if (!body.evidenceRefs || !Array.isArray(body.evidenceRefs) || body.evidenceRefs.length === 0) {
+        return res.status(400).json({
+          code: 'VALIDATION_ERROR',
+          message: 'At least one evidence reference is required to file a dispute',
+          details: { field: 'evidenceRefs' },
+        });
+      }
       const { fileDispute } = await import('../features/marketplace/services/verificationGatesService');
       const dispute = await fileDispute({
         filingPartyId: uid,
         opposingPartyId: body.opposingPartyId || '',
         relatedEntityId: body.relatedEntityId,
         relatedEntityType: body.relatedEntityType,
-        evidenceRefs: body.evidenceRefs || ['filing-evidence'],
+        evidenceRefs: body.evidenceRefs,
       });
       return res.status(201).json(dispute);
     } catch (err) {
