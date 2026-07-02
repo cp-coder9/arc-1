@@ -29,6 +29,15 @@ export type LifecycleStage =
   | 'pay'
   | 'closeout';
 
+export type WorkspaceSectionKey =
+  | 'proposal_appointment'
+  | 'design_compliance'
+  | 'costing_procurement'
+  | 'specforge'
+  | 'construction_admin'
+  | 'closeout'
+  | 'tool_search';
+
 /**
  * Stage-specific field-capture entry points surfaced through the Toolboxes
  * `construction_admin` (Build) and `closeout` (Close-out) sections.
@@ -47,7 +56,7 @@ export type FieldCaptureCapability =
 export type FieldCaptureMode = 'capture' | 'read_reporting';
 
 export type WorkspaceSection = {
-  key: string;
+  key: WorkspaceSectionKey | string;
   label: string;
   description: string;
   roles?: UserRole[];

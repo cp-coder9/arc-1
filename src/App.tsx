@@ -442,6 +442,7 @@ function AppContent() {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem('architex.sidebarCollapsed') === 'true';
   });
+  const [projectHealth] = useState<'good' | 'warning' | 'critical'>('good');
   const toggleSidebarCollapsed = useCallback(() => {
     setIsSidebarCollapsed((prev) => {
       const next = !prev;
@@ -994,8 +995,11 @@ function AppContent() {
 
   return (
     <DemoModeProvider>
-    <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
+    <div
+      className="relative flex h-dvh min-h-0 flex-col overflow-hidden text-foreground workspace-shell md:flex-row"
+      data-project-health={projectHealth}
+    >
+      <div className="workspace-grid-substrate" />
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-all duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:shrink-0 md:translate-x-0 ${isSidebarCollapsed ? 'md:w-[84px]' : 'md:w-[288px]'} ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className={`h-full flex flex-col gap-y-4 overflow-y-auto overflow-x-hidden p-7 ${isSidebarCollapsed ? 'md:px-3' : ''}`}>
           <div className={`flex items-center justify-between shrink-0 ${isSidebarCollapsed ? 'md:justify-center' : ''}`}>

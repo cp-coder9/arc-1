@@ -230,20 +230,54 @@
     -webkit-backdrop-filter: blur(18px);
   }
 
+  /* Signal Layer Aesthetic (Option 3 / Palette 1) */
+  .workspace-shell {
+    position: relative;
+    background:
+      radial-gradient(circle at 20% 0%, var(--health-glow, transparent), transparent 34%),
+      var(--background);
+    transition: background 240ms ease;
+    overflow: hidden;
+  }
+
+  .workspace-shell[data-project-health="good"] {
+    --health-glow: rgba(174, 239, 227, 0.08); /* Mint/Secondary */
+  }
+
+  .workspace-shell[data-project-health="warning"] {
+    --health-glow: rgba(251, 191, 36, 0.12);
+  }
+
+  .workspace-shell[data-project-health="critical"] {
+    --health-glow: rgba(248, 113, 113, 0.14);
+  }
+
+  .workspace-grid-substrate {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(var(--glass-border) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--glass-border) 1px, transparent 1px);
+    background-size: var(--grid-step) var(--grid-step);
+    opacity: 0.035;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   /* ===== Glassmorphism Design System ===== */
 
   .glass-base {
-    background: color-mix(in srgb, var(--card) 75%, transparent);
+    background: var(--background);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   }
 
   .glass-card {
-    background: color-mix(in srgb, var(--card) 88%, transparent);
+    background: var(--card);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    border: 1px solid var(--glass-border);
+    border-opacity: 0.3;
     box-shadow: 0 8px 32px rgba(20, 71, 63, 0.08);
   }
 
@@ -251,8 +285,18 @@
     background: color-mix(in srgb, var(--card) 92%, transparent);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--glass-border) 20%, transparent);
     box-shadow: 0 16px 48px rgba(20, 71, 63, 0.12);
+  }
+
+  .glass-elevated {
+    /* @apply glass border-glass-border/40; -- Removed @apply glass due to Tailwind v4 @apply issue */
+    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    border: 1px solid var(--glass-border);
+    border-color: color-mix(in srgb, var(--glass-border) 40%, transparent);
+    box-shadow: 0 8px 32px 0 var(--glass-glow);
+    background: color-mix(in srgb, var(--card) 90%, transparent);
   }
 
   .glass-tile {

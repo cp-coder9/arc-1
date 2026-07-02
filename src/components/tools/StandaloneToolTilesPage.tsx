@@ -25,7 +25,7 @@ interface StandaloneToolTilesPageProps {
 
 export default function StandaloneToolTilesPage({ user, onNavigate, mode, onModeChange }: StandaloneToolTilesPageProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [activeSection, setActiveSection] = useState<string | null>(null)
   const [activeTool, setActiveTool] = useState<StandaloneToolDef | null>(null)
   const [assignTarget, setAssignTarget] = useState<StandaloneToolDef | null>(null)
   const [runs, setRuns] = useState<StandaloneToolRun[]>(() => standaloneToolRunService.getRunsForUser(user.uid ?? 'unknown'))
@@ -33,14 +33,14 @@ export default function StandaloneToolTilesPage({ user, onNavigate, mode, onMode
   const allTools = useMemo(() => getToolsForRole(user.role), [user.role])
   const filteredTools = useMemo(() => {
     let tools = searchQuery ? searchTools(searchQuery, user.role) : allTools
-    if (activeCategory) {
-      tools = tools.filter(t => t.category === activeCategory)
+    if (activeSection) {
+      tools = tools.filter(t => t.moduleSection === activeSection)
     }
     return tools
-  }, [searchQuery, activeCategory, allTools, user.role])
+  }, [searchQuery, activeSection, allTools, user.role])
 
-  const availableCategories = useMemo(() =>
-    [...new Set(allTools.map(t => t.category))].sort(),
+  const availableSections = useMemo(() =>
+    [...new Set(allTools.map(t => t.moduleSection))].sort(),
     [allTools]
   )
 
@@ -148,9 +148,9 @@ export default function StandaloneToolTilesPage({ user, onNavigate, mode, onMode
       {/* Search and filter */}
       <ToolSearchFilterBar
         onSearchChange={setSearchQuery}
-        onCategoryFilter={setActiveCategory}
-        activeCategory={activeCategory}
-        availableCategories={availableCategories}
+        onCategoryFilter={setActiveSection}
+        activeCategory={activeSection}
+        availableCategories={availableSections}
       />
 
       {/* Tool tiles grid */}

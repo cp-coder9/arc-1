@@ -1,6 +1,8 @@
 // Standalone Tool Types — Independent Tool Tiles System
 
 import type { ClauseResult, GuidelineVersionRef } from '@/services/toolbox/types'
+import type { WorkspaceSectionKey } from '@/navigation/navTypes'
+import type { ProjectMetadata } from './architexMasterTypes'
 
 export type StandaloneToolCategory =
   | 'fee_calculator'
@@ -29,6 +31,7 @@ export interface StandaloneToolDef {
   id: string
   label: string
   category: StandaloneToolCategory
+  moduleSection: WorkspaceSectionKey
   description: string
   roles: string[]  // UserRole values
   icon: string  // lucide-react icon name string
@@ -39,6 +42,8 @@ export interface StandaloneToolDef {
   canAssignToProject: boolean
   recentRunsCount: number
   tags: string[]
+  outputCapabilities?: string[]
+  seedFromProject?: (project: ProjectMetadata) => Record<string, unknown>
   /**
    * Optional FK to a Toolbox Capability Framework `CalculatorDefinition`.
    * When present, the definition-driven runner takes over; otherwise the legacy

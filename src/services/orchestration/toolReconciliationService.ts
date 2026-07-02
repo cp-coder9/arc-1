@@ -28,6 +28,8 @@ import type {
   ReconciliationResult,
   ToolAssignment,
 } from './orchestrationTypes';
+import { specforgeReconciliationAdapter } from '../specforge/specforgeReconciliationAdapter';
+import { getToolById } from '../tools/standaloneToolRegistry';
 
 // ── Tool domain + adapter registry (injectable) ─────────────────────────────
 
@@ -350,6 +352,13 @@ export function createToolReconciliationService(
 
       store.saveMapped(record);
       audit(auditCtx(ctx, assignment), `tool_reconcile:mapped:tool=${assignment.toolId}`, record.id);
+
+      // Trigger SpecForge reconciliation if the tool is spec-relevant
+      const toolDef = getToolById(assignment.toolId);
+      if (toolDef?.outputCapabilities?.includes('spec_relevant')) {
+        await specforgeReconciliationAdapter.reconcile(assignment);
+      }
+
       return { outcome: 'mapped', record };
     } catch (err) {
       // Adapter or validation failure → preserve the original output as an
