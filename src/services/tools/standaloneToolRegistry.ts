@@ -856,7 +856,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     id: 'engineers_calc_hub',
     label: "Engineer's Calculation Hub",
     category: 'compliance',
-    description: '70+ professional-grade engineering calculators across 8 disciplines with SANS compliance checking',
+    description: '53 professional-grade engineering calculators across 8 disciplines with SANS compliance checking',
     roles: ['engineer', 'architect', 'bep', 'energy_professional', 'fire_engineer', 'quantity_surveyor', 'site_manager'],
     icon: 'Calculator',
     route: 'standalone/engineers-calc-hub',
