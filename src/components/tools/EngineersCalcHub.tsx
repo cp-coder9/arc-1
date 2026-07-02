@@ -344,7 +344,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
     // Persist run
     const run = persistCalcRun({
       calculatorId: activeCalculatorId,
-      userId: user.role,
+      userId: user.uid ?? user.email ?? user.role,
       role: user.role,
       input: inputs,
       output: result,
@@ -352,7 +352,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
 
     auditCalcEvent({
       action: 'calculator_run_created',
-      userId: user.role,
+      userId: user.uid ?? user.email ?? user.role,
       runId: run.runId,
       calculatorDefinitionId: activeCalculatorId,
     })
@@ -378,7 +378,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
       const html = generateCalcSheetHtml({
         calculatorTitle: activeCalculator.title,
         sansRef: activeCalculator.sansRef,
-        engineerName: user.role,
+        engineerName: user.displayName ?? user.email ?? user.role,
         engineerRole: user.role,
         date: new Date().toLocaleDateString(),
         runId: runHistory[0]?.runId ?? 'N/A',
@@ -404,7 +404,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
       if (runHistory[0]) {
         auditCalcEvent({
           action: 'calculator_run_exported',
-          userId: user.role,
+          userId: user.uid ?? user.email ?? user.role,
           runId: runHistory[0].runId,
           calculatorDefinitionId: activeCalculatorId ?? '',
           exportFormat: 'pdf',
@@ -425,7 +425,7 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
       assignRunToProject({ run: runHistory[0], projectName, jobRef })
       auditCalcEvent({
         action: 'calculator_run_assigned',
-        userId: user.role,
+        userId: user.uid ?? user.email ?? user.role,
         runId: runHistory[0].runId,
         calculatorDefinitionId: activeCalculatorId ?? '',
         projectId: projectName,
@@ -804,13 +804,13 @@ export default function EngineersCalcHub({ user }: EngineersCalcHubProps) {
                             <FileText className="h-3.5 w-3.5 mr-1.5" />
                             Export PDF
                           </Button>
-                          <Button variant="outline" size="sm" onClick={handleAssignToProject}>
+                          <Button variant="outline" size="sm" onClick={handleAssignToProject} className="opacity-60">
                             <FolderKanban className="h-3.5 w-3.5 mr-1.5" />
-                            Assign to Project
+                            Assign to Project (Preview)
                           </Button>
-                          <Button variant="outline" size="sm" onClick={handlePushToSpecForge}>
+                          <Button variant="outline" size="sm" onClick={handlePushToSpecForge} className="opacity-60">
                             <Send className="h-3.5 w-3.5 mr-1.5" />
-                            Push to SpecForge
+                            Push to SpecForge (Preview)
                           </Button>
                         </div>
                       </>
