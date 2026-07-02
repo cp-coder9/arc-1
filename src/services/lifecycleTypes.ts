@@ -152,6 +152,24 @@ export interface ProjectPassport {
   financialStatus: 'not_started' | 'pending_review' | 'current';
   lifecycle: LifecycleEvaluation;
   riskLevel: Priority;
+  specForge?: {
+    budgetSummary: {
+      allowance: number;
+      estimate: number;
+      delta: number;
+      deltaPct: number;
+      overBudgetItems: string[];
+      longLeadItems: string[];
+      staleItems: string[];
+    } | null;
+    readiness: {
+      blockerCount: number;
+      pendingClientDecisions: number;
+      longLeadItemCount: number;
+    } | null;
+    issueStatus: 'draft' | 'issued' | 'superseded' | null;
+    latestRevision: string | null;
+  };
 }
 
 export interface WorkflowEvent {

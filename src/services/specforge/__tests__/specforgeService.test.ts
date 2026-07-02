@@ -331,7 +331,7 @@ describe('getVisibleSpecItems with viewerUserId', () => {
     expect(items[0].id).toBe('item-1');
   });
 
-  it('returns all package items when viewerUserId does not match any team member', () => {
+  it('returns empty when item has no role assignment matching supplier', () => {
     const ws: SpecForgeWorkspace = {
       ...SAMPLE_WORKSPACE,
       team: [
@@ -347,9 +347,10 @@ describe('getVisibleSpecItems with viewerUserId', () => {
         },
       ],
     };
-    // viewerUserId 'u-unknown' not found in team, so no further filtering happens
+    // Item has no reviewerRole/approverRole matching 'supplier', and section
+    // sec-finishes has reviewerRole: 'quantity_surveyor' — supplier sees nothing
     const items = getVisibleSpecItems(ws, 'supplier', 'u-unknown');
-    expect(items.length).toBe(1);
+    expect(items.length).toBe(0);
   });
 });
 
