@@ -23,6 +23,8 @@ export interface LibrarySearchParams {
   scope?: SpecLibraryScope;
   offset?: number;
   limit?: number;
+  userId?: string;
+  firmId?: string;
 }
 
 export interface LibrarySearchResult {
@@ -125,14 +127,14 @@ const MOCK_LIBRARY: SpecLibraryItem[] = [
 // ── Core Search Logic ───────────────────────────────────────────────────────
 
 /**
- * Apply scope filter, case-insensitive substring search, sort by usageCount DESC,
- * and paginate results. Works against any SpecLibraryItem array.
+ * Apply scope filter, tenant boundary, case-insensitive substring search,
+ * sort by usageCount DESC, and paginate results. Works against any SpecLibraryItem array.
  */
 function filterAndPaginate(
   items: SpecLibraryItem[],
   params: LibrarySearchParams,
 ): LibrarySearchResult {
-  const { query, scope } = params;
+  const { query, scope, userId, firmId } = params;
   const offset = Math.max(0, params.offset ?? DEFAULT_OFFSET);
   const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit ?? DEFAULT_LIMIT));
   const lowerQuery = query.toLowerCase();
@@ -141,6 +143,22 @@ function filterAndPaginate(
   let filtered = scope
     ? items.filter((item) => item.scope === scope)
     : items;
+
+  // Apply tenant boundary (Blocker #10)
+  // Personal scope: filter by userId match
+  // Practice scope: filter by firmId match
+  // Platform/manufacturer/standards scopes remain global
+  if (scope === 'personal' && userId) {
+    filtered = filtered.filter((item) => {
+      const itemRecord = item as SpecLibraryItem & { ownerId?: string; userId?: string };
+      return itemRecord.ownerId === userId || itemRecord.userId === userId;
+    });
+  } else if (scope === 'practice' && firmId) {
+    filtered = filtered.filter((item) => {
+      const itemRecord = item as SpecLibraryItem & { firmId?: string; practiceId?: string };
+      return itemRecord.firmId === firmId || itemRecord.practiceId === firmId;
+    });
+  }
 
   // Apply case-insensitive substring search across title, category, tags, supplier (Req 12.3)
   if (lowerQuery.length > 0) {

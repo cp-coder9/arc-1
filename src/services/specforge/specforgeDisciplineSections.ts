@@ -57,9 +57,9 @@ const DISCIPLINE_SECTIONS: Record<string, Omit<SpecSection, 'id'>[]> = {
     { code: '48', title: 'Renewable Energy Systems', discipline: 'energy', ownerRole: 'bep', status: 'draft' },
   ],
   planning: [
-    { code: '01', title: 'General Requirements', discipline: 'planning', ownerRole: 'town_planner', status: 'draft' },
-    { code: '32', title: 'Exterior Improvements', discipline: 'planning', ownerRole: 'town_planner', status: 'draft' },
-    { code: '33', title: 'Utilities', discipline: 'planning', ownerRole: 'town_planner', status: 'draft' },
+    { code: '01', title: 'General Requirements', discipline: 'planning', ownerRole: 'architect', status: 'draft' },
+    { code: '32', title: 'Exterior Improvements', discipline: 'planning', ownerRole: 'architect', status: 'draft' },
+    { code: '33', title: 'Utilities', discipline: 'planning', ownerRole: 'architect', status: 'draft' },
   ],
   drainage: [
     { code: '22', title: 'Plumbing & Drainage', discipline: 'drainage', ownerRole: 'engineer', status: 'draft' },

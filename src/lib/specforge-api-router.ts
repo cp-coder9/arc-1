@@ -11,7 +11,7 @@ import { Router } from 'express';
 import type { Request, Response, RequestHandler } from 'express';
 import { requireAuth } from './roleMiddleware';
 import { toSpecForgeRole } from '@/types/specforgeTypes';
-import type { SpecCapability, SpecForgeWorkspace, SpecSection } from '@/types/specforgeTypes';
+import type { SpecApproval, SpecCapability, SpecForgeWorkspace, SpecIssueRecipient, SpecItem, SpecIssuer, SpecSection, SpecSubstitution } from '@/types/specforgeTypes';
 import type { UserRole } from '@/types';
 import { getSpecForgeRepository, initSpecForgeRepository, setSpecForgeRepository } from '@/services/specforge/specforgeRepository';
 import type { SpecForgeRepository } from '@/services/specforge/specforgeRepository';
@@ -36,6 +36,15 @@ import { resolveDrawingRefs, buildDrawingWarnings } from '@/services/specforge/s
 import type { DrawingRefResolution, StructuredWarning } from '@/services/specforge/specforgeDrawingAdapter';
 import { adminDb } from '@/lib/firebase-admin';
 import { getDefaultSectionsForDiscipline } from '@/services/specforge/specforgeDisciplineSections';
+import {
+  emitApprovalCreatedEvent,
+  emitClientDecisionEvent,
+  emitIssueNotifications,
+  emitSubstitutionEvent,
+  emitBudgetWarning,
+  emitLongLeadWarning,
+} from '@/services/specforge/specforgeInboxAdapter';
+import { createSpecIssuedWorkflowEvent } from '@/services/projectPassportService';
 
 const specforgeRouter = Router();
 
@@ -75,6 +84,64 @@ function requireCapability(capability: SpecCapability): RequestHandler {
     next();
   };
 }
+
+// ── requireProjectMember middleware ──────────────────────────────────────────
+
+/**
+ * Middleware that verifies the authenticated user is a member of the project team.
+ * Checks the project doc's `teamMembers` array for the user's UID.
+ * If the project doesn't exist or has no team data, allows access (graceful degradation).
+ *
+ * Requirements: 6.2
+ */
+const requireProjectMember: RequestHandler = async (req: Request, res: Response, next) => {
+  const projectId = req.params.projectId;
+  if (!projectId) {
+    next();
+    return;
+  }
+  try {
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) {
+      // Project doesn't exist — allow access (graceful degradation for new projects)
+      next();
+      return;
+    }
+    const projectData = projectSnap.data()!;
+    const teamMembers: Array<{ userId?: string; uid?: string }> = projectData.teamMembers ?? [];
+    if (teamMembers.length === 0) {
+      // No team data — allow access (graceful degradation)
+      next();
+      return;
+    }
+    const uid = req.authContext!.uid;
+    const isMember = teamMembers.some(
+      (m) => m.userId === uid || m.uid === uid,
+    );
+    // Also allow if user is the project owner/client
+    const isOwner = projectData.clientId === uid ||
+      projectData.ownerId === uid ||
+      projectData.leadProfessionalId === uid ||
+      projectData.leadBepId === uid ||
+      projectData.leadArchitectId === uid;
+
+    if (!isMember && !isOwner && req.authContext!.role !== 'admin' && req.authContext!.role !== 'platform_admin') {
+      res.status(403).json({ error: 'Not a member of this project' });
+      return;
+    }
+    next();
+  } catch {
+    // On failure to check, allow access (graceful degradation)
+    next();
+  }
+};
+
+// Apply project membership check to all :projectId routes
+specforgeRouter.param('projectId', (req, _res, next) => {
+  // The param callback just marks it so the middleware fires
+  next();
+});
+specforgeRouter.use('/:projectId', requireProjectMember);
 
 // ── Error mapper ─────────────────────────────────────────────────────────────
 
@@ -205,6 +272,35 @@ specforgeRouter.get('/:projectId/workspace', async (req: Request, res: Response)
       workspace = await createDefaultWorkspace(projectId, repo);
     }
 
+    // Rehydrate items/sections from subcollections (Blocker #7)
+    // Items/sections added via POST endpoints write to subcollections,
+    // so we need to merge them into the workspace object.
+    try {
+      const itemsSnap = await adminDb.collection('projects').doc(projectId).collection('specItems').get();
+      if (!itemsSnap.empty) {
+        const subItems = itemsSnap.docs.map((doc) => doc.data() as SpecItem);
+        const existingIds = new Set(workspace.items.map((i) => i.id));
+        for (const item of subItems) {
+          if (!existingIds.has(item.id)) {
+            workspace.items.push(item);
+          }
+        }
+      }
+
+      const sectionsSnap = await adminDb.collection('projects').doc(projectId).collection('specSections').get();
+      if (!sectionsSnap.empty) {
+        const subSections = sectionsSnap.docs.map((doc) => doc.data() as SpecSection);
+        const existingSectionIds = new Set(workspace.sections.map((s) => s.id));
+        for (const section of subSections) {
+          if (!existingSectionIds.has(section.id)) {
+            workspace.sections.push(section);
+          }
+        }
+      }
+    } catch {
+      // If subcollection queries fail, proceed with workspace data as-is
+    }
+
     // Apply role-based item filtering
     const role = toSpecForgeRole(req.authContext!.role as UserRole);
     if (!role) {
@@ -290,20 +386,25 @@ specforgeRouter.post(
       if (!parsed.success) {
         throw new SpecForgeValidationError(parsed.error.issues);
       }
+      const item = parsed.data as SpecItem;
       const repo = getSpecForgeRepository();
-      await repo.addItem(projectId, parsed.data);
+      await repo.addItem(projectId, item);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'created',
-        targetId: parsed.data.id,
+        targetId: item.id,
         targetType: 'item',
         performedBy: req.authContext!.uid,
         projectId,
-        newValue: JSON.stringify(parsed.data),
+        newValue: JSON.stringify(item),
       });
 
-      res.status(201).json(parsed.data);
+      // Wire inbox adapters (Blocker #9): check budget/long-lead warnings
+      await emitBudgetWarning(item, projectId);
+      await emitLongLeadWarning(item, projectId);
+
+      res.status(201).json(item);
     } catch (err) {
       handleError(err, res);
     }
@@ -324,20 +425,38 @@ specforgeRouter.patch(
       if (!parsed.success) {
         throw new SpecForgeValidationError(parsed.error.issues);
       }
+      const updates = parsed.data as Partial<SpecItem>;
       const repo = getSpecForgeRepository();
-      await repo.updateItem(projectId, itemId, parsed.data);
+      await repo.updateItem(projectId, itemId, updates);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'updated',
         targetId: itemId,
         targetType: 'item',
         performedBy: req.authContext!.uid,
         projectId,
-        newValue: JSON.stringify(parsed.data),
+        newValue: JSON.stringify(updates),
       });
 
-      res.status(200).json({ id: itemId, ...parsed.data });
+      // Wire inbox adapters (Blocker #9): emit client decision event if status becomes needs_decision
+      if (updates.status === 'needs_decision') {
+        const updatedItem: SpecItem = { id: itemId, ...updates } as SpecItem;
+        await emitClientDecisionEvent(updatedItem, projectId);
+      }
+
+      // Check budget/long-lead warnings on cost/lead time changes
+      if (updates.estimatedCost !== undefined || updates.budgetAllowance !== undefined || updates.leadTimeDays !== undefined) {
+        const workspace = await repo.getWorkspace(projectId);
+        const fullItem = workspace?.items.find(i => i.id === itemId);
+        if (fullItem) {
+          const merged = { ...fullItem, ...updates };
+          await emitBudgetWarning(merged, projectId);
+          await emitLongLeadWarning(merged, projectId);
+        }
+      }
+
+      res.status(200).json({ id: itemId, ...updates });
     } catch (err) {
       handleError(err, res);
     }
@@ -357,8 +476,8 @@ specforgeRouter.delete(
       const repo = getSpecForgeRepository();
       await repo.deleteItem(projectId, itemId);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'status_changed',
         targetId: itemId,
         targetType: 'item',
@@ -388,20 +507,21 @@ specforgeRouter.post(
       if (!parsed.success) {
         throw new SpecForgeValidationError(parsed.error.issues);
       }
+      const section = parsed.data as SpecSection;
       const repo = getSpecForgeRepository();
-      await repo.addSection(projectId, parsed.data);
+      await repo.addSection(projectId, section);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'created',
-        targetId: parsed.data.id,
+        targetId: section.id,
         targetType: 'section',
         performedBy: req.authContext!.uid,
         projectId,
-        newValue: JSON.stringify(parsed.data),
+        newValue: JSON.stringify(section),
       });
 
-      res.status(201).json(parsed.data);
+      res.status(201).json(section);
     } catch (err) {
       handleError(err, res);
     }
@@ -422,20 +542,21 @@ specforgeRouter.patch(
       if (!parsed.success) {
         throw new SpecForgeValidationError(parsed.error.issues);
       }
+      const updates = parsed.data as Partial<SpecSection>;
       const repo = getSpecForgeRepository();
-      await repo.updateSection(projectId, sectionId, parsed.data);
+      await repo.updateSection(projectId, sectionId, updates);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'updated',
         targetId: sectionId,
         targetType: 'section',
         performedBy: req.authContext!.uid,
         projectId,
-        newValue: JSON.stringify(parsed.data),
+        newValue: JSON.stringify(updates),
       });
 
-      res.status(200).json({ id: sectionId, ...parsed.data });
+      res.status(200).json({ id: sectionId, ...updates });
     } catch (err) {
       handleError(err, res);
     }
@@ -466,14 +587,24 @@ specforgeRouter.post(
         return;
       }
 
-      const { issuer, recipients } = parsed.data;
-      const result = issueSpecification(workspace, issuer, recipients);
+      // Derive issuer from auth context, not request body (Blocker #8)
+      const issuer: SpecIssuer = {
+        userId: req.authContext!.uid,
+        name: (req.authContext!.decoded as Record<string, string>).displayName
+          || (req.authContext!.decoded as Record<string, string>).name
+          || (req.authContext!.decoded as Record<string, string>).email
+          || 'Unknown',
+        role: toSpecForgeRole(req.authContext!.role as UserRole) || 'architect',
+      };
+      const { recipients } = parsed.data;
+      const typedRecipients = recipients as SpecIssueRecipient[];
+      const result = issueSpecification(workspace, issuer, typedRecipients);
 
       // Persist snapshot
       await repo.saveSnapshot(result.snapshot);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'issued',
         targetId: result.snapshot.snapshotId,
         targetType: 'snapshot',
@@ -482,6 +613,15 @@ specforgeRouter.post(
         snapshotId: result.snapshot.snapshotId,
         revision: result.snapshot.revision,
         auditHash: result.snapshot.auditHash,
+      });
+
+      // Wire inbox/passport adapters (Blocker #9)
+      await emitIssueNotifications(result.snapshot, typedRecipients);
+      createSpecIssuedWorkflowEvent({
+        projectId,
+        snapshotId: result.snapshot.snapshotId,
+        issuedAt: result.snapshot.issuedAt,
+        revision: result.snapshot.revision,
       });
 
       res.status(201).json(result);
@@ -497,26 +637,40 @@ specforgeRouter.post(
  */
 specforgeRouter.post(
   '/:projectId/approvals',
+  requireCapability('approve_technical_section'),
   async (req: Request, res: Response) => {
     try {
+      const { projectId } = req.params;
       const parsed = specApprovalSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new SpecForgeValidationError(parsed.error.issues);
       }
+      const approval = parsed.data as SpecApproval;
       const repo = getSpecForgeRepository();
-      await repo.saveApproval(parsed.data);
+      await repo.saveApproval(projectId, approval);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'approved',
-        targetId: parsed.data.id,
+        targetId: approval.id,
         targetType: 'item',
         performedBy: req.authContext!.uid,
-        projectId: req.params.projectId,
-        newValue: JSON.stringify(parsed.data),
+        projectId,
+        newValue: JSON.stringify(approval),
       });
 
-      res.status(201).json(parsed.data);
+      // Wire inbox adapter (Blocker #9): emit approval created event
+      try {
+        const workspace = await repo.getWorkspace(projectId);
+        const item = workspace?.items.find(i => i.id === approval.itemId);
+        if (item) {
+          await emitApprovalCreatedEvent(approval, item, projectId);
+        }
+      } catch {
+        // Non-critical: don't fail the request if inbox emission fails
+      }
+
+      res.status(201).json(approval);
     } catch (err) {
       handleError(err, res);
     }
@@ -529,15 +683,19 @@ specforgeRouter.post(
  */
 specforgeRouter.patch(
   '/:projectId/approvals/:approvalId',
+  requireCapability('approve_technical_section'),
   async (req: Request, res: Response) => {
     try {
-      const { approvalId } = req.params;
-      const { decision, decidedBy, comments } = req.body;
+      const { projectId, approvalId } = req.params;
+      const { decision, comments } = req.body;
 
-      if (!decision || !decidedBy) {
-        res.status(400).json({ error: 'decision and decidedBy are required' });
+      if (!decision) {
+        res.status(400).json({ error: 'decision is required' });
         return;
       }
+
+      // Enforce decidedBy from auth context (Blocker #4)
+      const decidedBy = req.authContext!.uid;
 
       const updates = {
         decision,
@@ -546,25 +704,23 @@ specforgeRouter.patch(
         ...(comments && { comments }),
       };
 
-      // For approvals, we save a new version (the repo uses sectionId as key in demo mode)
-      // In production, this would be a Firestore document update
       const repo = getSpecForgeRepository();
-      const approvals = await repo.getApprovals(req.params.projectId);
+      const approvals = await repo.getApprovals(projectId);
       const existing = approvals.find(a => a.id === approvalId);
       if (!existing) {
         throw new SpecForgeNotFoundError('Approval', approvalId);
       }
 
       const updated = { ...existing, ...updates };
-      await repo.saveApproval(updated);
+      await repo.saveApproval(projectId, updated);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'approved',
         targetId: approvalId,
         targetType: 'item',
         performedBy: req.authContext!.uid,
-        projectId: req.params.projectId,
+        projectId,
         previousValue: JSON.stringify(existing),
         newValue: JSON.stringify(updated),
       });
@@ -582,26 +738,40 @@ specforgeRouter.patch(
  */
 specforgeRouter.post(
   '/:projectId/substitutions',
+  requireCapability('request_substitution'),
   async (req: Request, res: Response) => {
     try {
+      const { projectId } = req.params;
       const parsed = specSubstitutionSchema.safeParse(req.body);
       if (!parsed.success) {
         throw new SpecForgeValidationError(parsed.error.issues);
       }
+      const substitution = parsed.data as SpecSubstitution;
       const repo = getSpecForgeRepository();
-      await repo.saveSubstitution(parsed.data);
+      await repo.saveSubstitution(projectId, substitution);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'substitution_requested',
-        targetId: parsed.data.id,
+        targetId: substitution.id,
         targetType: 'item',
         performedBy: req.authContext!.uid,
-        projectId: req.params.projectId,
-        newValue: JSON.stringify(parsed.data),
+        projectId,
+        newValue: JSON.stringify(substitution),
       });
 
-      res.status(201).json(parsed.data);
+      // Wire inbox adapter (Blocker #9): emit substitution event
+      try {
+        const workspace = await repo.getWorkspace(projectId);
+        const item = workspace?.items.find(i => i.id === substitution.originalItemId);
+        if (item) {
+          await emitSubstitutionEvent(substitution, item, projectId);
+        }
+      } catch {
+        // Non-critical: don't fail the request if inbox emission fails
+      }
+
+      res.status(201).json(substitution);
     } catch (err) {
       handleError(err, res);
     }
@@ -614,15 +784,19 @@ specforgeRouter.post(
  */
 specforgeRouter.patch(
   '/:projectId/substitutions/:substitutionId',
+  requireCapability('approve_substitution'),
   async (req: Request, res: Response) => {
     try {
       const { projectId, substitutionId } = req.params;
-      const { status, reviewedBy, reviewComments } = req.body;
+      const { status, reviewComments } = req.body;
 
-      if (!status || !reviewedBy) {
-        res.status(400).json({ error: 'status and reviewedBy are required' });
+      if (!status) {
+        res.status(400).json({ error: 'status is required' });
         return;
       }
+
+      // Enforce reviewedBy from auth context (Blocker #4)
+      const reviewedBy = req.authContext!.uid;
 
       const repo = getSpecForgeRepository();
       const substitutions = await repo.getSubstitutions(projectId);
@@ -631,17 +805,17 @@ specforgeRouter.patch(
         throw new SpecForgeNotFoundError('Substitution', substitutionId);
       }
 
-      const updated = {
+      const updated: SpecSubstitution = {
         ...existing,
         status,
         reviewedBy,
         reviewedAt: new Date().toISOString(),
         ...(reviewComments && { reviewComments }),
       };
-      await repo.saveSubstitution(updated);
+      await repo.saveSubstitution(projectId, updated);
 
-      // Fire-and-forget audit log
-      logSpecForgeAction({
+      // Await audit log (Blocker #6)
+      await logSpecForgeAction({
         action: 'substitution_resolved',
         targetId: substitutionId,
         targetType: 'item',

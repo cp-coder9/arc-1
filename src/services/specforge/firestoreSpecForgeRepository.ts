@@ -233,12 +233,12 @@ export class FirestoreSpecForgeRepository implements SpecForgeRepository {
 
   // ── Approvals ──────────────────────────────────────────────────────────
 
-  async saveApproval(approval: SpecApproval): Promise<void> {
+  async saveApproval(projectId: string, approval: SpecApproval): Promise<void> {
     const result = specApprovalSchema.safeParse(approval);
     if (!result.success) {
       throw new SpecForgeValidationError(result.error.issues);
     }
-    await this.col(approval.sectionId, 'specApprovals').doc(approval.id).set(result.data);
+    await this.col(projectId, 'specApprovals').doc(approval.id).set(result.data);
   }
 
   async getApprovals(projectId: string): Promise<SpecApproval[]> {
@@ -250,12 +250,12 @@ export class FirestoreSpecForgeRepository implements SpecForgeRepository {
 
   // ── Substitutions ──────────────────────────────────────────────────────
 
-  async saveSubstitution(substitution: SpecSubstitution): Promise<void> {
+  async saveSubstitution(projectId: string, substitution: SpecSubstitution): Promise<void> {
     const result = specSubstitutionSchema.safeParse(substitution);
     if (!result.success) {
       throw new SpecForgeValidationError(result.error.issues);
     }
-    await this.col(substitution.originalItemId, 'specSubstitutions').doc(substitution.id).set(result.data);
+    await this.col(projectId, 'specSubstitutions').doc(substitution.id).set(result.data);
   }
 
   async getSubstitutions(projectId: string): Promise<SpecSubstitution[]> {
