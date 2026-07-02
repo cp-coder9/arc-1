@@ -55,9 +55,8 @@ import type {
   ContractProjectAssignment,
 } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function createEoTClaimViaApi(input: EoTClaimInput) {
-  const res = await apiFetch('/api/contract-admin/eot/create', {
+  const res = await apiFetch(`/api/contract-admin/${input.projectId}/eot-claims`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -66,34 +65,30 @@ async function createEoTClaimViaApi(input: EoTClaimInput) {
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function submitEoTClaimViaApi(projectId: string, claimId: string, userId: string) {
-  const res = await apiFetch('/api/contract-admin/eot/submit', {
-    method: 'POST',
+async function submitEoTClaimViaApi(projectId: string, claimId: string, _userId: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/eot-claims/${claimId}/submit`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, claimId, userId }),
   });
   if (!res.ok) throw new Error(`Submit failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function reviewEoTClaimViaApi(projectId: string, claimId: string, decision: string, userId: string, reason?: string) {
-  const res = await apiFetch('/api/contract-admin/eot/review', {
-    method: 'POST',
+async function reviewEoTClaimViaApi(projectId: string, claimId: string, decision: string, _userId: string, reason?: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/eot-claims/${claimId}/review`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, claimId, decision, userId, reason }),
+    body: JSON.stringify({ decision, reason }),
   });
   if (!res.ok) throw new Error(`Review failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function calculateNotificationDeadlineViaApi(projectId: string, eventDate: string): Promise<string> {
-  const res = await apiFetch('/api/contract-admin/eot/notification-deadline', {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/eot-claims/notification-deadline`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, eventDate }),
+    body: JSON.stringify({ eventDate }),
   });
   if (!res.ok) throw new Error(`Deadline calculation failed: ${res.statusText}`);
   const data = await res.json();

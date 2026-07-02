@@ -54,9 +54,8 @@ import type {
 } from '@/services/contractAdmin/client';
 import { CLAIM_TRANSITIONS } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function registerClaimViaApi(input: ClaimInput) {
-  const res = await apiFetch('/api/contract-admin/claims/register', {
+  const res = await apiFetch(`/api/contract-admin/${input.projectId}/claims`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -65,49 +64,44 @@ async function registerClaimViaApi(input: ClaimInput) {
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function transitionClaimViaApi(projectId: string, claimId: string, newStatus: ClaimStatus, userId: string) {
-  const res = await apiFetch('/api/contract-admin/claims/transition', {
-    method: 'POST',
+async function transitionClaimViaApi(projectId: string, claimId: string, newStatus: ClaimStatus, _userId: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/claims/${claimId}/transition`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, claimId, newStatus, userId }),
+    body: JSON.stringify({ toStatus: newStatus }),
   });
   if (!res.ok) throw new Error(`Transition failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function registerDissatisfactionViaApi(projectId: string, claimId: string, userId: string, reason: string) {
-  const res = await apiFetch('/api/contract-admin/claims/dissatisfaction', {
-    method: 'POST',
+async function registerDissatisfactionViaApi(projectId: string, claimId: string, _userId: string, reason: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/claims/${claimId}/dissatisfaction`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, claimId, userId, reason }),
+    body: JSON.stringify({ reason }),
   });
   if (!res.ok) throw new Error(`Dissatisfaction registration failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function getClaimsCumulativeSummaryViaApi(projectId: string): Promise<ClaimsCumulativeSummary> {
-  const res = await apiFetch(`/api/contract-admin/claims/summary?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/claims/summary`);
   if (!res.ok) throw new Error(`Failed to load summary: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function linkEvidenceViaApi(projectId: string, claimId: string, evidence: unknown) {
-  const res = await apiFetch('/api/contract-admin/claims/link-evidence', {
-    method: 'POST',
+  const res = await apiFetch(`/api/contract-admin/${projectId}/claims/${claimId}/evidence`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, claimId, evidence }),
+    body: JSON.stringify({ evidence }),
   });
   if (!res.ok) throw new Error(`Evidence link failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
-  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/config`);
   if (!res.ok) return null;
   return res.json();
 }

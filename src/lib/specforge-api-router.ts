@@ -97,21 +97,19 @@ function requireCapability(capability: SpecCapability): RequestHandler {
 const requireProjectMember: RequestHandler = async (req: Request, res: Response, next) => {
   const projectId = req.params.projectId;
   if (!projectId) {
-    next();
+    res.status(400).json({ error: 'Project ID required' });
     return;
   }
   try {
     const projectSnap = await adminDb.collection('projects').doc(projectId).get();
     if (!projectSnap.exists) {
-      // Project doesn't exist — allow access (graceful degradation for new projects)
-      next();
+      res.status(404).json({ error: 'Project not found' });
       return;
     }
     const projectData = projectSnap.data()!;
     const teamMembers: Array<{ userId?: string; uid?: string }> = projectData.teamMembers ?? [];
     if (teamMembers.length === 0) {
-      // No team data — allow access (graceful degradation)
-      next();
+      res.status(403).json({ error: 'Not authorized for this project' });
       return;
     }
     const uid = req.authContext!.uid;
@@ -131,8 +129,8 @@ const requireProjectMember: RequestHandler = async (req: Request, res: Response,
     }
     next();
   } catch {
-    // On failure to check, allow access (graceful degradation)
-    next();
+    res.status(500).json({ error: 'Authorization check failed' });
+    return;
   }
 };
 
