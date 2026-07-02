@@ -39,14 +39,10 @@ import {
   Clock,
 } from 'lucide-react';
 import {
-  createVariation,
-  transitionVariation,
-  valueVariation,
-  getCumulativeSummary,
-  linkToSpecForge,
-  getContractConfig,
+  isValidVariationTransition,
   resolveMultiRolePermissions,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   VariationRecord,
   VariationStatus,
@@ -54,8 +50,66 @@ import type {
   VariationCumulativeSummary,
   ContractConfig,
   ContractProjectAssignment,
-} from '@/services/contractAdmin';
-import { VARIATION_TRANSITIONS } from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { VARIATION_TRANSITIONS } from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function createVariationViaApi(input: VariationInput) {
+  const res = await apiFetch('/api/contract-admin/variations/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Variation creation failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function transitionVariationViaApi(projectId: string, variationId: string, newStatus: VariationStatus, userId: string) {
+  const res = await apiFetch('/api/contract-admin/variations/transition', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, variationId, newStatus, userId }),
+  });
+  if (!res.ok) throw new Error(`Transition failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function valueVariationViaApi(projectId: string, variationId: string, costImpact: { type: 'addition' | 'omission'; amount: number }, timeImpact: number, userId: string) {
+  const res = await apiFetch('/api/contract-admin/variations/value', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, variationId, costImpact, timeImpact, userId }),
+  });
+  if (!res.ok) throw new Error(`Valuation failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function getCumulativeSummaryViaApi(projectId: string): Promise<VariationCumulativeSummary> {
+  const res = await apiFetch(`/api/contract-admin/variations/summary?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) throw new Error(`Failed to load summary: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function linkToSpecForgeViaApi(projectId: string, variationId: string, specForgeRef: string) {
+  const res = await apiFetch('/api/contract-admin/variations/link-specforge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, variationId, specForgeRef }),
+  });
+  if (!res.ok) throw new Error(`Link failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
+  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -123,8 +177,8 @@ export function VariationRegister({ user, projectId }: VariationRegisterProps) {
     setLoading(true);
     try {
       const [contractConfig, cumulativeSummary] = await Promise.all([
-        getContractConfig(projectId),
-        getCumulativeSummary(projectId),
+        getContractConfigViaApi(projectId),
+        getCumulativeSummaryViaApi(projectId),
       ]);
       setConfig(contractConfig);
       setSummary(cumulativeSummary);
@@ -146,19 +200,19 @@ export function VariationRegister({ user, projectId }: VariationRegisterProps) {
 
   const handleCreateVariation = useCallback(async (input: VariationInput) => {
     try {
-      const result = await createVariation(input, projectAssignment);
+      const result = await createVariationViaApi(input);
       setVariations((prev) => [...prev, result.variation]);
       setShowForm(false);
       await loadData();
     } catch {
       // Error handling via future toast
     }
-  }, [projectAssignment, loadData]);
+  }, [loadData]);
 
   const handleTransition = useCallback(async (variationId: string, toStatus: VariationStatus) => {
     setActionLoading(variationId);
     try {
-      await transitionVariation(projectId, variationId, toStatus, user.uid, projectAssignment);
+      await transitionVariationViaApi(projectId, variationId, toStatus, user.uid);
       // Update local state
       setVariations((prev) =>
         prev.map((v) => v.id === variationId ? { ...v, status: toStatus, updatedAt: new Date().toISOString() } : v)
@@ -170,7 +224,7 @@ export function VariationRegister({ user, projectId }: VariationRegisterProps) {
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, projectAssignment, selectedVariation, loadData]);
+  }, [projectId, user.uid, selectedVariation, loadData]);
 
   const handleValue = useCallback(async (
     variationId: string,
@@ -179,7 +233,7 @@ export function VariationRegister({ user, projectId }: VariationRegisterProps) {
   ) => {
     setActionLoading(variationId);
     try {
-      await valueVariation(projectId, variationId, costImpact, timeImpactDays, user.uid, projectAssignment);
+      await valueVariationViaApi(projectId, variationId, costImpact, timeImpactDays, user.uid);
       setVariations((prev) =>
         prev.map((v) => v.id === variationId
           ? { ...v, status: 'valued' as VariationStatus, costImpact, timeImpactDays, updatedAt: new Date().toISOString() }
@@ -193,12 +247,12 @@ export function VariationRegister({ user, projectId }: VariationRegisterProps) {
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, user.uid, projectAssignment, selectedVariation, loadData]);
+  }, [projectId, user.uid, selectedVariation, loadData]);
 
   const handleLinkSpecForge = useCallback(async (variationId: string, specItemId: string) => {
     setActionLoading(variationId);
     try {
-      await linkToSpecForge(projectId, variationId, specItemId, projectAssignment);
+      await linkToSpecForgeViaApi(projectId, variationId, specItemId);
       setVariations((prev) =>
         prev.map((v) => v.id === variationId ? { ...v, linkedSpecForgeItemId: specItemId } : v)
       );
@@ -208,7 +262,7 @@ export function VariationRegister({ user, projectId }: VariationRegisterProps) {
     } finally {
       setActionLoading(null);
     }
-  }, [projectId, projectAssignment, selectedVariation]);
+  }, [projectId, selectedVariation]);
 
   if (loading) {
     return (

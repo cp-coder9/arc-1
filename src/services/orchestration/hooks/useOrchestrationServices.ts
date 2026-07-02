@@ -57,6 +57,8 @@ function mapUserRoleToArchitexRole(role: UserRole): ArchitexRole {
     firm_admin: 'admin',
     platform_admin: 'platform_admin',
     admin: 'admin',
+    land_surveyor: 'candidate_professional',
+    cpm: 'site_manager',
   };
   return mapping[role] ?? 'candidate_professional';
 }

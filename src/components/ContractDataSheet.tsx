@@ -27,16 +27,33 @@ import {
   Loader2,
 } from 'lucide-react';
 import {
-  getContractConfig,
   getDataSheet,
-  updateContractParameter,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   ContractConfig,
   ContractDataSheet as ContractDataSheetType,
   ContractProjectAssignment,
   DataSheetField,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
+  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function updateContractParameterViaApi(projectId: string, field: string, value: unknown) {
+  const res = await apiFetch('/api/contract-admin/update-parameter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, field, value }),
+  });
+  if (!res.ok) throw new Error(`Update failed: ${res.statusText}`);
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -72,7 +89,7 @@ export function ContractDataSheet({ user, projectId }: ContractDataSheetProps) {
     async function loadConfig() {
       setLoading(true);
       try {
-        const cfg = await getContractConfig(projectId);
+        const cfg = await getContractConfigViaApi(projectId);
         if (!cancelled) {
           setConfig(cfg);
           setError(null);
@@ -96,9 +113,9 @@ export function ContractDataSheet({ user, projectId }: ContractDataSheetProps) {
 
   const handleFieldUpdate = useCallback(async (field: string, value: unknown) => {
     try {
-      await updateContractParameter(projectId, field, value, user.uid, projectAssignment);
+      await updateContractParameterViaApi(projectId, field, value);
       // Reload config after update
-      const cfg = await getContractConfig(projectId);
+      const cfg = await getContractConfigViaApi(projectId);
       setConfig(cfg);
     } catch {
       // TODO: surface error via toast in task 18

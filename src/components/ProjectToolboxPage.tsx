@@ -335,6 +335,33 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
+  land_surveyor: {
+    title: 'Land Surveyor Toolbox',
+    subtitle: 'Boundary surveys, SG diagrams, servitudes, and site verification tools.',
+    scope: 'Land surveyor tools for geomatics, boundary verification, and statutory cadastral records.',
+    primaryResponsibilities: ['Verify site boundaries and SG diagrams', 'Produce survey plans and servitude documentation', 'Support subdivision and consolidation workflows'],
+    handoffBoundaries: ['Survey sign-off requires PLATO registration', 'Cadastral submissions require professional verification'],
+    toolGroups: [
+      { id: 'survey-tools', label: 'Survey and cadastral', description: 'Site boundary verification, SG diagram management, and cadastral evidence.', tools: [
+        { label: 'Drawing Register', description: 'Track survey drawings, revisions, and coordination status.', pageId: 'drawing-register' },
+        { label: 'Design & Compliance', description: 'Review survey-related compliance and municipal readiness.', pageId: 'design' },
+      ] },
+    ],
+  },
+  cpm: {
+    title: 'Construction Project Manager Toolbox',
+    subtitle: 'Programme delivery, risk management, and construction oversight tools.',
+    scope: 'CPM tools for coordinating programme, cost, and delivery across the project lifecycle.',
+    primaryResponsibilities: ['Coordinate programme delivery and milestones', 'Manage project risk and resource allocation', 'Oversee construction governance and reporting'],
+    handoffBoundaries: ['Cannot certify professional compliance', 'Payment releases require client confirmation'],
+    toolGroups: [
+      { id: 'programme-delivery', label: 'Programme and delivery', description: 'Schedule management, milestone tracking, and construction coordination.', tools: [
+        { label: 'Programme / Gantt', description: 'Manage project schedule and milestone dependencies.', pageId: 'programme' },
+        { label: 'Tasks & Approvals', description: 'Track tasks, approvals, and coordination actions.', pageId: 'tasks' },
+        { label: 'Contract Administration', description: 'Manage notices, variations, claims, and payment schedules.', pageId: 'contract-admin' },
+      ] },
+    ],
+  },
 };
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {

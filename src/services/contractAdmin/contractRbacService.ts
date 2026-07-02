@@ -1,4 +1,14 @@
 /**
+ * RBAC is enforced in two layers:
+ * 1. Client-side: UI visibility (hide/show tabs and action buttons) using role from UserProfile
+ * 2. Server-side: All mutations go through API routes where the user's role and project assignment
+ *    are verified from the authenticated Firebase session before calling service functions.
+ *
+ * This service provides the permission logic used by BOTH layers.
+ * Client components use it for UI gating; API routes use it for authorization enforcement.
+ */
+
+/**
  * Contract Administration — Role-Based Access Control Service
  *
  * Encodes the role-feature-permission matrix per Requirements 9.1–9.9.

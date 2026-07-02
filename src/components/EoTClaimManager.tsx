@@ -38,15 +38,13 @@ import {
   CalendarClock,
 } from 'lucide-react';
 import {
-  createEoTClaim,
-  submitEoTClaim,
-  reviewEoTClaim,
-  calculateNotificationDeadline,
-  getContractConfig,
   getSouthAfricanHolidays,
   addWorkingDays,
   resolveMultiRolePermissions,
-} from '@/services/contractAdmin';
+  getEoTNotificationRule,
+  getRemainingWorkingDays,
+} from '@/services/contractAdmin/client';
+import { apiFetch } from '@/lib/apiClient';
 import type {
   EoTClaimRecord,
   EoTStatus,
@@ -55,7 +53,59 @@ import type {
   EoTClaimInput,
   ContractConfig,
   ContractProjectAssignment,
-} from '@/services/contractAdmin';
+} from '@/services/contractAdmin/client';
+
+// TODO: wire to real API endpoint
+async function createEoTClaimViaApi(input: EoTClaimInput) {
+  const res = await apiFetch('/api/contract-admin/eot/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`EoT claim creation failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function submitEoTClaimViaApi(projectId: string, claimId: string, userId: string) {
+  const res = await apiFetch('/api/contract-admin/eot/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, claimId, userId }),
+  });
+  if (!res.ok) throw new Error(`Submit failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function reviewEoTClaimViaApi(projectId: string, claimId: string, decision: string, userId: string, reason?: string) {
+  const res = await apiFetch('/api/contract-admin/eot/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, claimId, decision, userId, reason }),
+  });
+  if (!res.ok) throw new Error(`Review failed: ${res.statusText}`);
+  return res.json();
+}
+
+// TODO: wire to real API endpoint
+async function calculateNotificationDeadlineViaApi(projectId: string, eventDate: string): Promise<string> {
+  const res = await apiFetch('/api/contract-admin/eot/notification-deadline', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, eventDate }),
+  });
+  if (!res.ok) throw new Error(`Deadline calculation failed: ${res.statusText}`);
+  const data = await res.json();
+  return data.deadline;
+}
+
+// TODO: wire to real API endpoint
+async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
+  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -153,7 +203,7 @@ export function EoTClaimManager({ user, projectId }: EoTClaimManagerProps) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const contractConfig = await getContractConfig(projectId);
+      const contractConfig = await getContractConfigViaApi(projectId);
       setConfig(contractConfig);
       // Load claims from Firestore via adminDb (simulated here via config pattern)
       // In production, this would call a service function to list all EoT claims
@@ -171,7 +221,7 @@ export function EoTClaimManager({ user, projectId }: EoTClaimManagerProps) {
 
   const handleCreate = useCallback(async (input: EoTClaimInput) => {
     try {
-      const { claim } = await createEoTClaim(input);
+      const { claim } = await createEoTClaimViaApi(input);
       setClaims((prev) => [claim, ...prev]);
       setShowForm(false);
     } catch {
@@ -182,7 +232,7 @@ export function EoTClaimManager({ user, projectId }: EoTClaimManagerProps) {
   const handleSubmit = useCallback(async (claimId: string) => {
     setActionLoading(claimId);
     try {
-      await submitEoTClaim(projectId, claimId, user.uid);
+      await submitEoTClaimViaApi(projectId, claimId, user.uid);
       await loadData();
     } finally {
       setActionLoading(null);
@@ -196,7 +246,7 @@ export function EoTClaimManager({ user, projectId }: EoTClaimManagerProps) {
   ) => {
     setActionLoading(claimId);
     try {
-      await reviewEoTClaim(projectId, claimId, decision, approvedDays, user.uid);
+      await reviewEoTClaimViaApi(projectId, claimId, decision, user.uid, approvedDays ? String(approvedDays) : undefined);
       setShowReviewDialog(null);
       await loadData();
     } finally {
@@ -444,13 +494,19 @@ function EoTClaimForm({ projectId, userId, config, onSubmit, onCancel }: EoTClai
   const [evidenceDate, setEvidenceDate] = useState('');
   const [evidenceCaption, setEvidenceCaption] = useState('');
 
-  // Calculate notification deadline for display
+  // Calculate notification deadline for display (pure calculation using client-safe imports)
   const notificationInfo = useMemo(() => {
     if (!config?.contractForm || !delayEventDate) return null;
     try {
       const year = parseInt(delayEventDate.split('-')[0], 10);
       const holidays = getSouthAfricanHolidays(year);
-      return calculateNotificationDeadline(config.contractForm, delayEventDate, holidays);
+      const rule = getEoTNotificationRule(config.contractForm);
+      const deadline = rule.dayType === 'working'
+        ? addWorkingDays(delayEventDate, rule.notificationPeriodDays, holidays)
+        : (() => { const d = new Date(delayEventDate); d.setDate(d.getDate() + rule.notificationPeriodDays); return d.toISOString().split('T')[0]; })();
+      const today = new Date().toISOString().split('T')[0];
+      const remainingDays = getRemainingWorkingDays(today, deadline, holidays);
+      return { deadline, remainingDays };
     } catch {
       return null;
     }
