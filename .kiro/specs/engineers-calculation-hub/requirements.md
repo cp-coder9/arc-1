@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Engineer's Calculation Hub is a comprehensive multi-discipline engineering calculator workspace within the Architex Compliance Hub module. It provides 70+ professional-grade engineering calculators covering structural (steel, concrete, timber), geotechnical, civil (loading, stormwater), mechanical (HVAC), fire engineering, electrical, and wet services disciplines. Each calculator features Zod-validated inputs with South African standard defaults, a live computation engine with pass/fail status, step-by-step derivation display with SANS clause references, PDF export, and run history with assign-to-project capability. The tool integrates with SpecForge, Project Passport, and the platform audit trail. All calculations are advisory only — professional engineer sign-off is required.
+The Engineer's Calculation Hub is a comprehensive multi-discipline engineering calculator workspace within the Architex Compliance Hub module. It provides 53 professional-grade engineering calculators covering structural (steel, concrete, timber), geotechnical, civil (loading, stormwater), mechanical (HVAC), fire engineering, electrical, and wet services disciplines. Each calculator features Zod-validated inputs with South African standard defaults, a live computation engine with pass/fail status, step-by-step derivation display with SANS clause references, PDF export, and run history with assign-to-project capability. The tool integrates with SpecForge, Project Passport, and the platform audit trail. All calculations are advisory only — professional engineer sign-off is required.
 
 ## Glossary
 
@@ -24,7 +24,7 @@ The Engineer's Calculation Hub is a comprehensive multi-discipline engineering c
 
 ### Requirement 1: Workspace Layout and Navigation
 
-**User Story:** As an engineer, I want a calculator workspace with discipline-based navigation, so that I can quickly find and use any of the 70+ calculators without scrolling through a flat list.
+**User Story:** As an engineer, I want a calculator workspace with discipline-based navigation, so that I can quickly find and use any of the 53 calculators without scrolling through a flat list.
 
 #### Acceptance Criteria
 

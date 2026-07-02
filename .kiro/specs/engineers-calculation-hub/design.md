@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Engineer's Calculation Hub is a multi-discipline engineering calculator workspace rendered within the Architex OS shell as a Compliance Hub module tool. It provides 70+ professional-grade calculators across 8 engineering disciplines (structural, civil, mechanical, fire, electrical, wet services, geotechnical, utilities) — each implemented as a pure TypeScript function with Zod-validated inputs, deterministic computation, step-by-step derivation display, and integration with the platform spine (Project Passport, SpecForge, Audit Trail).
+The Engineer's Calculation Hub is a multi-discipline engineering calculator workspace rendered within the Architex OS shell as a Compliance Hub module tool. It provides 53 professional-grade calculators across 8 engineering disciplines (structural, civil, mechanical, fire, electrical, wet services, geotechnical, utilities) — each implemented as a pure TypeScript function with Zod-validated inputs, deterministic computation, step-by-step derivation display, and integration with the platform spine (Project Passport, SpecForge, Audit Trail).
 
 The architecture leverages the existing `CalculatorDefinition` framework and `StandaloneToolRun` persistence, extending them with a discipline-specific engine layer and a custom workspace UI that replaces the generic `DefinitionToolRunner` for this tool's multi-calculator navigation pattern.
 
@@ -10,7 +10,7 @@ The architecture leverages the existing `CalculatorDefinition` framework and `St
 
 1. **Pure engine functions per calculator** — Each calculator is a standalone pure function in its own module. This enables independent unit testing, deterministic audit replay, and parallel development across disciplines.
 
-2. **Custom workspace component vs generic runner** — Because the Calculator Hub hosts 70+ calculators with sidebar navigation and sub-tabs, it uses a custom `EngineersCalcHub.tsx` component instead of the generic `DefinitionToolRunner`. The engines still register as `CalculatorDefinition` objects for framework compatibility.
+2. **Custom workspace component vs generic runner** — Because the Calculator Hub hosts 53 calculators with sidebar navigation and sub-tabs, it uses a custom `EngineersCalcHub.tsx` component instead of the generic `DefinitionToolRunner`. The engines still register as `CalculatorDefinition` objects for framework compatibility.
 
 3. **SA Red Book steel sections as typed constant arrays** — Section properties are baked into the bundle as static data (not fetched). This ensures offline availability, deterministic computation, and zero latency for section lookups.
 
@@ -491,6 +491,35 @@ export interface SteelSection {
 | Error Condition | Handling |
 |----------------|----------|
 | Unauthorised role navigates to route | Display "Access Denied" card; no calculator UI rendered (Req 19.3) |
+
+---
+
+## Integration Scope (Current Release)
+
+### Fully Implemented
+- Calculator engine computation (53 calculators, all 8 disciplines)
+- Zod schema validation with SA-standard defaults
+- Derivation step generation with SANS clause references
+- PDF export (HTML-based, print-to-PDF)
+- Local run persistence (in-memory, session-scoped)
+- Local run history with restore capability
+- Session input cache (survives calculator switching within session)
+- Standalone tool registry entry with correct role access
+
+### Stub / Preview (Local-Only)
+The following integrations record actions locally (console logging) but do NOT persist to Firestore or the platform spine. They are wired to the correct interface contracts and will connect to the live services in a follow-up PR:
+
+- **Project Passport write-back** — `assignRunToProject()` updates the local run record but does not write to Firestore
+- **SpecForge push** — `pushRunToSpecForge()` logs the spec item shape but does not create a Firestore document
+- **Audit Trail** — `auditCalcEvent()` logs events to console but does not write to the platform audit collection
+- **Run persistence (Firestore)** — `persistCalcRun()` creates an in-memory StandaloneToolRun but does not write to Firestore
+
+### Planned Follow-Up
+- Wire `persistCalcRun` to Firestore `standaloneToolRuns` collection
+- Wire `assignRunToProject` to write compliance evidence into project passport document
+- Wire `pushRunToSpecForge` to create spec items in the SpecForge collection
+- Wire `auditCalcEvent` to the platform `auditTrail` collection
+- Add real toast notifications (replace console.info stubs)
 
 ---
 
