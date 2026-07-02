@@ -53,7 +53,9 @@ export function buildProjectPassport(
     lifecycle,
     riskLevel,
     specForge: {
-      budgetSummary: specForgeData.budgetSummary,
+      budgetSummary: specForgeData.budgetSummary
+        ? { ...specForgeData.budgetSummary, deltaPct: specForgeData.budgetSummary.deltaPct ?? 0 }
+        : null,
       readiness: specForgeData.readiness,
       issueStatus: specForgeData.issueStatus,
       latestRevision: specForgeData.latestRevision,

@@ -45,11 +45,11 @@ export interface SpecForgeRepository {
   updateProcurementEntry(projectId: string, entryId: string, updates: Partial<SpecProcurementEntry>): Promise<void>;
   
   // Approvals
-  saveApproval(approval: SpecApproval): Promise<void>;
+  saveApproval(projectId: string, approval: SpecApproval): Promise<void>;
   getApprovals(projectId: string): Promise<SpecApproval[]>;
   
   // Substitutions
-  saveSubstitution(substitution: SpecSubstitution): Promise<void>;
+  saveSubstitution(projectId: string, substitution: SpecSubstitution): Promise<void>;
   getSubstitutions(projectId: string): Promise<SpecSubstitution[]>;
 }
 
@@ -129,18 +129,18 @@ export class LocalSpecForgeRepository implements SpecForgeRepository {
     this.procurement.set(projectId, entries.map(e => e.id === entryId ? { ...e, ...updates } : e));
   }
 
-  async saveApproval(approval: SpecApproval): Promise<void> {
-    const existing = this.approvals.get(approval.sectionId) ?? [];
-    this.approvals.set(approval.sectionId, [...existing, approval]);
+  async saveApproval(projectId: string, approval: SpecApproval): Promise<void> {
+    const existing = this.approvals.get(projectId) ?? [];
+    this.approvals.set(projectId, [...existing, approval]);
   }
 
   async getApprovals(projectId: string): Promise<SpecApproval[]> {
     return this.approvals.get(projectId) ?? [];
   }
 
-  async saveSubstitution(substitution: SpecSubstitution): Promise<void> {
-    const existing = this.substitutions.get(substitution.originalItemId) ?? [];
-    this.substitutions.set(substitution.originalItemId, [...existing, substitution]);
+  async saveSubstitution(projectId: string, substitution: SpecSubstitution): Promise<void> {
+    const existing = this.substitutions.get(projectId) ?? [];
+    this.substitutions.set(projectId, [...existing, substitution]);
   }
 
   async getSubstitutions(projectId: string): Promise<SpecSubstitution[]> {
