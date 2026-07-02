@@ -49,16 +49,14 @@ import type {
   ContractProjectAssignment,
 } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function getActiveNoticesViaApi(projectId: string): Promise<NoticeRecord[]> {
-  const res = await apiFetch(`/api/contract-admin/notices?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/notices`);
   if (!res.ok) return [];
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function registerNoticeViaApi(input: NoticeRegistrationInput) {
-  const res = await apiFetch('/api/contract-admin/notices/register', {
+  const res = await apiFetch(`/api/contract-admin/${input.projectId}/notices`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -67,42 +65,37 @@ async function registerNoticeViaApi(input: NoticeRegistrationInput) {
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function acknowledgeNoticeViaApi(projectId: string, noticeId: string, userId: string) {
-  const res = await apiFetch('/api/contract-admin/notices/acknowledge', {
-    method: 'POST',
+async function acknowledgeNoticeViaApi(projectId: string, noticeId: string, _userId: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/notices/${noticeId}/acknowledge`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, noticeId, userId }),
   });
   if (!res.ok) throw new Error(`Acknowledge failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function respondToNoticeViaApi(projectId: string, noticeId: string, userId: string, response: string) {
-  const res = await apiFetch('/api/contract-admin/notices/respond', {
-    method: 'POST',
+async function respondToNoticeViaApi(projectId: string, noticeId: string, _userId: string, response: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/notices/${noticeId}/respond`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, noticeId, userId, response }),
+    body: JSON.stringify({ response }),
   });
   if (!res.ok) throw new Error(`Respond failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function withdrawNoticeViaApi(projectId: string, noticeId: string, userId: string, reason: string) {
-  const res = await apiFetch('/api/contract-admin/notices/withdraw', {
-    method: 'POST',
+async function withdrawNoticeViaApi(projectId: string, noticeId: string, _userId: string, reason: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/notices/${noticeId}/withdraw`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, noticeId, userId, reason }),
+    body: JSON.stringify({ reason }),
   });
   if (!res.ok) throw new Error(`Withdraw failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
-  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/config`);
   if (!res.ok) return null;
   return res.json();
 }

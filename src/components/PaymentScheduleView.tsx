@@ -45,32 +45,22 @@ import type {
   PaymentOverdueResult,
 } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function linkCertificateViaApi(projectId: string, entryId: string, certificateRef: string) {
-  const res = await apiFetch('/api/contract-admin/payments/link-certificate', {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/payment-schedule/link-certificate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, entryId, certificateRef }),
+    body: JSON.stringify({ entryId, certificateRef }),
   });
   if (!res.ok) throw new Error(`Link failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function runPaymentDeadlineCheckViaApi(projectId: string): Promise<PaymentOverdueResult[]> {
-  const res = await apiFetch(`/api/contract-admin/payments/deadline-check?projectId=${encodeURIComponent(projectId)}`);
-  if (!res.ok) return [];
-  return res.json();
-}
-
-// TODO: wire to real API endpoint
-async function surfaceToActionCentreViaApi(projectId: string, event: unknown) {
-  const res = await apiFetch('/api/contract-admin/action-centre/surface', {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/payment-schedule/deadline-check`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, event }),
   });
-  if (!res.ok) throw new Error(`Surface to action centre failed: ${res.statusText}`);
+  if (!res.ok) return [];
   return res.json();
 }
 
@@ -263,32 +253,18 @@ export function PaymentScheduleView({ user, projectId }: PaymentScheduleViewProp
     };
   }, [schedule, contractConfig]);
 
-  // Trigger overdue check + Action Centre notification
+  // Trigger overdue check
   const handleOverdueCheck = useCallback(async () => {
     setLoading(true);
     try {
       const results = await runPaymentDeadlineCheckViaApi(projectId);
       setOverdueEntries(results);
-
-      // Trigger Action Centre notification for overdue items (Req 7.5)
-      for (const overdue of results) {
-        await surfaceToActionCentreViaApi(projectId, {
-          projectId,
-          targetUserId: user.uid,
-          priority: 'high',
-          deadlineDate: overdue.paymentDeadline,
-          subject: `Payment overdue: Cycle ${overdue.cycleNumber} — ${overdue.daysOverdue} day(s) overdue`,
-          entityType: 'payment',
-          entityId: overdue.scheduleEntryId,
-          remainingDays: -overdue.daysOverdue,
-        });
-      }
     } catch {
       // Silently handle — would log to error tracking in production
     } finally {
       setLoading(false);
     }
-  }, [projectId, user.uid]);
+  }, [projectId]);
 
   // Open certificate linking dialog
   const handleLinkCertificate = useCallback((entry: PaymentScheduleEntry) => {

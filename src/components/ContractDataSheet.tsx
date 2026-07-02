@@ -37,19 +37,17 @@ import type {
   DataSheetField,
 } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
-  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/config`);
   if (!res.ok) return null;
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function updateContractParameterViaApi(projectId: string, field: string, value: unknown) {
-  const res = await apiFetch('/api/contract-admin/update-parameter', {
-    method: 'POST',
+  const res = await apiFetch(`/api/contract-admin/${projectId}/config`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, field, value }),
+    body: JSON.stringify({ field, value }),
   });
   if (!res.ok) throw new Error(`Update failed: ${res.statusText}`);
   return res.json();
