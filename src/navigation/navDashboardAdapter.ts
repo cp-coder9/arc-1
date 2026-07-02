@@ -19,7 +19,7 @@ const NAV_TO_DASHBOARD: Record<ArchitexNavKey, string[]> = {
   command_centre: ['command'],
   inbox: ['tasks'],
   projects: ['projects', 'journey', 'programme', 'passport'],
-  toolboxes: ['toolbox', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief'],
+  toolboxes: ['toolbox', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'contract-admin'],
   cpd_learning: ['cpd-assessment', 'knowledge'],
   documents: ['documents', 'resource-centre'],
   marketplace: ['marketplace', 'bep-marketplace', 'directory-search', 'bep-team', 'bep-freelancers'],
