@@ -465,7 +465,6 @@ function AppContent() {
     });
   }, []);
   const [activeTab, setActiveTab] = useState('command');
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
 
   const visibleNavItems = useMemo(() => {
@@ -1162,7 +1161,7 @@ function AppContent() {
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'standalone/engineers-calc-hub' && <EngineersCalcHub user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
-              {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} projectId={selectedProjectId ?? undefined} />}
+              {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
