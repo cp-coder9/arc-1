@@ -263,7 +263,48 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'create_project_posting')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Fetch posting
+      const postingDoc = await adminDb.collection('marketplace_project_postings').doc(id).get();
+      if (!postingDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Project posting not found' });
+      }
+      const posting = postingDoc.data()!;
+
+      // Verify ownership
+      if (posting.clientId !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the posting owner can withdraw' });
+      }
+      if (posting.status !== 'published') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot withdraw posting with status "${posting.status}"` });
+      }
+
+      const now = new Date().toISOString();
+      await adminDb.collection('marketplace_project_postings').doc(id).update({ status: 'withdrawn', updatedAt: now });
+
+      // Notify applicants via Action Centre
+      const proposalsSnap = await adminDb.collection('marketplace_proposals').where('postingId', '==', id).get();
+      for (const pDoc of proposalsSnap.docs) {
+        const pData = pDoc.data();
+        await adminDb.collection('action_centre_events').add({
+          type: 'posting_withdrawn',
+          recipientUserId: pData.professionalId,
+          title: 'Project Posting Withdrawn',
+          description: `The project "${posting.title}" has been withdrawn.`,
+          entityId: id,
+          entityType: 'project_posting',
+          createdAt: now,
+          read: false,
+          severity: 'info',
+        });
+      }
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'posting_withdrawn', entityId: id, entityType: 'project_posting', beforeStatus: 'published', afterStatus: 'withdrawn' });
+      return res.status(200).json({ id, status: 'withdrawn', updatedAt: now });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -382,7 +423,55 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'hire_freelancer')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id, appId } = req.params;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+      const { createMarketplaceEscrow } = await import('../features/marketplace/services/marketplaceEscrowService');
+
+      // Fetch task
+      const taskDoc = await adminDb.collection('marketplace_task_postings').doc(id).get();
+      if (!taskDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Task posting not found' });
+      }
+      const task = taskDoc.data()!;
+
+      // Fetch application
+      const appDoc = await adminDb.collection('marketplace_task_applications').doc(appId).get();
+      if (!appDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Application not found' });
+      }
+      const application = appDoc.data()!;
+
+      const now = new Date().toISOString();
+
+      // Create escrow holding for the task payment
+      const escrow = await createMarketplaceEscrow({
+        type: 'task_acceptance',
+        projectId: id,
+        entityId: appId,
+        fundingSourceId: uid,
+        amount: { amount: task.paymentAmount || 0, currency: 'ZAR' },
+        milestones: [{ title: 'Task Delivery', targetDate: task.deadline || now }],
+        actorId: uid,
+      });
+
+      // Update task status to in_progress and assign freelancer
+      await adminDb.collection('marketplace_task_postings').doc(id).update({
+        status: 'in_progress',
+        assignedFreelancerId: application.freelancerId || application.userId,
+        escrowId: escrow.escrowId,
+        updatedAt: now,
+      });
+
+      // Update application to accepted
+      await adminDb.collection('marketplace_task_applications').doc(appId).update({
+        status: 'accepted',
+        updatedAt: now,
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'task_application_accepted', entityId: appId, entityType: 'task_application', beforeStatus: 'pending', afterStatus: 'accepted' });
+      return res.status(200).json({ taskId: id, applicationId: appId, status: 'accepted', escrowId: escrow.escrowId });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -395,7 +484,51 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'apply_task')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { fileId, format, description } = req.body;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Verify task exists and is in_progress
+      const taskDoc = await adminDb.collection('marketplace_task_postings').doc(id).get();
+      if (!taskDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Task posting not found' });
+      }
+      const task = taskDoc.data()!;
+      if (task.status !== 'in_progress') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot deliver on task with status "${task.status}"` });
+      }
+
+      const now = new Date().toISOString();
+
+      // Store deliverable
+      const deliverableRef = adminDb.collection('marketplace_task_deliverables').doc();
+      await deliverableRef.set({
+        taskId: id,
+        freelancerId: uid,
+        fileId: fileId || null,
+        format: format || task.deliverableFormat || 'pdf',
+        description: description || '',
+        status: 'pending_review',
+        submittedAt: now,
+      });
+
+      // Route to AI review queue
+      await adminDb.collection('ai_review_queue').add({
+        entityId: deliverableRef.id,
+        entityType: 'task_deliverable',
+        taskId: id,
+        freelancerId: uid,
+        queuedAt: now,
+        status: 'pending',
+      });
+
+      // Update task status to delivered
+      await adminDb.collection('marketplace_task_postings').doc(id).update({ status: 'delivered', updatedAt: now });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'task_delivered', entityId: deliverableRef.id, entityType: 'task_deliverable', beforeStatus: 'in_progress', afterStatus: 'delivered' });
+      return res.status(201).json({ deliverableId: deliverableRef.id, taskId: id, status: 'delivered' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -408,7 +541,53 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'hire_freelancer')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Fetch task
+      const taskDoc = await adminDb.collection('marketplace_task_postings').doc(id).get();
+      if (!taskDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Task posting not found' });
+      }
+      const task = taskDoc.data()!;
+      if (task.status !== 'delivered') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot sign-off on task with status "${task.status}"` });
+      }
+
+      // Verify AI review passed
+      const reviewSnap = await adminDb.collection('ai_review_queue')
+        .where('taskId', '==', id)
+        .where('status', '==', 'passed')
+        .limit(1)
+        .get();
+
+      if (reviewSnap.empty) {
+        return res.status(422).json({ code: 'REVIEW_NOT_PASSED', message: 'AI review has not passed for this deliverable' });
+      }
+
+      const now = new Date().toISOString();
+
+      // Mark task complete
+      await adminDb.collection('marketplace_task_postings').doc(id).update({ status: 'completed', completedAt: now, updatedAt: now });
+
+      // Trigger escrow release if escrow exists
+      if (task.escrowId) {
+        const { requestEscrowRelease } = await import('../features/marketplace/services/marketplaceEscrowService');
+        await requestEscrowRelease({
+          escrowId: task.escrowId,
+          milestoneId: 'task-completion',
+          conditions: { milestoneCompleteByHiringParty: true, deliverableUploadedWithValidDocId: true, aiReviewPassed: true, professionalSignOff: true },
+          actorId: uid,
+          recipientUserId: task.assignedFreelancerId || '',
+          amount: { amount: task.paymentAmount || 0, currency: 'ZAR' },
+          complianceSignOffId: `signoff-${id}`,
+        });
+      }
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'task_signed_off', entityId: id, entityType: 'task_posting', beforeStatus: 'delivered', afterStatus: 'completed' });
+      return res.status(200).json({ taskId: id, status: 'completed', completedAt: now });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -468,7 +647,50 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'request_quote')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { quantity, projectId, deliveryZone, notes } = req.body;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Verify material listing exists
+      const materialDoc = await adminDb.collection('marketplace_material_listings').doc(id).get();
+      if (!materialDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Material listing not found' });
+      }
+      const material = materialDoc.data()!;
+
+      const now = new Date().toISOString();
+
+      // Create quote request linked to contractor's project
+      const quoteRef = adminDb.collection('marketplace_quote_requests').doc();
+      await quoteRef.set({
+        materialListingId: id,
+        requesterId: uid,
+        supplierId: material.supplierId,
+        projectId: projectId || null,
+        quantity: quantity || 1,
+        deliveryZone: deliveryZone || null,
+        notes: notes || '',
+        status: 'pending',
+        createdAt: now,
+      });
+
+      // Notify supplier via Action Centre
+      await adminDb.collection('action_centre_events').add({
+        type: 'quote_requested',
+        recipientUserId: material.supplierId,
+        title: 'New Quote Request',
+        description: `Quote request received for "${material.productName}".`,
+        entityId: quoteRef.id,
+        entityType: 'quote_request',
+        createdAt: now,
+        read: false,
+        severity: 'action_required',
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'quote_requested', entityId: quoteRef.id, entityType: 'quote_request', afterStatus: 'pending' });
+      return res.status(201).json({ quoteRequestId: quoteRef.id, materialListingId: id, status: 'pending' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -481,7 +703,33 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'respond_quote')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { amount, validUntil, leadTimeDays, notes } = req.body;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Fetch quote request
+      const quoteDoc = await adminDb.collection('marketplace_quote_requests').doc(id).get();
+      if (!quoteDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote request not found' });
+      }
+
+      const now = new Date().toISOString();
+
+      // Update quote with supplier's response
+      await adminDb.collection('marketplace_quote_requests').doc(id).update({
+        quotedAmount: amount || 0,
+        validUntil: validUntil || null,
+        leadTimeDays: leadTimeDays || null,
+        supplierNotes: notes || '',
+        status: 'quoted',
+        respondedAt: now,
+        updatedAt: now,
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'quote_responded', entityId: id, entityType: 'quote_request', beforeStatus: 'pending', afterStatus: 'quoted' });
+      return res.status(200).json({ quoteRequestId: id, status: 'quoted', quotedAmount: amount });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -494,7 +742,45 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'request_quote')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+      const { createMarketplaceEscrow } = await import('../features/marketplace/services/marketplaceEscrowService');
+
+      // Fetch quote
+      const quoteDoc = await adminDb.collection('marketplace_quote_requests').doc(id).get();
+      if (!quoteDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote request not found' });
+      }
+      const quote = quoteDoc.data()!;
+      if (quote.status !== 'quoted') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot accept quote with status "${quote.status}"` });
+      }
+
+      const now = new Date().toISOString();
+
+      // Create escrow holding for quoted amount
+      const escrow = await createMarketplaceEscrow({
+        type: 'supplier_quote_acceptance',
+        projectId: quote.projectId || id,
+        entityId: id,
+        fundingSourceId: uid,
+        amount: { amount: quote.quotedAmount || 0, currency: 'ZAR' },
+        milestones: [{ title: 'Material Delivery', targetDate: now }],
+        actorId: uid,
+      });
+
+      // Update quote status to accepted
+      await adminDb.collection('marketplace_quote_requests').doc(id).update({
+        status: 'accepted',
+        escrowId: escrow.escrowId,
+        acceptedAt: now,
+        updatedAt: now,
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'quote_accepted', entityId: id, entityType: 'quote_request', beforeStatus: 'quoted', afterStatus: 'accepted' });
+      return res.status(200).json({ quoteRequestId: id, status: 'accepted', escrowId: escrow.escrowId });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -507,7 +793,35 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'request_quote')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { deliveryNoteRef, deliveredAt, notes } = req.body;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Fetch quote
+      const quoteDoc = await adminDb.collection('marketplace_quote_requests').doc(id).get();
+      if (!quoteDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote request not found' });
+      }
+      const quote = quoteDoc.data()!;
+      if (quote.status !== 'accepted') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot add delivery note to quote with status "${quote.status}"` });
+      }
+
+      const now = new Date().toISOString();
+
+      // Update quote with delivery note reference
+      await adminDb.collection('marketplace_quote_requests').doc(id).update({
+        deliveryNoteRef: deliveryNoteRef || null,
+        deliveredAt: deliveredAt || now,
+        deliveryNotes: notes || '',
+        status: 'delivered',
+        updatedAt: now,
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'delivery_note_uploaded', entityId: id, entityType: 'quote_request', beforeStatus: 'accepted', afterStatus: 'delivered' });
+      return res.status(200).json({ quoteRequestId: id, status: 'delivered', deliveryNoteRef });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -562,7 +876,27 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'create_freelancer_profile')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const body = req.body;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Verify profile exists
+      const profileDoc = await adminDb.collection('marketplace_freelancer_profiles').doc(uid).get();
+      if (!profileDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Freelancer profile not found. Create one first.' });
+      }
+
+      const now = new Date().toISOString();
+      const updates: Record<string, unknown> = { updatedAt: now };
+      if (body.skills !== undefined) updates.skills = body.skills;
+      if (body.availability !== undefined) updates.availability = body.availability;
+      if (body.yearsExperience !== undefined) updates.yearsExperience = body.yearsExperience;
+
+      await adminDb.collection('marketplace_freelancer_profiles').doc(uid).update(updates);
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'freelancer_profile_updated', entityId: uid, entityType: 'freelancer_profile' });
+      return res.status(200).json({ userId: uid, ...updates });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -602,7 +936,16 @@ marketplaceRouter.get(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'post_collaboration')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { adminDb } = await import('@/lib/firebase-admin');
+
+      // Query collaborations filtered by user's firm (firmId matches uid or user is a member)
+      const snapshot = await adminDb.collection('marketplace_firm_collaborations')
+        .where('firmId', '==', uid)
+        .get();
+
+      const collaborations = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      return res.status(200).json({ collaborations, total: collaborations.length });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -615,7 +958,63 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'post_collaboration')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { inviteeId, role } = req.body;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      if (!inviteeId) {
+        return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'inviteeId is required' });
+      }
+
+      // Verify collaboration exists
+      const collabDoc = await adminDb.collection('marketplace_firm_collaborations').doc(id).get();
+      if (!collabDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Collaboration not found' });
+      }
+
+      // Verify invitee eligibility: Trust Score >= 75 and active registration
+      const { getTrustScore } = await import('../features/marketplace/services/trustScoreService');
+      const trustScore = await getTrustScore(inviteeId);
+      if (!trustScore || trustScore.overallScore < 75) {
+        return res.status(422).json({ code: 'ELIGIBILITY_BLOCKED', message: 'Invitee must have a Trust Score of at least 75' });
+      }
+
+      const { checkProfessionalVerification } = await import('../features/marketplace/services/verificationGatesService');
+      const verification = await checkProfessionalVerification(inviteeId);
+      if (!verification.verified) {
+        return res.status(422).json({ code: 'ELIGIBILITY_BLOCKED', message: 'Invitee must have an active professional registration' });
+      }
+
+      const now = new Date().toISOString();
+
+      // Create invitation record
+      const inviteRef = adminDb.collection('marketplace_collaboration_invites').doc();
+      await inviteRef.set({
+        collaborationId: id,
+        inviterId: uid,
+        inviteeId,
+        role: role || 'member',
+        status: 'pending',
+        createdAt: now,
+      });
+
+      // Notify invitee
+      await adminDb.collection('action_centre_events').add({
+        type: 'collaboration_invite',
+        recipientUserId: inviteeId,
+        title: 'Collaboration Invitation',
+        description: `You have been invited to join a firm collaboration.`,
+        entityId: inviteRef.id,
+        entityType: 'collaboration_invite',
+        createdAt: now,
+        read: false,
+        severity: 'action_required',
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'collaboration_invite_sent', entityId: inviteRef.id, entityType: 'collaboration_invite', afterStatus: 'pending' });
+      return res.status(201).json({ inviteId: inviteRef.id, collaborationId: id, inviteeId, status: 'pending' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -628,7 +1027,44 @@ marketplaceRouter.put(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'post_collaboration')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Fetch collaboration
+      const collabDoc = await adminDb.collection('marketplace_firm_collaborations').doc(id).get();
+      if (!collabDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Collaboration not found' });
+      }
+      const collab = collabDoc.data()!;
+
+      if (collab.status === 'completed') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: 'Collaboration is already completed' });
+      }
+
+      const now = new Date().toISOString();
+
+      // Mark collaboration complete
+      await adminDb.collection('marketplace_firm_collaborations').doc(id).update({
+        status: 'completed',
+        completedAt: now,
+        updatedAt: now,
+      });
+
+      // Trigger Trust Score recalculation for all participants
+      const { recalculateOnEvent } = await import('../features/marketplace/services/trustScoreService');
+      const members: Array<{ userId: string }> = collab.teamMembers || [];
+      for (const member of members) {
+        try {
+          await recalculateOnEvent({ userId: member.userId, type: 'project_completed' });
+        } catch (e) {
+          console.error(`[Marketplace] Trust Score recalculation failed for ${member.userId}:`, e);
+        }
+      }
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'collaboration_completed', entityId: id, entityType: 'firm_collaboration', beforeStatus: collab.status, afterStatus: 'completed' });
+      return res.status(200).json({ collaborationId: id, status: 'completed', completedAt: now });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -643,7 +1079,63 @@ marketplaceRouter.post(
   async (req: Request, res: Response) => {
     try {
       if (!checkPermission(req, res, 'receive_certificate')) return;
-      return res.status(501).json({ code: 'NOT_IMPLEMENTED', message: 'This endpoint is not yet implemented' });
+      const uid = getUserId(req)!;
+      const { id } = req.params;
+      const { adminDb } = await import('@/lib/firebase-admin');
+      const { logMarketplaceAction } = await import('../features/marketplace/services/marketplaceAuditService');
+
+      // Fetch project posting
+      const postingDoc = await adminDb.collection('marketplace_project_postings').doc(id).get();
+      if (!postingDoc.exists) {
+        return res.status(404).json({ code: 'NOT_FOUND', message: 'Project posting not found' });
+      }
+      const posting = postingDoc.data()!;
+
+      // Check all milestones complete (look at proposals for this posting with accepted status)
+      const proposalsSnap = await adminDb.collection('marketplace_proposals')
+        .where('postingId', '==', id)
+        .where('status', '==', 'accepted')
+        .limit(1)
+        .get();
+
+      if (proposalsSnap.empty) {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: 'No accepted proposal found for this project' });
+      }
+
+      // Verify project is complete (posting status must be 'accepted' and project tasks completed)
+      if (posting.status !== 'accepted') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: 'Project must have an accepted proposal to generate a certificate' });
+      }
+
+      const now = new Date().toISOString();
+
+      // Generate certificate data
+      const certRef = adminDb.collection('marketplace_certificates').doc();
+      const certificateData = {
+        projectPostingId: id,
+        title: posting.title,
+        clientId: posting.clientId,
+        issuedTo: uid,
+        sansReferences: posting.sansReferences || [],
+        requiredTools: posting.requiredTools || [],
+        issuedAt: now,
+        status: 'issued',
+      };
+
+      await certRef.set(certificateData);
+
+      // Store in document vault
+      await adminDb.collection('document_vault').add({
+        type: 'compliance_certificate',
+        entityId: certRef.id,
+        projectId: id,
+        ownerId: uid,
+        createdAt: now,
+        metadata: certificateData,
+      });
+
+      await logMarketplaceAction({ actorId: uid, actionType: 'certificate_generated', entityId: certRef.id, entityType: 'certificate', afterStatus: 'issued' });
+      return res.status(201).json({ certificateId: certRef.id, ...certificateData });
     } catch (err) {
       handleServiceError(res, err);
     }

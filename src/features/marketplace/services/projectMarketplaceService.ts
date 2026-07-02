@@ -1326,18 +1326,20 @@ export async function acceptProposal(
     console.error('[ProjectMarketplace] Failed to load toolbox:', error);
   }
 
-  // 5. Create escrow holding in "created" state for fee amount + platform fees
+  // 5. Create escrow holding via real marketplace escrow service
   let escrowId: string;
   try {
-    const result = await createEscrowHolding({
-      proposalId,
-      postingId,
-      clientId,
-      professionalId: proposal.professionalId,
-      feeAmount: proposal.feeAmount,
-      milestones: proposal.milestonePlan,
+    const { createMarketplaceEscrow } = await import('./marketplaceEscrowService');
+    const escrowResult = await createMarketplaceEscrow({
+      type: 'project_acceptance',
+      projectId,
+      entityId: proposalId,
+      fundingSourceId: clientId,
+      amount: { amount: proposal.feeAmount, currency: 'ZAR' },
+      milestones: proposal.milestonePlan.map((m) => ({ title: m.title, targetDate: m.targetDate })),
+      actorId: clientId,
     });
-    escrowId = result.escrowId;
+    escrowId = escrowResult.escrowId;
   } catch (error) {
     // Escrow creation failed — preserve proposal as "pending_acceptance"
     console.error('[ProjectMarketplace] Escrow creation failed:', error);
@@ -1367,36 +1369,51 @@ export async function acceptProposal(
     };
   }
 
-  // 6. Update proposal status to 'accepted' and posting status to 'accepted'
+  // 6. Atomically update proposal status to 'accepted' and posting status to 'accepted'
   const now = new Date().toISOString();
 
   try {
     const { adminDb } = await import('@/lib/firebase-admin');
+    const batch = adminDb.batch();
 
-    // Update proposal status
-    await adminDb
-      .collection('marketplace_proposals')
-      .doc(proposalId)
-      .update({ status: 'accepted' });
+    // Update posting status to 'accepted'
+    batch.update(adminDb.collection('marketplace_project_postings').doc(postingId), {
+      status: 'accepted',
+      updatedAt: now,
+    });
 
-    // Update posting status
-    await adminDb
-      .collection('marketplace_project_postings')
-      .doc(postingId)
-      .update({
-        status: 'accepted',
-        updatedAt: now,
-      });
+    // Update proposal status to 'accepted'
+    batch.update(adminDb.collection('marketplace_proposals').doc(proposalId), {
+      status: 'accepted',
+      updatedAt: now,
+    });
+
+    // Create project passport record
+    batch.set(adminDb.doc(`projects/${projectId}/passport/health`), {
+      postingId,
+      proposalId,
+      clientId,
+      professionalId: proposal.professionalId,
+      title: posting.title,
+      createdAt: now,
+      status: 'active',
+    });
+
+    // Commit atomically
+    await batch.commit();
   } catch (error) {
-    console.error('[ProjectMarketplace] Failed to update statuses after acceptance:', error);
+    console.error('[ProjectMarketplace] Batch commit failed during acceptance:', error);
     return {
       code: 'PERSISTENCE_ERROR',
       message: 'Failed to update proposal/posting status',
-      details: { reason: 'Firestore write failed during status update' },
+      details: { reason: 'Batch write failed during status update — no changes applied' },
     };
   }
 
-  // 7. Log acceptance event to audit trail with full context
+  // 7. After batch succeeds, create escrow (separate call, can be retried)
+  // (already done in step 5 above)
+
+  // 8. Log acceptance event to audit trail with full context
   await logMarketplaceAction({
     actorId: clientId,
     actionType: 'proposal_accepted',
@@ -1416,10 +1433,10 @@ export async function acceptProposal(
     },
   });
 
-  // 8. Surface to Action Centre for the professional
+  // 9. Surface to Action Centre for the professional (non-critical, fire-and-forget)
   try {
     const { surfaceToActionCentre } = await import('./platformIntegrationService');
-    await surfaceToActionCentre({
+    surfaceToActionCentre({
       recipientUserId: proposal.professionalId,
       recipientRole: 'architect',
       title: 'Proposal Accepted',
@@ -1429,10 +1446,9 @@ export async function acceptProposal(
       sourceEntityType: 'proposal',
       priority: 'high',
       projectId,
-    });
+    }).catch((err: unknown) => console.error('[Marketplace] Action Centre notification failed:', err));
   } catch (e) {
-    // Non-blocking: best-effort notification
-    console.error('[ProjectMarketplace] Failed to surface acceptance to Action Centre:', e);
+    console.error('[Marketplace] Action Centre notification failed:', e);
   }
 
   return {

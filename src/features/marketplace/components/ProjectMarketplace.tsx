@@ -26,65 +26,6 @@ interface ProjectMarketplaceProps {
   user: UserProfile;
 }
 
-const mockPostings: ProjectPosting[] = [
-  {
-    id: 'proj-1',
-    clientId: 'client-1',
-    tenantId: 'client-1',
-    title: 'Residential Development — Sandton Phase 2',
-    description: 'Full architectural services for a 24-unit residential complex including structural, MEP, and compliance.',
-    location: 'Sandton, Johannesburg',
-    municipality: 'City of Johannesburg',
-    budgetRange: { min: 2500000, max: 4800000 },
-    sansReferences: ['SANS 10400-K', 'SANS 10400-N', 'SANS 10400-XA'],
-    requiredTools: ['wall-compliance-checker', 'fenestration-analyser'],
-    expiryDate: '2026-08-15T00:00:00.000Z',
-    status: 'published',
-    createdAt: '2026-06-01T09:00:00.000Z',
-    updatedAt: '2026-06-01T09:00:00.000Z',
-  },
-  {
-    id: 'proj-2',
-    clientId: 'client-2',
-    tenantId: 'client-2',
-    title: 'Commercial Office Fit-Out — Cape Town CBD',
-    description: 'Interior architecture and compliance sign-off for a 3-floor office conversion.',
-    location: 'Cape Town CBD',
-    municipality: 'City of Cape Town',
-    budgetRange: { min: 800000, max: 1500000 },
-    sansReferences: ['SANS 10400-T', 'SANS 10400-S'],
-    requiredTools: ['fire-safety-analyser'],
-    expiryDate: '2026-07-30T00:00:00.000Z',
-    status: 'published',
-    createdAt: '2026-06-10T09:00:00.000Z',
-    updatedAt: '2026-06-10T09:00:00.000Z',
-  },
-];
-
-const mockProposal: ProjectProposal = {
-  id: 'prop-1',
-  postingId: 'proj-1',
-  professionalId: 'prof-1',
-  registrationNumber: 'SACAP-2024-1234',
-  cpdPointsEarned: 42,
-  cpdPointsRequired: 25,
-  trustScore: 88,
-  toolUsageHistory: { 'wall-compliance-checker': 15, 'fenestration-analyser': 8 },
-  recentProjects: [
-    { projectId: 'rp-1', title: 'Rosebank Mixed-Use', completedAt: '2026-03-15', rating: 4.8 },
-    { projectId: 'rp-2', title: 'Pretoria Office Park', completedAt: '2026-01-20', rating: 4.5 },
-  ],
-  feeAmount: 3200000,
-  milestonePlan: [
-    { title: 'Concept Design', targetDate: '2026-07-01T00:00:00.000Z', amount: 640000 },
-    { title: 'Developed Design', targetDate: '2026-08-15T00:00:00.000Z', amount: 960000 },
-    { title: 'Technical Documentation', targetDate: '2026-10-01T00:00:00.000Z', amount: 960000 },
-    { title: 'Construction Monitoring', targetDate: '2027-01-15T00:00:00.000Z', amount: 640000 },
-  ],
-  status: 'submitted',
-  createdAt: '2026-06-05T10:30:00.000Z',
-};
-
 function formatCurrency(amount: number): string {
   return `R ${amount.toLocaleString('en-ZA')}`;
 }
@@ -101,14 +42,16 @@ function getStatusColor(status: ProjectPostingStatus): string {
 
 export default function ProjectMarketplace({ user }: ProjectMarketplaceProps) {
   const [activeTab, setActiveTab] = useState('listings');
-  const [_postings, setPostings] = useState<ProjectPosting[]>(mockPostings);
-  const [_selectedProposal] = useState<ProjectProposal | null>(mockProposal);
+  const [_postings, setPostings] = useState<ProjectPosting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [_selectedProposal] = useState<ProjectProposal | null>(null);
 
   useEffect(() => {
     apiFetch('/api/marketplace/projects')
       .then((r) => r.json())
       .then((d) => setPostings(d.postings || []))
-      .catch(() => setPostings(mockPostings));
+      .catch(() => setPostings([]))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -135,6 +78,11 @@ export default function ProjectMarketplace({ user }: ProjectMarketplaceProps) {
 
         {/* Active Listings */}
         <TabsContent value="listings">
+          {loading ? (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">Loading...</p></div>
+          ) : _postings.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No postings found</p></div>
+          ) : (
           <div className="space-y-4">
             {_postings.map((posting) => (
               <Card key={posting.id} className="bg-surface-800/70 backdrop-blur border-surface-700/50">
@@ -190,11 +138,12 @@ export default function ProjectMarketplace({ user }: ProjectMarketplaceProps) {
               </Card>
             ))}
           </div>
+          )}
         </TabsContent>
 
         {/* Proposals */}
         <TabsContent value="proposals">
-          {_selectedProposal && (
+          {_selectedProposal ? (
             <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
@@ -264,6 +213,8 @@ export default function ProjectMarketplace({ user }: ProjectMarketplaceProps) {
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No proposals found</p></div>
           )}
         </TabsContent>
 

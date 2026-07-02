@@ -23,61 +23,6 @@ interface SupplierMarketplaceProps {
   user: UserProfile;
 }
 
-const mockListings: MaterialListing[] = [
-  {
-    id: 'mat-1',
-    supplierId: 'supplier-1',
-    tenantId: 'supplier-1',
-    productName: 'Concrete Roof Tiles — Marley Modern',
-    description: 'SANS 542 compliant concrete roof tiles. Available in charcoal, terracotta, and slate grey.',
-    sansComplianceReference: 'SANS 542',
-    leadTimeDays: 14,
-    warrantyTerms: '30-year structural warranty; 15-year colour warranty',
-    deliveryZones: ['Gauteng', 'North West', 'Mpumalanga'],
-    unitPriceZar: 12.50,
-    certificationDocuments: [
-      { fileId: 'cert-1', fileName: 'SANS-542-certificate.pdf', format: 'pdf', sizeBytes: 245000 },
-    ],
-    status: 'active',
-    createdAt: '2026-05-20T09:00:00.000Z',
-  },
-  {
-    id: 'mat-2',
-    supplierId: 'supplier-2',
-    tenantId: 'supplier-2',
-    productName: 'Structural Steel — IPE 200',
-    description: 'Hot-rolled structural steel IPE 200 sections. SANS 1431 grade 300W.',
-    sansComplianceReference: 'SANS 1431',
-    leadTimeDays: 7,
-    warrantyTerms: 'Material certification provided per batch. No warranty on fabrication.',
-    deliveryZones: ['Gauteng', 'Western Cape', 'KwaZulu-Natal'],
-    unitPriceZar: 3850.00,
-    certificationDocuments: [
-      { fileId: 'cert-2', fileName: 'mill-certificate.pdf', format: 'pdf', sizeBytes: 180000 },
-      { fileId: 'cert-3', fileName: 'test-report.pdf', format: 'pdf', sizeBytes: 320000 },
-    ],
-    status: 'active',
-    createdAt: '2026-06-01T11:00:00.000Z',
-  },
-  {
-    id: 'mat-3',
-    supplierId: 'supplier-3',
-    tenantId: 'supplier-3',
-    productName: 'Fire-Rated Drywall — 60min FRL',
-    description: 'Fire-rated gypsum board achieving 60-minute fire resistance. SANS 10400-T compliant system.',
-    sansComplianceReference: 'SANS 10400-T',
-    leadTimeDays: 5,
-    warrantyTerms: '10-year product warranty subject to correct installation per manufacturer spec.',
-    deliveryZones: ['Gauteng', 'Western Cape', 'Free State', 'KwaZulu-Natal'],
-    unitPriceZar: 285.00,
-    certificationDocuments: [
-      { fileId: 'cert-4', fileName: 'fire-test-report.pdf', format: 'pdf', sizeBytes: 520000 },
-    ],
-    status: 'active',
-    createdAt: '2026-06-05T14:30:00.000Z',
-  },
-];
-
 function formatCurrency(amount: number): string {
   return `R ${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
 }
@@ -85,13 +30,15 @@ function formatCurrency(amount: number): string {
 export default function SupplierMarketplace({ user }: SupplierMarketplaceProps) {
   const [activeTab, setActiveTab] = useState('browse');
   const [searchText, setSearchText] = useState('');
-  const [_listings, setListings] = useState<MaterialListing[]>(mockListings);
+  const [_listings, setListings] = useState<MaterialListing[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch('/api/marketplace/materials')
       .then((r) => r.json())
       .then((d) => setListings(d.materials || []))
-      .catch(() => setListings(mockListings));
+      .catch(() => setListings([]))
+      .finally(() => setLoading(false));
   }, []);
 
   const filteredListings = _listings.filter((listing) => {
@@ -165,6 +112,12 @@ export default function SupplierMarketplace({ user }: SupplierMarketplaceProps) 
             </Card>
 
             {/* Material Listings */}
+            {loading ? (
+              <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">Loading...</p></div>
+            ) : filteredListings.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No listings found</p></div>
+            ) : (
+            <>
             {filteredListings.map((listing) => (
               <Card key={listing.id} className="bg-surface-800/70 backdrop-blur border-surface-700/50">
                 <CardContent className="p-5">
@@ -211,6 +164,8 @@ export default function SupplierMarketplace({ user }: SupplierMarketplaceProps) 
                 </CardContent>
               </Card>
             ))}
+            </>
+            )}
           </div>
         </TabsContent>
 

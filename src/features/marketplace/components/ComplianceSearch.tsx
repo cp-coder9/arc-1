@@ -37,42 +37,6 @@ const mockSuggestions: AutoSuggestion[] = [
   { type: 'region', label: 'Western Cape', value: 'western-cape' },
 ];
 
-const mockResults: ComplianceSearchResult[] = [
-  {
-    userId: 'prof-1',
-    displayName: 'Thandi Mokoena Pr.Eng',
-    registrationNumber: 'ECSA-2019-4521',
-    cpdStatus: 'compliant',
-    trustScore: 94,
-    toolUsageHistory: { 'structural-load-calculator': 42, 'fenestration-analyser': 18 },
-    municipalApprovalCount: 31,
-    disputeCount: 0,
-    badges: ['top_10_percent'],
-  },
-  {
-    userId: 'prof-2',
-    displayName: 'Johan van der Merwe Pr.Arch',
-    registrationNumber: 'SACAP-2017-8834',
-    cpdStatus: 'compliant',
-    trustScore: 88,
-    toolUsageHistory: { 'structural-load-calculator': 12, 'fenestration-analyser': 25, 'energy-compliance-tool': 30 },
-    municipalApprovalCount: 22,
-    disputeCount: 0,
-    badges: [],
-  },
-  {
-    userId: 'prof-3',
-    displayName: 'Naledi Khumalo Pr.Eng',
-    registrationNumber: 'ECSA-2020-1127',
-    cpdStatus: 'compliant',
-    trustScore: 82,
-    toolUsageHistory: { 'structural-load-calculator': 8, 'fire-safety-analyser': 14 },
-    municipalApprovalCount: 15,
-    disputeCount: 0,
-    badges: [],
-  },
-];
-
 function getSuggestionTypeColor(type: AutoSuggestion['type']): string {
   switch (type) {
     case 'tool': return 'bg-primary-500/20 text-primary-400 border-primary-500/30';
@@ -95,7 +59,8 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
   const [searchText, setSearchText] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<AutoSuggestion[]>([]);
-  const [results, setResults] = useState<ComplianceSearchResult[]>(mockResults);
+  const [results, setResults] = useState<ComplianceSearchResult[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch('/api/marketplace/search/professionals', {
@@ -107,7 +72,8 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
       .then((d) => {
         if (d && d.results) setResults(d.results);
       })
-      .catch(() => { /* keep mock fallback */ });
+      .catch(() => { /* no fallback */ })
+      .finally(() => setLoading(false));
   }, []);
 
   const filteredSuggestions = searchText.length >= 2
@@ -235,6 +201,12 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
 
       {/* Search Results */}
       <div className="space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">Loading...</p></div>
+        ) : results.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No results found</p></div>
+        ) : (
+        <>
         <p className="text-sm text-surface-400">
           {results.length} professional{results.length !== 1 ? 's' : ''} found — sorted by Trust Score
         </p>
@@ -300,6 +272,8 @@ export default function ComplianceSearch({ user }: ComplianceSearchProps) {
             </CardContent>
           </Card>
         ))}
+        </>
+        )}
       </div>
     </div>
   );
