@@ -32,6 +32,7 @@
     "packs/**",
     "tmp/**",
     "arc-1/**",
-    ".claude/**"
+    ".claude/**",
+    "src/features/town-planning/**"
   ]
 }
