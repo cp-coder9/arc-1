@@ -83,9 +83,20 @@ function handleServiceError(res: Response, err: unknown): void {
     const statusMap: Record<string, number> = {
       VALIDATION_ERROR: 400,
       NOT_FOUND: 404,
+      ACCESS_DENIED: 403,
+      INVALID_TRANSITION: 422,
       ELIGIBILITY_BLOCKED: 422,
+      APPLICATION_BLOCKED: 422,
       ESCROW_TRANSITION_REJECTED: 422,
+      REVIEW_NOT_PASSED: 422,
+      USER_INELIGIBLE: 403,
+      INVALID_TOOL_IDS: 400,
+      PERSISTENCE_ERROR: 500,
+      FETCH_ERROR: 500,
+      PROJECT_CREATION_FAILED: 500,
+      ESCROW_CREATION_FAILED: 500,
       EXTERNAL_TIMEOUT: 503,
+      SUPPLIER_NOT_VERIFIED: 403,
     };
     const code = (err as any).code as string | undefined;
     const status = (code && statusMap[code]) || 500;
@@ -444,51 +455,59 @@ marketplaceRouter.put(
       }
       const appData = appDoc.data()!;
 
+      // Verify application belongs to this task
+      if (appData.taskId !== id) {
+        return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Application does not belong to this task' });
+      }
+
+      // Verify task is open (accept-ready)
+      if (taskData?.status !== 'open') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Task must be in "open" status to accept applications, current: "${taskData?.status}"` });
+      }
+
+      // Verify application is pending
+      if (appData.status !== 'pending') {
+        return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Application must be in "pending" status, current: "${appData.status}"` });
+      }
+
       const now = new Date().toISOString();
 
-      // Atomic batch: escrow + task status + application status + audit
-      const batch = adminDb.batch();
+      // Transaction-safe acceptance: prevents concurrent duplicate escrow
+      await adminDb.runTransaction(async (transaction) => {
+        // Re-read task within transaction to prevent race
+        const taskRef = adminDb.collection('marketplace_task_postings').doc(id);
+        const taskSnap = await transaction.get(taskRef);
+        if (taskSnap.data()?.status !== 'open') {
+          throw Object.assign(new Error('Task already accepted by another transaction'), { code: 'INVALID_TRANSITION' });
+        }
 
-      // Update task status
-      batch.update(adminDb.collection('marketplace_task_postings').doc(id), {
-        status: 'in_progress',
-        assignedFreelancerId: appData.freelancerId,
-        updatedAt: now,
+        const appRef = adminDb.collection('marketplace_task_applications').doc(appId);
+        const escrowRef = adminDb.collection('marketplace_escrow_holdings').doc();
+        const auditRef = adminDb.collection('marketplace_audit_trail').doc();
+
+        transaction.update(taskRef, { status: 'in_progress', assignedFreelancerId: appData.freelancerId, updatedAt: now });
+        transaction.update(appRef, { status: 'accepted', updatedAt: now });
+        transaction.set(escrowRef, {
+          escrowId: escrowRef.id,
+          type: 'task',
+          entityId: id,
+          amount: { value: taskData?.paymentAmount, currency: 'ZAR' },
+          state: 'funded_held',
+          createdAt: now,
+          updatedAt: now,
+        });
+        transaction.set(auditRef, {
+          actorId: uid,
+          actionType: 'task_application_accepted',
+          entityId: id,
+          entityType: 'task_posting',
+          timestamp: now,
+          afterStatus: 'in_progress',
+          metadata: { applicationId: appId, freelancerId: appData.freelancerId, escrowId: escrowRef.id },
+        });
       });
 
-      // Update application status
-      batch.update(adminDb.collection('marketplace_task_applications').doc(appId), {
-        status: 'accepted',
-        updatedAt: now,
-      });
-
-      // Create escrow holding (within batch)
-      const escrowRef = adminDb.collection('marketplace_escrow_holdings').doc();
-      batch.set(escrowRef, {
-        escrowId: escrowRef.id,
-        type: 'task',
-        entityId: id,
-        amount: { value: taskData.paymentAmount, currency: 'ZAR' },
-        state: 'funded_held',
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      // Create audit entry (within batch)
-      const auditRef = adminDb.collection('marketplace_audit_trail').doc();
-      batch.set(auditRef, {
-        actorId: uid,
-        actionType: 'task_application_accepted',
-        entityId: id,
-        entityType: 'task_posting',
-        timestamp: now,
-        afterStatus: 'in_progress',
-        metadata: { applicationId: appId, freelancerId: appData.freelancerId, escrowId: escrowRef.id },
-      });
-
-      await batch.commit();
-
-      return res.status(200).json({ taskId: id, applicationId: appId, status: 'accepted', escrowId: escrowRef.id });
+      return res.status(200).json({ taskId: id, applicationId: appId, status: 'accepted' });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -513,6 +532,12 @@ marketplaceRouter.post(
         return res.status(404).json({ code: 'NOT_FOUND', message: 'Task posting not found' });
       }
       const task = taskDoc.data()!;
+
+      // Entity-level auth: only the assigned freelancer can deliver
+      if (task.assignedFreelancerId !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the assigned freelancer can submit deliverables' });
+      }
+
       if (task.status !== 'in_progress') {
         return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot deliver on task with status "${task.status}"` });
       }
@@ -569,6 +594,12 @@ marketplaceRouter.put(
         return res.status(404).json({ code: 'NOT_FOUND', message: 'Task posting not found' });
       }
       const task = taskDoc.data()!;
+
+      // Entity-level auth: only the task professional owner can sign off
+      if (task.professionalId !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the task owner can sign off on deliverables' });
+      }
+
       if (task.status !== 'delivered') {
         return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot sign-off on task with status "${task.status}"` });
       }
@@ -767,25 +798,37 @@ marketplaceRouter.put(
       const quoteDoc = await adminDb.collection('marketplace_quote_requests').doc(id).get();
       if (!quoteDoc.exists) return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote not found' });
       const quoteData = quoteDoc.data();
-      if (quoteData?.contractorId !== uid && quoteData?.requesterId !== uid) {
+      const quoteOwner = quoteData?.contractorId || quoteData?.requesterId;
+      if (quoteOwner !== uid) {
         return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the requesting contractor can accept this quote' });
       }
       if (quoteData?.status !== 'quoted') {
         return res.status(422).json({ code: 'INVALID_TRANSITION', message: 'Quote must be in "quoted" status to accept' });
       }
 
+      // Positive amount validation
+      if (!quoteData.quotedAmount || quoteData.quotedAmount <= 0) {
+        return res.status(422).json({ code: 'VALIDATION_ERROR', message: 'Quote must have a positive amount before acceptance' });
+      }
+
       const now = new Date().toISOString();
 
-      // Atomic batch: escrow + status update + audit
-      const batch = adminDb.batch();
-      const escrowRef = adminDb.collection('marketplace_escrow_holdings').doc();
-      batch.update(quoteDoc.ref, { status: 'accepted', updatedAt: now });
-      batch.set(escrowRef, { escrowId: escrowRef.id, type: 'quote', entityId: id, amount: { value: quoteData.quotedAmount, currency: 'ZAR' }, state: 'funded_held', createdAt: now, updatedAt: now });
-      const auditRef = adminDb.collection('marketplace_audit_trail').doc();
-      batch.set(auditRef, { actorId: uid, actionType: 'quote_accepted', entityId: id, entityType: 'quote_request', timestamp: now, beforeStatus: 'quoted', afterStatus: 'accepted', metadata: { escrowId: escrowRef.id, amount: quoteData.quotedAmount } });
-      await batch.commit();
+      // Transaction-safe acceptance: prevents concurrent duplicate escrow
+      await adminDb.runTransaction(async (transaction) => {
+        const quoteRef = adminDb.collection('marketplace_quote_requests').doc(id);
+        const quoteSnap = await transaction.get(quoteRef);
+        const currentData = quoteSnap.data();
+        if (currentData?.status !== 'quoted') {
+          throw Object.assign(new Error('Quote status changed concurrently'), { code: 'INVALID_TRANSITION' });
+        }
+        const escrowRef = adminDb.collection('marketplace_escrow_holdings').doc();
+        const auditRef = adminDb.collection('marketplace_audit_trail').doc();
+        transaction.update(quoteRef, { status: 'accepted', updatedAt: now });
+        transaction.set(escrowRef, { escrowId: escrowRef.id, type: 'quote', entityId: id, amount: { value: currentData.quotedAmount, currency: 'ZAR' }, state: 'funded_held', createdAt: now, updatedAt: now });
+        transaction.set(auditRef, { actorId: uid, actionType: 'quote_accepted', entityId: id, entityType: 'quote_request', timestamp: now, beforeStatus: 'quoted', afterStatus: 'accepted', metadata: { escrowId: escrowRef.id, amount: currentData.quotedAmount } });
+      });
 
-      return res.status(200).json({ quoteId: id, status: 'accepted', escrowId: escrowRef.id, acceptedAt: now });
+      return res.status(200).json({ quoteId: id, status: 'accepted', acceptedAt: now });
     } catch (err) {
       handleServiceError(res, err);
     }
@@ -810,6 +853,13 @@ marketplaceRouter.put(
         return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote request not found' });
       }
       const quote = quoteDoc.data()!;
+
+      // Entity-level auth: only the contractor who accepted the quote can upload delivery note
+      const quoteOwner = quote.contractorId || quote.requesterId;
+      if (quoteOwner !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the contractor can upload delivery notes' });
+      }
+
       if (quote.status !== 'accepted') {
         return res.status(422).json({ code: 'INVALID_TRANSITION', message: `Cannot add delivery note to quote with status "${quote.status}"` });
       }

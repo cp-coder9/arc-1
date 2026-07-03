@@ -1275,7 +1275,45 @@ export async function acceptProposal(
     };
   }
 
-  // 3. Auto-create Architex Project linked to Project Passport (CONTRACT: within 5 seconds)
+  // 3. Atomically commit acceptance (posting + proposal status + audit) FIRST
+  const now = new Date().toISOString();
+
+  try {
+    const { adminDb } = await import('@/lib/firebase-admin');
+    await adminDb.runTransaction(async (transaction) => {
+      const postingRef = adminDb.collection('marketplace_project_postings').doc(postingId);
+      const proposalRef = adminDb.collection('marketplace_proposals').doc(proposalId);
+
+      // Re-read within transaction to prevent concurrent acceptance
+      const postingSnap = await transaction.get(postingRef);
+      if (postingSnap.data()?.status !== 'published') {
+        throw Object.assign(new Error('Posting status changed concurrently'), { code: 'INVALID_TRANSITION' });
+      }
+
+      const auditRef = adminDb.collection('marketplace_audit_trail').doc();
+      transaction.update(postingRef, { status: 'accepted', updatedAt: now });
+      transaction.update(proposalRef, { status: 'accepted', updatedAt: now });
+      transaction.set(auditRef, {
+        actorId: clientId,
+        actionType: 'proposal_accepted',
+        entityId: proposalId,
+        entityType: 'proposal',
+        timestamp: now,
+        beforeStatus: 'submitted',
+        afterStatus: 'accepted',
+        metadata: { postingId, professionalId: proposal.professionalId, feeAmount: proposal.feeAmount },
+      });
+    });
+  } catch (error) {
+    console.error('[ProjectMarketplace] Transaction failed during acceptance:', error);
+    return {
+      code: 'PERSISTENCE_ERROR',
+      message: 'Failed to update proposal/posting status',
+      details: { reason: 'Transaction failed during status update — no changes applied' },
+    };
+  }
+
+  // 4. Create project in passport (after committed acceptance — can retry if fails)
   let projectId: string;
   try {
     const result = await createProjectInPassport({
@@ -1290,35 +1328,25 @@ export async function acceptProposal(
     });
     projectId = result.projectId;
   } catch (error) {
-    // Project creation failed — preserve proposal as "pending_acceptance"
-    console.error('[ProjectMarketplace] Project Passport creation failed:', error);
-
-    try {
-      const { adminDb } = await import('@/lib/firebase-admin');
-      await adminDb
-        .collection('marketplace_proposals')
-        .doc(proposalId)
-        .update({ status: 'pending_acceptance' });
-    } catch (updateError) {
-      console.error('[ProjectMarketplace] Failed to update proposal to pending_acceptance:', updateError);
-    }
-
+    // Acceptance is committed. Project creation failed — log for manual resolution.
+    console.error('[ProjectMarketplace] Post-acceptance project creation failed:', error);
+    // Don't revert acceptance — it's committed. Surface via Action Centre for retry.
     await notifyUser(clientId, {
-      type: 'acceptance_failed',
-      title: 'Proposal Acceptance Failed',
-      message: 'Project creation in Project Passport failed. The proposal has been preserved for retry.',
+      type: 'acceptance_partial_failure',
+      title: 'Project Creation Pending',
+      message: 'Proposal accepted but project creation in Project Passport failed. The system will retry automatically.',
       entityId: proposalId,
       entityType: 'proposal',
     });
 
     return {
       code: 'PROJECT_CREATION_FAILED',
-      message: 'Failed to create project in Project Passport',
-      details: { reason: 'Project Passport write failed; proposal preserved as pending_acceptance' },
+      message: 'Proposal accepted but project creation failed — acceptance is committed, project can be retried',
+      details: { reason: 'Project Passport write failed post-acceptance' },
     };
   }
 
-  // 4. Load CalculatorDefinition toolbox for the project's discipline and stage
+  // 5. Load CalculatorDefinition toolbox for the project's discipline and stage
   try {
     await loadToolbox(posting.requiredTools[0] || 'general', 'design');
   } catch (error) {
@@ -1326,11 +1354,10 @@ export async function acceptProposal(
     console.error('[ProjectMarketplace] Failed to load toolbox:', error);
   }
 
-  // 5. Create escrow holding via real marketplace escrow service
-  let escrowId: string;
+  // 6. Create escrow holding (after committed acceptance — can retry if fails)
   try {
     const { createMarketplaceEscrow } = await import('./marketplaceEscrowService');
-    const escrowResult = await createMarketplaceEscrow({
+    await createMarketplaceEscrow({
       type: 'project_acceptance',
       projectId,
       entityId: proposalId,
@@ -1339,57 +1366,22 @@ export async function acceptProposal(
       milestones: proposal.milestonePlan.map((m) => ({ title: m.title, targetDate: m.targetDate })),
       actorId: clientId,
     });
-    escrowId = escrowResult.escrowId;
   } catch (error) {
-    // Escrow creation failed — preserve proposal as "pending_acceptance"
-    console.error('[ProjectMarketplace] Escrow creation failed:', error);
-
-    try {
-      const { adminDb } = await import('@/lib/firebase-admin');
-      await adminDb
-        .collection('marketplace_proposals')
-        .doc(proposalId)
-        .update({ status: 'pending_acceptance' });
-    } catch (updateError) {
-      console.error('[ProjectMarketplace] Failed to update proposal to pending_acceptance:', updateError);
-    }
-
+    // Acceptance is committed. Escrow creation failed — log for manual resolution.
+    console.error('[ProjectMarketplace] Post-acceptance escrow creation failed:', error);
     await notifyUser(clientId, {
-      type: 'acceptance_failed',
-      title: 'Proposal Acceptance Failed',
-      message: 'Escrow holding creation failed. The proposal has been preserved for retry.',
+      type: 'acceptance_partial_failure',
+      title: 'Escrow Creation Pending',
+      message: 'Proposal accepted and project created, but escrow setup failed. The system will retry automatically.',
       entityId: proposalId,
       entityType: 'proposal',
     });
-
-    return {
-      code: 'ESCROW_CREATION_FAILED',
-      message: 'Failed to create escrow holding',
-      details: { reason: 'Escrow creation failed; proposal preserved as pending_acceptance' },
-    };
   }
 
-  // 6. Atomically update proposal status to 'accepted' and posting status to 'accepted'
-  const now = new Date().toISOString();
-
+  // 7. Write project passport health record (non-critical, fire-and-forget)
   try {
     const { adminDb } = await import('@/lib/firebase-admin');
-    const batch = adminDb.batch();
-
-    // Update posting status to 'accepted'
-    batch.update(adminDb.collection('marketplace_project_postings').doc(postingId), {
-      status: 'accepted',
-      updatedAt: now,
-    });
-
-    // Update proposal status to 'accepted'
-    batch.update(adminDb.collection('marketplace_proposals').doc(proposalId), {
-      status: 'accepted',
-      updatedAt: now,
-    });
-
-    // Create project passport record
-    batch.set(adminDb.doc(`projects/${projectId}/passport/health`), {
+    await adminDb.doc(`projects/${projectId}/passport/health`).set({
       postingId,
       proposalId,
       clientId,
@@ -1398,35 +1390,11 @@ export async function acceptProposal(
       createdAt: now,
       status: 'active',
     });
-
-    // Audit entry inside the batch — atomic with state changes
-    const auditRef = adminDb.collection('marketplace_audit_trail').doc();
-    batch.set(auditRef, {
-      actorId: clientId,
-      actionType: 'proposal_accepted',
-      entityId: proposalId,
-      entityType: 'proposal',
-      timestamp: now,
-      beforeStatus: 'submitted',
-      afterStatus: 'accepted',
-      metadata: { postingId, professionalId: proposal.professionalId, feeAmount: proposal.feeAmount },
-    });
-
-    // Commit atomically
-    await batch.commit();
   } catch (error) {
-    console.error('[ProjectMarketplace] Batch commit failed during acceptance:', error);
-    return {
-      code: 'PERSISTENCE_ERROR',
-      message: 'Failed to update proposal/posting status',
-      details: { reason: 'Batch write failed during status update — no changes applied' },
-    };
+    console.error('[ProjectMarketplace] Passport health record write failed:', error);
   }
 
-  // 7. After batch succeeds, create escrow (separate call, can be retried)
-  // (already done in step 5 above)
-
-  // 9. Surface to Action Centre for the professional (non-critical, fire-and-forget)
+  // 8. Surface to Action Centre for the professional (non-critical, fire-and-forget)
   try {
     const { surfaceToActionCentre } = await import('./platformIntegrationService');
     surfaceToActionCentre({
