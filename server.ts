@@ -100,19 +100,26 @@ async function startServer() {
     }
   });
 
-  // Mount Town Planning API router
+  // Mount Town Planning API router (with Firebase auth)
   app.use("/api/town-planning", async (req, res, next) => {
     try {
-      const { createTownPlanningRouter } = await import("./src/features/town-planning/router.js");
-      const { adminDb } = await import("./src/lib/firebase-admin.js");
-      const townPlanningRouter = createTownPlanningRouter({ db: adminDb as any });
-      return townPlanningRouter(req, res, next);
-    } catch (error) {
-      console.error("Failed to load Town Planning API router:", error);
-      return res.status(500).json({
-        error: "Town Planning API router failed to initialize",
-        details: error instanceof Error ? error.message : String(error),
+      const { requireAuth } = await import("./src/lib/roleMiddleware.js");
+      requireAuth(req, res, async () => {
+        try {
+          const { createTownPlanningRouter } = await import("./src/features/town-planning/router.js");
+          const { adminDb } = await import("./src/lib/firebase-admin.js");
+          const townPlanningRouter = createTownPlanningRouter({ db: adminDb as any });
+          return townPlanningRouter(req, res, next);
+        } catch (error) {
+          console.error("Failed to load Town Planning API router:", error);
+          return res.status(500).json({
+            error: "Town Planning API router failed to initialize",
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
       });
+    } catch (error) {
+      return res.status(500).json({ error: "Auth middleware failed to load" });
     }
   });
 

@@ -247,6 +247,20 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
       );
 
       await persistTransition(db, req.params.id, updated);
+
+      // Fire Action Centre event
+      const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
+      await createActionCentreEvent(db, {
+        projectId: application.projectId,
+        applicationId: req.params.id,
+        type: 'stage_transition',
+        title: `Application ${application.referenceNumber} moved to ${updated.currentStage}`,
+        description: `Stage transition: ${application.currentStage} → ${updated.currentStage}`,
+        severity: 'info',
+        targetUserId: actor.userId,
+        createdAt: new Date().toISOString(),
+      });
+
       res.json(updated);
     } catch (err) {
       if (err instanceof TransitionError) {
@@ -265,12 +279,16 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const application = await getApplication(db, req.params.id);
       if (!application) {
         res.status(404).json({ error: 'Application not found' });
         return;
       }
+
+      const hasAccess = await requireProjectAccess(req, res, application.projectId);
+      if (!hasAccess) return;
 
       res.json(getStageHistory(application));
     } catch {
@@ -286,12 +304,16 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const application = await getApplication(db, req.params.id);
       if (!application) {
         res.status(404).json({ error: 'Application not found' });
         return;
       }
+
+      const hasAccess = await requireProjectAccess(req, res, application.projectId);
+      if (!hasAccess) return;
 
       res.json(getDeadlines(application));
     } catch {
@@ -309,12 +331,22 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const permCheck = checkPermission(actor.role, 'add_condition');
       if (!permCheck.allowed) {
         res.status(403).json({ error: permCheck.reason });
         return;
       }
+
+      const application = await getApplication(db, req.params.id);
+      if (!application) {
+        res.status(404).json({ error: 'Application not found' });
+        return;
+      }
+
+      const hasAccess = await requireProjectAccess(req, res, application.projectId);
+      if (!hasAccess) return;
 
       const parseResult = ConditionInputSchema.safeParse({
         ...req.body,
@@ -327,6 +359,18 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
 
       const condition = createCondition(parseResult.data, actor.userId);
       await persistCondition(db, condition);
+
+      // Fire Action Centre event
+      const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
+      await createActionCentreEvent(db, {
+        projectId: application.projectId,
+        applicationId: req.params.id,
+        type: 'condition_overdue',
+        title: `New condition added: ${condition.description.substring(0, 50)}`,
+        description: `Condition #${condition.conditionNumber} created and requires compliance`,
+        severity: 'info',
+        createdAt: new Date().toISOString(),
+      });
 
       res.status(201).json(condition);
     } catch {
@@ -342,6 +386,7 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const permCheck = checkPermission(actor.role, 'update_condition');
       if (!permCheck.allowed) {
@@ -361,6 +406,16 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
       if (!doc.exists) {
         res.status(404).json({ error: 'Condition not found' });
         return;
+      }
+
+      const condData = doc.data();
+      const applicationId = condData?.applicationId as string;
+      if (applicationId) {
+        const application = await getApplication(db, applicationId);
+        if (application) {
+          const hasAccess = await requireProjectAccess(req, res, application.projectId);
+          if (!hasAccess) return;
+        }
       }
 
       const condition = { id: req.params.id, ...doc.data() } as unknown as import('./types').ConditionOfApproval;
@@ -387,6 +442,13 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
       if (!actor) {
         res.status(401).json({ error: 'Authentication required' });
         return;
+      }
+      (req as any).__tpActor = actor;
+
+      const application = await getApplication(db, req.params.id);
+      if (application) {
+        const hasAccess = await requireProjectAccess(req, res, application.projectId);
+        if (!hasAccess) return;
       }
 
       const conditions = await loadConditions(db, req.params.id);

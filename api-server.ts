@@ -52,6 +52,28 @@ app.use('/api/specforge', async (req, res, next) => {
   }
 });
 
+app.use('/api/town-planning', async (req, res, next) => {
+  try {
+    const { requireAuth } = await import('./src/lib/roleMiddleware.ts');
+    requireAuth(req, res, async () => {
+      try {
+        const { createTownPlanningRouter } = await import('./src/features/town-planning/router.ts');
+        const { adminDb } = await import('./src/lib/firebase-admin.ts');
+        const townPlanningRouter = createTownPlanningRouter({ db: adminDb as any });
+        return townPlanningRouter(req, res, next);
+      } catch (error) {
+        console.error('Failed to load Town Planning API router:', error);
+        return res.status(500).json({
+          error: 'Town Planning API router failed to initialize',
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Auth middleware failed to load' });
+  }
+});
+
 app.use('/api', async (req, res, next) => {
   try {
     const { default: apiRouter } = await import('./src/lib/api-router.ts');
