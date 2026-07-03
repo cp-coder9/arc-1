@@ -100,6 +100,22 @@ async function startServer() {
     }
   });
 
+  // Mount Town Planning API router
+  app.use("/api/town-planning", async (req, res, next) => {
+    try {
+      const { createTownPlanningRouter } = await import("./src/features/town-planning/router.js");
+      const { adminDb } = await import("./src/lib/firebase-admin.js");
+      const townPlanningRouter = createTownPlanningRouter({ db: adminDb as any });
+      return townPlanningRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load Town Planning API router:", error);
+      return res.status(500).json({
+        error: "Town Planning API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Mount the shared API router lazily. Firebase Admin / Firestore can add a
   // noticeable cold-start cost locally, so the server should become healthy
   // before those integrations are imported.

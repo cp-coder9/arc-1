@@ -1,5 +1,7 @@
 /**
  * Unit Tests — SA Working Day Calculator
+ *
+ * @vitest-environment node
  */
 
 import { describe, it, expect } from 'vitest';

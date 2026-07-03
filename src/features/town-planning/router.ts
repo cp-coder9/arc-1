@@ -2,9 +2,11 @@
  * Town Planning API Router
  *
  * Express Router for all town planning endpoints.
- * Mounted at /api/town-planning/ in the main API router.
+ * Mounted at /api/town-planning/ in the main server.
  *
- * Authentication: Placeholder via x-user-id and x-user-role headers.
+ * Authentication: Firebase token via requireAuth middleware (authContext),
+ * with header-based fallback in dev/test only.
+ * Authorization: Project membership check for project-scoped resources.
  */
 
 import { Router } from 'express';
@@ -58,17 +60,53 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
   const router = Router();
   const { db } = deps;
 
-  // ─── Auth Middleware (placeholder) ────────────────────────────────────────
+  // ─── Auth Middleware ────────────────────────────────────────────────────────
 
   function extractActor(req: Request) {
-    const userId = req.headers['x-user-id'] as string | undefined;
-    const role = req.headers['x-user-role'] as UserRole | undefined;
-
-    if (!userId || !role) {
-      return null;
+    // Primary: Use Firebase auth context from requireAuth middleware
+    if ((req as any).authContext) {
+      const authCtx = (req as any).authContext;
+      return buildActorContext(authCtx.uid, authCtx.role || 'client');
     }
 
-    return buildActorContext(userId, role);
+    // Fallback (dev/test only): Header-based auth
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      const userId = req.headers['x-user-id'] as string | undefined;
+      const role = req.headers['x-user-role'] as UserRole | undefined;
+      if (userId && role) {
+        return buildActorContext(userId, role);
+      }
+    }
+
+    return null;
+  }
+
+  async function requireProjectAccess(req: Request, res: Response, projectId: string | undefined): Promise<boolean> {
+    const actor = (req as any).__tpActor;
+    if (!actor) {
+      res.status(401).json({ error: 'Authentication required' });
+      return false;
+    }
+
+    // Admin/platform_admin bypass project membership
+    if (actor.role === 'admin' || actor.role === 'platform_admin') {
+      return true;
+    }
+
+    if (!projectId) {
+      res.status(400).json({ error: 'Project context required' });
+      return false;
+    }
+
+    const { checkProjectMembership } = await import('./services/projectMembership');
+    const result = await checkProjectMembership(db, actor.userId, projectId);
+
+    if (!result.isMember) {
+      res.status(403).json({ error: 'Access denied: not a project team member', reason: result.reason });
+      return false;
+    }
+
+    return true;
   }
 
   // ─── Applications ─────────────────────────────────────────────────────────
@@ -81,12 +119,17 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const permCheck = checkPermission(actor.role, 'create_application');
       if (!permCheck.allowed) {
         res.status(403).json({ error: permCheck.reason });
         return;
       }
+
+      const projectId = req.body.projectId as string | undefined;
+      const hasAccess = await requireProjectAccess(req, res, projectId);
+      if (!hasAccess) return;
 
       // Use a simple sequence counter (in production, use Firestore counter)
       const seq = Date.now() % 10000;
@@ -111,6 +154,7 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const permCheck = checkPermission(actor.role, 'view_application');
       if (!permCheck.allowed) {
@@ -123,6 +167,9 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(404).json({ error: 'Application not found' });
         return;
       }
+
+      const hasAccess = await requireProjectAccess(req, res, application.projectId);
+      if (!hasAccess) return;
 
       res.json(application);
     } catch {
@@ -138,12 +185,16 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const permCheck = checkPermission(actor.role, 'view_application');
       if (!permCheck.allowed) {
         res.status(403).json({ error: permCheck.reason });
         return;
       }
+
+      const hasAccess = await requireProjectAccess(req, res, req.params.projectId);
+      if (!hasAccess) return;
 
       const applications = await listApplicationsByProject(db, req.params.projectId);
       res.json(applications);
@@ -162,6 +213,7 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
 
       const permCheck = checkPermission(actor.role, 'transition_stage');
       if (!permCheck.allowed) {
@@ -183,6 +235,9 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(404).json({ error: 'Application not found' });
         return;
       }
+
+      const hasAccess = await requireProjectAccess(req, res, application.projectId);
+      if (!hasAccess) return;
 
       const updated = transitionStage(
         application,
@@ -354,6 +409,10 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
+
+      const hasAccess = await requireProjectAccess(req, res, req.params.projectId);
+      if (!hasAccess) return;
 
       // Load application for this project (first one found)
       const applications = await listApplicationsByProject(db, req.params.projectId);
@@ -376,6 +435,10 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
         res.status(401).json({ error: 'Authentication required' });
         return;
       }
+      (req as any).__tpActor = actor;
+
+      const hasAccess = await requireProjectAccess(req, res, req.params.projectId);
+      if (!hasAccess) return;
 
       const { targetPhase } = req.body;
       if (!targetPhase) {

@@ -3,6 +3,8 @@
  *
  * Uses an in-memory mock Firestore to test the complete flow:
  *   Create application → Transition stages → Add conditions → Compliance check
+ *
+ * @vitest-environment node
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -18,6 +20,7 @@ import {
   TransitionError,
   getStageHistory,
   getDeadlines,
+  persistTransition,
 } from '../services/workflowTracker';
 import {
   createCondition,
@@ -512,6 +515,56 @@ describe('Town Planning E2E Workflow', () => {
       };
       const readiness = checkReadiness('sdp', approvedApp, null);
       expect(readiness.ready).toBe(true);
+    });
+  });
+
+  describe('Passport Adapter Integration', () => {
+    it('updates project passport on stage transition via persistTransition', async () => {
+      // Set up a project document so the passport adapter can find it
+      const projectId = 'proj_001';
+      const projectCollection = (db as any).__getStore?.() || {};
+
+      // Manually seed the projects collection
+      const projectsStore: Record<string, Record<string, unknown>> = {};
+      projectsStore[projectId] = {
+        name: 'Test Project',
+        passport: {},
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      };
+
+      // Create a db with a projects collection pre-seeded
+      const seededDb = createMockFirestore();
+      // Seed the project via set
+      await seededDb.collection('projects').doc(projectId).set({
+        name: 'Test Project',
+        passport: {},
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      });
+      // Seed the application document
+      const app = createApplication(VALID_REZONING_PARAMS, 1);
+      await seededDb.collection('town_planning_applications').doc(app.id).set({
+        ...app as unknown as Record<string, unknown>,
+      });
+
+      // Transition to submission
+      const updated = transitionStage(app, 'submission', 'user_tp_001');
+
+      // Persist — this should also call passport adapter
+      await persistTransition(seededDb, app.id, updated);
+
+      // Verify the application was updated
+      const appDoc = await seededDb.collection('town_planning_applications').doc(app.id).get();
+      expect(appDoc.exists).toBe(true);
+      const appData = appDoc.data();
+      expect(appData?.currentStage).toBe('submission');
+
+      // Verify the project passport was updated
+      const projDoc = await seededDb.collection('projects').doc(projectId).get();
+      expect(projDoc.exists).toBe(true);
+      const projData = projDoc.data();
+      expect(projData?.['passport.townPlanning']).toBeDefined();
+      expect(projData?.['passport.townPlanning'].currentStage).toBe('submission');
+      expect(projData?.['passport.townPlanning'].applicationId).toBe(app.id);
     });
   });
 });

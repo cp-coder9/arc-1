@@ -214,4 +214,15 @@ export async function persistTransition(
     stageHistory: updatedApplication.stageHistory as unknown as Record<string, unknown>[],
     updatedAt: updatedApplication.updatedAt,
   });
+
+  // Update Project Passport
+  const { updateProjectPassport } = await import('../adapters/passportAdapter');
+  await updateProjectPassport(db, updatedApplication.projectId, {
+    applicationId,
+    applicationType: updatedApplication.applicationType,
+    currentStage: updatedApplication.currentStage,
+    referenceNumber: updatedApplication.referenceNumber,
+    decision: updatedApplication.decision as any,
+    lastUpdated: updatedApplication.updatedAt,
+  });
 }
