@@ -84,20 +84,19 @@ async function reviewEoTClaimViaApi(projectId: string, claimId: string, decision
   return res.json();
 }
 
-async function calculateNotificationDeadlineViaApi(projectId: string, eventDate: string): Promise<string> {
-  const res = await apiFetch(`/api/contract-admin/${projectId}/eot-claims/notification-deadline`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ eventDate }),
-  });
-  if (!res.ok) throw new Error(`Deadline calculation failed: ${res.statusText}`);
-  const data = await res.json();
-  return data.deadline;
+async function calculateNotificationDeadlineViaApi(_projectId: string, eventDate: string, contractForm: string): Promise<string> {
+  // Pure client-side computation — no API call needed
+  const year = parseInt(eventDate.split('-')[0], 10);
+  const holidays = [...getSouthAfricanHolidays(year), ...getSouthAfricanHolidays(year + 1)];
+  const rule = getEoTNotificationRule(contractForm as any);
+  const deadline = rule.dayType === 'working'
+    ? addWorkingDays(eventDate, rule.notificationPeriodDays, holidays)
+    : (() => { const d = new Date(eventDate); d.setDate(d.getDate() + rule.notificationPeriodDays); return d.toISOString().split('T')[0]; })();
+  return deadline;
 }
 
-// TODO: wire to real API endpoint
 async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
-  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/config`);
   if (!res.ok) return null;
   return res.json();
 }

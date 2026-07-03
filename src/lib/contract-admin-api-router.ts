@@ -41,11 +41,29 @@ import {
   getCumulativeSummary as getClaimsCumulativeSummary,
 } from '@/services/contractAdmin/claimsRegisterService';
 import { adminDb } from '@/lib/firebase-admin';
+import { checkProjectMembership } from '@/lib/projectMembership';
 
 const router = Router();
 
 // ── Auth middleware: ALL contract-admin routes require authentication ────────
 router.use(requireAuth);
+
+// ── Project membership enforcement: ALL :projectId routes verify membership ─
+router.param('projectId', async (req, res, next) => {
+  const ctx = req.authContext;
+  if (!ctx) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  const { uid, normalizedRole } = ctx;
+  const projectId = req.params.projectId;
+  const membership = await checkProjectMembership(uid, normalizedRole || 'client', projectId);
+
+  if (!membership.isMember && !membership.isAdmin) {
+    res.status(403).json({ error: 'Not authorized for this project' });
+    return;
+  }
+
+  next();
+});
 
 // ── Project authorization helper ────────────────────────────────────────────
 async function buildProjectAssignment(uid: string, role: string, projectId: string) {
