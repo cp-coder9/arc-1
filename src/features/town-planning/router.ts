@@ -248,18 +248,22 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
 
       await persistTransition(db, req.params.id, updated);
 
-      // Fire Action Centre event
-      const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
-      await createActionCentreEvent(db, {
-        projectId: application.projectId,
-        applicationId: req.params.id,
-        type: 'stage_transition',
-        title: `Application ${application.referenceNumber} moved to ${updated.currentStage}`,
-        description: `Stage transition: ${application.currentStage} → ${updated.currentStage}`,
-        severity: 'info',
-        targetUserId: actor.userId,
-        createdAt: new Date().toISOString(),
-      });
+      // Fire Action Centre event (best-effort, non-blocking)
+      try {
+        const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
+        await createActionCentreEvent(db, {
+          projectId: application.projectId,
+          applicationId: req.params.id,
+          type: 'stage_transition',
+          title: `Application ${application.referenceNumber} moved to ${updated.currentStage}`,
+          description: `Stage transition: ${application.currentStage} → ${updated.currentStage}`,
+          severity: updated.currentStage === 'decision' ? 'critical' : 'info',
+          targetUserId: actor.userId,
+          createdAt: new Date().toISOString(),
+        });
+      } catch {
+        // Action Centre side-effect failure must not 500 the primary mutation
+      }
 
       res.json(updated);
     } catch (err) {
@@ -315,7 +319,32 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
       const hasAccess = await requireProjectAccess(req, res, application.projectId);
       if (!hasAccess) return;
 
-      res.json(getDeadlines(application));
+      const deadlines = getDeadlines(application);
+
+      // Fire deadline_warning for overdue deadlines (best-effort)
+      try {
+        const overdueDeadlines = deadlines.filter(d => d.isOverdue);
+        if (overdueDeadlines.length > 0) {
+          const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
+          for (const deadline of overdueDeadlines) {
+            await createActionCentreEvent(db, {
+              projectId: application.projectId,
+              applicationId: req.params.id,
+              type: 'deadline_warning',
+              title: `Overdue: ${deadline.description}`,
+              description: `Deadline for ${deadline.stage} stage has passed (due: ${deadline.dueDate})`,
+              severity: 'critical',
+              targetUserId: actor.userId,
+              dueDate: deadline.dueDate,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch {
+        // Side-effect failure must not break the response
+      }
+
+      res.json(deadlines);
     } catch {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -360,17 +389,21 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
       const condition = createCondition(parseResult.data, actor.userId);
       await persistCondition(db, condition);
 
-      // Fire Action Centre event
-      const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
-      await createActionCentreEvent(db, {
-        projectId: application.projectId,
-        applicationId: req.params.id,
-        type: 'condition_overdue',
-        title: `New condition added: ${condition.description.substring(0, 50)}`,
-        description: `Condition #${condition.conditionNumber} created and requires compliance`,
-        severity: 'info',
-        createdAt: new Date().toISOString(),
-      });
+      // Fire Action Centre event (best-effort, non-blocking)
+      try {
+        const { createActionCentreEvent } = await import('./adapters/actionCentreAdapter');
+        await createActionCentreEvent(db, {
+          projectId: application.projectId,
+          applicationId: req.params.id,
+          type: 'decision_received',
+          title: `New condition: ${condition.description.substring(0, 50)}`,
+          description: `Condition #${condition.conditionNumber} added — requires compliance`,
+          severity: 'warning',
+          createdAt: new Date().toISOString(),
+        });
+      } catch {
+        // Action Centre side-effect failure must not 500 the primary mutation
+      }
 
       res.status(201).json(condition);
     } catch {
@@ -410,13 +443,17 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
 
       const condData = doc.data();
       const applicationId = condData?.applicationId as string;
-      if (applicationId) {
-        const application = await getApplication(db, applicationId);
-        if (application) {
-          const hasAccess = await requireProjectAccess(req, res, application.projectId);
-          if (!hasAccess) return;
-        }
+      if (!applicationId) {
+        res.status(403).json({ error: 'Access denied: condition has no linked application' });
+        return;
       }
+      const condApplication = await getApplication(db, applicationId);
+      if (!condApplication) {
+        res.status(403).json({ error: 'Access denied: linked application not found' });
+        return;
+      }
+      const hasAccess = await requireProjectAccess(req, res, condApplication.projectId);
+      if (!hasAccess) return;
 
       const condition = { id: req.params.id, ...doc.data() } as unknown as import('./types').ConditionOfApproval;
       const updated = updateConditionStatus(condition, targetStatus, actor.userId, {
@@ -446,10 +483,13 @@ export function createTownPlanningRouter(deps: TownPlanningRouterDeps): Router {
       (req as any).__tpActor = actor;
 
       const application = await getApplication(db, req.params.id);
-      if (application) {
-        const hasAccess = await requireProjectAccess(req, res, application.projectId);
-        if (!hasAccess) return;
+      if (!application) {
+        res.status(404).json({ error: 'Application not found' });
+        return;
       }
+
+      const hasAccess = await requireProjectAccess(req, res, application.projectId);
+      if (!hasAccess) return;
 
       const conditions = await loadConditions(db, req.params.id);
       const summary = getConditionsSummary(conditions);
