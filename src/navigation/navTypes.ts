@@ -84,6 +84,8 @@ export type NavigationItem = {
   description: string;
   roles?: UserRole[];
   sections: WorkspaceSection[];
+  /** When true, the navigation item is only visible in demo mode (VITE_DEMO_MODE=true). */
+  demoOnly?: boolean;
 };
 
 export type MessagingContextSourceType =

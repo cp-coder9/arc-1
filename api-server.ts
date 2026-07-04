@@ -52,19 +52,6 @@ app.use('/api/specforge', async (req, res, next) => {
   }
 });
 
-app.use('/api/contract-admin', async (req, res, next) => {
-  try {
-    const { default: contractAdminRouter } = await import('./src/lib/contract-admin-api-router.ts');
-    return contractAdminRouter(req, res, next);
-  } catch (error) {
-    console.error('Failed to load Contract Admin API router:', error);
-    return res.status(500).json({
-      error: 'Contract Admin API router failed to initialize',
-      details: error instanceof Error ? error.message : String(error),
-    });
-  }
-});
-
 app.use('/api', async (req, res, next) => {
   try {
     const { default: apiRouter } = await import('./src/lib/api-router.ts');

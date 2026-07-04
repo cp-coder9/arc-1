@@ -4,7 +4,6 @@
  */
 
 import React, { Suspense, lazy, useCallback, useMemo, useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
 import type { ComponentType, LazyExoticComponent } from 'react';
 import { auth, db, trackEvent } from './lib/firebase';
 import { trackUserActivity, type UserActivitySource } from './lib/userActivity';
@@ -84,7 +83,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Store,
-  Scale,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -155,8 +153,6 @@ const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBr
 const ClientProposalComparison = lazyWithChunkRetry(() => import('./components/ClientProposalComparison'));
 const BEPClientMarketplacePage = lazyWithChunkRetry(() => import('./components/BEPClientMarketplacePage'));
 const DesignTeamMatrixPage = lazyWithChunkRetry(() => import('./components/DesignTeamMatrixPage'));
-const SpecForgeWorkspace = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
-const RoleAwareSidebar = lazyWithChunkRetry(() => import('./components/navigation/RoleAwareSidebar'));
 const TechnicalBriefEditor = lazyWithChunkRetry(() => import('./components/TechnicalBriefEditor'));
 const DirectorySearch = lazyWithChunkRetry(() => import('./components/DirectorySearch'));
 const PackageProcurementWorkspace = lazyWithChunkRetry(() => import('./components/PackageProcurementWorkspace'));
@@ -182,9 +178,7 @@ const PipelineKanbanPage = lazyWithChunkRetry(() => import('./components/Pipelin
 const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/TemplateLibrary'));
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
-const EngineersCalcHub = lazyWithChunkRetry(() => import('./components/tools/EngineersCalcHub'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
-const ContractAdminDashboard = lazyWithChunkRetry(() => import('./components/ContractAdminDashboard'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -219,6 +213,7 @@ type DashboardPage = {
   icon: React.ReactNode;
   summary: string;
   backedBy: string[];
+  demoOnly?: boolean;
 };
 
 type DashboardResourceLink = {
@@ -252,7 +247,6 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'submission-readiness', label: 'Submission Readiness', roles: ['client', 'bep', 'architect', 'contractor', 'admin'], group: 'Client tools', icon: <ClipboardCheck size={18} />, summary: 'Municipal submission readiness assessment — complexity, routing, evidence pack, and score.', backedBy: ['SubmissionReadinessDashboard'] },
   { id: 'client-progress', label: 'Progress Reports', roles: ['client'], group: 'Client tools', icon: <Clock size={18} />, summary: 'Plain-language progress report shell for client decisions and risks.', backedBy: ['StageProgressTracker', 'GanttChart'] },
   { id: 'design', label: 'Design & Compliance', roles: [...DESIGN_TEAM_ROLES, 'freelancer', 'admin'], group: 'BEP tools', icon: <Network size={18} />, summary: 'Design-team deliverables, registers, responsibility matrix, and compliance shell.', backedBy: ['ResponsibilityMatrix', 'TeamBuilder'] },
-  { id: 'specforge', label: 'SpecForge Specifications', roles: ['client', 'developer', 'bep', 'architect', 'engineer', 'quantity_surveyor', 'energy_professional', 'fire_engineer', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Interactive pictorial specifications, product schedules, approvals, RFQs, planning and closeout evidence.', backedBy: ['SpecForgeWorkspace', 'specforgeService'] },
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
   { id: 'drawing-checker', label: 'AI Drawing Checker', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Drawing compliance checker backed by upload/review records and FileManager quick scans.', backedBy: ['FileManager'] },
   { id: 'sans-forms', label: 'SANS / Compliance Forms', roles: [...DESIGN_TEAM_ROLES, 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Compliance form autofill shell using project/profile/team data.', backedBy: ['ComplianceReport'] },
@@ -267,7 +261,6 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management workspace for staff, wage evidence, and plant records.', backedBy: ['contractor profile/compliance records'] },
   { id: 'procurement', label: 'BoQ / BoM Procurement', roles: ['contractor', 'subcontractor', 'supplier', ...DESIGN_TEAM_ROLES, 'admin'], group: 'Construction tools', icon: <Factory size={18} />, summary: 'BoQ/BoM procurement shell for contractor, package, and supplier workflows.', backedBy: ['package readiness services'] },
   { id: 'packages', label: 'Subcontractor Packages', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Building2 size={18} />, summary: 'Package-layer shell for subcontractor/supplier scopes and progress.', backedBy: ['package readiness services'] },
-  { id: 'contract-admin', label: 'Contract Administration', roles: ['architect', 'bep', 'quantity_surveyor', 'contractor', 'subcontractor', 'client', 'developer', 'site_manager', 'admin', 'platform_admin'], group: 'Construction tools', icon: <Scale size={18} />, summary: 'Contract lifecycle administration — notices, variations, EoT claims, payment schedules, and dispute tracking for JBCC, NEC, GCC, and FIDIC forms.', backedBy: ['ContractAdminDashboard', 'contractAdmin'] },
   { id: 'freelancer-work', label: 'Assigned Work', roles: ['freelancer'], group: 'Freelancer tools', icon: <Briefcase size={18} />, summary: 'Assigned freelancer work surface backed by current freelancer task cards.', backedBy: ['FreelancerDashboard'] },
   { id: 'freelancer-submissions', label: 'Submissions & Feedback', roles: ['freelancer'], group: 'Freelancer tools', icon: <Send size={18} />, summary: 'Submission/revision/feedback shell for freelancer deliverables.', backedBy: ['delegatedTasks', 'FileManager'] },
   { id: 'knowledge', label: 'Knowledge / CPD', roles: ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Governance', icon: <BookOpen size={18} />, summary: 'Knowledge and CPD shell backed by knowledge-source tooling.', backedBy: ['KnowledgeSources', 'AdminKnowledgeUploader'] },
@@ -279,10 +272,11 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'pipeline', label: 'Pipeline', roles: ['architect', 'bep', 'admin'], group: 'Governance', icon: <BarChart3 size={18} />, summary: 'Visual pipeline kanban with win/loss tracking and value forecasting.', backedBy: ['pipelineService'] },
   { id: 'templates', label: 'Templates', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <FileText size={18} />, summary: 'Practice document template library with versioning and role-based access.', backedBy: ['templateLibraryService'] },
   { id: 'registrations', label: 'Registrations', roles: ['architect', 'bep', 'freelancer', 'admin'], group: 'Governance', icon: <ShieldCheck size={18} />, summary: 'Professional registration renewal tracker with CPD monitoring.', backedBy: ['registrationRenewalService'] },
-  { id: 'marketplace', component: 'MarketplaceShell', label: 'Marketplace', roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'], group: 'Core workflow', icon: <Store size={18} />, summary: 'Professional commerce layer — discover, transact, and collaborate across the built environment.', backedBy: ['MarketplaceShell', 'marketplace-api-router'] },
+  { id: 'marketplace', component: 'MarketplaceShell', label: 'Marketplace', roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'], group: 'Core workflow', icon: <Store size={18} />, summary: 'Professional commerce layer — discover, transact, and collaborate across the built environment.', backedBy: ['MarketplaceShell', 'marketplace-api-router'], demoOnly: true },
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
+const DEMO_ONLY_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.filter((page) => page.demoOnly).map((page) => page.id));
 const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'profile',
   'command',
@@ -311,7 +305,6 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'bep-team',
   'bep-freelancers',
   'sans-forms',
-  'specforge',
   'compliance',
   'cpd-assessment',
   'messages',
@@ -320,9 +313,6 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'templates',
   'registrations',
   'specforge',
-  'standalone/engineers-calc-hub',
-  'marketplace',
-  'contract-admin',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -365,7 +355,10 @@ const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
 };
 
 function pagesForRole(role: UserRole) {
-  return CANONICAL_DASHBOARD_PAGES.filter((page) => page.roles.includes(role));
+  return CANONICAL_DASHBOARD_PAGES.filter((page) => {
+    if (page.demoOnly && import.meta.env.VITE_DEMO_MODE !== 'true') return false;
+    return page.roles.includes(role);
+  });
 }
 
 function pageById(pageId: string) {
@@ -406,8 +399,6 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Oversee project portfolio, investment governance, and programme strategy.' },
   firm_admin: { label: 'Firm Admin', viewLabel: 'Firm View', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)', description: 'Manage practice operations, staff, CPD, and professional registrations.' },
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
-  land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage boundary surveys, SG diagrams, servitudes, and site verification.' },
-  cpm: { label: 'Construction Project Manager', viewLabel: 'CPM View', accent: '#1a237e', accentSoft: 'rgba(26, 35, 126, 0.12)', description: 'Coordinate programme delivery, risk management, and construction oversight.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -475,6 +466,7 @@ function AppContent() {
   const visibleNavItems = useMemo(() => {
     if (!user) return [];
     return architexNavigation.filter((item) => {
+      if (item.demoOnly && import.meta.env.VITE_DEMO_MODE !== 'true') return false;
       if (!item.roles || item.roles.length === 0) return true;
       return item.roles.includes(user.role);
     });
@@ -1014,18 +1006,80 @@ function AppContent() {
     <DemoModeProvider>
     <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground beos-grid-canvas md:flex-row">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_76%_8%,rgba(124,215,195,0.20),transparent_26rem)]" />
-      <Suspense fallback={null}>
-        <RoleAwareSidebar
-          user={user}
-          activeTab={activeTab}
-          onNavigate={(page) => { navigateDashboard(page, 'sidebar'); setIsSidebarOpen(false); }}
-          onSignOut={handleLogout}
-          className={cn(
-            'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:translate-x-0 md:sticky md:top-0 md:h-dvh md:flex',
-            isSidebarOpen ? 'translate-x-0 flex' : '-translate-x-full',
-          )}
-        />
-      </Suspense>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(86vw,288px)] flex-col border-r border-border/70 beos-glass transform transition-all duration-300 ease-in-out md:sticky md:top-0 md:h-dvh md:shrink-0 md:translate-x-0 ${isSidebarCollapsed ? 'md:w-[84px]' : 'md:w-[288px]'} ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`h-full flex flex-col gap-y-4 overflow-y-auto overflow-x-hidden p-7 ${isSidebarCollapsed ? 'md:px-3' : ''}`}>
+          <div className={`flex items-center justify-between shrink-0 ${isSidebarCollapsed ? 'md:justify-center' : ''}`}>
+            <div className="flex items-center gap-3">
+              <Logo iconClassName="h-14 w-14 object-contain sm:h-16 sm:w-16" textClassName="hidden" />
+              <div className={isSidebarCollapsed ? 'md:hidden' : ''}>
+                <p className="font-sans text-[1.35rem] font-black tracking-[-0.055em] text-primary">Architex OS</p>
+                <p className="beos-label-caps text-muted-foreground">Project Coordination</p>
+              </div>
+            </div>
+            <div className={isSidebarCollapsed ? 'md:hidden' : ''}>
+              <DemoRoleSwitcher />
+            </div>
+            <Button variant="ghost" size="icon" className="md:hidden rounded-full hover:bg-primary/10" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation menu" aria-expanded={isSidebarOpen}><X size={20} /></Button>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`hidden md:inline-flex rounded-full hover:bg-primary/10 self-end shrink-0 ${isSidebarCollapsed ? 'md:self-center' : ''}`}
+            onClick={toggleSidebarCollapsed}
+            aria-label={isSidebarCollapsed ? 'Expand navigation menu' : 'Collapse navigation menu'}
+            aria-expanded={!isSidebarCollapsed}
+            title={isSidebarCollapsed ? 'Expand menu' : 'Collapse menu'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+          </Button>
+
+          <div className={`rounded-[1.25rem] border border-border/70 bg-muted/70 p-4 shadow-[0_10px_26px_rgba(20,71,63,0.06)] ${isSidebarCollapsed ? 'md:hidden' : ''}`} style={{ borderTop: `4px solid ${roleVisual.accent}` }}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="beos-label-caps text-muted-foreground">Current Role</span>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: roleVisual.accent, boxShadow: `0 0 18px ${roleVisual.accent}` }} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-primary">{roleVisual.label}</p>
+                <p className="mt-1 text-[0.72rem] leading-snug text-muted-foreground">{roleVisual.description}</p>
+              </div>
+            </div>
+          </div>
+
+          <nav className="flex-1 space-y-1.5" aria-label="Architex navigation">
+            {visibleNavItems.map((item) => (
+              <NavItem
+                key={item.key}
+                icon={navKeyIcon(item.key)}
+                label={item.label}
+                active={activeNavKey === item.key}
+                collapsed={isSidebarCollapsed}
+                onClick={() => navigateDashboard(getDefaultPageForNavKey(item.key), 'sidebar')}
+              />
+            ))}
+          </nav>
+
+            <div className={`mt-4 rounded-[1rem] border border-border/70 bg-card/70 p-3 text-xs text-muted-foreground ${isSidebarCollapsed ? 'md:hidden' : ''}`} data-testid="dashboard-keyboard-shortcuts">
+              <p className="font-bold text-foreground">Keyboard shortcuts</p>
+              <p className="mt-1">Alt+1–9 opens your first visible pages. Alt+K Command, Alt+A AI, Alt+P Profile, Alt+F Files, Alt+I Invoicing.</p>
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Visible page shortcut map">
+                {visibleShortcutPages.slice(0, 5).map((page, index) => <Badge key={page.id} variant="outline" className="rounded-full bg-background/70">Alt+{index + 1}: {page.label}</Badge>)}
+              </div>
+            </div>
+
+          <div className="pt-5 mt-auto border-t border-border/70 shrink-0">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-full h-12 font-bold ${isSidebarCollapsed ? 'md:justify-center md:gap-0 md:px-0' : ''}`}
+              onClick={handleLogout}
+              title={isSidebarCollapsed ? 'Logout' : undefined}
+            >
+              <LogOut size={20} /> <span className={`font-bold ${isSidebarCollapsed ? 'md:hidden' : ''}`}>Logout</span>
+            </Button>
+          </div>
+        </div>
+      </aside>
       <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between border-b border-border/70 px-3 beos-glass sm:min-h-20 sm:px-8">
           <div className="flex items-center gap-4 min-w-0">
@@ -1096,19 +1150,16 @@ function AppContent() {
               {activeTab === 'bep-freelancers' && <BEPFreelancerJobsPage user={user} />}
               {activeTab === 'sans-forms' && <SANSComplianceFormsPage user={user} />}
               {activeTab === 'compliance' && <ComplianceToolboxHub />}
-              {activeTab === 'specforge' && <SpecForgeWorkspace user={user} />}
               {activeTab === 'cpd-assessment' && <CPDAssessmentPage user={user} />}
               {activeTab === 'timesheets' && <TimesheetEntryPage user={user} />}
               {activeTab === 'pipeline' && <PipelineKanbanPage user={user} />}
               {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
-              {activeTab === 'standalone/engineers-calc-hub' && <EngineersCalcHub user={user} />}
-              {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
-              {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} />}
+              {activeTab === 'marketplace' && import.meta.env.VITE_DEMO_MODE === 'true' && <MarketplaceShell user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
-              {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
+              {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && !(DEMO_ONLY_PAGE_IDS.has(activeTab) && import.meta.env.VITE_DEMO_MODE !== 'true') && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
