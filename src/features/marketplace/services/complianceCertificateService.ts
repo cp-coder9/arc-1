@@ -455,6 +455,17 @@ export async function generateCertificate(
   projectId: string,
   actorId: string
 ): Promise<ComplianceCertificateData | MarketplaceError> {
+  // Step 0: Verify actor is an eligible project party (client, professional, or team member)
+  const { checkProjectMembership } = await import('@/lib/projectMembership');
+  const membership = await checkProjectMembership(actorId, 'unknown', projectId);
+  if (!membership.isMember && !membership.isAdmin) {
+    return {
+      code: 'ACCESS_DENIED',
+      message: 'Certificate generation is restricted to eligible project parties (clients, professionals, or assigned team members)',
+      details: { reason: 'Actor is not a member of this project' },
+    };
+  }
+
   // Step 1: Check readiness — all milestones completed with sign-offs
   const readiness = await checkCertificateReadiness(projectId);
 
