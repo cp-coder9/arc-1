@@ -45,6 +45,8 @@ export function userRoleToArchitexRole(role: UserRole): ArchitexRole {
     developer: 'client_developer',
     firm_admin: 'admin',
     platform_admin: 'admin',
+    land_surveyor: 'candidate_professional',
+    cpm: 'contractor',
   };
 
   return mapping[role];

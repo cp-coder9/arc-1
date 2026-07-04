@@ -48,9 +48,17 @@ export default defineConfig(({ mode }) => {
       // Increase chunk size warning limit – some agent bundles are large
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
+        // Exclude server-only modules from client bundle
+        external: [
+          'firebase-admin',
+          'firebase-admin/app',
+          'firebase-admin/firestore',
+          'firebase-admin/auth',
+          'firebase-admin/storage',
+        ],
         output: {
          manualChunks(id) {
-            if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'firebase';
+            if ((id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) && !id.includes('firebase-admin')) return 'firebase';
             if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark') || id.includes('node_modules/unist') || id.includes('node_modules/mdast') || id.includes('node_modules/hast') || id.includes('node_modules/micromark')) return 'markdown-vendor';
             if (/node_modules\/(react|react-dom|scheduler)(\/|$)/.test(id)) return 'react';
             if (id.includes('node_modules/framer-motion')) return 'framer';

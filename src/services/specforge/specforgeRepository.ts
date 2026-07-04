@@ -1,10 +1,13 @@
 /**
- * SpecForge Repository — persistence interface + local implementation.
+ * SpecForge Repository — persistence interface + local implementation + factory.
  * 
  * This repository provides a clean seam between the SpecForge service/UI
  * and the persistence layer. The LocalSpecForgeRepository uses in-memory
- * state (seeded from SAMPLE_WORKSPACE for demo). When Firestore is wired,
- * swap to FirestoreSpecForgeRepository with the same interface.
+ * state (seeded from SAMPLE_WORKSPACE for demo). In production mode,
+ * the FirestoreSpecForgeRepository is used for live Firestore persistence.
+ *
+ * The factory (`initSpecForgeRepository`) checks VITE_DEMO_MODE to select
+ * the appropriate implementation at runtime.
  */
 import type { 
   SpecForgeWorkspace, SpecItem, SpecSection, SpecIssueSnapshot,
@@ -42,11 +45,11 @@ export interface SpecForgeRepository {
   updateProcurementEntry(projectId: string, entryId: string, updates: Partial<SpecProcurementEntry>): Promise<void>;
   
   // Approvals
-  saveApproval(approval: SpecApproval): Promise<void>;
+  saveApproval(projectId: string, approval: SpecApproval): Promise<void>;
   getApprovals(projectId: string): Promise<SpecApproval[]>;
   
   // Substitutions
-  saveSubstitution(substitution: SpecSubstitution): Promise<void>;
+  saveSubstitution(projectId: string, substitution: SpecSubstitution): Promise<void>;
   getSubstitutions(projectId: string): Promise<SpecSubstitution[]>;
 }
 
@@ -126,18 +129,18 @@ export class LocalSpecForgeRepository implements SpecForgeRepository {
     this.procurement.set(projectId, entries.map(e => e.id === entryId ? { ...e, ...updates } : e));
   }
 
-  async saveApproval(approval: SpecApproval): Promise<void> {
-    const existing = this.approvals.get(approval.sectionId) ?? [];
-    this.approvals.set(approval.sectionId, [...existing, approval]);
+  async saveApproval(projectId: string, approval: SpecApproval): Promise<void> {
+    const existing = this.approvals.get(projectId) ?? [];
+    this.approvals.set(projectId, [...existing, approval]);
   }
 
   async getApprovals(projectId: string): Promise<SpecApproval[]> {
     return this.approvals.get(projectId) ?? [];
   }
 
-  async saveSubstitution(substitution: SpecSubstitution): Promise<void> {
-    const existing = this.substitutions.get(substitution.originalItemId) ?? [];
-    this.substitutions.set(substitution.originalItemId, [...existing, substitution]);
+  async saveSubstitution(projectId: string, substitution: SpecSubstitution): Promise<void> {
+    const existing = this.substitutions.get(projectId) ?? [];
+    this.substitutions.set(projectId, [...existing, substitution]);
   }
 
   async getSubstitutions(projectId: string): Promise<SpecSubstitution[]> {
@@ -150,18 +153,40 @@ export class LocalSpecForgeRepository implements SpecForgeRepository {
 let _repository: SpecForgeRepository | null = null;
 
 /**
+ * Initialise the appropriate SpecForge repository based on environment.
+ * Returns LocalSpecForgeRepository in demo mode, FirestoreSpecForgeRepository in production.
+ * Uses dynamic import for FirestoreSpecForgeRepository to avoid pulling firebase-admin into client bundles.
+ *
+ * Requirements: 11.4
+ */
+export async function initSpecForgeRepository(): Promise<SpecForgeRepository> {
+  const isDemoMode = typeof process !== 'undefined'
+    ? process.env.VITE_DEMO_MODE === 'true'
+    : false;
+
+  if (isDemoMode) {
+    return new LocalSpecForgeRepository();
+  }
+  const { FirestoreSpecForgeRepository } = await import('./firestoreSpecForgeRepository');
+  return new FirestoreSpecForgeRepository();
+}
+
+/**
  * Get the active SpecForge repository instance.
- * In production, this will be replaced with FirestoreSpecForgeRepository.
+ * Returns the LocalSpecForgeRepository as default (safe for client bundles).
+ * Server-side code should call `initSpecForgeRepository()` explicitly for production mode.
  */
 export function getSpecForgeRepository(): SpecForgeRepository {
   if (!_repository) {
+    // Default to local repo — safe for client bundles (no firebase-admin).
+    // Server routes use initSpecForgeRepository() which dynamically loads FirestoreSpecForgeRepository.
     _repository = new LocalSpecForgeRepository();
   }
   return _repository;
 }
 
 /**
- * Replace the repository implementation (for testing or Firestore swap).
+ * Replace the repository implementation (for testing or manual override).
  */
 export function setSpecForgeRepository(repo: SpecForgeRepository): void {
   _repository = repo;

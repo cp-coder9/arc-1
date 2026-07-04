@@ -1,0 +1,32 @@
+src/features/town-planning/services/municipalityConfig.ts(166,29): error TS2322: Type 'ServiceResult<true>' is not assignable to type 'ServiceResult<MunicipalityProfile>'.
+  Type '{ success: true; data: true; }' is not assignable to type 'ServiceResult<MunicipalityProfile>'.
+    Type '{ success: true; data: true; }' is not assignable to type '{ success: true; data: MunicipalityProfile; }'.
+      Types of property 'data' are incompatible.
+        Type 'boolean' is not assignable to type 'MunicipalityProfile'.
+src/features/town-planning/services/municipalityConfig.ts(178,9): error TS2322: Type '{ createdBy: string; createdAt: string; updatedAt: string; notes?: string; name?: string; province?: string; contactEmail?: string; districtMunicipality?: string; contactPhone?: string; typicalProcessingDays?: number; ... 4 more ...; additionalFields?: Record<...>; }' is not assignable to type 'Omit<MunicipalityProfile, "id">'.
+  Property 'name' is optional in type '{ createdBy: string; createdAt: string; updatedAt: string; notes?: string; name?: string; province?: string; contactEmail?: string; districtMunicipality?: string; contactPhone?: string; typicalProcessingDays?: number; ... 4 more ...; additionalFields?: Record<...>; }' but required in type 'Omit<MunicipalityProfile, "id">'.
+src/features/town-planning/services/municipalityConfig.ts(245,29): error TS2322: Type 'ServiceResult<true>' is not assignable to type 'ServiceResult<MunicipalityProfile>'.
+  Type '{ success: true; data: true; }' is not assignable to type 'ServiceResult<MunicipalityProfile>'.
+    Type '{ success: true; data: true; }' is not assignable to type '{ success: true; data: MunicipalityProfile; }'.
+      Types of property 'data' are incompatible.
+        Type 'boolean' is not assignable to type 'MunicipalityProfile'.
+src/features/town-planning/services/municipalityConfig.ts(271,25): error TS2352: Conversion of type 'MunicipalityProfile' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'MunicipalityProfile'.
+src/features/town-planning/services/propertyRegister.ts(159,29): error TS2322: Type '{ success: true; } | { success: false; error: string; }' is not assignable to type 'ServiceResult<PropertyIntelligence>'.
+  Type '{ success: true; }' is not assignable to type 'ServiceResult<PropertyIntelligence>'.
+    Property 'data' is missing in type '{ success: true; }' but required in type '{ success: true; data: PropertyIntelligence; }'.
+src/features/town-planning/services/propertyRegister.ts(238,29): error TS2322: Type '{ success: true; } | { success: false; error: string; }' is not assignable to type 'ServiceResult<PropertyIntelligence>'.
+  Type '{ success: true; }' is not assignable to type 'ServiceResult<PropertyIntelligence>'.
+    Property 'data' is missing in type '{ success: true; }' but required in type '{ success: true; data: PropertyIntelligence; }'.
+src/features/town-planning/services/propertyRegister.ts(291,29): error TS2322: Type '{ success: true; } | { success: false; error: string; }' is not assignable to type 'ServiceResult<RestrictiveCondition>'.
+  Type '{ success: true; }' is not assignable to type 'ServiceResult<RestrictiveCondition>'.
+    Property 'data' is missing in type '{ success: true; }' but required in type '{ success: true; data: RestrictiveCondition; }'.
+src/features/town-planning/services/propertyRegister.ts(343,29): error TS2322: Type '{ success: true; } | { success: false; error: string; }' is not assignable to type 'ServiceResult<RestrictiveCondition>'.
+  Type '{ success: true; }' is not assignable to type 'ServiceResult<RestrictiveCondition>'.
+    Property 'data' is missing in type '{ success: true; }' but required in type '{ success: true; data: RestrictiveCondition; }'.
+src/features/town-planning/services/propertyRegister.ts(406,29): error TS2322: Type '{ success: true; } | { success: false; error: string; }' is not assignable to type 'ServiceResult<Servitude>'.
+  Type '{ success: true; }' is not assignable to type 'ServiceResult<Servitude>'.
+    Property 'data' is missing in type '{ success: true; }' but required in type '{ success: true; data: Servitude; }'.
+src/features/town-planning/services/propertyRegister.ts(458,29): error TS2322: Type '{ success: true; } | { success: false; error: string; }' is not assignable to type 'ServiceResult<PropertyIntelligence>'.
+  Type '{ success: true; }' is not assignable to type 'ServiceResult<PropertyIntelligence>'.
+    Property 'data' is missing in type '{ success: true; }' but required in type '{ success: true; data: PropertyIntelligence; }'.

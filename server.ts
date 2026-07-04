@@ -86,15 +86,29 @@ async function startServer() {
     return next();
   });
 
-  // Mount marketplace API router
-  app.use("/api/marketplace", async (req, res, next) => {
+  // Mount SpecForge API router
+  app.use("/api/specforge", async (req, res, next) => {
     try {
-      const { default: marketplaceRouter } = await import("./src/lib/marketplace-api-router.js");
-      return marketplaceRouter(req, res, next);
+      const { default: specforgeRouter } = await import("./src/lib/specforge-api-router.js");
+      return specforgeRouter(req, res, next);
     } catch (error) {
-      console.error("Failed to load Marketplace API router:", error);
+      console.error("Failed to load SpecForge API router:", error);
       return res.status(500).json({
-        error: "Marketplace API router failed to initialize",
+        error: "SpecForge API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Mount Contract Administration API router
+  app.use("/api/contract-admin", async (req, res, next) => {
+    try {
+      const { default: contractAdminRouter } = await import("./src/lib/contract-admin-api-router.js");
+      return contractAdminRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load Contract Admin API router:", error);
+      return res.status(500).json({
+        error: "Contract Admin API router failed to initialize",
         details: error instanceof Error ? error.message : String(error),
       });
     }

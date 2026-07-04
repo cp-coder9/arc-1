@@ -117,6 +117,8 @@ const ROLE_VISIBILITY: Record<MunicipalTrackerRole, MunicipalVisibilityLevel[]> 
   developer: ['public_project'],
   firm_admin: ['public_project', 'project_team', 'bep_admin', 'admin_only'],
   platform_admin: ['public_project', 'project_team', 'bep_admin', 'admin_only'],
+  land_surveyor: ['public_project', 'project_team'],
+  cpm: ['public_project', 'project_team'],
 };
 
 function requireString(value: unknown, field: string): string {

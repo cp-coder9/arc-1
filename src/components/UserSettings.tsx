@@ -124,6 +124,14 @@ const ROLE_PROFILE_FIELDS: Record<UserProfile['role'], RoleProfileField[]> = {
     { key: 'permissionLevel', label: 'Permission level', helper: 'Governance permission level for audit visibility.' },
     { key: 'twoFactorEnabled', label: '2FA enabled', helper: 'Confirm whether 2FA is enabled.', kind: 'boolean' },
   ],
+  land_surveyor: [
+    { key: 'platoRegistration', label: 'PLATO registration number', helper: 'Professional Land Surveyor registration with PLATO.' },
+    { key: 'region', label: 'Region', helper: 'Primary operating region.' },
+  ],
+  cpm: [
+    { key: 'sacpcmpRegistration', label: 'SACPCMP registration number', helper: 'Construction Project Manager registration with SACPCMP.' },
+    { key: 'region', label: 'Region', helper: 'Primary operating region.' },
+  ],
 };
 
 const ARRAY_FIELDS = new Set(['disciplines', 'healthSafetyFiles', 'plantCapacity', 'tradeCategories', 'packageTypes', 'serviceAreas', 'productCategories', 'deliveryRegions', 'catalogueUrls', 'skills', 'software', 'portfolioUrls']);

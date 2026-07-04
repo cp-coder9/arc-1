@@ -851,6 +851,24 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     tags: ['valuation', 'payment', 'certificate', 'retention', 'VAT', 'QS'],
   },
 
+  // ===== Engineer's Calculation Hub =====
+  {
+    id: 'engineers_calc_hub',
+    label: "Engineer's Calculation Hub",
+    category: 'compliance',
+    description: '53 professional-grade engineering calculators across 8 disciplines with SANS compliance checking',
+    roles: ['engineer', 'architect', 'bep', 'energy_professional', 'fire_engineer', 'quantity_surveyor', 'site_manager'],
+    icon: 'Calculator',
+    route: 'standalone/engineers-calc-hub',
+    standaloneOnly: false,
+    requiresInput: true,
+    canExport: true,
+    canAssignToProject: true,
+    recentRunsCount: 0,
+    tags: ['engineering', 'calculator', 'SANS', 'structural', 'steel', 'concrete', 'timber', 'geotechnical', 'fire', 'electrical', 'mechanical', 'plumbing', 'compliance'],
+    calculatorDefinitionId: 'engineers_calc_hub_v1',
+  },
+
   // ===== Town Planner (additional) =====
   {
     id: 'zoning_check',
