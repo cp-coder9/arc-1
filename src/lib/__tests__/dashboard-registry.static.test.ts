@@ -150,15 +150,10 @@ describe('canonical dashboard page registry', () => {
     };
 
     const allPageIds = extractPageIds();
-    expect(allPageIds).toHaveLength(47);
+    expect(allPageIds).toHaveLength(46);
 
     for (const role of canonicalRoles) {
-      const actualPagesForRole = allPageIds.filter((pageId) => {
-        const entry = findPageEntry(pageId);
-        // Skip demoOnly pages in role assertions (mirrors runtime pagesForRole filter)
-        if (entry.includes('demoOnly: true')) return false;
-        return entryIncludesRole(entry, role);
-      });
+      const actualPagesForRole = allPageIds.filter((pageId) => entryIncludesRole(findPageEntry(pageId), role));
       expect(actualPagesForRole, `Unexpected dashboard navigation matrix for ${role}`).toHaveLength(expectedPagesByRole[role].length);
       expect(actualPagesForRole, `Unexpected dashboard navigation matrix for ${role}`).toEqual(expect.arrayContaining(expectedPagesByRole[role]));
     }

@@ -39,14 +39,27 @@ app.post('/api/auth/check-admin', (req, res, next) => {
   return next();
 });
 
-app.use('/api/specforge', async (req, res, next) => {
+app.use('/api/marketplace', async (req, res, next) => {
   try {
-    const { default: specforgeRouter } = await import('./src/lib/specforge-api-router.ts');
-    return specforgeRouter(req, res, next);
+    const { default: marketplaceRouter } = await import('./src/lib/marketplace-api-router.ts');
+    return marketplaceRouter(req, res, next);
   } catch (error) {
-    console.error('Failed to load SpecForge API router:', error);
+    console.error('Failed to load Marketplace API router:', error);
     return res.status(500).json({
-      error: 'SpecForge API router failed to initialize',
+      error: 'Marketplace API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+app.use('/api/fee-proposal', async (req, res, next) => {
+  try {
+    const { default: feeProposalRouter } = await import('./src/lib/fee-proposal-api-router.ts');
+    return feeProposalRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load Fee Proposal API router:', error);
+    return res.status(500).json({
+      error: 'Fee Proposal API router failed to initialize',
       details: error instanceof Error ? error.message : String(error),
     });
   }

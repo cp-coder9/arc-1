@@ -22,7 +22,7 @@ const NAV_TO_DASHBOARD: Record<ArchitexNavKey, string[]> = {
   toolboxes: ['toolbox', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief'],
   cpd_learning: ['cpd-assessment', 'knowledge'],
   documents: ['documents', 'resource-centre'],
-  marketplace: ['marketplace', 'bep-marketplace', 'directory-search', 'bep-team', 'bep-freelancers'],
+  marketplace: ['bep-marketplace', 'directory-search', 'bep-team', 'bep-freelancers'],
   finance: ['payments', 'invoicing', 'escrow', 'fees'],
   analytics: ['analytics'],
   messages: ['messages'],
