@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Engineer's Calculation Hub is a comprehensive multi-discipline engineering calculator workspace within the Architex Compliance Hub module. It provides 70+ professional-grade engineering calculators covering structural (steel, concrete, timber), geotechnical, civil (loading, stormwater), mechanical (HVAC), fire engineering, electrical, and wet services disciplines. Each calculator features Zod-validated inputs with South African standard defaults, a live computation engine with pass/fail status, step-by-step derivation display with SANS clause references, PDF export, and run history with assign-to-project capability. The tool integrates with SpecForge, Project Passport, and the platform audit trail. All calculations are advisory only — professional engineer sign-off is required.
+The Engineer's Calculation Hub is a comprehensive multi-discipline engineering calculator workspace within the Architex Compliance Hub module. It provides 53 professional-grade engineering calculators covering structural (steel, concrete, timber), geotechnical, civil (loading, stormwater), mechanical (HVAC), fire engineering, electrical, and wet services disciplines. Each calculator features Zod-validated inputs with South African standard defaults, a live computation engine with pass/fail status, step-by-step derivation display with SANS clause references, PDF export, and run history with assign-to-project capability. The tool integrates with SpecForge, Project Passport, and the platform audit trail. All calculations are advisory only — professional engineer sign-off is required.
 
 ## Glossary
 
@@ -24,7 +24,7 @@ The Engineer's Calculation Hub is a comprehensive multi-discipline engineering c
 
 ### Requirement 1: Workspace Layout and Navigation
 
-**User Story:** As an engineer, I want a calculator workspace with discipline-based navigation, so that I can quickly find and use any of the 70+ calculators without scrolling through a flat list.
+**User Story:** As an engineer, I want a calculator workspace with discipline-based navigation, so that I can quickly find and use any of the 53 calculators without scrolling through a flat list.
 
 #### Acceptance Criteria
 
@@ -112,14 +112,16 @@ The Engineer's Calculation Hub is a comprehensive multi-discipline engineering c
 
 **User Story:** As an engineer, I want to assign calculation results to a project, so that they appear as compliance evidence in Project Passport and can be pushed to SpecForge as spec items.
 
+> **Implementation Note (Current Release):** Criteria 2, 3, 4, 5, and 6 define the *target integration contracts*. In this release, these actions are implemented as local-only preview stubs (console logging + in-memory state). Live Firestore write-back to Project Passport, SpecForge, and Audit Trail is deferred to a follow-up PR.
+
 #### Acceptance Criteria
 
 1. WHEN a user clicks "Assign to Project" on a completed run, THE Calculation_Hub SHALL display a project selection interface and persist the assignment by updating the Calculator_Run's `assignedToProject` and `assignedToJobRef` fields.
-2. WHEN a run is assigned to a project, THE Calculation_Hub SHALL write a compliance evidence record to Project_Passport containing the calculator name, pass/fail status, key result summary, SANS references, run ID, and timestamp.
-3. WHEN a user clicks "Push to SpecForge", THE Calculation_Hub SHALL create a spec item in SpecForge containing the calculator name as title, the result summary as description, SANS references as clause tags, and the run ID as a source reference.
-4. WHEN any calculator run is created, THE Audit_Trail SHALL receive an audit event with action "calculator_run_created", the calculator definition ID, user identity, project ID (if assigned), and ISO 8601 timestamp.
-5. WHEN a run is assigned to a project, THE Audit_Trail SHALL receive an audit event with action "calculator_run_assigned", the run ID, target project ID, and user identity.
-6. WHEN a run is exported as PDF, THE Audit_Trail SHALL receive an audit event with action "calculator_run_exported", the run ID, export format, and user identity.
+2. *(Deferred — local preview only)* WHEN a run is assigned to a project, THE Calculation_Hub SHALL write a compliance evidence record to Project_Passport containing the calculator name, pass/fail status, key result summary, SANS references, run ID, and timestamp.
+3. *(Deferred — local preview only)* WHEN a user clicks "Push to SpecForge", THE Calculation_Hub SHALL create a spec item in SpecForge containing the calculator name as title, the result summary as description, SANS references as clause tags, and the run ID as a source reference.
+4. *(Deferred — local preview only)* WHEN any calculator run is created, THE Audit_Trail SHALL receive an audit event with action "calculator_run_created", the calculator definition ID, user identity, project ID (if assigned), and ISO 8601 timestamp.
+5. *(Deferred — local preview only)* WHEN a run is assigned to a project, THE Audit_Trail SHALL receive an audit event with action "calculator_run_assigned", the run ID, target project ID, and user identity.
+6. *(Deferred — local preview only)* WHEN a run is exported as PDF, THE Audit_Trail SHALL receive an audit event with action "calculator_run_exported", the run ID, export format, and user identity.
 
 ### Requirement 8: Structural Steel Calculators (SANS 10162-1)
 
