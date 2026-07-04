@@ -41,6 +41,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'instructions', label: 'Instructions', description: 'Site/project instructions.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true },
       { key: 'snags', label: 'Snags', description: 'Snagging and defects.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true, component: 'IssueDashboard', preservesComponents: ['SnagManager'] },
       { key: 'payments', label: 'Payments', description: 'Project financial items.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true },
+      { key: 'command_centre_project', label: 'Command Centre', description: 'Unified project management workspace — programme, tasks, budget, quality, risks, and AI advisor.', projectScoped: true, phaseAware: true },
       { key: 'passport', label: 'Passport', description: 'Single project truth record — health, risks, and stage progress.', projectScoped: true },
       { key: 'audit_trail', label: 'Audit Trail', description: 'Project record and history.', projectScoped: true },
     ],
