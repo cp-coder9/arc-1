@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'land_surveyor' | 'cpm';
+export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin';
 
 export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
 export type FirmMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';

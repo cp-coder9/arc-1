@@ -7,8 +7,8 @@
  * - Persists a SpecAuditEvent to the SpecForge collection via the repository
  * - Persists a platform audit record via the auditTrailService
  * - Caps previousValue / newValue at 10,000 characters each
- * - If the platform audit service is unavailable, queues for retry
- *   (exponential backoff, max 3 attempts) — never fails the primary operation
+ * - If the platform audit service is unavailable, persists to Firestore
+ *   retry queue (`specAuditRetryQueue/{eventId}`) for durable retry
  * - Only called after successful writes — never on failed/rolled-back operations
  *
  * Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7
@@ -17,27 +17,15 @@
 import type { SpecAuditAction, SpecAuditEvent } from '@/types/specforgeTypes';
 import { getSpecForgeRepository } from './specforgeRepository';
 import { createAuditEntry } from '@/services/auditTrailService';
+import { adminDb } from '@/lib/firebase-admin';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
 /** Maximum character length for previousValue / newValue fields. */
 const VALUE_CAP = 10_000;
 
-/** Maximum retry attempts for platform audit trail persistence. */
-const MAX_RETRIES = 3;
-
-/** Base delay in milliseconds for exponential backoff (doubles each retry). */
-const BASE_RETRY_DELAY_MS = 500;
-
-// ── Retry Queue ─────────────────────────────────────────────────────────────
-
-interface RetryEntry {
-  event: SpecAuditEvent;
-  attempts: number;
-}
-
-/** In-memory queue for events that failed to reach the platform audit trail. */
-const retryQueue: RetryEntry[] = [];
+/** Firestore collection for durable retry queue. */
+const RETRY_QUEUE_COLLECTION = 'specAuditRetryQueue';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -53,11 +41,6 @@ function capValue(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   if (value.length <= VALUE_CAP) return value;
   return value.slice(0, VALUE_CAP - 3) + '...';
-}
-
-/** Sleep helper for retry delays. */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Platform Audit Persistence ──────────────────────────────────────────────
@@ -80,36 +63,25 @@ function persistToPlatformAudit(event: SpecAuditEvent): boolean {
 }
 
 /**
- * Process a single retry entry with exponential backoff.
- * Removes the entry from the queue on success or after max retries exhausted.
+ * Persist a failed platform audit event to Firestore for durable retry.
+ * A background worker can pick these up later for reprocessing.
+ *
+ * TODO: Implement a background Cloud Function or scheduled worker that
+ * queries `specAuditRetryQueue` for unprocessed events and retries
+ * platform audit persistence with exponential backoff.
  */
-async function processRetry(entry: RetryEntry): Promise<void> {
-  for (let attempt = entry.attempts; attempt < MAX_RETRIES; attempt++) {
-    const backoffMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt);
-    await delay(backoffMs);
-
-    const success = persistToPlatformAudit(entry.event);
-    if (success) {
-      return;
-    }
-    entry.attempts = attempt + 1;
+async function persistToRetryQueue(event: SpecAuditEvent): Promise<void> {
+  try {
+    await adminDb.collection(RETRY_QUEUE_COLLECTION).doc(event.id).set({
+      event,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      attempts: 0,
+    });
+  } catch (err) {
+    // Last resort: log the failure — the event is already safe in SpecForge collection
+    console.warn('[SpecForge Audit] Failed to persist retry queue entry:', event.id, err);
   }
-  // Max retries exhausted — event is already safe in SpecForge collection.
-  // In production, this would be logged to a dead-letter queue or monitoring.
-}
-
-/**
- * Queue a failed platform audit event for retry with exponential backoff.
- */
-function queueForRetry(event: SpecAuditEvent): void {
-  const entry: RetryEntry = { event, attempts: 0 };
-  retryQueue.push(entry);
-
-  // Fire-and-forget retry processing — don't block the caller
-  processRetry(entry).finally(() => {
-    const idx = retryQueue.indexOf(entry);
-    if (idx !== -1) retryQueue.splice(idx, 1);
-  });
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -119,7 +91,8 @@ function queueForRetry(event: SpecAuditEvent): void {
  * and the platform-wide audit trail.
  *
  * This function should ONLY be called after a successful write operation.
- * It never throws — platform audit failures are queued for retry silently.
+ * It never throws — platform audit failures are persisted to Firestore
+ * retry queue for durable processing.
  *
  * @param params - The audit action parameters
  */
@@ -162,24 +135,17 @@ export async function logSpecForgeAction(params: {
   const repo = getSpecForgeRepository();
   await repo.logAuditEvent(event);
 
-  // 2. Persist to platform-wide audit trail (best-effort with retry)
+  // 2. Persist to platform-wide audit trail (best-effort with durable retry)
   const platformSuccess = persistToPlatformAudit(event);
   if (!platformSuccess) {
-    queueForRetry(event);
+    await persistToRetryQueue(event);
   }
 }
 
 // ── Test Utilities ──────────────────────────────────────────────────────────
 
-/** Get the current retry queue length (for testing). */
-export function _getRetryQueueLength(): number {
-  return retryQueue.length;
-}
-
-/** Clear the retry queue (for testing). */
-export function _clearRetryQueue(): void {
-  retryQueue.length = 0;
-}
-
 /** Exposed for testing: the value cap constant. */
 export const VALUE_CAP_LIMIT = VALUE_CAP;
+
+/** Exposed for testing: the retry queue collection name. */
+export const RETRY_QUEUE_COLLECTION_NAME = RETRY_QUEUE_COLLECTION;

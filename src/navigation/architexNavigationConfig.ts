@@ -7,7 +7,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'command_centre',
     label: 'Command Centre',
     description: 'Personal daily cockpit curated by the user agent.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
       { key: 'active_projects', label: 'Active Projects', description: 'Current project responsibilities.' },
@@ -20,7 +20,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'inbox',
     label: 'Inbox / Action Centre',
     description: 'Protected action centre for required work and agent-pushed tasks.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'required_actions', label: 'Required Actions', description: 'Tasks requiring user action.', supportsContextualMessaging: true },
       { key: 'approvals', label: 'Approvals', description: 'Items awaiting approval.', supportsContextualMessaging: true },
@@ -32,7 +32,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'projects',
     label: 'Projects',
     description: 'Phase-aware project workspace.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'dashboard', label: 'Project Dashboard', description: 'Project overview.', projectScoped: true, phaseAware: true },
       { key: 'team', label: 'Team', description: 'Project team and responsibilities.', projectScoped: true, supportsContextualMessaging: true },
@@ -41,7 +41,6 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'instructions', label: 'Instructions', description: 'Site/project instructions.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true },
       { key: 'snags', label: 'Snags', description: 'Snagging and defects.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true, component: 'IssueDashboard', preservesComponents: ['SnagManager'] },
       { key: 'payments', label: 'Payments', description: 'Project financial items.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true },
-      { key: 'command_centre_project', label: 'Command Centre', description: 'Unified project management workspace — programme, tasks, budget, quality, risks, and AI advisor.', projectScoped: true, phaseAware: true },
       { key: 'passport', label: 'Passport', description: 'Single project truth record — health, risks, and stage progress.', projectScoped: true },
       { key: 'audit_trail', label: 'Audit Trail', description: 'Project record and history.', projectScoped: true },
     ],
@@ -50,14 +49,13 @@ export const architexNavigation: NavigationItem[] = [
     key: 'toolboxes',
     label: 'Toolboxes',
     description: 'Role-specific professional tools, not a flat list.',
-    roles: ['architect', 'admin', 'freelancer', 'contractor', 'bep', 'subcontractor', 'supplier', 'client', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['architect', 'admin', 'freelancer', 'contractor', 'bep', 'subcontractor', 'supplier', 'client', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
       { key: 'design_compliance', label: 'Design & Compliance', description: 'NBR/SANS/municipal/drawing checks.', supportsContextualMessaging: true },
       { key: 'costing_procurement', label: 'Costing & Procurement', description: 'BoQ, BoM, RFQs and quote comparisons.', supportsContextualMessaging: true },
       { key: 'specforge', label: 'SpecForge Specifications', description: 'Pictorial specs, product schedules, approvals, issue and procurement pipeline.', supportsContextualMessaging: true },
       { key: 'construction_admin', label: 'Construction Admin', description: 'Site diary, RFIs, variations and certificates.', supportsContextualMessaging: true, captureStage: 'build', captureCapabilities: ['field_capture', 'checklists', 'field_reporting'] },
-      { key: 'contract_administration', label: 'Contract Administration', description: 'Notices, variations, EoT claims, payment schedules, and dispute tracking.', supportsContextualMessaging: true, roles: ['architect', 'bep', 'quantity_surveyor', 'contractor', 'subcontractor', 'client', 'developer', 'site_manager', 'admin', 'platform_admin'] },
       { key: 'closeout', label: 'Closeout', description: 'Snags, handover and closeout packs.', supportsContextualMessaging: true, captureStage: 'closeout', captureCapabilities: ['snag_rectification', 'handover_reporting'] },
       { key: 'full_library', label: 'Full Tool Library', description: 'All available tools with search/filter.' },
     ],
@@ -66,7 +64,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'cpd_learning',
     label: 'CPD & Learning',
     description: 'Separate CPD platform for learning, assessments and professional records.',
-    roles: ['architect', 'admin', 'freelancer', 'land_surveyor', 'cpm'],
+    roles: ['architect', 'admin', 'freelancer'],
     sections: [
       { key: 'cpd_dashboard', label: 'CPD Dashboard', description: 'Role/body-aware CPD status.' },
       { key: 'courses', label: 'Courses & Webinars', description: 'CPD learning content.' },
@@ -80,7 +78,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'documents',
     label: 'Documents / Knowledge Hub',
     description: 'Global document, template and knowledge hub.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'my_documents', label: 'My Documents', description: 'User documents.' },
       { key: 'project_documents', label: 'Project Documents', description: 'Cross-project document search.', supportsContextualMessaging: true },
@@ -93,7 +91,8 @@ export const architexNavigation: NavigationItem[] = [
     key: 'marketplace',
     label: 'Marketplace / Resource Centre',
     description: 'Industry network, resources, suppliers and opportunities.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin', 'land_surveyor', 'cpm'],
+    demoOnly: true,
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'],
     sections: [
       { key: 'professionals', label: 'Professionals', description: 'Find consultants and professionals.' },
       { key: 'contractors', label: 'Contractors', description: 'Find contractors and subcontractors.' },
@@ -120,7 +119,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'analytics',
     label: 'Analytics & Reporting',
     description: 'Role-scoped KPIs computed from real finance, site-execution and verification data.',
-    roles: ['client', 'architect', 'admin', 'contractor', 'bep', 'engineer', 'quantity_surveyor', 'town_planner', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['client', 'architect', 'admin', 'contractor', 'bep', 'engineer', 'quantity_surveyor', 'town_planner', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'kpi_overview', label: 'KPI Overview', description: 'Schedule variance, cost-to-complete, defect-liability days, retention readiness and compliance-gap count.', projectScoped: true },
       { key: 'project_reports', label: 'Project Reports', description: 'Versioned KPI reports and history per project.', projectScoped: true },
@@ -132,7 +131,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'messages',
     label: 'Messages',
     description: 'Full persistent messaging centre linked to project context.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'cpm'],
+    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'direct', label: 'Direct Messages', description: 'One-to-one messages.' },
       { key: 'project_groups', label: 'Project Groups', description: 'Project group conversations.' },
@@ -186,6 +185,7 @@ export const architexNavigation: NavigationItem[] = [
 export function getNavigationForRole(role: UserRole): NavigationItem[] {
   return architexNavigation
     .filter((item) => {
+      if (item.demoOnly && import.meta.env.VITE_DEMO_MODE !== 'true') return false;
       if (!item.roles || item.roles.length === 0) return true;
       return item.roles.includes(role);
     })
