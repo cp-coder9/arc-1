@@ -91,8 +91,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'marketplace',
     label: 'Marketplace / Resource Centre',
     description: 'Industry network, resources, suppliers and opportunities.',
-    demoOnly: true,
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'freelancer', 'developer', 'firm_admin'],
+    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'supplier'],
     sections: [
       { key: 'professionals', label: 'Professionals', description: 'Find consultants and professionals.' },
       { key: 'contractors', label: 'Contractors', description: 'Find contractors and subcontractors.' },
@@ -185,7 +184,6 @@ export const architexNavigation: NavigationItem[] = [
 export function getNavigationForRole(role: UserRole): NavigationItem[] {
   return architexNavigation
     .filter((item) => {
-      if (item.demoOnly && import.meta.env.VITE_DEMO_MODE !== 'true') return false;
       if (!item.roles || item.roles.length === 0) return true;
       return item.roles.includes(role);
     })
