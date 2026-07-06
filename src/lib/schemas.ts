@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'health_safety']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
 export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected', 'withdrawn']);

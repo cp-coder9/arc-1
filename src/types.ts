@@ -1,4 +1,95 @@
-export type UserRole = 'client' | 'architect' | 'admin' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'land_surveyor' | 'health_safety';
+export type UserRole = 'client' | 'architect' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'land_surveyor' | 'health_safety';
+
+/**
+ * A tuple type that ensures at least one element exists.
+ * Used for route role definitions to guarantee compile-time error on empty arrays.
+ */
+export type NonEmptyArray<T> = [T, ...T[]];
+
+/**
+ * Project-scoped access roles that grant elevated permissions on a specific project.
+ * These are assigned per-project and do NOT include 'admin'.
+ */
+export type ProjectAccessRole =
+  | 'project_owner'
+  | 'lead_bep'
+  | 'lead_consultant'
+  | 'project_administrator'
+  | 'design_team_member'
+  | 'contractor'
+  | 'subcontractor_package_assignee'
+  | 'supplier_package_assignee'
+  | 'freelancer_task_assignee';
+
+/**
+ * All permission actions available in the platform authorization system.
+ * Used by permissionService for role-based and project-scoped permission evaluation.
+ */
+export type PermissionAction =
+  | 'project:read'
+  | 'project:update'
+  | 'project:manage_members'
+  | 'profile:read'
+  | 'profile:update'
+  | 'verification:review'
+  | 'audit:read'
+  | 'audit:write'
+  | 'admin:override'
+  | 'payment:read'
+  | 'payment:manage'
+  | 'escrow:release'
+  | 'compliance:sign'
+  | 'municipal:manage'
+  | 'municipal:view_insight';
+
+/**
+ * Normalized user representation for authorization decisions.
+ * Used throughout the permission service and middleware.
+ */
+export interface AuthzUser {
+  uid: string;
+  role?: UserRole | string;
+  admin?: boolean;
+  verificationStatus?: string;
+  /** Indicates this user has platform_admin permissions merged (e.g. Professional_Role + admin:true) */
+  isPlatformAdmin?: boolean;
+}
+
+/**
+ * Request for a platform_admin to override separation-of-duty constraints.
+ * Requires an audit-logged reason of at least 10 characters.
+ */
+export interface AdminOverrideRequest {
+  admin: AuthzUser;
+  action: PermissionAction;
+  projectId: string;
+  reason: string;
+}
+
+/**
+ * Audit trail entry written when a platform_admin exercises an override.
+ * Stored in projects/{projectId}/auditTrail/{eventId}.
+ */
+export interface AdminOverrideAuditEntry {
+  adminUid: string;
+  action: PermissionAction;
+  projectId: string;
+  reason: string;
+  timestamp: string; // ISO 8601
+}
+
+/**
+ * Firestore document representing a project access role assignment.
+ * Stored in projects/{projectId}/accessRoles/{userId}.
+ */
+export interface ProjectAccessRoleAssignment {
+  userId: string;
+  projectId: string;
+  accessRole: 'lead_consultant' | 'project_administrator';
+  assignedBy: string;
+  assignedAt: string; // ISO 8601
+  userProfessionalRole: UserRole;
+}
 
 export type FirmRole = 'owner' | 'admin' | 'coordinator' | 'staff' | 'billing_viewer';
 export type FirmMemberStatus = 'invited' | 'active' | 'suspended' | 'removed';
