@@ -44,6 +44,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  Shield,
   History,
   ArrowRight,
   CheckCircle2,
@@ -177,6 +178,7 @@ const PipelineKanbanPage = lazyWithChunkRetry(() => import('./components/Pipelin
 const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/TemplateLibrary'));
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
+const HealthSafetyWorkspacePage = lazyWithChunkRetry(() => import('./components/healthSafety/HealthSafetyWorkspace'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
 const FeeProposalBuilder = lazyWithChunkRetry(() => import('./components/tools/FeeProposalBuilder/index'));
 
@@ -254,6 +256,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'bep-team', label: 'Design Team Matrix', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Users size={18} />, summary: 'Discipline responsibility matrix and consultant invitation workspace.', backedBy: ['projects.teamMembers', 'teamService'] },
   { id: 'bep-freelancers', label: 'Freelancer Jobs', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Plus size={18} />, summary: 'Controlled BEP-to-freelancer work package shell.', backedBy: ['delegatedTasks'] },
   { id: 'specforge', label: 'SpecForge Specifications', roles: ['client', 'developer', 'bep', 'architect', 'engineer', 'quantity_surveyor', 'energy_professional', 'fire_engineer', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Interactive pictorial specifications, product schedules, approvals, RFQs, planning and closeout.', backedBy: ['SpecForgeWorkspace', 'specforgeService'] },
+  { id: 'health-safety', label: 'Health & Safety', roles: ['health_safety', 'site_manager', 'contractor', 'subcontractor', 'client', 'admin', 'architect', 'engineer'], group: 'Construction tools', icon: <Shield size={18} />, summary: 'Construction Regulations 2014 safety file, permits, HIRA, incidents, inductions and fall protection plans.', backedBy: ['HealthSafetyWorkspace', 'healthSafetyServices'] },
   { id: 'snagging', label: 'Snagging / Close-Out', roles: [...DESIGN_TEAM_ROLES, 'contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <CheckCircle2 size={18} />, summary: 'Project and package close-out shell backed by existing closeout workflows and package evidence records.', backedBy: ['CloseoutWizard', 'PackageCloseoutPage'] },
   { id: 'construction', label: 'Construction OS', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Construction size={18} />, summary: 'Construction operations shell for site logs, RFIs, programme, and delivery controls.', backedBy: ['SiteLogManager', 'RFIManager'] },
   { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management workspace for staff, wage evidence, and plant records.', backedBy: ['contractor profile/compliance records'] },
@@ -309,6 +312,7 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'templates',
   'registrations',
   'specforge',
+  'health-safety',
   'marketplace',
 ]);
 const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
@@ -393,6 +397,8 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Oversee project portfolio, investment governance, and programme strategy.' },
   firm_admin: { label: 'Firm Admin', viewLabel: 'Firm View', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)', description: 'Manage practice operations, staff, CPD, and professional registrations.' },
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
+  land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage land surveys, boundary pegging, and topographic data.' },
+  health_safety: { label: 'H&S Officer', viewLabel: 'H&S View', accent: '#f57c00', accentSoft: 'rgba(245, 124, 0, 0.12)', description: 'Manage safety files, permits, inductions, incidents, and HIRA registers.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -1149,12 +1155,13 @@ function AppContent() {
               {activeTab === 'templates' && <TemplateLibraryPage user={user} />}
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
+              {activeTab === 'health-safety' && <HealthSafetyWorkspacePage user={user} />}
               {activeTab === 'fee-proposal-builder' && <FeeProposalBuilder user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
