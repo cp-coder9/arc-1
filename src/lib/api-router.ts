@@ -16,6 +16,8 @@ import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../s
 import { normalizeUserRole } from "../services/permissionService";
 import { requireAdmin, requireAuth } from "./roleMiddleware";
 import popiaRoutes from "./popiaRoutes";
+import marketplaceRouter from "@/features/remote-desktop-marketplace/remote-desktop-marketplace-api-router";
+import { ownerRouter } from "@/features/remote-desktop-marketplace/remote-desktop-marketplace-owner-api-router";
 import {
   applyVerificationReview,
   assertVerificationSubjectType,
@@ -8351,5 +8353,9 @@ router.post(["/sync-queue/flush", "/api/sync-queue/flush"], async (req, res) => 
 
 // Mount POPIA/PAIA compliance routes
 router.use("/popia", popiaRoutes);
+
+// Mount Remote Desktop Marketplace routes
+router.use("/remote-desktop-marketplace", marketplaceRouter);
+router.use("/remote-desktop-marketplace", ownerRouter);
 
 export default router;

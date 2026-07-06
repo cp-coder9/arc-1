@@ -84,6 +84,7 @@ import {
   BarChart3,
   PanelLeftClose,
   PanelLeftOpen,
+  Store,
 } from 'lucide-react';
 
 import { Logo } from './components/Logo';
@@ -188,6 +189,7 @@ const SiteInstructionManagerStandalone = lazyWithChunkRetry(() => import('./comp
 const ContractAdminWorkspace = lazyWithChunkRetry(() => import('./components/ContractAdminWorkspace'));
 const ContractorComplianceDashboard = lazyWithChunkRetry(() => import('./components/ContractorComplianceDashboard'));
 const DisputeResolutionPage = lazyWithChunkRetry(() => import('./components/DisputeResolutionPage'));
+const RemoteDesktopMarketplace = lazyWithChunkRetry(() => import('@/features/remote-desktop-marketplace/components/RemoteDesktopMarketplace'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -284,6 +286,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'freelancer-submissions', label: 'Submissions & Feedback', roles: ['freelancer'], group: 'Freelancer tools', icon: <Send size={18} />, summary: 'Submission/revision/feedback shell for freelancer deliverables.', backedBy: ['delegatedTasks', 'FileManager'] },
   { id: 'knowledge', label: 'Knowledge / CPD', roles: ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'firm_admin'], group: 'Governance', icon: <BookOpen size={18} />, summary: 'Knowledge and CPD shell backed by knowledge-source tooling.', backedBy: ['KnowledgeSources', 'AdminKnowledgeUploader'] },
   { id: 'resource-sharing', label: 'Remote Desktop / Resources', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'Governance', icon: <HardDrive size={18} />, summary: 'Remote workstation/resource sharing workspace backed by booking, usage, and resource listing records.', backedBy: ['Resource library workflow'] },
+  { id: 'remote-desktop-marketplace', label: 'Remote Desktop Marketplace', roles: ['freelancer', 'contractor', 'subcontractor', 'bep', 'architect', 'firm_admin', 'platform_admin'], group: 'Governance', icon: <Store size={18} />, summary: 'Browse, filter, and book remote desktop resources from marketplace owners.', backedBy: ['RemoteDesktopMarketplace'] },
   { id: 'resource-centre', label: 'Resource Centre / Checklists', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'Governance', icon: <Database size={18} />, summary: 'Role-based resource centre and checklist shell.', backedBy: ['KnowledgeSources'] },
   { id: 'cpd-assessment', label: 'CPD Assessment', roles: DESIGN_TEAM_ROLES, group: 'Governance', icon: <BookOpen size={18} />, summary: 'CPD assessment workflow backed by live assessment and attempt records with human-reviewed certificates.', backedBy: ['cpdService'] },
   { id: 'admin-console', label: 'Admin Console', roles: ['platform_admin'], group: 'Governance', icon: <Settings2 size={18} />, summary: 'Whole-system governance console backed by current admin dashboard tabs.', backedBy: ['AdminDashboard'] },
@@ -332,6 +335,7 @@ export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'specforge',
   'health-safety',
   'marketplace',
+  'remote-desktop-marketplace',
   'council-navigator',
   'ncr-manager',
   'site-instructions',
@@ -1216,10 +1220,11 @@ function AppContent() {
               {activeTab === 'disputes' && <DisputeResolutionPage user={user} />}
               {activeTab === 'fee-proposal-builder' && <FeeProposalBuilder user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
+              {activeTab === 'remote-desktop-marketplace' && <RemoteDesktopMarketplace user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}

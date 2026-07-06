@@ -105,6 +105,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'suppliers', label: 'Suppliers', description: 'Find suppliers.', supportsContextualMessaging: true },
       { key: 'freelancers', label: 'Freelancers', description: 'Candidate professionals and freelancers.' },
       { key: 'resource_sharing', label: 'Resource Sharing', description: 'Plant, equipment and shared resources.' },
+      { key: 'remote_desktop_marketplace', label: 'Marketplace', description: 'Browse, filter, and book remote desktop resources.', roles: ['freelancer', 'contractor', 'subcontractor', 'bep', 'architect', 'firm_admin', 'platform_admin'] },
       { key: 'opportunities', label: 'Opportunities', description: 'Project opportunities and invitations.', supportsContextualMessaging: true },
     ],
   },
