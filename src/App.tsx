@@ -49,6 +49,7 @@ import {
   ArrowRight,
   CheckCircle2,
   MapPin,
+  AlertTriangle,
   Clock,
   Menu,
   X,
@@ -181,6 +182,12 @@ const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/spe
 const HealthSafetyWorkspacePage = lazyWithChunkRetry(() => import('./components/healthSafety/HealthSafetyWorkspace'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
 const FeeProposalBuilder = lazyWithChunkRetry(() => import('./components/tools/FeeProposalBuilder/index'));
+const SACouncilDrawingComplianceNavigator = lazyWithChunkRetry(() => import('./components/SACouncilDrawingComplianceNavigator'));
+const NCRManagerStandalone = lazyWithChunkRetry(() => import('./components/NCRManagerStandalone'));
+const SiteInstructionManagerStandalone = lazyWithChunkRetry(() => import('./components/SiteInstructionManagerStandalone'));
+const ContractAdminWorkspace = lazyWithChunkRetry(() => import('./components/ContractAdminWorkspace'));
+const ContractorComplianceDashboard = lazyWithChunkRetry(() => import('./components/ContractorComplianceDashboard'));
+const DisputeResolutionPage = lazyWithChunkRetry(() => import('./components/DisputeResolutionPage'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -206,7 +213,7 @@ const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   },
 ];
 
-type DashboardPage = {
+export type DashboardPage = {
   id: string;
   label: string;
   roles: UserRole[];
@@ -225,7 +232,7 @@ type DashboardResourceLink = {
 
 const DESIGN_TEAM_ROLES: UserRole[] = ['bep', 'architect'];
 
-const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
+export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'command', label: 'Command Centre', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <LayoutDashboard size={18} />, summary: 'Role-aware dashboard landing page for priorities, project state, and next decisions.', backedBy: ['role dashboards', 'active project data'] },
   { id: 'profile', label: 'Profile Editor', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <UserCircle size={18} />, summary: 'Canonical profile surface reused for verification, contracts, invoices, procurement, matching, and governance.', backedBy: ['UserSettings', 'ProfileEditor'] },
   { id: 'toolbox', label: 'Project Toolbox', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Core workflow', icon: <Files size={18} />, summary: 'Guided, role-aware project tools and checklists from the backend.html reference.', backedBy: ['FileManager', 'current project metadata'] },
@@ -256,12 +263,17 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'bep-team', label: 'Design Team Matrix', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Users size={18} />, summary: 'Discipline responsibility matrix and consultant invitation workspace.', backedBy: ['projects.teamMembers', 'teamService'] },
   { id: 'bep-freelancers', label: 'Freelancer Jobs', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Plus size={18} />, summary: 'Controlled BEP-to-freelancer work package shell.', backedBy: ['delegatedTasks'] },
   { id: 'specforge', label: 'SpecForge Specifications', roles: ['client', 'developer', 'bep', 'architect', 'engineer', 'quantity_surveyor', 'energy_professional', 'fire_engineer', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Interactive pictorial specifications, product schedules, approvals, RFQs, planning and closeout.', backedBy: ['SpecForgeWorkspace', 'specforgeService'] },
+  { id: 'council-navigator', label: 'Council Drawing Navigator', roles: ['architect', 'bep', 'engineer', 'energy_professional', 'fire_engineer', 'town_planner', 'admin'], group: 'BEP tools', icon: <MapPin size={18} />, summary: 'Municipality-specific drawing submission requirements for South African local authorities.', backedBy: ['SACouncilDrawingComplianceNavigator', 'saCouncilDrawingComplianceData'] },
   { id: 'health-safety', label: 'Health & Safety', roles: ['health_safety', 'site_manager', 'contractor', 'subcontractor', 'client', 'admin', 'architect', 'engineer'], group: 'Construction tools', icon: <Shield size={18} />, summary: 'Construction Regulations 2014 safety file, permits, HIRA, incidents, inductions and fall protection plans.', backedBy: ['HealthSafetyWorkspace', 'healthSafetyServices'] },
   { id: 'snagging', label: 'Snagging / Close-Out', roles: [...DESIGN_TEAM_ROLES, 'contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <CheckCircle2 size={18} />, summary: 'Project and package close-out shell backed by existing closeout workflows and package evidence records.', backedBy: ['CloseoutWizard', 'PackageCloseoutPage'] },
   { id: 'construction', label: 'Construction OS', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Construction size={18} />, summary: 'Construction operations shell for site logs, RFIs, programme, and delivery controls.', backedBy: ['SiteLogManager', 'RFIManager'] },
   { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management workspace for staff, wage evidence, and plant records.', backedBy: ['contractor profile/compliance records'] },
   { id: 'procurement', label: 'BoQ / BoM Procurement', roles: ['contractor', 'subcontractor', 'supplier', ...DESIGN_TEAM_ROLES, 'admin'], group: 'Construction tools', icon: <Factory size={18} />, summary: 'BoQ/BoM procurement shell for contractor, package, and supplier workflows.', backedBy: ['package readiness services'] },
   { id: 'packages', label: 'Subcontractor Packages', roles: ['contractor', 'subcontractor', 'supplier', 'admin'], group: 'Construction tools', icon: <Building2 size={18} />, summary: 'Package-layer shell for subcontractor/supplier scopes and progress.', backedBy: ['package readiness services'] },
+  { id: 'ncr-manager', label: 'NCR Manager', roles: ['architect', 'bep', 'contractor', 'subcontractor', 'site_manager', 'engineer', 'admin'], group: 'Construction tools', icon: <AlertTriangle size={18} />, summary: 'Non-conformance report management — defect identification, tracking, and resolution workflows.', backedBy: ['NCRManager', 'ncrService'] },
+  { id: 'site-instructions', label: 'Site Instructions', roles: ['architect', 'bep', 'contractor', 'subcontractor', 'site_manager', 'engineer', 'admin'], group: 'Construction tools', icon: <FileText size={18} />, summary: 'Formal site instruction issuance, acknowledgement, and tracking workflows.', backedBy: ['SiteInstructionManager', 'siteInstructionService'] },
+  { id: 'contract-admin', label: 'Contract Administration', roles: ['architect', 'bep', 'quantity_surveyor', 'contractor', 'subcontractor', 'site_manager', 'engineer', 'admin'], group: 'Construction tools', icon: <Briefcase size={18} />, summary: 'Unified contract administration — claims, variations, EoT, notices, payment schedules, and contract data.', backedBy: ['ContractAdminWorkspace', 'contractAdmin services'] },
+  { id: 'contractor-compliance', label: 'Contractor Compliance', roles: ['architect', 'bep', 'contractor', 'subcontractor', 'supplier', 'site_manager', 'quantity_surveyor', 'admin'], group: 'Construction tools', icon: <ShieldCheck size={18} />, summary: 'Contractor and supplier compliance gate — check statuses, expired certifications, and access control.', backedBy: ['ContractorComplianceDashboard', 'contractorSupplierComplianceService'] },
   { id: 'freelancer-work', label: 'Assigned Work', roles: ['freelancer'], group: 'Freelancer tools', icon: <Briefcase size={18} />, summary: 'Assigned freelancer work surface backed by current freelancer task cards.', backedBy: ['FreelancerDashboard'] },
   { id: 'freelancer-submissions', label: 'Submissions & Feedback', roles: ['freelancer'], group: 'Freelancer tools', icon: <Send size={18} />, summary: 'Submission/revision/feedback shell for freelancer deliverables.', backedBy: ['delegatedTasks', 'FileManager'] },
   { id: 'knowledge', label: 'Knowledge / CPD', roles: ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin'], group: 'Governance', icon: <BookOpen size={18} />, summary: 'Knowledge and CPD shell backed by knowledge-source tooling.', backedBy: ['KnowledgeSources', 'AdminKnowledgeUploader'] },
@@ -276,7 +288,7 @@ const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 ];
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
-const DIRECT_WORKFLOW_PAGE_IDS = new Set([
+export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'profile',
   'command',
   'client-intake',
@@ -314,8 +326,14 @@ const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'specforge',
   'health-safety',
   'marketplace',
+  'council-navigator',
+  'ncr-manager',
+  'site-instructions',
+  'contract-admin',
+  'contractor-compliance',
+  'disputes',
 ]);
-const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
+export const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
 
 const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
@@ -355,7 +373,7 @@ const DASHBOARD_RESOURCE_LINKS: Record<string, DashboardResourceLink[]> = {
   ],
 };
 
-function pagesForRole(role: UserRole) {
+export function pagesForRole(role: UserRole) {
   return CANONICAL_DASHBOARD_PAGES.filter((page) => page.roles.includes(role));
 }
 
@@ -1156,12 +1174,18 @@ function AppContent() {
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'health-safety' && <HealthSafetyWorkspacePage user={user} />}
+              {activeTab === 'council-navigator' && <SACouncilDrawingComplianceNavigator />}
+              {activeTab === 'ncr-manager' && <NCRManagerStandalone user={user} />}
+              {activeTab === 'site-instructions' && <SiteInstructionManagerStandalone user={user} />}
+              {activeTab === 'contract-admin' && <ContractAdminWorkspace user={user} />}
+              {activeTab === 'contractor-compliance' && <ContractorComplianceDashboard user={user} />}
+              {activeTab === 'disputes' && <DisputeResolutionPage user={user} />}
               {activeTab === 'fee-proposal-builder' && <FeeProposalBuilder user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
-              {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
+              {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
