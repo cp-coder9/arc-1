@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3 } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -74,6 +74,35 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
           { id: 'material-testing', icon: FlaskConical, label: 'Material Testing' },
           { id: 'hold-points', icon: ShieldAlert, label: 'Hold Points' },
           { id: 'reports', icon: FileText, label: 'Reports' },
+        ],
+      },
+    ],
+  },
+  'town-planning': {
+    name: 'Town Planning',
+    subtitle: 'SPLUMA application lifecycle tracker',
+    sections: [
+      {
+        label: 'Overview',
+        items: [
+          { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+          { id: 'applications', icon: ClipboardList, label: 'Applications' },
+        ],
+      },
+      {
+        label: 'Workflow',
+        items: [
+          { id: 'deadlines', icon: Calendar, label: 'Deadlines' },
+          { id: 'participation', icon: Users, label: 'Public Participation' },
+          { id: 'conditions', icon: FileText, label: 'Conditions' },
+          { id: 'hearings', icon: Scale, label: 'Appeals & Hearings' },
+        ],
+      },
+      {
+        label: 'Intelligence',
+        items: [
+          { id: 'municipalities', icon: Building2, label: 'Municipality Profiles' },
+          { id: 'reports', icon: BarChart3, label: 'Reports & Analytics' },
         ],
       },
     ],
