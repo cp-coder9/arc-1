@@ -1,7 +1,7 @@
 // Fee Proposal API Router — REST endpoints for the Professional Fee Proposal Builder
 //
-// Uses InMemoryFirestoreAdapter for process-lifetime persistence.
-// Replace with real Firebase adapter for durable production storage.
+// Uses Firebase Admin SDK (via adminDb) for durable Firestore persistence.
+// InMemoryFirestoreAdapter retained as a fallback for test environments only.
 //
 // Provides CRUD operations for:
 // - Source versions (admin only): create, status transition, import
@@ -14,7 +14,8 @@
 // Requirements: 5.6, 5.9, 8.1, 8.4, 6.1, 6.5, 7.1, 7.2, 11.1, 14.3
 
 import { Router, type Request, type Response } from 'express';
-import { RunPersistenceService, InMemoryFirestoreAdapter } from '@/services/professionalFee/persistence/runPersistenceService';
+import { requireAuth } from './roleMiddleware';
+import { RunPersistenceService, InMemoryFirestoreAdapter, type FirestoreAdapter } from '@/services/professionalFee/persistence/runPersistenceService';
 import { SourceVersionService } from '@/services/professionalFee/persistence/sourceVersionService';
 import { TermsPersistenceService } from '@/services/professionalFee/persistence/termsPersistenceService';
 import { ProposalPersistenceService } from '@/services/professionalFee/persistence/proposalPersistenceService';
@@ -23,11 +24,70 @@ import type { Profession } from '@/services/professionalFee/types';
 
 const router = Router();
 
+// ── Authentication: ALL fee-proposal routes require authentication ───────────
+router.use(requireAuth);
+
 // ---------------------------------------------------------------------------
-// Shared service instances (process-lifetime persistence)
+// Shared service instances — Firestore persistence via AdminFirestoreAdapter
 // ---------------------------------------------------------------------------
 
-const db = new InMemoryFirestoreAdapter();
+/**
+ * Production-grade Firestore adapter using the Firebase Admin SDK.
+ * Stores fee proposal data in the `feeProposal/` Firestore namespace.
+ */
+class AdminFirestoreAdapter implements FirestoreAdapter {
+  private _adminDb: any = null;
+
+  private async getDb() {
+    if (!this._adminDb) {
+      const { adminDb } = await import('@/lib/firebase-admin');
+      this._adminDb = adminDb;
+    }
+    return this._adminDb;
+  }
+
+  async get(collection: string, docId: string): Promise<Record<string, unknown> | null> {
+    const db = await this.getDb();
+    const doc = await db.collection(`feeProposal_${collection}`).doc(docId).get();
+    return doc.exists ? { id: doc.id, ...doc.data() } as Record<string, unknown> : null;
+  }
+
+  async set(collection: string, docId: string, data: Record<string, unknown>): Promise<void> {
+    const db = await this.getDb();
+    await db.collection(`feeProposal_${collection}`).doc(docId).set({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async update(collection: string, docId: string, data: Partial<Record<string, unknown>>): Promise<void> {
+    const db = await this.getDb();
+    await db.collection(`feeProposal_${collection}`).doc(docId).update({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async delete(collection: string, docId: string): Promise<void> {
+    const db = await this.getDb();
+    await db.collection(`feeProposal_${collection}`).doc(docId).delete();
+  }
+
+  async query(collection: string, filters: Array<{ field: string; op: string; value: unknown }>): Promise<Record<string, unknown>[]> {
+    const db = await this.getDb();
+    let ref = db.collection(`feeProposal_${collection}`) as any;
+    for (const f of filters) {
+      ref = ref.where(f.field, f.op, f.value);
+    }
+    const snapshot = await ref.get();
+    return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Record<string, unknown>));
+  }
+}
+
+// Use real Firestore in production, InMemory for test environments only
+const db: FirestoreAdapter = process.env.NODE_ENV === 'test'
+  ? new InMemoryFirestoreAdapter()
+  : new AdminFirestoreAdapter();
 const runService = new RunPersistenceService(db);
 const sourceVersionService = new SourceVersionService(db);
 const termsService = new TermsPersistenceService(db);
@@ -35,21 +95,16 @@ const proposalService = new ProposalPersistenceService(db);
 const guidelineWatchService = new GuidelineWatchPersistence(db, sourceVersionService);
 
 // ---------------------------------------------------------------------------
-// Middleware: Admin-only guard
-// Note: In production, this should use the app's getAuthContext(req.headers) pattern 
-// from api-router.ts for Firebase token verification. Currently uses a simplified
-// check compatible with both dev (bypass) and production (role check) modes.
+// Middleware: Admin-only guard (uses standardized requireAuth context)
 // ---------------------------------------------------------------------------
 
-function requireAdmin(req: Request, res: Response, next: () => void) {
-  // Check both patterns: req.authContext (main router) and req.user (middleware-injected)
-  const authContext = (req as any).authContext ?? (req as any).user;
-  const userRole = authContext?.role;
-  if (userRole === 'admin' || userRole === 'platform_admin') {
-    return next();
+function requireFeeAdmin(req: Request, res: Response, next: () => void) {
+  const authContext = req.authContext;
+  if (!authContext) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
-  // Allow in dev/demo modes for development iteration
-  if (process.env.NODE_ENV !== 'production') {
+  const userRole = authContext.role;
+  if (userRole === 'admin' || userRole === 'platform_admin') {
     return next();
   }
   return res.status(403).json({ error: 'Admin access required' });
@@ -60,13 +115,13 @@ function requireAdmin(req: Request, res: Response, next: () => void) {
 // ---------------------------------------------------------------------------
 
 /** POST /api/fee-proposal/source-versions — Create new source version */
-router.post('/source-versions', requireAdmin, async (req: Request, res: Response) => {
+router.post('/source-versions', requireFeeAdmin, async (req: Request, res: Response) => {
   try {
     const { profession, body, title, effectiveDate, payload } = req.body;
     if (!profession || !title || !effectiveDate) {
       return res.status(400).json({ error: 'profession, title, and effectiveDate are required' });
     }
-    const createdBy = (req as any).user?.id ?? 'system';
+    const createdBy = req.authContext!.uid;
     const newVersion = await sourceVersionService.createSourceVersion({
       profession,
       body: body || '',
@@ -82,14 +137,14 @@ router.post('/source-versions', requireAdmin, async (req: Request, res: Response
 });
 
 /** PATCH /api/fee-proposal/source-versions/:id/status — Transition status (verify/retire) */
-router.patch('/source-versions/:id/status', requireAdmin, async (req: Request, res: Response) => {
+router.patch('/source-versions/:id/status', requireFeeAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
     if (!['verified', 'retired'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status. Must be verified or retired.' });
     }
-    const actorId = (req as any).user?.id ?? 'system';
+    const actorId = req.authContext!.uid;
     const updated = await sourceVersionService.transitionStatus(id, status, actorId);
     return res.json(updated);
   } catch (error: any) {
@@ -104,7 +159,7 @@ router.patch('/source-versions/:id/status', requireAdmin, async (req: Request, r
 });
 
 /** POST /api/fee-proposal/source-versions/:id/import — Import fee table data */
-router.post('/source-versions/:id/import', requireAdmin, async (req: Request, res: Response) => {
+router.post('/source-versions/:id/import', requireFeeAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { data, format, profession } = req.body;
@@ -350,7 +405,7 @@ router.patch('/terms/:id', async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 
 /** GET /api/fee-proposal/guidelines/watch — Get watch list */
-router.get('/guidelines/watch', requireAdmin, async (req: Request, res: Response) => {
+router.get('/guidelines/watch', requireFeeAdmin, async (req: Request, res: Response) => {
   try {
     const watchEntries = await guidelineWatchService.loadWatchRegistry();
     const candidates = await guidelineWatchService.listCandidates();
@@ -361,7 +416,7 @@ router.get('/guidelines/watch', requireAdmin, async (req: Request, res: Response
 });
 
 /** POST /api/fee-proposal/guidelines/scan — Trigger a scan */
-router.post('/guidelines/scan', requireAdmin, async (req: Request, res: Response) => {
+router.post('/guidelines/scan', requireFeeAdmin, async (req: Request, res: Response) => {
   try {
     // Load watch registry, trigger scan via FeeGuideUpdateService, persist any candidates
     const watchSources = await guidelineWatchService.loadWatchRegistry();
@@ -373,11 +428,11 @@ router.post('/guidelines/scan', requireAdmin, async (req: Request, res: Response
 });
 
 /** POST /api/fee-proposal/guidelines/candidates/:id/approve — Approve change candidate */
-router.post('/guidelines/candidates/:id/approve', requireAdmin, async (req: Request, res: Response) => {
+router.post('/guidelines/candidates/:id/approve', requireFeeAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { sourceTitle, effectiveDate } = req.body;
-    const approvedBy = (req as any).user?.id ?? 'system';
+    const approvedBy = req.authContext!.uid;
     await guidelineWatchService.approveCandidate(id, approvedBy, sourceTitle || 'Approved update', effectiveDate || new Date().toISOString().split('T')[0]);
     return res.json({ id, status: 'approved', approvedBy, approvedAt: new Date().toISOString() });
   } catch (error: any) {
