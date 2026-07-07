@@ -592,7 +592,10 @@ export type NotificationType =
   | 'supervision_log_required'
   | 'registration_expiring'
   | 'cpd_shortfall'
-  | 'invoice_ready_for_review';
+  | 'invoice_ready_for_review'
+  | 'feedback_status_changed'
+  | 'feedback_shipped'
+  | 'feedback_declined';
 
 export interface Notification {
   id: string;
@@ -624,6 +627,9 @@ export interface Notification {
     supervisionLogId?: string;
     registrationId?: string;
     invoiceReadinessId?: string;
+    clusterId?: string;
+    releaseNoteUrl?: string;
+    declineReason?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];

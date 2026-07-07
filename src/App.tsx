@@ -89,6 +89,9 @@ import {
 
 import { Logo } from './components/Logo';
 import { NotificationBell } from './components/NotificationBell';
+import { useFrictionDetector } from '@/hooks/useFrictionDetector';
+import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
+import { FeedbackErrorBoundary } from '@/components/feedback/FeedbackErrorBoundary';
 import { architexNavigation } from './navigation/architexNavigationConfig';
 import { getDefaultPageForNavKey, getNavKeyForActiveTab } from './navigation/navDashboardAdapter';
 import type { ArchitexNavKey } from './navigation/navTypes';
@@ -190,6 +193,7 @@ const ContractAdminWorkspace = lazyWithChunkRetry(() => import('./components/Con
 const ContractorComplianceDashboard = lazyWithChunkRetry(() => import('./components/ContractorComplianceDashboard'));
 const DisputeResolutionPage = lazyWithChunkRetry(() => import('./components/DisputeResolutionPage'));
 const RemoteDesktopMarketplace = lazyWithChunkRetry(() => import('@/features/remote-desktop-marketplace/components/RemoteDesktopMarketplace'));
+const FeedbackRoadmapDashboard = lazyWithChunkRetry(() => import('./components/feedback/FeedbackRoadmapDashboard'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -290,6 +294,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'resource-centre', label: 'Resource Centre / Checklists', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'Governance', icon: <Database size={18} />, summary: 'Role-based resource centre and checklist shell.', backedBy: ['KnowledgeSources'] },
   { id: 'cpd-assessment', label: 'CPD Assessment', roles: DESIGN_TEAM_ROLES, group: 'Governance', icon: <BookOpen size={18} />, summary: 'CPD assessment workflow backed by live assessment and attempt records with human-reviewed certificates.', backedBy: ['cpdService'] },
   { id: 'admin-console', label: 'Admin Console', roles: ['platform_admin'], group: 'Governance', icon: <Settings2 size={18} />, summary: 'Whole-system governance console backed by current admin dashboard tabs.', backedBy: ['AdminDashboard'] },
+  { id: 'feedback-roadmap', label: 'Feedback Roadmap', roles: ['platform_admin'], group: 'Governance', icon: <BarChart3 size={18} />, summary: 'AI-powered feedback intelligence dashboard — clusters, trends, severity scoring, and loop closure.', backedBy: ['FeedbackRoadmapDashboard', 'feedbackService'] },
   { id: 'timesheets', label: 'Timesheets', roles: ['architect', 'bep', 'freelancer', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor'], group: 'Governance', icon: <Clock size={18} />, summary: 'Time capture with billable/non-billable tracking and fee reconciliation.', backedBy: ['timesheetService'] },
   { id: 'pipeline', label: 'Pipeline', roles: ['architect', 'bep', 'firm_admin', 'developer'], group: 'Governance', icon: <BarChart3 size={18} />, summary: 'Visual pipeline kanban with win/loss tracking and value forecasting.', backedBy: ['pipelineService'] },
   { id: 'templates', label: 'Templates', roles: ['architect', 'bep', 'freelancer', 'engineer', 'quantity_surveyor', 'firm_admin'], group: 'Governance', icon: <FileText size={18} />, summary: 'Practice document template library with versioning and role-based access.', backedBy: ['templateLibraryService'] },
@@ -342,6 +347,7 @@ export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'contract-admin',
   'contractor-compliance',
   'disputes',
+  'feedback-roadmap',
 ]);
 export const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -495,6 +501,9 @@ function AppContent() {
   }, []);
   const [activeTab, setActiveTab] = useState('command');
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
+
+  // Passive friction detection — monitors for user struggle patterns (rage clicks, repeated errors, etc.)
+  useFrictionDetector(user);
 
   const visibleNavItems = useMemo(() => {
     if (!user) return [];
@@ -1194,6 +1203,7 @@ function AppContent() {
               {activeTab === 'resource-centre' && <ResourceCentre user={user} />}
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
+              {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}
@@ -1241,6 +1251,9 @@ function AppContent() {
         </ScrollArea>
       </main>
       <DemoBanner />
+      <FeedbackErrorBoundary>
+        <FeedbackWidget user={user} />
+      </FeedbackErrorBoundary>
       <Toaster />
     </div>
     </DemoModeProvider>

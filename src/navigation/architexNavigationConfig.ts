@@ -196,6 +196,18 @@ export const architexNavigation: NavigationItem[] = [
     ],
   },
   {
+    key: 'feedback_intelligence',
+    label: 'Feedback Intelligence',
+    description: 'AI-powered feedback pipeline — clusters, trends, severity scoring, and closed-loop notifications.',
+    roles: ['platform_admin'],
+    sections: [
+      { key: 'overview', label: 'Overview', description: 'Summary of feedback clusters, activity, and key metrics.' },
+      { key: 'clusters', label: 'Clusters', description: 'Feedback clusters sorted by severity with filtering and pagination.' },
+      { key: 'trends', label: 'Trends', description: 'Feedback volume trend chart by category over time.' },
+      { key: 'friction_signals', label: 'Friction Signals', description: 'Implicit friction detections from user sessions.' },
+    ],
+  },
+  {
     key: 'user_settings',
     label: 'My Account',
     description: 'Profile, professional registrations and preferences.',
