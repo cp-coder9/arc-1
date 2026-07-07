@@ -64,6 +64,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'contractor-compliance', label: 'Contractor Compliance', description: 'Contractor and supplier compliance gate dashboard.' },
       { key: 'disputes', label: 'Dispute Resolution', description: 'Cross-project dispute management.' },
       { key: 'health_safety', label: 'Health & Safety', description: 'Safety file, permits, HIRA, inductions, incidents, H&S plans and fall protection — Construction Regulations 2014.', supportsContextualMessaging: true, captureStage: 'build', captureCapabilities: ['field_capture', 'checklists'] },
+      { key: 'itp-workspace', label: 'Inspection Test Plans', description: 'QA/QC inspection test plans, hold points, material testing, and compliance reporting.' },
       { key: 'closeout', label: 'Closeout', description: 'Snags, handover and closeout packs.', supportsContextualMessaging: true, captureStage: 'closeout', captureCapabilities: ['snag_rectification', 'handover_reporting'] },
       { key: 'full_library', label: 'Full Tool Library', description: 'All available tools with search/filter.' },
     ],

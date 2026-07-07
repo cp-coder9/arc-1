@@ -65,7 +65,8 @@ export type ProjectRecordType =
   | 'permit_issued'
   | 'incident_reported'
   | 'safety_file_score_changed'
-  | 'hs_specification_complete';
+  | 'hs_specification_complete'
+  | 'inspection_test_plan';
 
 export interface AuditMetadata {
   createdBy: string;
@@ -184,7 +185,7 @@ export interface WorkflowEvent {
   title: string;
   detail: string;
   priority: Priority;
-  sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'settings_admin' | 'health_safety';
+  sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'site' | 'settings_admin' | 'health_safety';
   assignedRoles: ArchitexRole[];
   createdAt: string;
 }

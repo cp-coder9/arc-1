@@ -6,6 +6,10 @@ import {
 } from '@/services/specforge/specforgePassportAdapter';
 import { getSpecForgeRepository } from '@/services/specforge/specforgeRepository';
 import { createWorkflowEvent } from '@/services/inboxEventAdapter';
+// ITP Passport Integration — call buildITPPassportData() to include quality metrics in the passport.
+// Usage: const qualitySummary = await buildITPPassportData(metadata.projectId);
+// Then include qualitySummary in the passport as the 'quality' field.
+// import { buildITPPassportData } from '@/services/itpPassportAdapter';
 import type { SpecForgeWorkspace } from '@/types/specforgeTypes';
 import type {
   ArchitexRole,

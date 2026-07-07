@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -58,6 +58,22 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
           { id: 'clusters', icon: Layers, label: 'Clusters' },
           { id: 'trends', icon: TrendingUp, label: 'Trends' },
           { id: 'friction-signals', icon: AlertTriangle, label: 'Friction Signals' },
+        ],
+      },
+    ],
+  },
+  'itp-workspace': {
+    name: 'Inspection Test Plans',
+    subtitle: 'QA/QC quality assurance during construction',
+    sections: [
+      {
+        label: 'Views',
+        items: [
+          { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+          { id: 'itps', icon: ClipboardList, label: 'ITPs' },
+          { id: 'material-testing', icon: FlaskConical, label: 'Material Testing' },
+          { id: 'hold-points', icon: ShieldAlert, label: 'Hold Points' },
+          { id: 'reports', icon: FileText, label: 'Reports' },
         ],
       },
     ],
