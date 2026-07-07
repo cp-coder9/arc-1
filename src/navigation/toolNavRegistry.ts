@@ -27,6 +27,26 @@ export interface ToolNavConfig {
 }
 
 export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
+  'wingman': {
+    name: 'Wingman',
+    subtitle: 'AI Copilot Workspace',
+    sections: [
+      {
+        label: 'Conversations',
+        items: [
+          { id: 'threads', icon: LayoutDashboard, label: 'Threads' },
+          { id: 'capabilities', icon: Layers, label: 'Capabilities' },
+        ],
+      },
+      {
+        label: 'Intelligence',
+        items: [
+          { id: 'provenance', icon: TrendingUp, label: 'Provenance' },
+          { id: 'imports', icon: AlertTriangle, label: 'AI Imports' },
+        ],
+      },
+    ],
+  },
   'feedback-roadmap': {
     name: 'Feedback Intelligence',
     subtitle: 'AI-powered feedback pipeline',

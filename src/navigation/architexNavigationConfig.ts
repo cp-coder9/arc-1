@@ -11,6 +11,7 @@ export const architexNavigation: NavigationItem[] = [
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
       { key: 'active_projects', label: 'Active Projects', description: 'Current project responsibilities.' },
+      { key: 'wingman', label: 'Wingman', description: 'AI Copilot — role-aware project assistant.' },
       { key: 'cpd_status', label: 'CPD Status', description: 'Professional learning and compliance summary.' },
       { key: 'priority_messages', label: 'Priority Messages', description: 'Unread project/CPD/finance messages.' },
       { key: 'agent_recommendations', label: 'Agent Recommendations', description: 'Next-best actions from user/project agents.' },

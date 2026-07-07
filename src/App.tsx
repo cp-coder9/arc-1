@@ -194,6 +194,7 @@ const ContractorComplianceDashboard = lazyWithChunkRetry(() => import('./compone
 const DisputeResolutionPage = lazyWithChunkRetry(() => import('./components/DisputeResolutionPage'));
 const RemoteDesktopMarketplace = lazyWithChunkRetry(() => import('@/features/remote-desktop-marketplace/components/RemoteDesktopMarketplace'));
 const FeedbackRoadmapDashboard = lazyWithChunkRetry(() => import('./components/feedback/FeedbackRoadmapDashboard'));
+const CopilotPanel = lazyWithChunkRetry(() => import('./components/CopilotPanel'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -1204,6 +1205,7 @@ function AppContent() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
+              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={selectedProjectId || undefined} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}

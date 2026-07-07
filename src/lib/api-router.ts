@@ -8358,4 +8358,12 @@ router.use("/popia", popiaRoutes);
 router.use("/remote-desktop-marketplace", marketplaceRouter);
 router.use("/remote-desktop-marketplace", ownerRouter);
 
+// Mount Feedback Loop routes
+import feedbackRouter from "./feedback-api-router";
+router.use("/feedback", feedbackRouter);
+
+// Mount Copilot / Provenance / BYOAI routes
+import copilotRouter from "./copilot-api-router";
+router.use(copilotRouter);
+
 export default router;
