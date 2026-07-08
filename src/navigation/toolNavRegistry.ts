@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -152,6 +152,35 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
         items: [
           { id: 'host-settings', icon: Settings, label: 'Host Settings' },
           { id: 'audit-log', icon: FileText, label: 'Audit Log' },
+        ],
+      },
+    ],
+  },
+  'eia-workspace': {
+    name: 'EIA & Environmental',
+    subtitle: 'Environmental compliance & green building',
+    sections: [
+      {
+        label: 'EIA Lifecycle',
+        items: [
+          { id: 'overview', icon: LayoutDashboard, label: 'EIA Overview' },
+          { id: 'screening', icon: Search, label: 'Activity Screening' },
+          { id: 'basic-assessment', icon: ClipboardList, label: 'Basic Assessment' },
+          { id: 'full-eia', icon: FileText, label: 'Full EIA' },
+        ],
+      },
+      {
+        label: 'Compliance',
+        items: [
+          { id: 'authorization', icon: ShieldCheck, label: 'Authorization Register' },
+          { id: 'empr', icon: Shield, label: 'EMPr Monitor' },
+          { id: 'public-participation', icon: Users, label: 'Public Participation' },
+        ],
+      },
+      {
+        label: 'Green Building',
+        items: [
+          { id: 'green-building', icon: Leaf, label: 'Green Building' },
         ],
       },
     ],

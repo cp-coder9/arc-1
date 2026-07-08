@@ -200,6 +200,7 @@ const CopilotPanel = lazyWithChunkRetry(() => import('./components/CopilotPanel'
 const ITPWorkspace = lazyWithChunkRetry(() => import('./components/itp/ITPWorkspace'));
 const MunicipalApprovalWorkspacePage = lazyWithChunkRetry(() => import('./components/municipal-workspace/MunicipalApprovalWorkspace'));
 const FormSystemWorkspace = lazyWithChunkRetry(() => import('./components/forms/FormSystemWorkspace'));
+const EIAWorkspace = lazyWithChunkRetry(() => import('./components/eia/EIAWorkspace'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -295,6 +296,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'contract-admin', label: 'Contract Administration', roles: ['architect', 'bep', 'quantity_surveyor', 'contractor', 'subcontractor', 'site_manager', 'engineer'], group: 'Construction tools', icon: <Briefcase size={18} />, summary: 'Unified contract administration — claims, variations, EoT, notices, payment schedules, and contract data.', backedBy: ['ContractAdminWorkspace', 'contractAdmin services'] },
   { id: 'contractor-compliance', label: 'Contractor Compliance', roles: ['architect', 'bep', 'contractor', 'subcontractor', 'supplier', 'site_manager', 'quantity_surveyor'], group: 'Construction tools', icon: <ShieldCheck size={18} />, summary: 'Contractor and supplier compliance gate — check statuses, expired certifications, and access control.', backedBy: ['ContractorComplianceDashboard', 'contractorSupplierComplianceService'] },
   { id: 'itp-workspace', label: 'Inspection Test Plans', roles: ['engineer', 'architect', 'site_manager', 'contractor', 'subcontractor', 'quantity_surveyor', 'client', 'developer', 'bep'], group: 'Construction tools', icon: <ClipboardCheck size={18} />, summary: 'QA/QC quality assurance governance — inspection test plans, hold points, material testing, and compliance reporting.', backedBy: ['ITPWorkspace', 'itpService'] },
+  { id: 'eia-workspace', label: 'EIA & Environmental', roles: ['architect', 'engineer', 'town_planner', 'energy_professional', 'developer', 'client', 'platform_admin', 'site_manager', 'contractor'], group: 'BEP tools', icon: <ShieldCheck size={18} />, summary: 'NEMA EIA lifecycle — screening, assessment tracking, authorization, EMPr monitoring, public participation, and green building certification (GBCSA Green Star SA, EDGE, Net Zero).', backedBy: ['EIAWorkspace', 'eiaIntegrationService'] },
   { id: 'freelancer-work', label: 'Assigned Work', roles: ['freelancer'], group: 'Freelancer tools', icon: <Briefcase size={18} />, summary: 'Assigned freelancer work surface backed by current freelancer task cards.', backedBy: ['FreelancerDashboard'] },
   { id: 'freelancer-submissions', label: 'Submissions & Feedback', roles: ['freelancer'], group: 'Freelancer tools', icon: <Send size={18} />, summary: 'Submission/revision/feedback shell for freelancer deliverables.', backedBy: ['delegatedTasks', 'FileManager'] },
   { id: 'knowledge', label: 'Knowledge / CPD', roles: ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'firm_admin'], group: 'Governance', icon: <BookOpen size={18} />, summary: 'Knowledge and CPD shell backed by knowledge-source tooling.', backedBy: ['KnowledgeSources', 'AdminKnowledgeUploader'] },
@@ -361,6 +363,7 @@ export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'feedback-roadmap',
   'municipal-approval-workspace',
   'form-system',
+  'eia-workspace',
 ]);
 export const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1250,9 +1253,10 @@ function AppContent() {
               {activeTab === 'itp-workspace' && <ITPWorkspace user={user} />}
               {activeTab === 'municipal-approval-workspace' && <MunicipalApprovalWorkspacePage user={user} />}
               {activeTab === 'form-system' && <FormSystemWorkspace user={user} />}
+              {activeTab === 'eia-workspace' && <EIAWorkspace user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && activeTab !== 'eia-workspace' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}

@@ -60,6 +60,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'costing_procurement', label: 'Costing & Procurement', description: 'BoQ, BoM, RFQs and quote comparisons.', supportsContextualMessaging: true },
       { key: 'specforge', label: 'SpecForge Specifications', description: 'Pictorial specs, product schedules, approvals, issue and procurement pipeline.', supportsContextualMessaging: true },
       { key: 'town-planning', label: 'Town Planning Tracker', description: 'SPLUMA application lifecycle — rezoning, subdivision, consent use, conditions, appeals.', supportsContextualMessaging: true },
+      { key: 'eia-workspace', label: 'EIA & Environmental', description: 'NEMA EIA lifecycle, screening, authorization, EMPr, public participation, and green building certification.', supportsContextualMessaging: true },
       { key: 'construction_admin', label: 'Construction Admin', description: 'Site diary, RFIs, variations and certificates.', supportsContextualMessaging: true, captureStage: 'build', captureCapabilities: ['field_capture', 'checklists', 'field_reporting'] },
       { key: 'ncr-manager', label: 'NCR Manager', description: 'Non-conformance report management and resolution.' },
       { key: 'site-instructions', label: 'Site Instructions', description: 'Site instruction issuance and tracking.' },
