@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -152,6 +152,45 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
         items: [
           { id: 'host-settings', icon: Settings, label: 'Host Settings' },
           { id: 'audit-log', icon: FileText, label: 'Audit Log' },
+        ],
+      },
+    ],
+  },
+  'practice-management': {
+    name: 'Practice Management',
+    subtitle: 'Firm financial operations',
+    sections: [
+      {
+        label: 'Time & Costs',
+        items: [
+          { id: 'pm-timesheets', icon: Clock, label: 'Timesheets' },
+          { id: 'pm-expenses', icon: Receipt, label: 'Expenses' },
+          { id: 'pm-billing-rates', icon: DollarSign, label: 'Billing Rates' },
+        ],
+      },
+      {
+        label: 'Financials',
+        items: [
+          { id: 'pm-fee-tracker', icon: Target, label: 'Fee Tracker' },
+          { id: 'pm-wip', icon: TrendingUp, label: 'WIP' },
+          { id: 'pm-profitability', icon: PieChart, label: 'Profitability' },
+          { id: 'pm-invoicing', icon: FileText, label: 'Invoicing' },
+          { id: 'pm-write-offs', icon: XCircle, label: 'Write-Offs' },
+        ],
+      },
+      {
+        label: 'Planning',
+        items: [
+          { id: 'pm-resources', icon: Users, label: 'Resource Planning' },
+          { id: 'pm-leave', icon: Calendar, label: 'Leave' },
+          { id: 'pm-forecast', icon: BarChart3, label: 'Income Forecast' },
+          { id: 'pm-pipeline', icon: GitBranch, label: 'Pipeline' },
+        ],
+      },
+      {
+        label: 'Reporting',
+        items: [
+          { id: 'pm-firm-dashboard', icon: LayoutDashboard, label: 'Firm Dashboard' },
         ],
       },
     ],

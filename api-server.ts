@@ -65,6 +65,19 @@ app.use('/api/fee-proposal', async (req, res, next) => {
   }
 });
 
+app.use('/api/practice', async (req, res, next) => {
+  try {
+    const { default: practiceManagementRouter } = await import('./src/lib/practice-management-api-router.ts');
+    return practiceManagementRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load Practice Management API router:', error);
+    return res.status(500).json({
+      error: 'Practice Management API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 app.use(async (req, res, next) => {
   if (!req.path.startsWith('/api/forms')) return next();
   try {

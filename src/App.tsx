@@ -201,6 +201,18 @@ const ITPWorkspace = lazyWithChunkRetry(() => import('./components/itp/ITPWorksp
 const MunicipalApprovalWorkspacePage = lazyWithChunkRetry(() => import('./components/municipal-workspace/MunicipalApprovalWorkspace'));
 const FormSystemWorkspace = lazyWithChunkRetry(() => import('./components/forms/FormSystemWorkspace'));
 const EIAWorkspace = lazyWithChunkRetry(() => import('./components/eia/EIAWorkspace'));
+const FirmCommandCentreDashboard = lazyWithChunkRetry(() => import('./components/FirmCommandCentreDashboard'));
+const LeaveRequestForm = lazyWithChunkRetry(() => import('./components/practiceManagement/LeaveRequestForm'));
+const LeaveCalendar = lazyWithChunkRetry(() => import('./components/practiceManagement/LeaveCalendar'));
+const IncomeForecastChart = lazyWithChunkRetry(() => import('./components/practiceManagement/IncomeForecastChart'));
+const CrmPipelineBoard = lazyWithChunkRetry(() => import('./components/practiceManagement/CrmPipelineBoard'));
+const FirmPortfolioTable = lazyWithChunkRetry(() => import('./components/practiceManagement/FirmPortfolioTable'));
+const TimesheetCapture = lazyWithChunkRetry(() => import('./components/practiceManagement/TimesheetCapture'));
+const TimesheetApproval = lazyWithChunkRetry(() => import('./components/practiceManagement/TimesheetApproval'));
+const ExpenseClaimForm = lazyWithChunkRetry(() => import('./components/practiceManagement/ExpenseClaimForm'));
+const ExpenseApproval = lazyWithChunkRetry(() => import('./components/practiceManagement/ExpenseApproval'));
+const BillingRateConfig = lazyWithChunkRetry(() => import('./components/practiceManagement/BillingRateConfig'));
+const FeeTrackerPanel = lazyWithChunkRetry(() => import('./components/practiceManagement/FeeTrackerPanel'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -1254,9 +1266,22 @@ function AppContent() {
               {activeTab === 'municipal-approval-workspace' && <MunicipalApprovalWorkspacePage user={user} />}
               {activeTab === 'form-system' && <FormSystemWorkspace user={user} />}
               {activeTab === 'eia-workspace' && <EIAWorkspace user={user} />}
+              {activeTab === 'practice-management' && <FirmCommandCentreDashboard user={user} />}
+              {activeTab === 'pm-firm-dashboard' && <FirmCommandCentreDashboard user={user} />}
+              {activeTab === 'pm-timesheets' && <TimesheetCapture user={user} />}
+              {activeTab === 'pm-timesheet-approval' && <TimesheetApproval user={user} />}
+              {activeTab === 'pm-expenses' && <ExpenseClaimForm user={user} />}
+              {activeTab === 'pm-expense-approval' && <ExpenseApproval user={user} />}
+              {activeTab === 'pm-billing-rates' && <BillingRateConfig user={user} />}
+              {activeTab === 'pm-fee-tracker' && <FeeTrackerPanel user={user} />}
+              {activeTab === 'pm-leave' && <LeaveRequestForm user={user} />}
+              {activeTab === 'pm-leave-calendar' && <LeaveCalendar user={user} />}
+              {activeTab === 'pm-forecast' && <IncomeForecastChart user={user} />}
+              {activeTab === 'pm-pipeline' && <CrmPipelineBoard user={user} />}
+              {activeTab === 'pm-portfolio' && <FirmPortfolioTable user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && activeTab !== 'eia-workspace' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && activeTab !== 'eia-workspace' && !activeTab.startsWith('pm-') && activeTab !== 'practice-management' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
