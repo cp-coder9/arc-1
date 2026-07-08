@@ -26,6 +26,7 @@ const CATEGORY_LABELS: Record<StandaloneToolCategory, string> = {
   communication: 'Communication',
   freelancer: 'Freelancer',
   resource_centre: 'Resources',
+  construction_admin: 'Contract Admin',
   general: 'General',
 }
 

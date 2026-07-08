@@ -1,5 +1,5 @@
 import type { NavigationItem, WorkspaceSection, LifecycleStage, FieldCaptureCapability, FieldCaptureMode } from './navTypes';
-import type { UserRole } from '../types';
+import type { UserRole, AuthzUser } from '../types';
 import { canPerform, assertFieldAction, type AuthorizationError } from '@/services/fieldAccessService';
 
 export const architexNavigation: NavigationItem[] = [
@@ -7,10 +7,11 @@ export const architexNavigation: NavigationItem[] = [
     key: 'command_centre',
     label: 'Command Centre',
     description: 'Personal daily cockpit curated by the user agent.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'today', label: 'Today / Next Actions', description: 'Next actions and daily priorities.' },
       { key: 'active_projects', label: 'Active Projects', description: 'Current project responsibilities.' },
+      { key: 'wingman', label: 'Wingman', description: 'AI Copilot — role-aware project assistant.' },
       { key: 'cpd_status', label: 'CPD Status', description: 'Professional learning and compliance summary.' },
       { key: 'priority_messages', label: 'Priority Messages', description: 'Unread project/CPD/finance messages.' },
       { key: 'agent_recommendations', label: 'Agent Recommendations', description: 'Next-best actions from user/project agents.' },
@@ -20,7 +21,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'inbox',
     label: 'Inbox / Action Centre',
     description: 'Protected action centre for required work and agent-pushed tasks.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
     sections: [
       { key: 'required_actions', label: 'Required Actions', description: 'Tasks requiring user action.', supportsContextualMessaging: true },
       { key: 'approvals', label: 'Approvals', description: 'Items awaiting approval.', supportsContextualMessaging: true },
@@ -32,7 +33,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'projects',
     label: 'Projects',
     description: 'Phase-aware project workspace.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['client', 'architect', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin'],
     sections: [
       { key: 'dashboard', label: 'Project Dashboard', description: 'Project overview.', projectScoped: true, phaseAware: true },
       { key: 'team', label: 'Team', description: 'Project team and responsibilities.', projectScoped: true, supportsContextualMessaging: true },
@@ -42,6 +43,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'snags', label: 'Snags', description: 'Snagging and defects.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true, component: 'IssueDashboard', preservesComponents: ['SnagManager'] },
       { key: 'payments', label: 'Payments', description: 'Project financial items.', projectScoped: true, phaseAware: true, supportsContextualMessaging: true },
       { key: 'passport', label: 'Passport', description: 'Single project truth record — health, risks, and stage progress.', projectScoped: true },
+      { key: 'form-system', label: 'Forms', description: 'Auto-fill project forms and manage construction documents.', projectScoped: true },
       { key: 'audit_trail', label: 'Audit Trail', description: 'Project record and history.', projectScoped: true },
     ],
   },
@@ -49,13 +51,24 @@ export const architexNavigation: NavigationItem[] = [
     key: 'toolboxes',
     label: 'Toolboxes',
     description: 'Role-specific professional tools, not a flat list.',
-    roles: ['architect', 'admin', 'freelancer', 'contractor', 'bep', 'subcontractor', 'supplier', 'client', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['architect', 'freelancer', 'contractor', 'bep', 'subcontractor', 'supplier', 'client', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'health_safety'],
     sections: [
       { key: 'proposal_appointment', label: 'Proposal & Appointment', description: 'Fee calculators, proposals and appointment workflows.' },
       { key: 'design_compliance', label: 'Design & Compliance', description: 'NBR/SANS/municipal/drawing checks.', supportsContextualMessaging: true },
+      { key: 'council-navigator', label: 'Council Drawing Navigator', description: 'Municipality-specific drawing submission requirements.' },
+      { key: 'form-system', label: 'Form System', description: 'Auto-fill & manage construction documents — templates, drafts, export, and audit.', supportsContextualMessaging: true },
       { key: 'costing_procurement', label: 'Costing & Procurement', description: 'BoQ, BoM, RFQs and quote comparisons.', supportsContextualMessaging: true },
       { key: 'specforge', label: 'SpecForge Specifications', description: 'Pictorial specs, product schedules, approvals, issue and procurement pipeline.', supportsContextualMessaging: true },
+      { key: 'town-planning', label: 'Town Planning Tracker', description: 'SPLUMA application lifecycle — rezoning, subdivision, consent use, conditions, appeals.', supportsContextualMessaging: true },
+      { key: 'eia-workspace', label: 'EIA & Environmental', description: 'NEMA EIA lifecycle, screening, authorization, EMPr, public participation, and green building certification.', supportsContextualMessaging: true },
       { key: 'construction_admin', label: 'Construction Admin', description: 'Site diary, RFIs, variations and certificates.', supportsContextualMessaging: true, captureStage: 'build', captureCapabilities: ['field_capture', 'checklists', 'field_reporting'] },
+      { key: 'ncr-manager', label: 'NCR Manager', description: 'Non-conformance report management and resolution.' },
+      { key: 'site-instructions', label: 'Site Instructions', description: 'Site instruction issuance and tracking.' },
+      { key: 'contract-admin', label: 'Contract Administration', description: 'Claims, variations, EoT, notices, and payment schedules.' },
+      { key: 'contractor-compliance', label: 'Contractor Compliance', description: 'Contractor and supplier compliance gate dashboard.' },
+      { key: 'disputes', label: 'Dispute Resolution', description: 'Cross-project dispute management.' },
+      { key: 'health_safety', label: 'Health & Safety', description: 'Safety file, permits, HIRA, inductions, incidents, H&S plans and fall protection — Construction Regulations 2014.', supportsContextualMessaging: true, captureStage: 'build', captureCapabilities: ['field_capture', 'checklists'] },
+      { key: 'itp-workspace', label: 'Inspection Test Plans', description: 'QA/QC inspection test plans, hold points, material testing, and compliance reporting.' },
       { key: 'closeout', label: 'Closeout', description: 'Snags, handover and closeout packs.', supportsContextualMessaging: true, captureStage: 'closeout', captureCapabilities: ['snag_rectification', 'handover_reporting'] },
       { key: 'full_library', label: 'Full Tool Library', description: 'All available tools with search/filter.' },
     ],
@@ -64,21 +77,21 @@ export const architexNavigation: NavigationItem[] = [
     key: 'cpd_learning',
     label: 'CPD & Learning',
     description: 'Separate CPD platform for learning, assessments and professional records.',
-    roles: ['architect', 'admin', 'freelancer'],
+    roles: ['architect', 'freelancer'],
     sections: [
       { key: 'cpd_dashboard', label: 'CPD Dashboard', description: 'Role/body-aware CPD status.' },
       { key: 'courses', label: 'Courses & Webinars', description: 'CPD learning content.' },
       { key: 'assessments', label: 'Assessments', description: 'Assessment runner and attempts.', supportsContextualMessaging: true },
       { key: 'certificates', label: 'Certificates', description: 'Issued CPD evidence.', supportsContextualMessaging: true },
       { key: 'manual_submissions', label: 'Manual Submissions', description: 'Professional-body submission tracking.', supportsContextualMessaging: true },
-      { key: 'partner_admin', label: 'Partner Admin', description: 'CPD Central/partner administration.', roles: ['admin'] },
+      { key: 'partner_admin', label: 'Partner Admin', description: 'CPD Central/partner administration.', roles: ['platform_admin'] },
     ],
   },
   {
     key: 'documents',
     label: 'Documents / Knowledge Hub',
     description: 'Global document, template and knowledge hub.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['client', 'architect', 'bep', 'contractor', 'subcontractor', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin'],
     sections: [
       { key: 'my_documents', label: 'My Documents', description: 'User documents.' },
       { key: 'project_documents', label: 'Project Documents', description: 'Cross-project document search.', supportsContextualMessaging: true },
@@ -91,13 +104,15 @@ export const architexNavigation: NavigationItem[] = [
     key: 'marketplace',
     label: 'Marketplace / Resource Centre',
     description: 'Industry network, resources, suppliers and opportunities.',
-    roles: ['client', 'architect', 'admin', 'bep', 'contractor', 'supplier'],
+    roles: ['client', 'architect', 'bep', 'contractor', 'supplier'],
     sections: [
       { key: 'professionals', label: 'Professionals', description: 'Find consultants and professionals.' },
       { key: 'contractors', label: 'Contractors', description: 'Find contractors and subcontractors.' },
       { key: 'suppliers', label: 'Suppliers', description: 'Find suppliers.', supportsContextualMessaging: true },
       { key: 'freelancers', label: 'Freelancers', description: 'Candidate professionals and freelancers.' },
       { key: 'resource_sharing', label: 'Resource Sharing', description: 'Plant, equipment and shared resources.' },
+      { key: 'remote_desktop_marketplace', label: 'Marketplace', description: 'Browse, filter, and book remote desktop resources.', roles: ['freelancer', 'contractor', 'subcontractor', 'bep', 'architect', 'firm_admin', 'platform_admin'] },
+      { key: 'remote_desktop_viewer', label: 'Remote Desktop Viewer', description: 'Live remote desktop session viewer for active bookings.', roles: ['freelancer', 'contractor', 'subcontractor', 'bep', 'architect', 'firm_admin', 'platform_admin'] },
       { key: 'opportunities', label: 'Opportunities', description: 'Project opportunities and invitations.', supportsContextualMessaging: true },
     ],
   },
@@ -105,7 +120,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'finance',
     label: 'Finance & Commercial',
     description: 'Commercial controls, payments, escrow and financial records.',
-    roles: ['client', 'admin', 'contractor', 'subcontractor'],
+    roles: ['client', 'contractor', 'subcontractor'],
     sections: [
       { key: 'quotes', label: 'Quotes', description: 'Quotes and comparisons.', supportsContextualMessaging: true },
       { key: 'invoices', label: 'Invoices', description: 'Invoices and payments.', supportsContextualMessaging: true },
@@ -118,7 +133,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'analytics',
     label: 'Analytics & Reporting',
     description: 'Role-scoped KPIs computed from real finance, site-execution and verification data.',
-    roles: ['client', 'architect', 'admin', 'contractor', 'bep', 'engineer', 'quantity_surveyor', 'town_planner', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['client', 'architect', 'contractor', 'bep', 'engineer', 'quantity_surveyor', 'town_planner', 'developer', 'firm_admin'],
     sections: [
       { key: 'kpi_overview', label: 'KPI Overview', description: 'Schedule variance, cost-to-complete, defect-liability days, retention readiness and compliance-gap count.', projectScoped: true },
       { key: 'project_reports', label: 'Project Reports', description: 'Versioned KPI reports and history per project.', projectScoped: true },
@@ -130,7 +145,7 @@ export const architexNavigation: NavigationItem[] = [
     key: 'messages',
     label: 'Messages',
     description: 'Full persistent messaging centre linked to project context.',
-    roles: ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin'],
+    roles: ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin'],
     sections: [
       { key: 'direct', label: 'Direct Messages', description: 'One-to-one messages.' },
       { key: 'project_groups', label: 'Project Groups', description: 'Project group conversations.' },
@@ -144,14 +159,59 @@ export const architexNavigation: NavigationItem[] = [
     key: 'settings',
     label: 'Settings',
     description: 'User, company, permissions, billing and admin configuration.',
-    roles: ['admin'],
+    roles: ['platform_admin'],
     sections: [
       { key: 'profile', label: 'Profile', description: 'Personal profile and preferences.' },
       { key: 'professional_registrations', label: 'Professional Registrations', description: 'Professional body details.' },
       { key: 'company', label: 'Company', description: 'Company/team settings.' },
       { key: 'billing', label: 'Billing', description: 'Subscription and billing.' },
-      { key: 'roles_permissions', label: 'Roles & Permissions', description: 'Access control.', roles: ['admin'] },
-      { key: 'platform_admin', label: 'Platform Admin', description: 'System configuration.', roles: ['admin'] },
+      { key: 'roles_permissions', label: 'Roles & Permissions', description: 'Access control.', roles: ['platform_admin'] },
+      { key: 'platform_admin', label: 'Platform Admin', description: 'System configuration.', roles: ['platform_admin'] },
+    ],
+  },
+  {
+    key: 'verification_queue',
+    label: 'Verification Queue',
+    description: 'User and professional verification queue for platform operators.',
+    roles: ['platform_admin'],
+    sections: [
+      { key: 'pending', label: 'Pending Verifications', description: 'Users awaiting identity and credential verification.' },
+      { key: 'in_progress', label: 'In Progress', description: 'Verifications currently under review.' },
+      { key: 'completed', label: 'Completed', description: 'Resolved verification decisions.' },
+    ],
+  },
+  {
+    key: 'ai_review_queue',
+    label: 'AI Review Queue',
+    description: 'Review AI-generated outputs requiring human confirmation before release.',
+    roles: ['platform_admin'],
+    sections: [
+      { key: 'pending_review', label: 'Pending Review', description: 'AI outputs awaiting human confirmation.' },
+      { key: 'flagged', label: 'Flagged', description: 'AI outputs flagged for specialist review.' },
+      { key: 'resolved', label: 'Resolved', description: 'Reviewed and released or rejected AI outputs.' },
+    ],
+  },
+  {
+    key: 'system_health',
+    label: 'System Health',
+    description: 'Platform health monitoring, service status and audit metrics.',
+    roles: ['platform_admin'],
+    sections: [
+      { key: 'services', label: 'Service Status', description: 'Live service health and response metrics.' },
+      { key: 'error_rates', label: 'Error Rates', description: 'Error rate trends and alerts.' },
+      { key: 'audit_metrics', label: 'Audit Metrics', description: 'Audit trail density and compliance metrics.' },
+    ],
+  },
+  {
+    key: 'feedback_intelligence',
+    label: 'Feedback Intelligence',
+    description: 'AI-powered feedback pipeline — clusters, trends, severity scoring, and closed-loop notifications.',
+    roles: ['platform_admin'],
+    sections: [
+      { key: 'overview', label: 'Overview', description: 'Summary of feedback clusters, activity, and key metrics.' },
+      { key: 'clusters', label: 'Clusters', description: 'Feedback clusters sorted by severity with filtering and pagination.' },
+      { key: 'trends', label: 'Trends', description: 'Feedback volume trend chart by category over time.' },
+      { key: 'friction_signals', label: 'Friction Signals', description: 'Implicit friction detections from user sessions.' },
     ],
   },
   {
@@ -194,6 +254,107 @@ export function getNavigationForRole(role: UserRole): NavigationItem[] {
         return section.roles.includes(role);
       }),
     }));
+}
+
+/**
+ * Professional roles used to detect dual-role users.
+ * Mirrors the authoritative list in permissionService.ts.
+ */
+const PROFESSIONAL_ROLES: readonly string[] = [
+  'client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor',
+  'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional',
+  'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'land_surveyor', 'health_safety',
+];
+
+/**
+ * Returns the navigation modules accessible to a normalized AuthzUser,
+ * supporting dual-role users who hold both a Professional_Role and
+ * `platform_admin` privileges (via `admin: true` or `isPlatformAdmin: true`).
+ *
+ * For dual-role users, returns the UNION of:
+ *   - Modules accessible to the user's Professional_Role
+ *   - Modules accessible to `platform_admin`
+ *
+ * Modules appearing in both sets are deduplicated (by key). Section-level
+ * filtering is applied for BOTH roles — sections with `roles: ['platform_admin']`
+ * are visible to dual-role users.
+ *
+ * For single-role users (only a Professional_Role or only platform_admin),
+ * delegates to `getNavigationForRole`.
+ *
+ * Preconditions: `user` is a normalized AuthzUser (via normalizeUserForAuthz)
+ * Postconditions: returns deduplicated array of NavigationItems with merged
+ *   section visibility for dual-role users
+ *
+ * Validates: Requirements 2.7
+ */
+export function getNavigationForUser(user: AuthzUser | null | undefined): NavigationItem[] {
+  if (!user) return [];
+
+  const role = user.role as UserRole | undefined;
+  const isDualRole = user.isPlatformAdmin === true &&
+    typeof role === 'string' &&
+    PROFESSIONAL_ROLES.includes(role);
+
+  // Single-role: delegate to existing function
+  if (!isDualRole) {
+    if (user.isPlatformAdmin || role === 'platform_admin') {
+      return getNavigationForRole('platform_admin');
+    }
+    if (role) {
+      return getNavigationForRole(role as UserRole);
+    }
+    return [];
+  }
+
+  // Dual-role: compute union of both module sets
+  const professionalRole = role as UserRole;
+  const professionalModules = getNavigationForRole(professionalRole);
+  const platformModules = getNavigationForRole('platform_admin');
+
+  // Merge: start with professional modules, add platform-only modules
+  const mergedMap = new Map<string, NavigationItem>();
+
+  for (const mod of professionalModules) {
+    mergedMap.set(mod.key, mod);
+  }
+
+  for (const mod of platformModules) {
+    if (!mergedMap.has(mod.key)) {
+      // Platform-only module (settings, verification_queue, etc.) — add directly
+      mergedMap.set(mod.key, mod);
+    } else {
+      // Module exists in both sets — merge section visibility
+      const existing = mergedMap.get(mod.key)!;
+      const mergedSections = mergeSections(existing.sections, mod.sections);
+      mergedMap.set(mod.key, { ...existing, sections: mergedSections });
+    }
+  }
+
+  return Array.from(mergedMap.values());
+}
+
+/**
+ * Merges two section arrays by key, deduplicating and preferring the version
+ * that includes more permissive role visibility (i.e. if a section appears in
+ * the platform set, it's included even if the professional set filtered it out).
+ */
+function mergeSections(professionalSections: WorkspaceSection[], platformSections: WorkspaceSection[]): WorkspaceSection[] {
+  const sectionMap = new Map<string, WorkspaceSection>();
+
+  for (const section of professionalSections) {
+    sectionMap.set(section.key, section);
+  }
+
+  for (const section of platformSections) {
+    if (!sectionMap.has(section.key)) {
+      // Section only visible to platform_admin — include it for dual-role user
+      sectionMap.set(section.key, section);
+    }
+    // If already present, keep the existing (professional) version — both roles have access
+  }
+
+  return Array.from(sectionMap.values());
 }
 
 /**

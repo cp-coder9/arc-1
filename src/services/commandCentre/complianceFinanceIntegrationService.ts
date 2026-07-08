@@ -35,7 +35,7 @@ export interface PaymentWorkflowResult {
   projectId: string;
   certificateId: string;
   workflowType: 'escrow_release' | 'direct_payment';
-  status: 'triggered' | 'pending_approval' | 'failed';
+  status: 'pending_approval' | 'processing' | 'failed';
   triggeredAt: string;
 }
 
@@ -126,6 +126,11 @@ export async function surfaceMunicipalChecklist(
  * Triggers the payment workflow in the Finance Module for a certified payment
  * certificate. Determines whether to release from escrow or process direct payment.
  *
+ * FAIL-CLOSED: In production, this returns status 'pending_approval' (not 'triggered')
+ * to indicate the workflow has been queued but not yet executed. The Finance Module
+ * must explicitly confirm the release. If the Finance Module is unavailable, returns
+ * status 'failed' rather than a false positive.
+ *
  * Integration adapter: returns workflow trigger result.
  */
 export async function triggerPaymentWorkflow(
@@ -133,15 +138,48 @@ export async function triggerPaymentWorkflow(
   certificateId: string,
   workflowType: 'escrow_release' | 'direct_payment' = 'escrow_release',
 ): Promise<PaymentWorkflowResult> {
-  const result: PaymentWorkflowResult = {
+  // In production, attempt to call the Finance Module API
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      // Import finance router service for actual escrow release
+      const { adminDb } = await import('@/lib/firebase-admin');
+      
+      // Queue the payment workflow request in Firestore for the Finance Module to process
+      await adminDb.collection('payment_workflow_queue').add({
+        projectId,
+        certificateId,
+        workflowType,
+        status: 'pending_approval',
+        queuedAt: new Date().toISOString(),
+      });
+
+      return {
+        projectId,
+        certificateId,
+        workflowType,
+        status: 'pending_approval',
+        triggeredAt: new Date().toISOString(),
+      };
+    } catch {
+      // Finance Module unavailable — fail closed
+      return {
+        projectId,
+        certificateId,
+        workflowType,
+        status: 'failed',
+        triggeredAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  // Dev/demo mode: return pending_approval (not a false 'triggered')
+  return {
     projectId,
     certificateId,
     workflowType,
-    status: 'triggered',
+    status: 'pending_approval',
     triggeredAt: new Date().toISOString(),
   };
-
-  return result;
 }
 
 // ── Retention Rules ──────────────────────────────────────────────────────────
