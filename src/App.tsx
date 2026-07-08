@@ -199,6 +199,7 @@ const FeedbackRoadmapDashboard = lazyWithChunkRetry(() => import('./components/f
 const CopilotPanel = lazyWithChunkRetry(() => import('./components/CopilotPanel'));
 const ITPWorkspace = lazyWithChunkRetry(() => import('./components/itp/ITPWorkspace'));
 const MunicipalApprovalWorkspacePage = lazyWithChunkRetry(() => import('./components/municipal-workspace/MunicipalApprovalWorkspace'));
+const FormSystemWorkspace = lazyWithChunkRetry(() => import('./components/forms/FormSystemWorkspace'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -275,6 +276,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'contractor'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
   { id: 'drawing-checker', label: 'AI Drawing Checker', roles: [...DESIGN_TEAM_ROLES, 'freelancer'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Drawing compliance checker backed by upload/review records and FileManager quick scans.', backedBy: ['FileManager'] },
   { id: 'sans-forms', label: 'SANS / Compliance Forms', roles: [...DESIGN_TEAM_ROLES, 'engineer', 'energy_professional', 'fire_engineer', 'town_planner', 'quantity_surveyor'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Compliance form autofill shell using project/profile/team data.', backedBy: ['ComplianceReport'] },
+  { id: 'form-system', label: 'Form System', roles: ['architect', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'contractor', 'subcontractor', 'firm_admin', 'platform_admin', 'client'], group: 'BEP tools', icon: <FileText size={18} />, summary: 'Auto-fill & manage construction documents — templates, drafts, export, signatures, and audit trail.', backedBy: ['FormSystemWorkspace', 'formTemplateService'] },
   { id: 'compliance', label: 'SANS Codified Compliance', roles: ['client', 'bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer'], group: 'BEP tools', icon: <ShieldCheck size={18} />, summary: 'SANS/NBR Compliance Intelligence Engine: clause search, part browser, boundary wall checker, AI drawing compliance bridge.', backedBy: ['complianceEngineService', 'AI Drawing Checker'] },
   { id: 'technical-brief', label: 'Technical Brief Editor', roles: [...DESIGN_TEAM_ROLES, 'engineer', 'energy_professional', 'fire_engineer'], group: 'BEP tools', icon: <Briefcase size={18} />, summary: 'BEP technical brief refinement shell after client intake.', backedBy: ['job brief data'] },
   { id: 'bep-marketplace', label: 'Client Marketplace', roles: DESIGN_TEAM_ROLES, group: 'BEP tools', icon: <Search size={18} />, summary: 'Live client opportunity marketplace for design-team proposal submissions.', backedBy: ['jobs', 'applications'] },
@@ -358,6 +360,7 @@ export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'disputes',
   'feedback-roadmap',
   'municipal-approval-workspace',
+  'form-system',
 ]);
 export const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1246,9 +1249,10 @@ function AppContent() {
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {activeTab === 'itp-workspace' && <ITPWorkspace user={user} />}
               {activeTab === 'municipal-approval-workspace' && <MunicipalApprovalWorkspacePage user={user} />}
+              {activeTab === 'form-system' && <FormSystemWorkspace user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}

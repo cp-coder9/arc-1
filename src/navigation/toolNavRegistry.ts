@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -103,6 +103,28 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
         items: [
           { id: 'municipalities', icon: Building2, label: 'Municipality Profiles' },
           { id: 'reports', icon: BarChart3, label: 'Reports & Analytics' },
+        ],
+      },
+    ],
+  },
+  'form-system': {
+    name: 'Form System',
+    subtitle: 'Auto-fill & manage construction documents',
+    sections: [
+      {
+        label: 'Forms',
+        items: [
+          { id: 'library', icon: Library, label: 'Template Library' },
+          { id: 'drafts', icon: FileEdit, label: 'My Drafts' },
+          { id: 'recent', icon: Clock, label: 'Recent Forms' },
+        ],
+      },
+      {
+        label: 'Management',
+        items: [
+          { id: 'export', icon: Download, label: 'Export Queue' },
+          { id: 'approvals', icon: CheckCircle, label: 'Approvals' },
+          { id: 'audit', icon: Shield, label: 'Audit Trail' },
         ],
       },
     ],

@@ -65,6 +65,20 @@ app.use('/api/fee-proposal', async (req, res, next) => {
   }
 });
 
+app.use(async (req, res, next) => {
+  if (!req.path.startsWith('/api/forms')) return next();
+  try {
+    const { formsApiRouter } = await import('./src/lib/forms-api-router.ts');
+    return formsApiRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load Forms API router:', error);
+    return res.status(500).json({
+      error: 'Forms API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 app.use('/api', async (req, res, next) => {
   try {
     const { default: apiRouter } = await import('./src/lib/api-router.ts');
