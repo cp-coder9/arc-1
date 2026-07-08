@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architex — H&S Module Design Sample</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0d2520;
+      color: #ffffff;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    /* ─── OS Shell Layout ─────────────────────────────────────── */
+    .os-shell { display: flex; height: 100vh; }
+
+    /* ─── Left Sidebar Navigation ─────────────────────────────── */
+    .sidebar {
+      width: 288px; flex-shrink: 0;
+      background: #0d2520;
+      border-right: 1px solid rgba(174,239,227,0.16);
+      display: flex; flex-direction: column;
+      padding: 28px 20px; overflow-y: auto;
+    }
+</style>
+</head>
+<body>
+<div class="os-shell">
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <!-- Brand -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div class="brand-icon">🏛️</div>
+      <div>
+        <p style="font-family:'Space Grotesk',sans-serif;font-size:1.35rem;font-weight:900;letter-spacing:-0.055em;color:#005b4e;">Architex OS</p>
+        <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.62);">Project Coordination</p>
+      </div>
+    </div>
+    <!-- Role Card -->
+    <div class="role-card">
+      <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.62);">Current Role</p>
+      <p style="font-size:14px;font-weight:900;color:#005b4e;margin-top:4px;">H&S Officer</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.62);margin-top:2px;line-height:1.4;">Construction safety management across all assigned projects</p>
+    </div>
+
+    <!-- Nav Items -->
+    <nav style="flex:1;display:flex;flex-direction:column;gap:6px;margin-top:16px;">
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">📊</span><span class="nav-label">Command Centre</span>
+      </button>
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">📥</span><span class="nav-label">Inbox</span>
+      </button>
+      <button class="nav-item active" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">⛑️</span><span class="nav-label">Health & Safety</span>
+        <span class="nav-dot"></span>
+      </button>
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">🏗️</span><span class="nav-label">Site Execution</span>
+      </button>
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">📄</span><span class="nav-label">Documents</span>
+      </button>
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">✅</span><span class="nav-label">Compliance Hub</span>
+      </button>
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">💳</span><span class="nav-label">Finance</span>
+      </button>
+      <button class="nav-item" onclick="switchTab(this,'overview')">
+        <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+      </button>
+    </nav>
+
+    <!-- Logout -->
+    <div style="padding-top:16px;border-top:1px solid rgba(174,239,227,0.16);margin-top:auto;">
+      <button class="nav-item logout">
+        <span class="nav-icon">🚪</span><span class="nav-label">Logout</span>
+      </button>
+    </div>
+  </aside>
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Header Bar (glass) -->
+    <header class="top-header">
+      <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+        <div class="breadcrumb">
+          <span class="breadcrumb-brand">Architex</span>
+          <span class="breadcrumb-sep">›</span>
+          <span class="breadcrumb-item">Site Execution</span>
+          <span class="breadcrumb-sep">›</span>
+          <span class="breadcrumb-current">Health & Safety</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+          <h1 class="page-title">Health & Safety</h1>
+          <span class="role-badge">H&S Officer View</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <button class="ai-btn">🤖 Ask AI</button>
+        <div class="notification-bell">🔔</div>
+        <div class="avatar">TM</div>
+      </div>
+    </header>
+
+    <!-- Scrollable Content -->
+    <div class="scroll-area">
+      <div class="content-wrapper">
+        <!-- Project Toggles -->
+        <div class="project-toggles">
+          <span class="toggle-label">Projects:</span>
+          <button class="project-toggle active" onclick="switchProject(this)">
+            <span class="toggle-dot green"></span>Kensington Mixed-Use
+          </button>
+          <button class="project-toggle" onclick="switchProject(this)">
+            <span class="toggle-dot green"></span>Sandton Office Park
+          </button>
+          <button class="project-toggle" onclick="switchProject(this)">
+            <span class="toggle-dot amber"></span>Melrose Arch Phase 3
+          </button>
+          <button class="project-toggle" onclick="switchProject(this)" style="margin-left:auto;">
+            All Projects
+          </button>
+        </div>
+        <!-- Tab Navigation -->
+        <div class="tabs-container">
+          <div class="tabs-list">
+            <button class="tab active" onclick="activateTab(this,'tab-overview')">Overview</button>
+            <button class="tab" onclick="activateTab(this,'tab-safety-file')">Safety File</button>
+            <button class="tab" onclick="activateTab(this,'tab-permits')">Permits</button>
+            <button class="tab" onclick="activateTab(this,'tab-hira')">HIRA Register</button>
+            <button class="tab" onclick="activateTab(this,'tab-incidents')">Incidents</button>
+            <button class="tab" onclick="activateTab(this,'tab-inductions')">Inductions</button>
+            <button class="tab" onclick="activateTab(this,'tab-plans')">H&S Plans</button>
+            <button class="tab" onclick="activateTab(this,'tab-fall')">Fall Protection</button>
+          </div>
+        </div>
+
+        <!-- ═══ TAB: OVERVIEW ═══════════════════════════════════════════ -->
+        <div class="tab-panel active" id="tab-overview">
+          <!-- Stat Cards -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-label">Safety File</div>
+              <div class="stat-value">72%</div>
+              <div class="stat-sub">6 of 8 sections complete</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Active Permits</div>
+              <div class="stat-value">4</div>
+              <div class="stat-sub">1 expiring soon</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Open Incidents</div>
+              <div class="stat-value destructive">1</div>
+              <div class="stat-sub">Investigation in progress</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Induction Rate</div>
+              <div class="stat-value">87%</div>
+              <div class="stat-sub">52 of 60 workers</div>
+            </div>
+          </div>
+          <!-- Quick Actions -->
+          <div class="card" style="padding:14px 20px;margin-bottom:20px;">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="action-btn" onclick="activateTab(document.querySelectorAll('.tab')[2],'tab-permits')">📋 New Permit</button>
+              <button class="action-btn" onclick="activateTab(document.querySelectorAll('.tab')[4],'tab-incidents')">🚨 Log Incident</button>
+              <button class="action-btn" onclick="activateTab(document.querySelectorAll('.tab')[5],'tab-inductions')">📢 Toolbox Talk</button>
+              <button class="action-btn" onclick="activateTab(document.querySelectorAll('.tab')[5],'tab-inductions')">📝 Record Induction</button>
+              <button class="action-btn" onclick="activateTab(document.querySelectorAll('.tab')[3],'tab-hira')">⚠️ Add Hazard</button>
+              <button class="action-btn" onclick="activateTab(document.querySelectorAll('.tab')[7],'tab-fall')">🏗️ Fall Protection Plan</button>
+            </div>
+          </div>
+
+          <!-- Two-column: Safety File + Permits -->
+          <div class="grid-2col" style="margin-bottom:20px;">
+            <!-- Safety File Card -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Safety File Sections</span>
+                <span class="badge mint">72%</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="file-row"><span class="dot complete">✓</span><span class="file-name">H&S Plan</span><span class="file-meta">Approved 12 Jun</span></div>
+                <div class="file-row"><span class="dot complete">✓</span><span class="file-name">Risk Assessments</span><span class="file-meta">Rev 3</span></div>
+                <div class="file-row"><span class="dot complete">✓</span><span class="file-name">Fall Protection Plan</span><span class="file-meta">Current</span></div>
+                <div class="file-row"><span class="dot complete">✓</span><span class="file-name">Permits Archive</span><span class="file-meta">41 records</span></div>
+                <div class="file-row"><span class="dot complete">✓</span><span class="file-name">Incident Records</span><span class="file-meta">4 logged</span></div>
+                <div class="file-row"><span class="dot complete">✓</span><span class="file-name">Induction Records</span><span class="file-meta">52 inducted</span></div>
+                <div class="file-row"><span class="dot pending">⏳</span><span class="file-name">Emergency Procedures</span><span class="file-meta">Draft</span></div>
+                <div class="file-row"><span class="dot missing">✗</span><span class="file-name">Appointments (16.2)</span><span class="file-meta">Not submitted</span></div>
+              </div>
+            </div>
+            <!-- Active Permits Table -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Active Permits</span>
+                <span class="badge purple">4 Active</span>
+              </div>
+              <table>
+                <thead><tr><th>Permit</th><th>Type</th><th>Location</th><th>Expires</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">PTW-0041</td><td>Excavation</td><td>Block C Foundation</td><td><span class="countdown ok">14h 22m</span></td><td><span class="badge mint">Active</span></td></tr>
+                  <tr><td class="mono">PTW-0039</td><td>Scaffolding</td><td>Level 4 Façade</td><td><span class="countdown warn">3h 15m</span></td><td><span class="badge amber">Expiring</span></td></tr>
+                  <tr><td class="mono">PTW-0038</td><td>Hot Work</td><td>Roof Steel</td><td><span class="countdown danger">Expired 2h</span></td><td><span class="badge red">Expired</span></td></tr>
+                  <tr><td class="mono">PTW-0037</td><td>Confined Space</td><td>Sewer Line — Melrose</td><td><span class="countdown ok">22h 45m</span></td><td><span class="badge mint">Active</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Two-column: HIRA + Incidents -->
+          <div class="grid-2col" style="margin-bottom:20px;">
+            <!-- HIRA Risk Matrix -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">HIRA Risk Matrix</span>
+                <span class="badge amber">3 High</span>
+              </div>
+              <div style="display:flex;justify-content:center;margin-bottom:12px;">
+                <div class="risk-matrix">
+                  <div class="rl"></div><div class="rl">1</div><div class="rl">2</div><div class="rl">3</div><div class="rl">4</div><div class="rl">5</div>
+                  <div class="rl">5</div><div class="rc medium">1</div><div class="rc high">0</div><div class="rc critical">0</div><div class="rc critical">1</div><div class="rc critical">0</div>
+                  <div class="rl">4</div><div class="rc low">0</div><div class="rc high">2</div><div class="rc high">1</div><div class="rc critical">0</div><div class="rc critical">0</div>
+                  <div class="rl">3</div><div class="rc low">1</div><div class="rc medium">3</div><div class="rc high">2</div><div class="rc high">0</div><div class="rc critical">0</div>
+                  <div class="rl">2</div><div class="rc low">2</div><div class="rc low">4</div><div class="rc medium">1</div><div class="rc high">0</div><div class="rc high">0</div>
+                  <div class="rl">1</div><div class="rc low">3</div><div class="rc low">2</div><div class="rc low">1</div><div class="rc low">0</div><div class="rc medium">0</div>
+                </div>
+              </div>
+              <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:10px;">Likelihood (↑) × Severity (→)</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.62);display:flex;flex-direction:column;gap:3px;">
+                <div><span style="color:#d95747;">●</span> Crane near powerlines (Critical)</div>
+                <div><span style="color:#d26a38;">●</span> Excavation collapse (High)</div>
+                <div><span style="color:#d26a38;">●</span> Working at height — Level 4 (High)</div>
+                <div><span style="color:#d26a38;">●</span> Confined space — sewer (High)</div>
+              </div>
+            </div>
+            <!-- Incidents -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Recent Incidents</span>
+                <span class="badge red">1 Open</span>
+              </div>
+              <div class="timeline">
+                <div class="tl-item"><div class="tl-dot red"></div><div class="tl-body"><div class="tl-title">Worker struck by falling object</div><div class="tl-meta">Block C · 28 Jun 2026 · <span class="badge red">Lost Time</span></div><div class="tl-meta">Investigation: In Progress — Sipho Nkosi</div></div></div>
+                <div class="tl-item"><div class="tl-dot amber"></div><div class="tl-body"><div class="tl-title">Near-miss: unsecured scaffolding plank</div><div class="tl-meta">Sandton · 25 Jun 2026 · <span class="badge amber">Near Miss</span></div><div class="tl-meta">Closed — Daily scaffold inspection added</div></div></div>
+                <div class="tl-item"><div class="tl-dot green"></div><div class="tl-body"><div class="tl-title">Minor cut — rebar handling</div><div class="tl-meta">Melrose · 22 Jun 2026 · <span class="badge mint">First Aid</span></div><div class="tl-meta">Closed — Gloves mandate reinforced</div></div></div>
+                <div class="tl-item"><div class="tl-dot green"></div><div class="tl-body"><div class="tl-title">Dehydration — concrete pour team</div><div class="tl-meta">Block A · 18 Jun 2026 · <span class="badge mint">First Aid</span></div><div class="tl-meta">Closed — Hydration stations added</div></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two-column: Inductions + Toolbox Talk -->
+          <div class="grid-2col" style="margin-bottom:20px;">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Induction Status</span>
+                <span class="badge mint">87%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+                <span style="font-weight:600;">Site Induction Progress</span>
+                <span style="color:#aeefe3;font-weight:700;">52 / 60</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:87%;background:linear-gradient(90deg,#aeefe3,#1d8d6f);"></div></div>
+              <div style="margin-top:14px;font-size:12px;color:rgba(255,255,255,0.62);">
+                <div style="font-weight:600;color:#fff;margin-bottom:4px;">Not Inducted (8):</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;">
+                  <span>• Themba Dlamini</span><span>• Bongani Zulu</span>
+                  <span>• Peter van Wyk</span><span>• Mandla Sithole</span>
+                  <span>• Johan Botha</span><span>• Sibusiso Mthembu</span>
+                  <span>• David Pretorius</span><span>• Lucky Ngubane</span>
+                </div>
+              </div>
+              <div style="margin-top:12px;font-size:11px;color:rgba(255,255,255,0.45);padding-top:10px;border-top:1px solid rgba(174,239,227,0.16);">⚠️ These workers flagged in daily workforce logs</div>
+            </div>
+            <!-- Toolbox Talk -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Today's Toolbox Talk</span>
+                <span class="badge purple">Completed</span>
+              </div>
+              <div style="padding:16px;background:rgba(0,91,78,0.12);border:1px solid rgba(174,239,227,0.12);border-radius:12px;margin-bottom:14px;">
+                <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Working at Heights Safety</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.62);display:flex;gap:14px;flex-wrap:wrap;">
+                  <span>📅 5 Jul 2026, 06:30</span>
+                  <span>👤 Thabo Mokoena</span>
+                  <span>⏱️ 15 min</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+                <span style="font-weight:500;">Attendance</span>
+                <span style="color:#aeefe3;font-weight:700;">47 / 52 (90%)</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:90%;background:linear-gradient(90deg,#9b7bd4,#7046a8);"></div></div>
+              <div style="margin-top:14px;font-size:11px;color:rgba(255,255,255,0.45);">
+                Topics: harness inspection, anchor points, rescue procedures, exclusion zones
+              </div>
+            </div>
+          </div>
+
+          <!-- Full-width Compliance Table -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Project Compliance Overview</span>
+              <span style="font-size:10px;color:rgba(255,255,255,0.45);font-style:italic;">Advisory Only — Does Not Constitute Professional Certification</span>
+            </div>
+            <table>
+              <thead><tr><th>Project</th><th>Client</th><th>Location</th><th>Safety File</th><th>H&S Plan</th><th>Permits</th><th>HIRA</th><th>Score</th></tr></thead>
+              <tbody>
+                <tr><td class="bold">Kensington Mixed-Use Phase 2</td><td>Attwell Properties</td><td>Kensington, JHB</td><td><span class="badge mint">72%</span></td><td><span class="badge mint">Approved</span></td><td>2 active</td><td><span style="color:#d26a38;">3 high</span></td><td class="score-good">72%</td></tr>
+                <tr><td class="bold">Sandton Office Park Tower B</td><td>Redefine Capital</td><td>Sandton, JHB</td><td><span class="badge mint">88%</span></td><td><span class="badge mint">Approved</span></td><td>1 active</td><td><span style="color:#d26a38;">2 medium</span></td><td class="score-good">88%</td></tr>
+                <tr><td class="bold">Melrose Arch Phase 3</td><td>Amdec Group</td><td>Melrose, JHB</td><td><span class="badge amber">54%</span></td><td><span class="badge amber">Pending</span></td><td>1 active</td><td><span style="color:#d95747;">1 critical</span></td><td class="score-warn">54%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- end tab-overview -->
+        <!-- ═══ TAB: SAFETY FILE ═══════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-safety-file">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Construction Safety File — Kensington Mixed-Use Phase 2</span>
+              <span class="badge mint">Rev 3</span>
+            </div>
+            <p style="font-size:12px;color:rgba(255,255,255,0.45);margin-bottom:16px;">Regulation 7 — Principal Contractor: Mvubu Construction (Pty) Ltd</p>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="sf-row"><div class="sf-num">7.1</div><span class="dot complete">✓</span><div class="sf-detail"><span class="sf-name">Health & Safety Plan</span><span class="sf-meta">Approved by client 12 Jun 2026 · Version 2.1</span></div><span class="badge mint">Current</span></div>
+              <div class="sf-row"><div class="sf-num">7.2</div><span class="dot complete">✓</span><div class="sf-detail"><span class="sf-name">Risk Assessments (HIRA)</span><span class="sf-meta">23 hazards registered · Last updated 3 Jul</span></div><span class="badge mint">Current</span></div>
+              <div class="sf-row"><div class="sf-num">7.3</div><span class="dot complete">✓</span><div class="sf-detail"><span class="sf-name">Fall Protection Plans</span><span class="sf-meta">2 active plans · Next inspection 8 Jul</span></div><span class="badge mint">Current</span></div>
+              <div class="sf-row"><div class="sf-num">7.4</div><span class="dot complete">✓</span><div class="sf-detail"><span class="sf-name">Permits to Work</span><span class="sf-meta">41 permits issued · 4 currently active</span></div><span class="badge mint">Current</span></div>
+              <div class="sf-row"><div class="sf-num">7.5</div><span class="dot complete">✓</span><div class="sf-detail"><span class="sf-name">Incident / Accident Records</span><span class="sf-meta">4 incidents logged · 1 under investigation</span></div><span class="badge mint">Current</span></div>
+              <div class="sf-row"><div class="sf-num">7.6</div><span class="dot complete">✓</span><div class="sf-detail"><span class="sf-name">Induction & Toolbox Talk Records</span><span class="sf-meta">52 inducted · 89 toolbox talks recorded</span></div><span class="badge mint">Current</span></div>
+              <div class="sf-row"><div class="sf-num">7.7</div><span class="dot pending">⏳</span><div class="sf-detail"><span class="sf-name">Emergency Procedures</span><span class="sf-meta">Draft uploaded — awaiting sign-off</span></div><span class="badge amber">Draft</span></div>
+              <div class="sf-row"><div class="sf-num">7.8</div><span class="dot missing">✗</span><div class="sf-detail"><span class="sf-name">Appointments (Reg 16.2)</span><span class="sf-meta">Not yet submitted — required before next phase</span></div><span class="badge red">Missing</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- ═══ TAB: PERMITS ═══════════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-permits">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">Permit-to-Work Register</span>
+              <button class="action-btn">+ Request New Permit</button>
+            </div>
+            <table>
+              <thead><tr><th>ID</th><th>Type</th><th>Location</th><th>Requested By</th><th>Valid From</th><th>Valid To</th><th>Approver</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">PTW-0041</td><td>Excavation</td><td>Block C Foundation</td><td>James Ndlovu</td><td>5 Jul 06:00</td><td>5 Jul 18:00</td><td>Thabo Mokoena</td><td><span class="badge mint">Active</span></td></tr>
+                <tr><td class="mono">PTW-0040</td><td>Hot Work</td><td>Level 2 Riser</td><td>Pieter Venter</td><td>4 Jul 07:00</td><td>4 Jul 15:00</td><td>Thabo Mokoena</td><td><span class="badge purple">Closed</span></td></tr>
+                <tr><td class="mono">PTW-0039</td><td>Scaffolding</td><td>Level 4 Façade</td><td>Sipho Nkosi</td><td>5 Jul 06:00</td><td>5 Jul 12:00</td><td>Thabo Mokoena</td><td><span class="badge amber">Expiring</span></td></tr>
+                <tr><td class="mono">PTW-0038</td><td>Hot Work</td><td>Roof Steel</td><td>Bongani Zulu</td><td>5 Jul 05:00</td><td>5 Jul 07:00</td><td>Thabo Mokoena</td><td><span class="badge red">Expired</span></td></tr>
+                <tr><td class="mono">PTW-0037</td><td>Confined Space</td><td>Sewer Line</td><td>Mandla Sithole</td><td>5 Jul 06:00</td><td>6 Jul 06:00</td><td>Thabo Mokoena</td><td><span class="badge mint">Active</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══ TAB: HIRA ══════════════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-hira">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">Hazard Identification & Risk Assessment Register</span>
+              <button class="action-btn">+ Add Hazard</button>
+            </div>
+            <table>
+              <thead><tr><th>ID</th><th>Hazard</th><th>Activity</th><th>Location</th><th>L</th><th>S</th><th>Rating</th><th>Residual</th><th>Controls</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">H-001</td><td>Crane near powerlines</td><td>Lifting operations</td><td>Block C</td><td>4</td><td>5</td><td>20</td><td><span class="badge red">Critical</span></td><td>Exclusion zones, spotter</td></tr>
+                <tr><td class="mono">H-002</td><td>Excavation collapse</td><td>Foundation dig</td><td>Block C</td><td>3</td><td>4</td><td>12</td><td><span class="badge amber">High</span></td><td>Shoring, daily inspection</td></tr>
+                <tr><td class="mono">H-003</td><td>Working at height</td><td>Façade work</td><td>Level 4</td><td>4</td><td>3</td><td>12</td><td><span class="badge amber">High</span></td><td>Harness, fall arrest</td></tr>
+                <tr><td class="mono">H-004</td><td>Confined space entry</td><td>Sewer install</td><td>Basement</td><td>3</td><td>4</td><td>12</td><td><span class="badge amber">High</span></td><td>Gas monitor, standby</td></tr>
+                <tr><td class="mono">H-005</td><td>Manual handling strain</td><td>Rebar placement</td><td>All areas</td><td>3</td><td>2</td><td>6</td><td><span class="badge purple">Medium</span></td><td>Mechanical assist, rotation</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- ═══ TAB: INCIDENTS ═══════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-incidents">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">Incident & Accident Register</span>
+              <button class="action-btn">+ Report Incident</button>
+            </div>
+            <table>
+              <thead><tr><th>Ref</th><th>Date</th><th>Description</th><th>Classification</th><th>Location</th><th>Section 24</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">INC-004</td><td>28 Jun</td><td>Worker struck by falling object</td><td><span class="badge red">Lost Time</span></td><td>Block C</td><td>Yes</td><td><span class="badge amber">Investigating</span></td></tr>
+                <tr><td class="mono">INC-003</td><td>25 Jun</td><td>Unsecured scaffolding plank fell</td><td><span class="badge amber">Near Miss</span></td><td>Sandton L4</td><td>No</td><td><span class="badge mint">Closed</span></td></tr>
+                <tr><td class="mono">INC-002</td><td>22 Jun</td><td>Minor cut — rebar handling</td><td><span class="badge mint">First Aid</span></td><td>Melrose</td><td>No</td><td><span class="badge mint">Closed</span></td></tr>
+                <tr><td class="mono">INC-001</td><td>18 Jun</td><td>Dehydration during concrete pour</td><td><span class="badge mint">First Aid</span></td><td>Block A</td><td>No</td><td><span class="badge mint">Closed</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══ TAB: INDUCTIONS ═══════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-inductions">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">Toolbox Talks & Inductions</span>
+              <div style="display:flex;gap:8px;">
+                <button class="action-btn">+ Toolbox Talk</button>
+                <button class="action-btn">+ Induction</button>
+              </div>
+            </div>
+            <h3 style="font-size:13px;font-weight:700;color:#aeefe3;margin-bottom:10px;">Recent Toolbox Talks</h3>
+            <table style="margin-bottom:20px;">
+              <thead><tr><th>Date</th><th>Topic</th><th>Presenter</th><th>Duration</th><th>Attendance</th></tr></thead>
+              <tbody>
+                <tr><td>5 Jul</td><td>Working at Heights Safety</td><td>Thabo Mokoena</td><td>15 min</td><td>47/52 (90%)</td></tr>
+                <tr><td>4 Jul</td><td>Excavation & Shoring</td><td>Thabo Mokoena</td><td>12 min</td><td>50/52 (96%)</td></tr>
+                <tr><td>3 Jul</td><td>Hot Work Precautions</td><td>Sipho Nkosi</td><td>10 min</td><td>48/52 (92%)</td></tr>
+                <tr><td>2 Jul</td><td>PPE Inspection</td><td>Thabo Mokoena</td><td>8 min</td><td>51/52 (98%)</td></tr>
+              </tbody>
+            </table>
+            <h3 style="font-size:13px;font-weight:700;color:#aeefe3;margin-bottom:10px;">Recent Inductions</h3>
+            <table>
+              <thead><tr><th>Date</th><th>Inductee</th><th>Type</th><th>Conducted By</th><th>Acknowledged</th></tr></thead>
+              <tbody>
+                <tr><td>4 Jul</td><td>Vusi Mkhize</td><td>Site</td><td>Thabo Mokoena</td><td><span class="badge mint">Yes</span></td></tr>
+                <tr><td>3 Jul</td><td>Anna van der Merwe</td><td>Visitor</td><td>Sipho Nkosi</td><td><span class="badge mint">Yes</span></td></tr>
+                <tr><td>1 Jul</td><td>Lucky Ngubane</td><td>Task-specific</td><td>Thabo Mokoena</td><td><span class="badge amber">Pending</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- ═══ TAB: H&S PLANS ══════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-plans">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">H&S Plan Approval Workflow</span>
+              <span class="badge mint">All Approved</span>
+            </div>
+            <table>
+              <thead><tr><th>Project</th><th>Version</th><th>Submitted By</th><th>Submitted</th><th>Approver</th><th>Status</th><th>Site Ops</th></tr></thead>
+              <tbody>
+                <tr><td class="bold">Kensington Mixed-Use Phase 2</td><td>v2.1</td><td>Mvubu Construction</td><td>10 Jun 2026</td><td>Attwell Properties</td><td><span class="badge mint">Approved</span></td><td><span class="badge mint">Unblocked</span></td></tr>
+                <tr><td class="bold">Sandton Office Park Tower B</td><td>v1.3</td><td>Group Five</td><td>2 Jun 2026</td><td>Redefine Capital</td><td><span class="badge mint">Approved</span></td><td><span class="badge mint">Unblocked</span></td></tr>
+                <tr><td class="bold">Melrose Arch Phase 3</td><td>v1.0</td><td>WBHO Construction</td><td>1 Jul 2026</td><td>Amdec Group</td><td><span class="badge amber">Pending</span></td><td><span class="badge red">Blocked</span></td></tr>
+              </tbody>
+            </table>
+            <div style="margin-top:14px;padding:12px;background:rgba(217,87,71,0.08);border:1px solid rgba(217,87,71,0.2);border-radius:10px;font-size:12px;color:rgba(255,255,255,0.8);">
+              ⚠️ <strong>Melrose Arch Phase 3</strong> — H&S Plan pending approval for 4 business days. Site diary creation blocked per Regulation 7(1)(a). Escalation in 1 business day.
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ TAB: FALL PROTECTION ══════════════════════════════════ -->
+        <div class="tab-panel" id="tab-fall">
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <span class="card-title">Fall Protection Plans — Regulation 10</span>
+              <button class="action-btn">+ New Plan</button>
+            </div>
+            <table>
+              <thead><tr><th>ID</th><th>Work Area</th><th>Methods</th><th>Responsible</th><th>Next Inspection</th><th>Linked Permits</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">FPP-002</td><td>Level 4 Façade — Sandton</td><td>Harnesses, guardrails</td><td>Sipho Nkosi</td><td>8 Jul 2026</td><td>PTW-0039</td><td><span class="badge mint">Approved</span></td></tr>
+                <tr><td class="mono">FPP-001</td><td>Roof Steel — Kensington</td><td>Safety nets, exclusion zones</td><td>James Ndlovu</td><td>10 Jul 2026</td><td>PTW-0038</td><td><span class="badge mint">Approved</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center;font-size:10px;color:rgba(255,255,255,0.35);padding:16px 0;border-top:1px solid rgba(174,239,227,0.08);margin-top:20px;">
+          Architex Health & Safety Module — Advisory Only · Construction Regulations 2014 · OHS Act 85 of 1993
+        </div>
+      </div><!-- end content-wrapper -->
+    </div><!-- end scroll-area -->
+  </main>
+</div><!-- end os-shell -->
+<!-- ─── STYLES ─────────────────────────────────────────────────────── -->
+<style>
+  /* ─── Sidebar ─────────────────────────────────────────────── */
+  .brand-icon {
+    width:48px; height:48px; border-radius:12px;
+    background: rgba(0,91,78,0.15); border: 1px solid rgba(174,239,227,0.16);
+    display:flex; align-items:center; justify-content:center; font-size:22px;
+  }
+  .role-card {
+    padding: 14px 16px; border-radius: 1.25rem;
+    border: 1px solid rgba(174,239,227,0.12);
+    background: rgba(18,49,41,0.7);
+    border-top: 4px solid #1d8d6f;
+  }
+  .nav-item {
+    width:100%; display:flex; align-items:center; gap:12px;
+    padding: 10px 12px; border-radius: 1.05rem;
+    font-size:14px; font-weight:700; letter-spacing:0.01em;
+    color: rgba(255,255,255,0.62); background:transparent;
+    border:none; cursor:pointer; text-align:left;
+    transition: all 0.15s;
+  }
+  .nav-item:hover { background: #123129; color: #005b4e; }
+  .nav-item.active {
+    background: #dff1fa; color: #005b4e;
+    box-shadow: 0 12px 30px rgba(20,71,63,0.10);
+  }
+  .nav-item.logout:hover { color: #d95747; background: rgba(217,87,71,0.08); }
+  .nav-icon {
+    width:32px; height:32px; border-radius:0.7rem;
+    display:grid; place-items:center; font-size:15px;
+    border: 1px solid transparent;
+    background: rgba(255,255,255,0.07);
+    transition: all 0.15s;
+  }
+  .nav-item.active .nav-icon {
+    background: #fff; border-color: rgba(0,91,78,0.15);
+  }
+  .nav-item:hover .nav-icon { border-color: rgba(0,91,78,0.15); }
+  .nav-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nav-dot { width:8px; height:8px; border-radius:50%; background:#005b4e; }
+  /* ─── Main Content ─────────────────────────────────────────── */
+  .main-content {
+    flex: 1; display: flex; flex-direction: column;
+    min-width: 0; overflow: hidden;
+  }
+  .top-header {
+    position:sticky; top:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 12px 32px; min-height: 80px;
+    border-bottom: 1px solid rgba(174,239,227,0.12);
+    background: rgba(13,37,32,0.85);
+    backdrop-filter: blur(16px);
+  }
+  .breadcrumb { display:flex; align-items:center; gap:6px; font-size:12px; }
+  .breadcrumb-brand { font-weight:700; color:#005b4e; }
+  .breadcrumb-sep { color: rgba(174,239,227,0.3); }
+  .breadcrumb-item { color: rgba(255,255,255,0.62); }
+  .breadcrumb-current { font-weight:700; color:#fff; }
+  .page-title {
+    font-family:'Inter',sans-serif;
+    font-size: 24px; font-weight: 900;
+    letter-spacing: -0.045em; color: #fff;
+  }
+  .role-badge {
+    display:inline-flex; padding:4px 12px; border-radius:9999px;
+    font-size:11px; font-weight:700; color:#fff;
+    background: #1d8d6f;
+  }
+  .ai-btn {
+    padding: 6px 14px; border-radius: 9999px;
+    font-size:12px; font-weight:900;
+    border: 1px solid rgba(112,70,168,0.25);
+    background: rgba(112,70,168,0.1);
+    color: #9b7bd4; cursor:pointer; transition: all 0.2s;
+  }
+  .ai-btn:hover { background: #7046a8; color:#fff; }
+  .notification-bell { font-size:18px; cursor:pointer; }
+  .avatar {
+    width:40px; height:40px; border-radius:50%;
+    background: #11302a; border: 1px solid rgba(174,239,227,0.16);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:700; color:#005b4e;
+  }
+  .scroll-area { flex:1; overflow-y:auto; }
+  .content-wrapper { padding:24px 32px; max-width:1440px; }
+  /* ─── Project Toggles ──────────────────────────────────────── */
+  .project-toggles {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:12px 20px; margin-bottom:20px; border-radius:1.25rem;
+    background: #11302a; border: 1px solid rgba(174,239,227,0.16);
+  }
+  .toggle-label {
+    font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
+    color:rgba(255,255,255,0.45); font-weight:600;
+  }
+  .project-toggle {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 14px; border-radius:9999px;
+    font-size:12px; font-weight:600; color:rgba(255,255,255,0.62);
+    background: rgba(18,49,41,0.7);
+    border: 1px solid rgba(174,239,227,0.12);
+    cursor:pointer; transition: all 0.15s;
+  }
+  .project-toggle:hover { border-color: rgba(174,239,227,0.35); color:#fff; }
+  .project-toggle.active {
+    border-color: #aeefe3; color:#fff; font-weight:700;
+    background: rgba(0,91,78,0.2);
+    box-shadow: 0 0 12px rgba(174,239,227,0.08);
+  }
+  .toggle-dot { width:7px; height:7px; border-radius:50%; }
+  .toggle-dot.green { background:#1d8d6f; }
+  .toggle-dot.amber { background:#d26a38; }
+
+  /* ─── Tabs ────────────────────────────────────────────────── */
+  .tabs-container { margin-bottom:20px; }
+  .tabs-list {
+    display:flex; flex-wrap:wrap; gap:3px;
+    padding:4px; border-radius:1.25rem;
+    background: rgba(18,49,41,0.7);
+    border: 1px solid rgba(174,239,227,0.12);
+  }
+  .tab {
+    padding:9px 18px; border-radius:0.9rem;
+    font-size:13px; font-weight:600; color:rgba(255,255,255,0.55);
+    background:transparent; border:none; cursor:pointer;
+    transition: all 0.15s;
+  }
+  .tab:hover { color:#fff; background: rgba(0,91,78,0.15); }
+  .tab.active {
+    color:#fff; background: #005b4e;
+    box-shadow: 0 2px 8px rgba(0,91,78,0.25);
+  }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+  /* ─── Cards ────────────────────────────────────────────────── */
+  .card {
+    background: #11302a;
+    border: 1px solid rgba(174,239,227,0.16);
+    border-radius: 1.25rem;
+    padding: 20px;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: rgba(174,239,227,0.28); }
+  .card-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .card-title {
+    font-size:12px; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.06em;
+    color:rgba(255,255,255,0.55);
+  }
+
+  /* ─── Badges ──────────────────────────────────────────────── */
+  .badge {
+    display:inline-flex; align-items:center;
+    padding:3px 10px; border-radius:9999px;
+    font-size:11px; font-weight:700; letter-spacing:0.02em;
+  }
+  .badge.mint { background:rgba(174,239,227,0.12); color:#aeefe3; }
+  .badge.red { background:rgba(217,87,71,0.12); color:#d95747; }
+  .badge.amber { background:rgba(210,106,56,0.12); color:#d26a38; }
+  .badge.purple { background:rgba(155,123,212,0.12); color:#9b7bd4; }
+
+  /* ─── Stat Cards ──────────────────────────────────────────── */
+  .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
+  .stat-card {
+    background: #11302a; border: 1px solid rgba(174,239,227,0.16);
+    border-radius: 1.25rem; padding:18px 20px;
+  }
+  .stat-label {
+    font-size:10px; font-weight:600; text-transform:uppercase;
+    letter-spacing:0.08em; color:rgba(255,255,255,0.45); margin-bottom:4px;
+  }
+  .stat-value { font-size:28px; font-weight:900; color:#fff; margin-bottom:2px; }
+  .stat-value.destructive { color:#d95747; }
+  .stat-sub { font-size:12px; color:rgba(255,255,255,0.45); }
+  /* ─── Action Buttons ───────────────────────────────────────── */
+  .action-btn {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 14px; border-radius:9999px;
+    font-size:12px; font-weight:700;
+    border: 1px solid rgba(174,239,227,0.2);
+    background: rgba(0,91,78,0.1);
+    color:#aeefe3; cursor:pointer; transition: all 0.15s;
+  }
+  .action-btn:hover { background: rgba(0,91,78,0.25); border-color:rgba(174,239,227,0.4); }
+
+  /* ─── Tables ──────────────────────────────────────────────── */
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th {
+    text-align:left; padding:8px 12px;
+    font-size:10px; text-transform:uppercase; letter-spacing:0.06em;
+    color:rgba(255,255,255,0.4);
+    border-bottom: 1px solid rgba(174,239,227,0.12);
+  }
+  td {
+    padding:10px 12px; color:rgba(255,255,255,0.75);
+    border-bottom: 1px solid rgba(174,239,227,0.06);
+  }
+  .mono { font-family:'JetBrains Mono',monospace; font-size:12px; color:rgba(255,255,255,0.55); }
+  .bold { font-weight:600; color:#fff; }
+  .score-good { font-weight:900; color:#aeefe3; }
+  .score-warn { font-weight:900; color:#d26a38; }
+
+  /* ─── Countdown ───────────────────────────────────────────── */
+  .countdown { font-variant-numeric:tabular-nums; font-size:12px; font-weight:700; }
+  .countdown.ok { color:#1d8d6f; }
+  .countdown.warn { color:#d26a38; }
+  .countdown.danger { color:#d95747; }
+
+  /* ─── Grid layouts ────────────────────────────────────────── */
+  .grid-2col { display:grid; grid-template-columns:1fr 2fr; gap:20px; }
+  @media (max-width:1100px) { .grid-2col { grid-template-columns:1fr; } }
+  /* ─── Safety File Rows ──────────────────────────────────────── */
+  .file-row {
+    display:flex; align-items:center; gap:10px;
+    padding:7px 8px; border-radius:8px; font-size:13px;
+    color:rgba(255,255,255,0.8); transition: background 0.15s;
+  }
+  .file-row:hover { background: rgba(0,91,78,0.08); }
+  .file-name { flex:1; }
+  .file-meta { font-size:11px; color:rgba(255,255,255,0.4); }
+  .dot {
+    width:20px; height:20px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; flex-shrink:0;
+  }
+  .dot.complete { background:rgba(29,141,111,0.15); color:#1d8d6f; }
+  .dot.pending { background:rgba(210,106,56,0.15); color:#d26a38; }
+  .dot.missing { background:rgba(217,87,71,0.15); color:#d95747; }
+
+  /* Safety File detail rows (tab view) */
+  .sf-row {
+    display:flex; align-items:center; gap:12px;
+    padding:14px 16px; border-radius:12px;
+    border: 1px solid rgba(174,239,227,0.08);
+    transition: all 0.15s; margin-bottom:4px;
+  }
+  .sf-row:hover { border-color:rgba(174,239,227,0.2); background:rgba(0,91,78,0.05); }
+  .sf-num { font-family:'JetBrains Mono',monospace; font-size:11px; color:rgba(255,255,255,0.4); width:28px; flex-shrink:0; }
+  .sf-detail { flex:1; }
+  .sf-name { font-size:13px; font-weight:600; color:#fff; display:block; }
+  .sf-detail .sf-meta { font-size:11px; color:rgba(255,255,255,0.4); display:block; margin-top:2px; }
+
+  /* ─── Progress Bar ────────────────────────────────────────── */
+  .progress-track {
+    height:6px; border-radius:3px;
+    background: rgba(174,239,227,0.08); overflow:hidden;
+  }
+  .progress-fill { height:100%; border-radius:3px; transition:width 0.3s; }
+
+  /* ─── Risk Matrix ─────────────────────────────────────────── */
+  .risk-matrix {
+    display:grid; grid-template-columns:auto repeat(5,1fr); gap:3px;
+  }
+  .rc {
+    display:flex; align-items:center; justify-content:center;
+    width:36px; height:28px; border-radius:4px; font-size:11px; font-weight:700;
+  }
+  .rc.low { background:rgba(29,141,111,0.15); color:#1d8d6f; }
+  .rc.medium { background:rgba(210,106,56,0.12); color:#d26a38; }
+  .rc.high { background:rgba(210,106,56,0.2); color:#d26a38; }
+  .rc.critical { background:rgba(217,87,71,0.15); color:#d95747; }
+  .rl { display:flex; align-items:center; justify-content:center; font-size:10px; color:rgba(255,255,255,0.4); font-weight:600; }
+
+  /* ─── Timeline ────────────────────────────────────────────── */
+  .timeline { display:flex; flex-direction:column; gap:8px; }
+  .tl-item { display:flex; align-items:flex-start; gap:12px; padding:10px; border-radius:10px; background:rgba(18,49,41,0.5); }
+  .tl-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .tl-dot.red { background:#d95747; }
+  .tl-dot.amber { background:#d26a38; }
+  .tl-dot.green { background:#1d8d6f; }
+  .tl-body { flex:1; }
+  .tl-title { font-size:13px; font-weight:600; color:#fff; }
+  .tl-meta { font-size:11px; color:rgba(255,255,255,0.45); margin-top:2px; }
+</style>
+<!-- ─── JAVASCRIPT ─────────────────────────────────────────────────── -->
+<script>
+  // Tab switching (top content tabs)
+  function activateTab(el, panelId) {
+    // Deactivate all tabs + panels
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    // Activate clicked tab + panel
+    el.classList.add('active');
+    const panel = document.getElementById(panelId);
+    if (panel) panel.classList.add('active');
+  }
+
+  // Project toggle switching
+  function switchProject(el) {
+    document.querySelectorAll('.project-toggle').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Sidebar nav switching (visual only — all content stays in main)
+  function switchTab(el, tabId) {
+    document.querySelectorAll('.nav-item').forEach(n => {
+      n.classList.remove('active');
+      const dot = n.querySelector('.nav-dot');
+      if (dot) dot.remove();
+    });
+    el.classList.add('active');
+    const dot = document.createElement('span');
+    dot.className = 'nav-dot';
+    el.appendChild(dot);
+  }
+</script>
+</body>
+</html>

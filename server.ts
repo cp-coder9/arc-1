@@ -204,7 +204,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     if (shouldStartNotificationWorker) {
@@ -213,6 +213,20 @@ async function startServer() {
       });
     }
   });
+
+  // ── WebSocket upgrade handling for Remote Desktop signalling ───────────────
+  // The signallingService attaches to the HTTP server and handles upgrade
+  // requests at /api/remote-desktop/signal.
+  try {
+    const { signallingService } = await import("./src/services/remoteDesktop/signallingService.js");
+    signallingService.attach(server);
+    console.log("[Remote Desktop] Signalling WebSocket attached at /api/remote-desktop/signal");
+  } catch (error) {
+    console.warn(
+      "[Remote Desktop] Signalling service disabled:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 startServer().catch((error) => {

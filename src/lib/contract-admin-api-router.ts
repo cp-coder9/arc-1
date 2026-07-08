@@ -67,22 +67,19 @@ router.param('projectId', async (req, res, next) => {
 
 // ── Project authorization helper ────────────────────────────────────────────
 async function buildProjectAssignment(uid: string, role: string, projectId: string) {
-  const teamDoc = await adminDb.collection(`projects/${projectId}/team`).doc(uid).get();
-  const isTeamMember = teamDoc.exists;
-  const projectDoc = await adminDb.collection('projects').doc(projectId).get();
-  const projectData = projectDoc.exists ? projectDoc.data() : null;
-  const isOwner = projectData?.clientId === uid;
+  // Delegate to canonical shared project-membership function
+  const membership = await checkProjectMembership(uid, role, projectId);
   const isAdmin = role === 'admin' || role === 'platform_admin';
 
   return {
     projectId,
     userId: uid,
     roles: [role] as UserRole[],
-    isAssignedTeamMember: isAdmin || isTeamMember,
-    isAssignedContractor: isTeamMember && role === 'contractor',
-    isAssignedSubcontractor: isTeamMember && role === 'subcontractor',
-    isProjectOwner: isOwner,
-    isAssignedSiteManager: isTeamMember && role === 'site_manager',
+    isAssignedTeamMember: membership.isMember,
+    isAssignedContractor: membership.isMember && role === 'contractor',
+    isAssignedSubcontractor: membership.isMember && role === 'subcontractor',
+    isProjectOwner: membership.isOwner,
+    isAssignedSiteManager: membership.isMember && role === 'site_manager',
   };
 }
 

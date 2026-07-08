@@ -1,6 +1,8 @@
-import type { UserRole } from '@/types';
+import type { UserRole, ProjectAccessRoleAssignment } from '@/types';
 import { buildAuditEvent, type AuditEventInput } from './auditService';
-import { isCanonicalUserRole, normalizeUserRole } from './permissionService';
+import { isCanonicalUserRole, normalizeUserRole, isProjectAccessRoleCompatibleWithUserRole } from './permissionService';
+import type { AuthzUser } from './permissionService';
+import { adminDb } from '@/lib/firebase-admin';
 
 export type RoleChangeReasonCode =
   | 'verification_approved'
@@ -115,4 +117,97 @@ export function buildRoleChangeAuditInput(actor: RoleChangeActor, decision: Role
     },
     createdAt: decision.createdAt,
   });
+}
+
+
+// --- Project Access Role Assignment and Revocation (Requirements 3.7, 3.8, 3.9) ---
+
+export interface ProjectAccessRoleError {
+  error: string;
+  status: number;
+}
+
+/**
+ * Assigns a project access role (lead_consultant or project_administrator) to a target user
+ * on a specific project, after validating Professional_Role compatibility and mutual exclusivity.
+ *
+ * - Validates that the target user's Professional_Role is compatible with the requested access role
+ * - Enforces mutual exclusivity: a user cannot hold both lead_consultant and project_administrator
+ *   on the same project
+ * - Writes the assignment to Firestore at `projects/{projectId}/accessRoles/{userId}`
+ *
+ * Validates: Requirements 3.7, 3.8, 3.9
+ */
+export async function assignProjectAccessRole(
+  targetUser: AuthzUser,
+  projectAccessRole: 'lead_consultant' | 'project_administrator',
+  projectId: string,
+  assignedBy: string,
+): Promise<ProjectAccessRoleAssignment | ProjectAccessRoleError> {
+  const userRole = targetUser.role as UserRole | undefined;
+
+  // Validate Professional_Role compatibility
+  if (!isProjectAccessRoleCompatibleWithUserRole(projectAccessRole, userRole)) {
+    return {
+      error: `Role ${userRole ?? 'unknown'} is not compatible with project access role ${projectAccessRole}`,
+      status: 400,
+    };
+  }
+
+  // Enforce mutual exclusivity: check if user already holds the other role on this project
+  const oppositeRole: 'lead_consultant' | 'project_administrator' =
+    projectAccessRole === 'lead_consultant' ? 'project_administrator' : 'lead_consultant';
+
+  const existingDocRef = adminDb
+    .collection('projects')
+    .doc(projectId)
+    .collection('accessRoles')
+    .doc(targetUser.uid);
+
+  const existingDoc = await existingDocRef.get();
+
+  if (existingDoc.exists) {
+    const existingData = existingDoc.data() as ProjectAccessRoleAssignment | undefined;
+    if (existingData && existingData.accessRole === oppositeRole) {
+      return {
+        error: `User already holds ${oppositeRole} on project ${projectId}; revoke it first`,
+        status: 409,
+      };
+    }
+  }
+
+  // Persist the assignment
+  const assignment: ProjectAccessRoleAssignment = {
+    userId: targetUser.uid,
+    projectId,
+    accessRole: projectAccessRole,
+    assignedBy,
+    assignedAt: new Date().toISOString(),
+    userProfessionalRole: userRole as UserRole,
+  };
+
+  await existingDocRef.set(assignment);
+
+  return assignment;
+}
+
+/**
+ * Revokes a project access role from a user on a specific project.
+ * Deletes the document at `projects/{projectId}/accessRoles/{userId}` in Firestore.
+ *
+ * Validates: Requirements 3.7, 3.9
+ */
+export async function revokeProjectAccessRole(
+  targetUser: AuthzUser,
+  projectAccessRole: 'lead_consultant' | 'project_administrator',
+  projectId: string,
+  revokedBy: string,
+): Promise<void> {
+  const docRef = adminDb
+    .collection('projects')
+    .doc(projectId)
+    .collection('accessRoles')
+    .doc(targetUser.uid);
+
+  await docRef.delete();
 }
