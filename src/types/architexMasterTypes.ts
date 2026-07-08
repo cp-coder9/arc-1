@@ -60,7 +60,8 @@ export type ProjectRecordType =
   | 'practice_record'
   | 'verification_record'
   | 'risk_alert'
-  | 'municipal_submission_item';
+  | 'municipal_submission_item'
+  | 'inspection_test_plan';
 
 export interface AuditMetadata {
   createdByUserId: string;
@@ -184,7 +185,7 @@ export interface WorkflowEvent {
   title: string;
   detail: string;
   priority: Priority;
-  sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'settings_admin';
+  sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'site' | 'settings_admin';
   assignedRoles: ArchitexRole[];
   createdAt: string;
 }

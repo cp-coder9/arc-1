@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { adminDb, auth } from './firebase-admin';
 import {
   normalizeUserRole,
+  normalizeUserForAuthz,
+  isAdminUser,
   type AuthzUser,
   type PermissionAction,
   type NormalizedUserRole,
@@ -132,14 +134,27 @@ async function middlewareGetAuthContext(headers: Record<string, any>): Promise<A
   const decodedClaims = decoded as typeof decoded & { admin?: boolean };
   const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
   const userData = userDoc.exists ? userDoc.data() : null;
-  const role = (userData?.role || decodedClaims.role) as UserRole | string | undefined;
+  const rawRole = (userData?.role || decodedClaims.role) as UserRole | string | undefined;
+  const rawAdmin = userData?.admin === true || decodedClaims.admin === true;
+
+  // Normalize user for authorization — maps legacy role:'admin' → 'platform_admin'
+  // and handles admin:true flag. This ensures API-layer behavior matches client-layer.
+  const rawAuthzUser: AuthzUser = {
+    uid: decoded.uid as string,
+    role: rawRole,
+    admin: rawAdmin,
+  };
+  const normalized = normalizeUserForAuthz(rawAuthzUser)!;
+
+  const effectiveRole = normalized.role as UserRole | string | undefined;
+
   return {
     decoded,
     userData,
     uid: decoded.uid as string,
-    role,
-    normalizedRole: normalizeUserRole(role),
-    isAdmin: role === "admin" || decodedClaims.admin === true,
+    role: effectiveRole,
+    normalizedRole: normalizeUserRole(effectiveRole),
+    isAdmin: isAdminUser(normalized),
   };
 }
 
@@ -209,11 +224,13 @@ export function requirePermission(
   return (req, res, next) => {
     middlewareGetAuthContext(req.headers)
       .then(async (ctx) => {
-        const user: AuthzUser = {
+        const rawUser: AuthzUser = {
           uid: ctx.uid,
           role: ctx.role,
           admin: ctx.isAdmin,
         };
+        // Normalize before permission evaluation to handle legacy admin records
+        const user = normalizeUserForAuthz(rawUser)!;
 
         let projectCtx: any = undefined;
         const projectId = getProjectId ? getProjectId(req) : undefined;
@@ -278,11 +295,13 @@ export function roleGuard(opts: {
         }
 
         if (opts.permission) {
-          const user: AuthzUser = {
+          const rawUser: AuthzUser = {
             uid: ctx.uid,
             role: ctx.role,
             admin: ctx.isAdmin,
           };
+          // Normalize before permission evaluation to handle legacy admin records
+          const user = normalizeUserForAuthz(rawUser)!;
           try {
             const { assertCanUserPerform } = await import('../services/permissionService');
             assertCanUserPerform(user, opts.permission);
