@@ -9,7 +9,8 @@
 
 // Use the Firebase Timestamp type for Firestore fields.
 // A local structural alias keeps this file portable across test environments.
-export type { Timestamp } from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
+export type { Timestamp };
 
 // ─── Host Registration ─────────────────────────────────────────────────────────
 

@@ -6,7 +6,6 @@
 
 export * from './types';
 export * from './schemas';
-export * from './remoteDesktopService';
 export * from './tokenEngine';
 export * from './sessionBrokerService';
 export * from './allowlistService';
@@ -16,6 +15,26 @@ export * from './turnProvisioningService';
 export * from './bandwidthAdaptationService';
 export * from './sessionTimerService';
 export * from './fileHandoffService';
-export * from './workspaceRetentionService';
+export {
+  RETENTION_PERIOD_MS,
+  RETENTION_PERIOD_HOURS,
+  isWorkspaceExpired,
+  getRetentionDeadline,
+  handleExpiry,
+  deleteWorkspaceContents,
+  getRetentionInfo,
+  registerSessionForRetention,
+  isSessionExpired,
+  _clearAllState as _clearAllRetentionState,
+  _getAuditEvent,
+  _getRegisteredCount,
+  _getExpiredCount,
+} from './workspaceRetentionService';
+export type { WorkspaceExpiryResult, WorkspaceRetentionInfo, AuditEventWriter, WorkspaceResolver } from './workspaceRetentionService';
+export * from './governanceService';
 export * from './remoteDesktopPassportAdapter';
+export * from './remoteDesktopInboxAdapter';
+export * from './remoteDesktopAnalyticsAdapter';
 export * from './fileApprovalService';
+export * from './ownerSessionService';
+export * from './sessionLifecycleOrchestrator';

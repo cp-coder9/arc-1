@@ -6,7 +6,7 @@
  *
  * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.7, 10.8
  *
- * @vitest-environment node
+
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

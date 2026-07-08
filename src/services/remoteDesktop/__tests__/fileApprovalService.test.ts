@@ -6,7 +6,7 @@
  *
  * Requirements: 8.4, 8.5, 8.6, 8.8, 13.4
  *
- * @vitest-environment node
+
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';

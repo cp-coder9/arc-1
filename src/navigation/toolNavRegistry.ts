@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -103,6 +103,33 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
         items: [
           { id: 'municipalities', icon: Building2, label: 'Municipality Profiles' },
           { id: 'reports', icon: BarChart3, label: 'Reports & Analytics' },
+        ],
+      },
+    ],
+  },
+  'remote-desktop': {
+    name: 'Remote Desktop',
+    subtitle: 'Governed remote workstation sessions',
+    sections: [
+      {
+        label: 'Sessions',
+        items: [
+          { id: 'active-sessions', icon: Monitor, label: 'Active Sessions' },
+          { id: 'session-history', icon: Activity, label: 'Session History' },
+        ],
+      },
+      {
+        label: 'Hosts',
+        items: [
+          { id: 'my-hosts', icon: LayoutDashboard, label: 'My Hosts' },
+          { id: 'allowlist', icon: ClipboardList, label: 'App Allowlists' },
+        ],
+      },
+      {
+        label: 'Configuration',
+        items: [
+          { id: 'host-settings', icon: Settings, label: 'Host Settings' },
+          { id: 'audit-log', icon: FileText, label: 'Audit Log' },
         ],
       },
     ],

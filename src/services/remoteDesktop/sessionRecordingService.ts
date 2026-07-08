@@ -74,13 +74,15 @@ function generateRecordingId(): string {
   });
 }
 
-function nowTimestamp(): { seconds: number; nanoseconds: number } {
+function nowTimestamp(): Timestamp {
   const now = Date.now();
-  return { seconds: Math.floor(now / 1000), nanoseconds: (now % 1000) * 1_000_000 };
+  return { seconds: Math.floor(now / 1000), nanoseconds: (now % 1000) * 1_000_000 } as unknown as Timestamp;
 }
 
-function msToTimestamp(ms: number): { seconds: number; nanoseconds: number } {
-  return { seconds: Math.floor(ms / 1000), nanoseconds: (ms % 1000) * 1_000_000 };
+import type { Timestamp } from 'firebase/firestore';
+
+function msToTimestamp(ms: number): Timestamp {
+  return { seconds: Math.floor(ms / 1000), nanoseconds: (ms % 1000) * 1_000_000 } as unknown as Timestamp;
 }
 
 // ─── Core Functions ─────────────────────────────────────────────────────────────

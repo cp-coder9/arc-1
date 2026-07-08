@@ -82,9 +82,21 @@ app.use('/api', (req, res) => {
   res.status(404).json({ error: 'API route not found', path: req.originalUrl });
 });
 
-const server = app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', async () => {
   console.log('Architex API server running on http://localhost:' + port);
   console.log('Environment: ' + (process.env.NODE_ENV || 'production'));
+
+  // ── WebSocket upgrade handling for Remote Desktop signalling ───────────────
+  try {
+    const { signallingService } = await import('./src/services/remoteDesktop/signallingService.ts');
+    signallingService.attach(server);
+    console.log('[Remote Desktop] Signalling WebSocket attached at /api/remote-desktop/signal');
+  } catch (error) {
+    console.warn(
+      '[Remote Desktop] Signalling service disabled:',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 });
 
 server.on('error', (error) => {

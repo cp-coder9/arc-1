@@ -6,7 +6,7 @@
  *
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9
  *
- * @vitest-environment node
+
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -33,13 +33,12 @@ function createValidInput(): GenerateTokenInput {
   };
 }
 
-// ─── Setup ──────────────────────────────────────────────────────────────────────
-
-beforeEach(() => {
-  _clearRevocationList();
-});
-
 // ─── Token Generation ───────────────────────────────────────────────────────────
+
+describe('Token Engine', () => {
+  beforeEach(() => {
+    _clearRevocationList();
+  });
 
 describe('Token Generation', () => {
   it('should produce a valid token with all required fields', () => {

@@ -8677,6 +8677,10 @@ router.use("/popia", popiaRoutes);
 router.use("/remote-desktop-marketplace", marketplaceRouter);
 router.use("/remote-desktop-marketplace", ownerRouter);
 
+// Mount Remote Desktop Core (Session Broker) routes
+import remoteDesktopCoreRouter from "./remote-desktop-api-router";
+router.use("/remote-desktop", remoteDesktopCoreRouter);
+
 // Mount Feedback Loop routes
 import feedbackRouter from "./feedback-api-router";
 router.use("/feedback", feedbackRouter);
