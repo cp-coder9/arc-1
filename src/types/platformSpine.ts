@@ -50,6 +50,7 @@ export type NavigationZoneId =
   | 'marketplace'
   | 'finance'
   | 'messages'
+  | 'site'
   | 'settings_admin';
 
 /** Workflow event types that drive inbox items and agent recommendations. */

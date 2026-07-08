@@ -114,6 +114,21 @@ async function startServer() {
     }
   });
 
+  // Mount forms API router
+  app.use(async (req, res, next) => {
+    if (!req.path.startsWith('/api/forms')) return next();
+    try {
+      const { formsApiRouter } = await import("./src/lib/forms-api-router.js");
+      return formsApiRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load Forms API router:", error);
+      return res.status(500).json({
+        error: "Forms API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Mount the shared API router lazily. Firebase Admin / Firestore can add a
   // noticeable cold-start cost locally, so the server should become healthy
   // before those integrations are imported.
@@ -204,7 +219,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     if (shouldStartNotificationWorker) {
@@ -213,6 +228,20 @@ async function startServer() {
       });
     }
   });
+
+  // ── WebSocket upgrade handling for Remote Desktop signalling ───────────────
+  // The signallingService attaches to the HTTP server and handles upgrade
+  // requests at /api/remote-desktop/signal.
+  try {
+    const { signallingService } = await import("./src/services/remoteDesktop/signallingService.js");
+    signallingService.attach(server);
+    console.log("[Remote Desktop] Signalling WebSocket attached at /api/remote-desktop/signal");
+  } catch (error) {
+    console.warn(
+      "[Remote Desktop] Signalling service disabled:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 startServer().catch((error) => {
