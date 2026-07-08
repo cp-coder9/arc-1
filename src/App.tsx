@@ -196,6 +196,7 @@ const RemoteDesktopMarketplace = lazyWithChunkRetry(() => import('@/features/rem
 const FeedbackRoadmapDashboard = lazyWithChunkRetry(() => import('./components/feedback/FeedbackRoadmapDashboard'));
 const CopilotPanel = lazyWithChunkRetry(() => import('./components/CopilotPanel'));
 const ITPWorkspace = lazyWithChunkRetry(() => import('./components/itp/ITPWorkspace'));
+const MunicipalApprovalWorkspacePage = lazyWithChunkRetry(() => import('./components/municipal-workspace/MunicipalApprovalWorkspace'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -266,6 +267,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'directory-search', label: 'Directory Search', roles: ['client', 'bep', 'architect', 'contractor'], group: 'Client tools', icon: <Search size={18} />, summary: 'Manual verified directory search/invite shell.', backedBy: ['marketplace user profiles'] },
   { id: 'municipal-tracker', label: 'Municipal Status', roles: ['client', 'bep', 'architect', 'contractor'], group: 'Client tools', icon: <MapPin size={18} />, summary: 'Municipal status shell backed by the existing tracker component/domain.', backedBy: ['MunicipalTracker'] },
   { id: 'submission-readiness', label: 'Submission Readiness', roles: ['client', 'bep', 'architect', 'contractor', 'engineer', 'town_planner'], group: 'Client tools', icon: <ClipboardCheck size={18} />, summary: 'Municipal submission readiness assessment — complexity, routing, evidence pack, and score.', backedBy: ['SubmissionReadinessDashboard'] },
+  { id: 'municipal-approval-workspace', label: 'Municipal Approval Workspace', roles: ['architect', 'engineer', 'town_planner', 'energy_professional', 'fire_engineer', 'quantity_surveyor', 'platform_admin'], group: 'BEP tools', icon: <CheckCircle2 size={18} />, summary: 'Unified municipal submission readiness workspace with land use validation, departmental simulation, and submission pack assembly.', backedBy: ['municipalSubmissionReadinessService', 'landUseSchemeService', 'circulationSimulatorService'] },
   { id: 'client-progress', label: 'Progress Reports', roles: ['client'], group: 'Client tools', icon: <Clock size={18} />, summary: 'Plain-language progress report shell for client decisions and risks.', backedBy: ['StageProgressTracker', 'GanttChart'] },
   { id: 'design', label: 'Design & Compliance', roles: [...DESIGN_TEAM_ROLES, 'freelancer', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer'], group: 'BEP tools', icon: <Network size={18} />, summary: 'Design-team deliverables, registers, responsibility matrix, and compliance shell.', backedBy: ['ResponsibilityMatrix', 'TeamBuilder'] },
   { id: 'drawing-register', label: 'Drawing Register', roles: ['client', ...DESIGN_TEAM_ROLES, 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'contractor'], group: 'BEP tools', icon: <FileArchive size={18} />, summary: 'Formal drawing numbers, revisions, issue status, superseded records, and transmittal logs.', backedBy: ['projects.documents', 'projects.transmittals', 'coordination_items'] },
@@ -351,6 +353,7 @@ export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'contractor-compliance',
   'disputes',
   'feedback-roadmap',
+  'municipal-approval-workspace',
 ]);
 export const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1237,6 +1240,7 @@ function AppContent() {
               {activeTab === 'remote-desktop-marketplace' && <RemoteDesktopMarketplace user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {activeTab === 'itp-workspace' && <ITPWorkspace user={user} />}
+              {activeTab === 'municipal-approval-workspace' && <MunicipalApprovalWorkspacePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
               {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
