@@ -1,5 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link, Award, MapPin, Calculator } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link, Award, MapPin, Calculator, GanttChart, ListTodo, Flag, FileSignature, BookOpen, MessageSquare, Brain, Fingerprint, History } from 'lucide-react';
+import type { CommandCentreView, ComplexityMode } from '@/services/commandCentre/types';
+import type { UserRole } from '@/types';
+import { getViewsForRole } from '@/services/commandCentre/roleViewMatrix';
 
 /**
  * Tool Nav configuration registry.
@@ -26,7 +29,104 @@ export interface ToolNavConfig {
   sections: ToolNavSection[];
 }
 
+// ── Command Centre Section Configuration ─────────────────────────────────────
+
+/**
+ * Full Command Centre sidebar section layout with all subsystem navigation items.
+ * Sections: Overview, Delivery, Commercial, Quality & Site, Intelligence, Administration.
+ *
+ * @see Requirements 4.1, 4.2, 4.3
+ */
+export const COMMAND_CENTRE_SECTIONS: ToolNavSection[] = [
+  {
+    label: 'Overview',
+    items: [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { id: 'calendar', icon: Calendar, label: 'Calendar' },
+      { id: 'actions', icon: CheckCircle, label: 'Actions' },
+    ],
+  },
+  {
+    label: 'Delivery',
+    items: [
+      { id: 'programme', icon: GanttChart, label: 'Programme' },
+      { id: 'tasks', icon: ListTodo, label: 'Tasks' },
+      { id: 'milestones', icon: Flag, label: 'Milestones' },
+    ],
+  },
+  {
+    label: 'Commercial',
+    items: [
+      { id: 'budget', icon: DollarSign, label: 'Budget' },
+      { id: 'valuations', icon: Receipt, label: 'Valuations' },
+      { id: 'procurement', icon: Package, label: 'Procurement' },
+      { id: 'contracts', icon: FileSignature, label: 'Contracts' },
+    ],
+  },
+  {
+    label: 'Quality & Site',
+    items: [
+      { id: 'quality', icon: Shield, label: 'Quality / Snags' },
+      { id: 'site-diary', icon: BookOpen, label: 'Site Diary' },
+      { id: 'rfis', icon: MessageSquare, label: 'RFIs / Instructions' },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { id: 'ai-advisor', icon: Brain, label: 'AI Advisor' },
+      { id: 'analytics', icon: BarChart3, label: 'Analytics' },
+      { id: 'documents', icon: FileText, label: 'Documents' },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { id: 'team', icon: Users, label: 'Team' },
+      { id: 'passport', icon: Fingerprint, label: 'Passport' },
+      { id: 'form-system', icon: ClipboardList, label: 'Forms' },
+      { id: 'audit-trail', icon: History, label: 'Audit Trail' },
+      { id: 'settings', icon: Settings, label: 'Settings' },
+    ],
+  },
+];
+
+/**
+ * Returns Command Centre sidebar sections filtered by the user's role and
+ * complexity mode. Items not in the user's permitted view list are removed.
+ * Entire section groups are hidden when all their items are filtered out.
+ *
+ * This filtering is designed to complete within 200ms of a complexity mode
+ * change (synchronous array operations — well under that budget).
+ *
+ * @see Requirements 4.4, 4.6, 4.7
+ * @see Property 6 — Empty Section Group Hiding
+ */
+export function getFilteredSections(role: UserRole, mode: ComplexityMode): ToolNavSection[] {
+  const permittedViews = getViewsForRole(role, mode);
+
+  const filtered: ToolNavSection[] = [];
+
+  for (const section of COMMAND_CENTRE_SECTIONS) {
+    const visibleItems = section.items.filter((item) =>
+      permittedViews.includes(item.id as CommandCentreView),
+    );
+
+    // Hide entire section group when all items are filtered out (Property 6)
+    if (visibleItems.length > 0) {
+      filtered.push({ label: section.label, items: visibleItems });
+    }
+  }
+
+  return filtered;
+}
+
 export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
+  'command-centre': {
+    name: 'Command Centre',
+    subtitle: 'Unified project workspace',
+    sections: COMMAND_CENTRE_SECTIONS,
+  },
   'wingman': {
     name: 'Wingman',
     subtitle: 'AI Copilot Workspace',

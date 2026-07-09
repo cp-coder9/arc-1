@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Filter, AlertTriangle } from 'lucide-react';
 import type { TaskBoardItem } from '@/services/commandCentre/types';
+import { LinkChip } from '@/components/commandCentre/LinkChip';
 
 interface TaskBoardViewProps {
   projectId: string;
@@ -120,6 +121,15 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps) {
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">Due: {task.dueDate}</p>
+                        {task.linkedActivityId && (
+                          <LinkChip
+                            link={{
+                              linkedEntityId: task.linkedActivityId,
+                              linkedEntityType: 'programme',
+                              label: task.linkedActivityName ?? `Activity ${task.linkedActivityId.slice(0, 8)}`,
+                            }}
+                          />
+                        )}
                       </div>
                     </CardContent>
                   </Card>

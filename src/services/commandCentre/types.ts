@@ -30,7 +30,10 @@ export type CommandCentreView =
   | 'documents'
   | 'settings'
   | 'actions'
-  | 'notifications';
+  | 'notifications'
+  | 'passport'
+  | 'form-system'
+  | 'audit-trail';
 
 /** Scalable complexity mode: Simple (subset) or Full (all subsystems). */
 export type ComplexityMode = 'simple' | 'full';
@@ -43,7 +46,8 @@ export type RiskCategory =
   | 'quality'
   | 'compliance'
   | 'commercial'
-  | 'safety';
+  | 'safety'
+  | 'health_and_safety';
 
 export type RiskSeverity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -135,6 +139,7 @@ export interface CommandCentreMilestone {
   actualDate?: string;
   status: 'complete' | 'on_track' | 'at_risk' | 'overdue' | 'pending';
   linkedCertificateId?: string;
+  linkedCertificateName?: string;
   linkedActivityId?: string;
   category?: 'general' | 'nhbrc_inspection' | 'municipal_submission';
   nhbrcStage?: number;
@@ -212,6 +217,7 @@ export interface TaskBoardItem {
   dueDate: string;
   linkedSpecForgeItemId?: string;
   linkedActivityId?: string;
+  linkedActivityName?: string;
   linkedProcurementOrderId?: string;
   createdBy: string;
   createdAt: string;
@@ -252,6 +258,8 @@ export interface RiskItem {
   ownerId: string;
   ownerName: string;
   mitigationPlan?: string;
+  linkedBudgetPackageId?: string;
+  linkedBudgetPackageName?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -310,6 +318,7 @@ export interface ProcurementOrder {
   status: ProcurementStatus;
   bbbeeLevel?: number;
   linkedSpecForgeItemId?: string;
+  linkedSpecForgeItemTitle?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

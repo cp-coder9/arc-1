@@ -44,13 +44,12 @@ describe('firm_admin scope preservation (Task 9.2)', () => {
     expect(permissions).toEqual(['project:read', 'profile:read', 'profile:update', 'audit:read']);
   });
 
-  it('retains navigation access to: command_centre, inbox, projects, toolboxes, documents, analytics, messages', () => {
+  it('retains navigation access to: command_centre, inbox, toolboxes, documents, analytics, messages', () => {
     const modules = getNavigationForRole('firm_admin');
     const moduleKeys = modules.map((m) => m.key);
 
     expect(moduleKeys).toContain('command_centre');
     expect(moduleKeys).toContain('inbox');
-    expect(moduleKeys).toContain('projects');
     expect(moduleKeys).toContain('toolboxes');
     expect(moduleKeys).toContain('documents');
     expect(moduleKeys).toContain('analytics');

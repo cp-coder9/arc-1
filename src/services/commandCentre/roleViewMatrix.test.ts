@@ -67,23 +67,23 @@ describe('roleViewMatrix', () => {
     it('filters to simple mode subset intersected with role views for client', () => {
       const views = getViewsForRole('client', 'simple');
       // client has: dashboard, milestones, budget, documents, notifications
-      // simple has: tasks, milestones, budget, site-diary, quality, documents
-      // intersection: milestones, budget, documents
-      expect(views).toEqual(['milestones', 'budget', 'documents']);
+      // simple has: dashboard, tasks, milestones, budget, site-diary, quality, documents, actions
+      // intersection: dashboard, milestones, budget, documents
+      expect(views).toEqual(['dashboard', 'milestones', 'budget', 'documents']);
     });
 
     it('filters to simple mode subset for site_manager', () => {
       const views = getViewsForRole('site_manager', 'simple');
       // site_manager has: dashboard, programme, tasks, site-diary, rfis, quality, team
-      // simple has: tasks, milestones, budget, site-diary, quality, documents
-      // intersection: tasks, site-diary, quality
-      expect(views).toEqual(['tasks', 'site-diary', 'quality']);
+      // simple has: dashboard, tasks, milestones, budget, site-diary, quality, documents, actions
+      // intersection: dashboard, tasks, site-diary, quality
+      expect(views).toEqual(['dashboard', 'tasks', 'site-diary', 'quality']);
     });
 
-    it('returns empty array for supplier in simple mode (no overlap)', () => {
+    it('returns documents for supplier in simple mode', () => {
       const views = getViewsForRole('supplier', 'simple');
       // supplier has: procurement, documents
-      // simple has: tasks, milestones, budget, site-diary, quality, documents
+      // simple has: dashboard, tasks, milestones, budget, site-diary, quality, documents, actions
       // intersection: documents
       expect(views).toEqual(['documents']);
     });
@@ -99,8 +99,8 @@ describe('roleViewMatrix', () => {
     });
 
     it('returns false when view is role-accessible but not in simple mode', () => {
-      // architect has dashboard in full, but dashboard is not in SIMPLE_MODE_VIEWS
-      expect(isViewAccessible('architect', 'dashboard', 'simple')).toBe(false);
+      // architect has programme in full, but programme is not in SIMPLE_MODE_VIEWS
+      expect(isViewAccessible('architect', 'programme', 'simple')).toBe(false);
     });
 
     it('returns true when view is both role-accessible and in simple mode', () => {
@@ -141,17 +141,19 @@ describe('roleViewMatrix', () => {
   describe('constants', () => {
     it('SIMPLE_MODE_VIEWS contains exactly the defined subset', () => {
       expect(SIMPLE_MODE_VIEWS).toEqual([
+        'dashboard',
         'tasks',
         'milestones',
         'budget',
         'site-diary',
         'quality',
         'documents',
+        'actions',
       ]);
     });
 
-    it('ALL_VIEWS contains 20 views', () => {
-      expect(ALL_VIEWS).toHaveLength(20);
+    it('ALL_VIEWS contains 23 views', () => {
+      expect(ALL_VIEWS).toHaveLength(23);
     });
 
     it('SIMPLE_MODE_VIEWS is a subset of ALL_VIEWS', () => {

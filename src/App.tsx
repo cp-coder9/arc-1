@@ -96,6 +96,7 @@ import { FeedbackErrorBoundary } from '@/components/feedback/FeedbackErrorBounda
 import { architexNavigation } from './navigation/architexNavigationConfig';
 import { getDefaultPageForNavKey, getNavKeyForActiveTab } from './navigation/navDashboardAdapter';
 import type { ArchitexNavKey } from './navigation/navTypes';
+import { isLegacyProjectRoute, resolveLegacyRedirect, performRedirect } from './navigation/NavigationRedirect';
 
 // Sub-components
 import { AnimatedFloorPlan } from './components/AnimatedFloorPlan';
@@ -537,6 +538,22 @@ function AppContent() {
   }, []);
   const [activeTab, setActiveTab] = useState('command');
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
+
+  // ── Legacy route intercept (NavigationRedirect) ──────────────────────────
+  // If the current URL matches a legacy /projects/:id/:section pattern,
+  // redirect to the Command Centre and set the active tab to 'command'.
+  // Validates: Requirements 1.4, 2.6, 13.1, 13.2
+  useEffect(() => {
+    const pathname = window.location.pathname;
+    if (isLegacyProjectRoute(pathname)) {
+      const queryString = window.location.search.replace(/^\?/, '');
+      const result = resolveLegacyRedirect(pathname, queryString);
+      if (result) {
+        performRedirect(result);
+        setActiveTab('command');
+      }
+    }
+  }, []);
 
   // Passive friction detection — monitors for user struggle patterns (rage clicks, repeated errors, etc.)
   useFrictionDetector(user);

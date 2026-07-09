@@ -274,6 +274,8 @@ export const budgetService = {
   computeVariance,
   isOverBudgetThreshold,
   computeForecastAtCompletion,
+  // Collection path constants (exported for Data Bridge consistency verification)
+  BUDGET_PACKAGES_COLLECTION_PATH: BUDGET_PACKAGES_COL,
 };
 
 export default budgetService;

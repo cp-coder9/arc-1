@@ -27,7 +27,6 @@ import type { UserRole } from '@/types';
 /** Professional workflow module keys per the spec */
 const PROFESSIONAL_MODULE_KEYS = [
   'toolboxes',
-  'projects',
   'cpd_learning',
   'documents',
   'marketplace',
@@ -42,6 +41,7 @@ const PLATFORM_ONLY_MODULE_KEYS = [
   'verification_queue',
   'ai_review_queue',
   'system_health',
+  'feedback_intelligence',
 ] as const;
 
 /** Shared utility module keys accessible to platform_admin */
@@ -107,7 +107,7 @@ describe('Feature: role-architecture-refinement, Property 2: Professional module
    * **Validates: Requirements 2.1, 2.2, 2.3**
    *
    * For any professional workflow module in the navigation config (toolboxes,
-   * projects, CPD & learning, documents, marketplace, finance, analytics,
+   * CPD & learning, documents, marketplace, finance, analytics,
    * messages), the module's roles array SHALL contain only Professional_Role
    * values and SHALL NOT contain 'platform_admin' or 'admin'.
    * Consequently, getNavigationForRole('platform_admin') SHALL return none of

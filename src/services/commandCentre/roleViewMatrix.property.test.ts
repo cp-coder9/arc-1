@@ -24,7 +24,7 @@ const ALL_ROLES: UserRole[] = [
   'client', 'architect', 'admin', 'freelancer', 'bep', 'contractor',
   'subcontractor', 'supplier', 'engineer', 'quantity_surveyor',
   'town_planner', 'energy_professional', 'fire_engineer', 'site_manager',
-  'developer', 'firm_admin', 'platform_admin',
+  'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'health_safety', 'cpm',
 ];
 
 const userRoleArb = fc.constantFrom(...ALL_ROLES);
@@ -52,6 +52,9 @@ const EXPECTED_ROLE_VIEWS: Record<UserRole, CommandCentreView[]> = {
   energy_professional: ['dashboard', 'programme', 'tasks', 'quality', 'documents'],
   fire_engineer: ['dashboard', 'programme', 'tasks', 'quality', 'documents'],
   freelancer: ['dashboard', 'tasks', 'documents', 'notifications'],
+  land_surveyor: ['dashboard', 'programme', 'tasks', 'documents', 'quality'],
+  health_safety: ['dashboard', 'programme', 'tasks', 'site-diary', 'quality', 'documents', 'notifications'],
+  cpm: ['dashboard', 'programme', 'tasks', 'site-diary', 'rfis', 'quality', 'procurement', 'documents'],
 };
 
 // ── Property Tests ───────────────────────────────────────────────────────────

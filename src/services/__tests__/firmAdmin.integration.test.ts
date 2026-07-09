@@ -85,7 +85,6 @@ describe('firm_admin scope and integration scenarios', () => {
 
       expect(moduleKeys).toContain('command_centre');
       expect(moduleKeys).toContain('inbox');
-      expect(moduleKeys).toContain('projects');
       expect(moduleKeys).toContain('toolboxes');
       expect(moduleKeys).toContain('documents');
       expect(moduleKeys).toContain('analytics');
