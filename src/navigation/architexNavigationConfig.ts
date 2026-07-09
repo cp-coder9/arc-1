@@ -58,6 +58,7 @@ export const architexNavigation: NavigationItem[] = [
       { key: 'council-navigator', label: 'Council Drawing Navigator', description: 'Municipality-specific drawing submission requirements.' },
       { key: 'form-system', label: 'Form System', description: 'Auto-fill & manage construction documents — templates, drafts, export, and audit.', supportsContextualMessaging: true },
       { key: 'costing_procurement', label: 'Costing & Procurement', description: 'BoQ, BoM, RFQs and quote comparisons.', supportsContextualMessaging: true },
+      { key: 'bim-quantity-extraction', label: 'BIM Quantities', description: 'IFC model extraction, ASAQS/JBCC BoQ generation, and procurement package feed.', supportsContextualMessaging: true },
       { key: 'specforge', label: 'SpecForge Specifications', description: 'Pictorial specs, product schedules, approvals, issue and procurement pipeline.', supportsContextualMessaging: true },
       { key: 'town-planning', label: 'Town Planning Tracker', description: 'SPLUMA application lifecycle — rezoning, subdivision, consent use, conditions, appeals.', supportsContextualMessaging: true },
       { key: 'eia-workspace', label: 'EIA & Environmental', description: 'NEMA EIA lifecycle, screening, authorization, EMPr, public participation, and green building certification.', supportsContextualMessaging: true },

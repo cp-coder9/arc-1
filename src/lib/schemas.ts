@@ -587,3 +587,57 @@ export const getFieldErrors = (error: z.ZodError): Record<string, string> => {
   });
   return errors;
 };
+
+
+// ── BIM/IFC Quantity Extraction Bridge Schemas ──────────────────────────────
+
+/** Validates IFC file upload request body */
+export const bimUploadSchema = z.object({
+  file: z.string().min(1, 'Base64-encoded file content is required'),
+  fileName: z.string().endsWith('.ifc', 'File must have a .ifc extension'),
+  projectId: z.string().min(1, 'Project ID is required'),
+});
+
+/** Validates BoQ generation request body */
+export const bimBoqGenerateSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  extractionId: z.string().min(1, 'Extraction ID is required'),
+  options: z.object({
+    currency: z.string().optional(),
+    includeJbccPreambles: z.boolean().optional(),
+    roundingPrecision: z.number().int().min(0).max(6).optional(),
+  }).partial().optional(),
+});
+
+/** Validates mapping rule creation/update request body */
+export const bimMappingRuleSchema = z.object({
+  ifcEntityType: z.string().min(1, 'IFC entity type is required'),
+  predefinedType: z.string().optional(),
+  classificationCode: z.string().optional(),
+  tradeSection: z.string().min(1, 'Trade section is required'),
+  tradeSectionCode: z.string().min(1, 'Trade section code is required'),
+  measurementUnit: z.enum(['m²', 'm³', 'm', 'nr', 'kg', 'item']),
+  scope: z.enum(['default', 'firm', 'project']),
+  scopeId: z.string().optional(),
+});
+
+/** Validates BoQ export request body */
+export const bimExportSchema = z.object({
+  format: z.enum(['csv', 'xlsx', 'json']),
+});
+
+/** Validates procurement package creation request body */
+export const bimProcurementPackageSchema = z.object({
+  boqId: z.string().min(1, 'BoQ ID is required'),
+  selectedSections: z.array(z.string()).min(1, 'At least one trade section must be selected'),
+  selectedLineItems: z.array(z.string()).optional(),
+  coverSheet: z.object({
+    projectName: z.string().min(1, 'Project name is required'),
+    projectNumber: z.string().min(1, 'Project number is required'),
+    packageTitle: z.string().min(1, 'Package title is required'),
+    issueDate: z.string().min(1, 'Issue date is required'),
+    revisionNumber: z.string().min(1, 'Revision number is required'),
+    qsContactName: z.string().min(1, 'QS contact name is required'),
+    qsContactEmail: z.string().email('QS contact email must be a valid email'),
+  }),
+});

@@ -128,6 +128,20 @@ async function startServer() {
     }
   });
 
+  // Mount BIM API router
+  app.use("/api/bim", async (req, res, next) => {
+    try {
+      const { default: bimApiRouter } = await import("./src/lib/bim-api-router.js");
+      return bimApiRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load BIM API router:", error);
+      return res.status(500).json({
+        error: "BIM API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Mount forms API router
   app.use(async (req, res, next) => {
     if (!req.path.startsWith('/api/forms')) return next();

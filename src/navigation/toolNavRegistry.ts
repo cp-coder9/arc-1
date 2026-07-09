@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -220,6 +220,36 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
         label: 'Green Building',
         items: [
           { id: 'green-building', icon: Leaf, label: 'Green Building' },
+        ],
+      },
+    ],
+  },
+  'bim-quantity-extraction': {
+    name: 'BIM Quantities',
+    subtitle: 'IFC Model Extraction & BoQ',
+    sections: [
+      {
+        label: 'Model',
+        items: [
+          { id: 'upload', icon: Upload, label: 'Upload Model' },
+          { id: 'models', icon: Box, label: 'Models' },
+          { id: 'validation', icon: ShieldCheck, label: 'Validation' },
+        ],
+      },
+      {
+        label: 'Quantities',
+        items: [
+          { id: 'extraction', icon: Layers, label: 'Extraction' },
+          { id: 'mapping-rules', icon: Settings, label: 'Mapping Rules' },
+          { id: 'boq', icon: FileText, label: 'BoQ' },
+        ],
+      },
+      {
+        label: 'Output',
+        items: [
+          { id: 'export', icon: Download, label: 'Export' },
+          { id: 'procurement', icon: Package, label: 'Procurement' },
+          { id: 'specforge-sync', icon: Link, label: 'SpecForge Sync' },
         ],
       },
     ],
