@@ -470,8 +470,10 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Oversee project portfolio, investment governance, and programme strategy.' },
   firm_admin: { label: 'Firm Admin', viewLabel: 'Firm View', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)', description: 'Manage practice operations, staff, CPD, and professional registrations.' },
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
+  admin: { label: 'Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'System administration and platform governance.' },
   land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage land surveys, boundary pegging, and topographic data.' },
   health_safety: { label: 'H&S Officer', viewLabel: 'H&S View', accent: '#f57c00', accentSoft: 'rgba(245, 124, 0, 0.12)', description: 'Manage safety files, permits, inductions, incidents, and HIRA registers.' },
+  cpm: { label: 'Construction Project Manager', viewLabel: 'CPM View', accent: '#2f72a7', accentSoft: 'rgba(47, 114, 167, 0.12)', description: 'Manage construction project delivery, coordination, and site oversight.' },
 };
 
 function roleVisualFor(role: UserRole) {

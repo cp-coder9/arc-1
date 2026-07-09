@@ -105,6 +105,9 @@ const ROLE_VIEW_MAP: Record<UserRole, CommandCentreView[]> = {
 
   // H&S Officer: safety-focused execution views
   health_safety: ['dashboard', 'programme', 'tasks', 'site-diary', 'quality', 'documents', 'notifications'],
+
+  // Construction Project Manager: execution-focused
+  cpm: ['dashboard', 'programme', 'tasks', 'site-diary', 'rfis', 'quality', 'procurement', 'documents'],
 };
 
 // ── Public API ───────────────────────────────────────────────────────────────
