@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architex — Municipal Refuse Area Calculator Design Sample</title>
+  <style>
+    :root {
+      --teal: #19B7B0;
+      --deep: #167E79;
+      --jade: #58C8BC;
+      --mint: #BFE9E2;
+      --aqua: #DFF5F2;
+      --ink: #102033;
+      --muted: #657287;
+      --border: rgba(16,32,51,.09);
+      --white: #fff;
+      --shadow: 0 22px 64px rgba(16,32,51,.08);
+      --soft: 0 12px 34px rgba(16,32,51,.055);
+      --green: #4ADE80;
+      --amber: #F5A623;
+      --red: #d95747;
+      --font: "Geist", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --os-nav-width: 56px;
+      --tool-nav-width: 200px;
+      --topbar-height: 36px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(191,233,226,.38), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(223,245,242,.55), transparent 32%),
+        linear-gradient(180deg, #fff 0%, #f7fbfb 100%);
+    }
+
+    /* ─── Shell Grid ─────────────────────────────────────────── */
+    .shell {
+      display: grid;
+      grid-template-columns: var(--os-nav-width) var(--tool-nav-width) 1fr;
+      grid-template-rows: var(--topbar-height) 1fr;
+      min-height: 100vh;
+    }
+
+    /* ─── OS Nav ─────────────────────────────────────────────── */
+    .os-nav {
+      grid-row: 1 / -1;
+      background: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0;
+      gap: 18px;
+    }
+    .os-nav-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .os-nav-icon:hover { color: var(--white); background: rgba(255,255,255,.08); }
+    .os-nav-icon.active { color: var(--teal); background: rgba(25,183,176,.12); }
+    .os-nav-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--teal), var(--deep));
+      margin-bottom: 8px;
+    }
+
+    /* ─── Tool Nav ───────────────────────────────────────────── */
+    .tool-nav {
+      grid-row: 1 / -1;
+      background: rgba(255,255,255,.92);
+      border-right: 1px solid var(--border);
+      padding: 14px;
+      overflow-y: auto;
+    }
+    .tool-nav-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--deep);
+      letter-spacing: .5px;
+      margin-bottom: 4px;
+    }
+    .tool-nav-subtitle {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .tool-nav-section { margin-bottom: 16px; }
+    .tool-nav-section-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: .4px;
+      margin-bottom: 6px;
+    }
+    .tool-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .tool-nav-item:hover { background: var(--aqua); }
+    .tool-nav-item.active { background: var(--mint); color: var(--deep); font-weight: 500; }
+    .tool-nav-item .icon { font-size: 14px; opacity: .7; }
+
+    /* ─── Top Bar ────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.6);
+      font-size: 12px;
+      color: var(--muted);
+      gap: 6px;
+    }
+    .topbar .crumb { color: var(--muted); }
+    .topbar .crumb-active { color: var(--deep); font-weight: 500; }
+    .topbar .separator { margin: 0 2px; }
+
+    /* ─── Content Area ───────────────────────────────────────── */
+    .content {
+      padding: 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* ─── Hero ───────────────────────────────────────────────── */
+    .hero {
+      border-radius: 28px;
+      padding: 28px 32px;
+      background:
+        radial-gradient(circle at 85% 20%, rgba(191,233,226,.25), transparent 40%),
+        rgba(255,255,255,.82);
+      border: 1px solid var(--border);
+      box-shadow: var(--soft);
+    }
+    .hero-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .eyebrow {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--teal);
+      margin-bottom: 4px;
+    }
+    .hero h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .sub { font-size: 13px; color: var(--muted); }
+    .hero-pills { display: flex; gap: 6px; margin-top: 12px; }
+
+    /* ─── Pills ──────────────────────────────────────────────── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--teal);
+      background: rgba(25,183,176,.08);
+      border: 1px solid rgba(25,183,176,.18);
+    }
+    .pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--teal);
+    }
+    .pill-success { color: var(--green); background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.18); }
+    .pill-success .dot { background: var(--green); }
+    .pill-warning { color: var(--amber); background: rgba(245,166,35,.08); border-color: rgba(245,166,35,.18); }
+    .pill-warning .dot { background: var(--amber); }
+    .pill-muted { color: var(--muted); background: rgba(16,32,51,.04); border-color: var(--border); }
+    .pill-muted .dot { background: var(--muted); }
+
+    /* ─── Stat Cards ─────────────────────────────────────────── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .stat-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: var(--soft);
+    }
+    .stat-value { font-size: 22px; font-weight: 700; color: var(--ink); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.teal { color: var(--teal); }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ─── Panel ──────────────────────────────────────────────── */
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 22px;
+      background: rgba(255,255,255,.74);
+      box-shadow: var(--soft);
+    }
+    .panel h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--deep);
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      margin-bottom: 14px;
+    }
+
+    /* ─── Buttons ────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid rgba(25,183,176,.22);
+      background: var(--aqua);
+      color: var(--deep);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn:hover { background: var(--mint); border-color: var(--teal); }
+    .btn-secondary {
+      border-color: var(--border);
+      background: rgba(255,255,255,.7);
+      color: var(--ink);
+    }
+    .btn-sm { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 8px; }
+
+    /* ─── Tables ─────────────────────────────────────────────── */
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .table th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--ink);
+    }
+    .table tr:last-child td { border-bottom: none; }
+
+    /* ─── Form Elements ──────────────────────────────────────── */
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      margin-bottom: 5px;
+    }
+    .form-input, .form-select {
+      width: 100%;
+      height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--white);
+      outline: none;
+      transition: border-color .15s;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(25,183,176,.08);
+    }
+    .form-select { appearance: none; cursor: pointer; }
+
+    /* ─── Results Grid ───────────────────────────────────────── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .result-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      background: var(--white);
+    }
+    .result-card h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--deep);
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      margin-bottom: 12px;
+    }
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(16,32,51,.04);
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item-label { font-size: 12px; color: var(--muted); }
+    .result-item-value { font-size: 13px; font-weight: 600; color: var(--ink); }
+
+    /* ─── Advisory Disclaimer ────────────────────────────────── */
+    .advisory-disclaimer {
+      border: 1px solid rgba(245,166,35,.22);
+      border-radius: 12px;
+      padding: 14px 18px;
+      background: rgba(245,166,35,.04);
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .advisory-disclaimer strong {
+      color: var(--amber);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+
+    /* ─── Sign-Off Gate ──────────────────────────────────────── */
+    .sign-off-gate {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      background: rgba(255,255,255,.9);
+    }
+    .sign-off-gate h3 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--deep);
+      margin-bottom: 12px;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      accent-color: var(--teal);
+      cursor: pointer;
+    }
+    .checkbox-row label {
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+
+    /* ─── Action Bar ─────────────────────────────────────────── */
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      margin-top: 14px;
+    }
+    .btn-disabled {
+      opacity: .5;
+      pointer-events: none;
+    }
+
+    /* ─── Input/Results Split Layout ─────────────────────────── */
+    .calculator-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 14px;
+    }
+
+    /* ─── Mono text ──────────────────────────────────────────── */
+    .mono { font-family: monospace; font-size: 11px; color: var(--muted); }
+
+    /* ─── Profile meta ───────────────────────────────────────── */
+    .profile-meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(16,32,51,.04);
+    }
+    .profile-meta span { display: flex; align-items: center; gap: 4px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <!-- ═══ OS Nav ═══════════════════════════════════════════════ -->
+    <nav class="os-nav">
+      <div class="os-nav-logo"></div>
+      <div class="os-nav-icon" title="Command Centre">⌘</div>
+      <div class="os-nav-icon" title="Inbox">✉</div>
+      <div class="os-nav-icon" title="Projects">◈</div>
+      <div class="os-nav-icon active" title="Toolboxes">⚙</div>
+      <div class="os-nav-icon" title="Documents">▤</div>
+      <div class="os-nav-icon" title="People">♟</div>
+      <div class="os-nav-icon" title="Compliance">✓</div>
+      <div class="os-nav-icon" title="Payments">₿</div>
+    </nav>
+
+    <!-- ═══ Tool Nav ════════════════════════════════════════════ -->
+    <aside class="tool-nav">
+      <div class="tool-nav-title">Refuse Area Calculator</div>
+      <div class="tool-nav-subtitle">Municipal Compliance Tool</div>
+
+      <div class="tool-nav-section">
+        <div class="tool-nav-section-label">Input</div>
+        <div class="tool-nav-item">
+          <span class="icon">◉</span> Municipality
+        </div>
+        <div class="tool-nav-item">
+          <span class="icon">▦</span> Building Type
+        </div>
+        <div class="tool-nav-item">
+          <span class="icon">✎</span> Parameters
+        </div>
+      </div>
+
+      <div class="tool-nav-section">
+        <div class="tool-nav-section-label">Calculation</div>
+        <div class="tool-nav-item">
+          <span class="icon">⊞</span> Compute Area
+        </div>
+        <div class="tool-nav-item">
+          <span class="icon">▣</span> Bin Sizing
+        </div>
+      </div>
+
+      <div class="tool-nav-section">
+        <div class="tool-nav-section-label">Results</div>
+        <div class="tool-nav-item active">
+          <span class="icon">◧</span> Summary
+        </div>
+        <div class="tool-nav-item">
+          <span class="icon">⎙</span> Export PDF
+        </div>
+        <div class="tool-nav-item">
+          <span class="icon">⇥</span> Save to Passport
+        </div>
+      </div>
+    </aside>
+
+    <!-- ═══ Top Bar ═════════════════════════════════════════════ -->
+    <header class="topbar">
+      <span class="crumb">Architex</span>
+      <span class="separator">›</span>
+      <span class="crumb">Compliance Hub</span>
+      <span class="separator">›</span>
+      <span class="crumb">Toolboxes</span>
+      <span class="separator">›</span>
+      <span class="crumb-active">Refuse Area Calculator</span>
+    </header>
+
+    <!-- ═══ Content Area ════════════════════════════════════════ -->
+    <main class="content">
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-header">
+          <div>
+            <div class="eyebrow">REFUSE AREA CALCULATOR</div>
+            <h1>Residential — City of Johannesburg</h1>
+            <p class="sub">24 units · 4 occupants/unit · Computed 15 Jun 2026</p>
+          </div>
+        </div>
+        <div class="hero-pills">
+          <span class="pill-success pill"><span class="dot"></span> Computed</span>
+          <span class="pill"><span class="dot"></span> Residential</span>
+          <span class="pill-muted pill"><span class="dot"></span> Awaiting Sign-Off</span>
+        </div>
+      </div>
+
+      <!-- Stat Row -->
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-value teal">6.5 m²</div>
+          <div class="stat-label">Refuse Area Required</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">6</div>
+          <div class="stat-label">Bins (1100L)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">5,760 L</div>
+          <div class="stat-label">Total Waste Volume</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value green">6.0 m</div>
+          <div class="stat-label">Min Access Road Width</div>
+        </div>
+      </div>
+
+      <!-- Calculator Layout: Input Sidebar + Results -->
+      <div class="calculator-layout">
+
+        <!-- Input Panel (Left) -->
+        <div class="panel">
+          <h2>Project Inputs</h2>
+
+          <div class="form-group">
+            <label class="form-label">Municipality</label>
+            <select class="form-select">
+              <option selected>City of Johannesburg</option>
+              <option>City of Cape Town</option>
+              <option>eThekwini (Durban)</option>
+              <option>City of Tshwane (Pretoria)</option>
+              <option>Nelson Mandela Bay</option>
+              <option>Buffalo City</option>
+              <option>Mangaung</option>
+              <option>Other (Generic Fallback)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Building Type</label>
+            <select class="form-select">
+              <option selected>Residential</option>
+              <option>Commercial</option>
+              <option>Industrial</option>
+              <option>Mixed-Use</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Number of Units</label>
+            <input type="number" class="form-input" value="24">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Avg Occupants per Unit</label>
+            <input type="number" class="form-input" value="4">
+          </div>
+
+          <div class="profile-meta">
+            <span>📋 Profile: 15 Apr 2026</span>
+            <span>🔄 Cycle: 7 days</span>
+          </div>
+
+          <div class="action-bar">
+            <button class="btn" style="width:100%">⊞ Calculate</button>
+          </div>
+        </div>
+
+        <!-- Results Panel (Right) -->
+        <div style="display:flex; flex-direction:column; gap:14px;">
+
+          <!-- Area Dimensions Card -->
+          <div class="result-card">
+            <h3>Refuse Storage Area — Dimensions</h3>
+            <div class="result-item">
+              <span class="result-item-label">Total Area Required</span>
+              <span class="result-item-value" style="color:var(--teal)">6.50 m²</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Length</span>
+              <span class="result-item-value">2.6 m</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Width</span>
+              <span class="result-item-value">2.5 m</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Minimum Clearance Height</span>
+              <span class="result-item-value">2.4 m</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Minimum Applied?</span>
+              <span class="result-item-value">No — computed area exceeds 4.0 m²</span>
+            </div>
+          </div>
+
+          <!-- Bin Quantity Card -->
+          <div class="result-card">
+            <h3>Bin Calculation</h3>
+            <div class="result-item">
+              <span class="result-item-label">Total Waste Volume</span>
+              <span class="result-item-value">5,760 L</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Bin Size Selected</span>
+              <span class="result-item-value">1100L Wheelie Bin</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Bins Required</span>
+              <span class="result-item-value" style="color:var(--deep)">6</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Total Bin Volume</span>
+              <span class="result-item-value">6,600 L</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Bin Floor Space</span>
+              <span class="result-item-value">2.52 m² (6 × 0.7m × 0.6m)</span>
+            </div>
+          </div>
+
+          <!-- Vehicle Access Card -->
+          <div class="result-card">
+            <h3>Collection Vehicle Access</h3>
+            <div class="result-item">
+              <span class="result-item-label">Minimum Road Width</span>
+              <span class="result-item-value">6.0 m</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Turning Circle Radius</span>
+              <span class="result-item-value">12.5 m</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Maximum Gradient</span>
+              <span class="result-item-value">8%</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Maximum Carry Distance</span>
+              <span class="result-item-value">30 m</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Hardstand Required</span>
+              <span class="result-item-value">Yes — 12.0 m × 4.0 m</span>
+            </div>
+          </div>
+
+          <!-- Ventilation & Drainage Card -->
+          <div class="result-card">
+            <h3>Ventilation &amp; Drainage</h3>
+            <div class="result-item">
+              <span class="result-item-label">Ventilation Type</span>
+              <span class="result-item-value">Natural Openings</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Opening Area Required</span>
+              <span class="result-item-value">0.5 m²</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Floor Gradient</span>
+              <span class="result-item-value">1.5%</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Drain Diameter</span>
+              <span class="result-item-value">100 mm</span>
+            </div>
+            <div class="result-item">
+              <span class="result-item-label">Wash-Down Provision</span>
+              <span class="result-item-value">Hose connection — adjacent to entrance</span>
+            </div>
+          </div>
+
+          <!-- Advisory Disclaimer -->
+          <div class="advisory-disclaimer">
+            <strong>⚠ Advisory Disclaimer</strong>
+            This output is advisory only. It does not constitute legal compliance certification. Results are derived from interpreted municipal guidelines and must be verified by a qualified professional against current local bylaws.
+          </div>
+
+          <!-- Professional Sign-Off Gate -->
+          <div class="sign-off-gate">
+            <h3>Professional Sign-Off</h3>
+            <div class="checkbox-row">
+              <input type="checkbox" id="signoff-ack">
+              <label for="signoff-ack">
+                I confirm that: (a) this output is advisory only, (b) I have reviewed the computed results, and (c) professional verification against current local bylaws remains my responsibility.
+              </label>
+            </div>
+            <div class="action-bar" style="border-top:none; margin-top:0; padding-top:0;">
+              <button class="btn btn-disabled">⇥ Save to Project Passport</button>
+              <button class="btn btn-secondary btn-disabled">⎙ Export PDF</button>
+              <button class="btn btn-secondary btn-disabled">↗ Push to SpecForge</button>
+            </div>
+            <p style="font-size:11px; color:var(--muted); margin-top:10px;">
+              Save and export actions are unavailable until sign-off is completed.
+            </p>
+          </div>
+
+          <!-- Source Profile Meta -->
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--muted); padding:8px 0;">
+            <span>Source: <strong style="color:var(--deep)">City of Johannesburg</strong></span>
+            <span>Profile Last Updated: <strong>15 Apr 2026</strong></span>
+          </div>
+
+        </div><!-- /results column -->
+      </div><!-- /calculator-layout -->
+
+    </main><!-- /content -->
+  </div><!-- /shell -->
+</body>
+</html>

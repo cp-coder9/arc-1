@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architex OS — Datum UI Scaffold</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --teal-origin:#19B7B0;--deep-teal:#167E79;--jade:#58C8BC;
+  --soft-mint:#BFE9E2;--pale-aqua:#DFF5F2;--blueprint-grey:#C9D4D9;
+  --mist-white:#F7F9FA;--pure-white:#FFFFFF;
+  --text-primary:#1a2b30;--text-secondary:#5e7478;--text-muted:#8fa3a8;
+  --border:#e8f0ee;--sidebar-w:240px;
+}
+html,body{height:100%;font-family:'Inter',system-ui,sans-serif;
+  background:var(--mist-white);color:var(--text-primary);font-weight:400;font-size:14px;}
+body{
+  background-image:
+    linear-gradient(rgba(25,183,176,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(25,183,176,0.03) 1px, transparent 1px);
+  background-size:44px 44px;
+}
+.app{display:grid;grid-template-rows:60px 1fr 36px;grid-template-columns:var(--sidebar-w) 1fr;height:100vh;overflow:hidden;}
+.header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+  background:var(--pure-white);border-bottom:1px solid var(--border);padding:0 24px;z-index:10;}
+.sidebar{grid-row:2;background:var(--pure-white);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;padding:16px 12px;}
+.workspace{grid-row:2;overflow-y:auto;padding:32px 40px;}
+.statusbar{grid-column:1/-1;grid-row:3;display:flex;align-items:center;gap:24px;
+  background:var(--pure-white);border-top:1px solid var(--border);padding:0 20px;font-size:11.5px;color:var(--text-muted);}
+/* Header */
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-center{flex:1;max-width:480px;margin:0 auto;}
+.search-bar{width:100%;padding:9px 20px;border-radius:999px;border:1px solid var(--border);
+  background:var(--mist-white);font-size:13px;color:var(--text-secondary);cursor:pointer;outline:none;}
+.search-bar:hover{border-color:var(--jade);}
+.header-right{display:flex;align-items:center;gap:12px;}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
+  background:var(--pure-white);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.icon-btn:hover{background:var(--pale-aqua);}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--teal-origin),var(--deep-teal));cursor:pointer;}
+/* Sidebar */
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:4px 8px;margin-bottom:20px;}
+.sidebar-logo span{font-size:12px;font-weight:600;letter-spacing:0.08em;color:var(--text-primary);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;
+  cursor:pointer;font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .15s;}
+.nav-item:hover{background:var(--pale-aqua);color:var(--deep-teal);}
+.nav-item.active{background:var(--pale-aqua);color:var(--deep-teal);}
+.nav-item svg{flex-shrink:0;width:18px;height:18px;}
+.nav-sep{height:1px;background:var(--border);margin:12px 8px;}
+.nav-bottom{margin-top:auto;}
+.connection-status{display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:11px;color:var(--text-muted);}
+.connection-status .dot{width:7px;height:7px;border-radius:50%;background:#34d399;}
+/* Datum Hero */
+.datum-section{margin-bottom:40px;}
+.datum-project-anchor{display:flex;align-items:center;gap:16px;margin-bottom:24px;}
+.datum-bird-circle{width:72px;height:72px;border-radius:50%;background:var(--pale-aqua);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.datum-project-info h2{font-size:18px;font-weight:500;color:var(--text-primary);}
+.datum-project-info p{font-size:12.5px;color:var(--text-secondary);margin-top:2px;}
+.datum-project-info .aligned{color:var(--deep-teal);font-size:12px;margin-top:4px;}
+.datum-project-info .aligned .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal-origin);margin-right:4px;}
+/* Datum cards row */
+.datum-cards-row{display:flex;justify-content:space-between;gap:12px;margin:0 40px;}
+.datum-card{flex:1;background:var(--pure-white);border-radius:16px;border:1px solid var(--border);
+  box-shadow:0 2px 8px rgba(25,183,176,0.06);padding:12px 14px;cursor:pointer;transition:all .15s;min-width:0;}
+.datum-card:hover{border-color:var(--jade);box-shadow:0 4px 16px rgba(25,183,176,0.12);}
+.datum-card-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;margin-bottom:8px;font-size:16px;}
+.datum-card h4{font-size:12.5px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.datum-card .subtitle{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.datum-card .status{font-size:10.5px;color:#34d399;margin-top:4px;display:flex;align-items:center;gap:3px;}
+/* Datum line */
+.datum-line-container{position:relative;margin:16px 0;padding:0 40px;}
+.datum-line{height:2px;background:linear-gradient(90deg,var(--teal-origin),var(--jade),var(--soft-mint));border-radius:1px;position:relative;}
+.datum-nodes{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;height:2px;}
+.datum-node{position:relative;display:flex;flex-direction:column;align-items:center;}
+.datum-node-circle{width:10px;height:10px;border-radius:50%;border:2px solid var(--jade);background:var(--pure-white);position:relative;z-index:2;}
+.datum-node-circle.filled{background:var(--teal-origin);border-color:var(--teal-origin);box-shadow:0 0 6px rgba(25,183,176,0.4);}
+.datum-tick{position:absolute;width:1px;height:20px;background:var(--soft-mint);}
+.datum-tick-up{bottom:5px;}
+.datum-tick-down{top:5px;}
+.datum-tick-dot{width:4px;height:4px;border-radius:50%;background:var(--soft-mint);position:absolute;}
+.datum-tick-dot-up{top:-4px;left:-1.5px;}
+.datum-tick-dot-down{bottom:-4px;left:-1.5px;}
+/* Pillar cards */
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px;}
+.pillar-card{background:var(--pure-white);border-radius:16px;border:1px solid var(--border);
+  box-shadow:0 2px 8px rgba(25,183,176,0.05);padding:24px;transition:all .15s;}
+.pillar-card:hover{box-shadow:0 4px 16px rgba(25,183,176,0.1);}
+.pillar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.pillar-header h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;color:var(--deep-teal);}
+.pillar-header .arrow{color:var(--text-muted);font-size:16px;cursor:pointer;}
+.pillar-desc{font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:16px;}
+.pillar-tools{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.pillar-tool{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;
+  background:var(--mist-white);border:1px solid var(--border);cursor:pointer;transition:all .15s;}
+.pillar-tool:hover{background:var(--pale-aqua);border-color:var(--jade);}
+.pillar-tool-icon{width:28px;height:28px;border-radius:8px;background:var(--pale-aqua);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--deep-teal);}
+.pillar-tool span{font-size:11.5px;font-weight:500;color:var(--text-primary);}
+/* Status bar */
+.status-dot{width:7px;height:7px;border-radius:50%;background:#34d399;flex-shrink:0;}
+.statusbar .mono{font-family:'SF Mono','Fira Code',monospace;font-weight:500;color:var(--text-secondary);}
+.statusbar a{color:var(--deep-teal);text-decoration:none;cursor:pointer;margin-left:auto;}
+.statusbar a:hover{text-decoration:underline;}
+/* Responsive */
+@media(max-width:1100px){
+  :root{--sidebar-w:200px;}
+  .datum-cards-row{margin:0 20px;gap:8px;}
+  .workspace{padding:24px 20px;}
+}
+@media(max-width:800px){
+  :root{--sidebar-w:56px;}
+  .sidebar-logo span,.nav-item .nav-label,.connection-status span{display:none;}
+  .sidebar-logo{justify-content:center;padding:4px 0;}
+  .nav-item{justify-content:center;padding:9px 0;}
+  .search-bar{max-width:200px;}
+  .datum-cards-row{margin:0 8px;gap:6px;flex-wrap:wrap;}
+  .datum-card{min-width:calc(50% - 6px);}
+  .pillars{grid-template-columns:1fr;}
+  .workspace{padding:16px 12px;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left"></div>
+  <div class="header-center">
+    <input type="text" class="search-bar" placeholder="Search projects, documents, people... ⌘K" readonly onclick="alertAction('Global search')">
+  </div>
+  <div class="header-right">
+    <div class="icon-btn" onclick="alertAction('Notifications')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+    </div>
+    <div class="avatar" onclick="alertAction('My Account')"></div>
+  </div>
+</header>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <svg width="30" height="30" viewBox="0 0 40 40">
+      <polygon points="20,4 8,20 14,20" fill="#19B7B0"/>
+      <polygon points="20,4 26,20 32,20" fill="#167E79"/>
+      <polygon points="14,20 20,14 26,20" fill="#58C8BC"/>
+      <polygon points="12,22 20,36 20,22" fill="#BFE9E2"/>
+      <polygon points="20,22 20,36 28,22" fill="#19B7B0"/>
+    </svg>
+    <span>ARCHITEX OS</span>
+  </div>
+  <div class="nav-item active" onclick="nav(this,'Command Centre')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="nav-label">Command Centre</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Inbox')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+    <span class="nav-label">Inbox</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Projects')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+    <span class="nav-label">Projects</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Toolboxes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+    <span class="nav-label">Toolboxes</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'CPD & Learning')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+    <span class="nav-label">CPD & Learning</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Documents')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+    <span class="nav-label">Documents</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Marketplace')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+    <span class="nav-label">Marketplace</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Finance')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+    <span class="nav-label">Finance</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Analytics')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+    <span class="nav-label">Analytics</span>
+  </div>
+  <div class="nav-item" onclick="nav(this,'Messages')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span class="nav-label">Messages</span>
+  </div>
+  <div class="nav-bottom">
+    <div class="nav-sep"></div>
+    <div class="nav-item" onclick="nav(this,'Settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z"/></svg>
+      <span class="nav-label">Settings</span>
+    </div>
+    <div class="nav-item" onclick="nav(this,'My Account')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 00-16 0"/></svg>
+      <span class="nav-label">My Account</span>
+    </div>
+    <div class="connection-status"><span class="dot"></span><span>Connected</span></div>
+  </div>
+</aside>
+<!-- WORKSPACE -->
+<main class="workspace">
+  <section class="datum-section">
+    <div class="datum-project-anchor">
+      <div class="datum-bird-circle">
+        <svg width="44" height="44" viewBox="0 0 40 40">
+          <polygon points="20,4 8,20 14,20" fill="#19B7B0"/>
+          <polygon points="20,4 26,20 32,20" fill="#167E79"/>
+          <polygon points="14,20 20,14 26,20" fill="#58C8BC"/>
+          <polygon points="12,22 20,36 20,22" fill="#BFE9E2"/>
+          <polygon points="20,22 20,36 28,22" fill="#19B7B0"/>
+        </svg>
+      </div>
+      <div class="datum-project-info">
+        <h2>Harborview Civic Center</h2>
+        <p>Single source of truth</p>
+        <div class="aligned"><span class="dot"></span> All systems aligned</div>
+      </div>
+    </div>
+    <!-- Cards ABOVE datum line -->
+    <div class="datum-cards-row" style="margin-bottom:8px;">
+      <div class="datum-card" onclick="alertAction('Client')">
+        <div class="datum-card-icon" style="background:var(--pale-aqua);color:var(--deep-teal);">👤</div>
+        <h4>Client</h4>
+        <div class="subtitle">Project owner</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Professionals')">
+        <div class="datum-card-icon" style="background:var(--pale-aqua);color:var(--deep-teal);">👥</div>
+        <h4>Professionals</h4>
+        <div class="subtitle">Design team</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Drawings')">
+        <div class="datum-card-icon" style="background:var(--pale-aqua);color:var(--deep-teal);">📐</div>
+        <h4>Drawings</h4>
+        <div class="subtitle">Rev. 04 current</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Compliance')">
+        <div class="datum-card-icon" style="background:var(--pale-aqua);color:var(--deep-teal);">✅</div>
+        <h4>Compliance</h4>
+        <div class="subtitle">SANS verified</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Municipal')">
+        <div class="datum-card-icon" style="background:var(--pale-aqua);color:var(--deep-teal);">🏛️</div>
+        <h4>Municipal</h4>
+        <div class="subtitle">Submitted</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+    </div>
+    <!-- DATUM LINE -->
+    <div class="datum-line-container">
+      <div class="datum-line">
+        <div class="datum-nodes">
+          <div class="datum-node"><div class="datum-node-circle filled"></div><div class="datum-tick datum-tick-up"></div><div class="datum-tick datum-tick-down"><div class="datum-tick-dot datum-tick-dot-down"></div></div></div>
+          <div class="datum-node"><div class="datum-node-circle filled"></div><div class="datum-tick datum-tick-up"><div class="datum-tick-dot datum-tick-dot-up"></div></div><div class="datum-tick datum-tick-down"></div></div>
+          <div class="datum-node"><div class="datum-node-circle filled"></div><div class="datum-tick datum-tick-up"></div><div class="datum-tick datum-tick-down"><div class="datum-tick-dot datum-tick-dot-down"></div></div></div>
+          <div class="datum-node"><div class="datum-node-circle filled"></div><div class="datum-tick datum-tick-up"><div class="datum-tick-dot datum-tick-dot-up"></div></div><div class="datum-tick datum-tick-down"></div></div>
+          <div class="datum-node"><div class="datum-node-circle"></div><div class="datum-tick datum-tick-up"></div><div class="datum-tick datum-tick-down"><div class="datum-tick-dot datum-tick-dot-down"></div></div></div>
+          <div class="datum-node"><div class="datum-node-circle"></div><div class="datum-tick datum-tick-up"><div class="datum-tick-dot datum-tick-dot-up"></div></div><div class="datum-tick datum-tick-down"></div></div>
+          <div class="datum-node"><div class="datum-node-circle"></div><div class="datum-tick datum-tick-up"></div><div class="datum-tick datum-tick-down"><div class="datum-tick-dot datum-tick-dot-down"></div></div></div>
+          <div class="datum-node"><div class="datum-node-circle"></div><div class="datum-tick datum-tick-up"><div class="datum-tick-dot datum-tick-dot-up"></div></div><div class="datum-tick datum-tick-down"></div></div>
+        </div>
+      </div>
+    </div>
+    <!-- Cards BELOW datum line -->
+    <div class="datum-cards-row" style="margin-top:8px;">
+      <div class="datum-card" onclick="alertAction('Contractors')">
+        <div class="datum-card-icon" style="background:#FEF3C7;color:#D97706;">🏗️</div>
+        <h4>Contractors</h4>
+        <div class="subtitle">3 appointed</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Suppliers')">
+        <div class="datum-card-icon" style="background:#FEF3C7;color:#D97706;">📦</div>
+        <h4>Suppliers</h4>
+        <div class="subtitle">12 active</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Site')">
+        <div class="datum-card-icon" style="background:#FEF3C7;color:#D97706;">🔨</div>
+        <h4>Site</h4>
+        <div class="subtitle">Day 84</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Payments')">
+        <div class="datum-card-icon" style="background:#FEF3C7;color:#D97706;">💳</div>
+        <h4>Payments</h4>
+        <div class="subtitle">R2.4M released</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+      <div class="datum-card" onclick="alertAction('Handover')">
+        <div class="datum-card-icon" style="background:#FEF3C7;color:#D97706;">🔑</div>
+        <h4>Handover</h4>
+        <div class="subtitle">Pending</div>
+        <div class="status">✓ Aligned</div>
+      </div>
+    </div>
+  </section>
+  <!-- THREE PILLAR CARDS -->
+  <section class="pillars">
+    <div class="pillar-card">
+      <div class="pillar-header">
+        <h3>Project Tools</h3>
+        <span class="arrow" onclick="alertAction('Project Tools')">→</span>
+      </div>
+      <p class="pillar-desc">Professional tools and compliance workflows for your active projects.</p>
+      <div class="pillar-tools">
+        <div class="pillar-tool" onclick="alertAction('SpecForge')"><div class="pillar-tool-icon">📋</div><span>SpecForge</span></div>
+        <div class="pillar-tool" onclick="alertAction('Drawing Checker')"><div class="pillar-tool-icon">✏️</div><span>Drawing Checker</span></div>
+        <div class="pillar-tool" onclick="alertAction('SANS Compliance')"><div class="pillar-tool-icon">✅</div><span>SANS Compliance</span></div>
+        <div class="pillar-tool" onclick="alertAction('Fee Proposal')"><div class="pillar-tool-icon">💰</div><span>Fee Proposal</span></div>
+      </div>
+    </div>
+    <div class="pillar-card">
+      <div class="pillar-header">
+        <h3>Collaboration</h3>
+        <span class="arrow" onclick="alertAction('Collaboration')">→</span>
+      </div>
+      <p class="pillar-desc">Coordinate teams, approvals, and communications across all stakeholders.</p>
+      <div class="pillar-tools">
+        <div class="pillar-tool" onclick="alertAction('Team Matrix')"><div class="pillar-tool-icon">👥</div><span>Team Matrix</span></div>
+        <div class="pillar-tool" onclick="alertAction('Approvals')"><div class="pillar-tool-icon">✓</div><span>Approvals</span></div>
+        <div class="pillar-tool" onclick="alertAction('RFIs')"><div class="pillar-tool-icon">❓</div><span>RFIs</span></div>
+        <div class="pillar-tool" onclick="alertAction('Messenger')"><div class="pillar-tool-icon">💬</div><span>Messenger</span></div>
+      </div>
+    </div>
+    <div class="pillar-card">
+      <div class="pillar-header">
+        <h3>Commercial</h3>
+        <span class="arrow" onclick="alertAction('Commercial')">→</span>
+      </div>
+      <p class="pillar-desc">Financial governance, procurement, and payment workflows.</p>
+      <div class="pillar-tools">
+        <div class="pillar-tool" onclick="alertAction('Invoicing')"><div class="pillar-tool-icon">🧾</div><span>Invoicing</span></div>
+        <div class="pillar-tool" onclick="alertAction('Escrow')"><div class="pillar-tool-icon">🔒</div><span>Escrow</span></div>
+        <div class="pillar-tool" onclick="alertAction('Procurement')"><div class="pillar-tool-icon">📄</div><span>Procurement</span></div>
+        <div class="pillar-tool" onclick="alertAction('Analytics')"><div class="pillar-tool-icon">📊</div><span>Analytics</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+<!-- STATUS BAR -->
+<footer class="statusbar">
+  <span class="status-dot"></span>
+  <span>Connected</span>
+  <span>Connected Data: <span class="mono">1.2M+</span> records</span>
+  <span>Integrations: <span class="mono">18</span> active</span>
+  <span>Active Users: <span class="mono">124</span> online</span>
+  <span>Security: SOC 2 Type II</span>
+  <span>Uptime: <span class="mono">99.99%</span></span>
+  <a onclick="alertAction('System Status')">System Status ↗</a>
+</footer>
+</div>
+<script>
+function nav(btn, page) {
+  document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('active'); });
+  btn.classList.add('active');
+  console.log('Navigate to:', page);
+}
+function alertAction(name) {
+  alert('Opening: ' + name);
+}
+</script>
+</body>
+</html>
