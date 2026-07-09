@@ -334,6 +334,133 @@ export async function emitLongLeadWarning(
   }
 }
 
+// ── Enhanced Inbox Event API (Req 12.1, 12.10) ─────────────────────────────
+
+/**
+ * Enhanced inbox event type following the EnhancedInboxEvent schema.
+ * Supports targeting by specific user UIDs or by role, includes event type,
+ * source entity reference, a capped message, and a deep link route.
+ *
+ * Requirements: 12.1, 12.10
+ */
+export interface EnhancedSpecInboxEvent {
+  id: string;
+  targetUsers?: string[];
+  targetRole?: string;
+  eventType: string;
+  sourceEntityType: string;
+  sourceEntityId: string;
+  message: string;
+  deepLinkRoute: string;
+  createdAt: string;
+}
+
+/** Maximum message length for enhanced inbox events. */
+const ENHANCED_MESSAGE_CAP = 500;
+
+/** In-memory store for enhanced inbox events (for querying/testing). */
+const enhancedInboxEvents: EnhancedSpecInboxEvent[] = [];
+let enhancedSeq = 1;
+
+/**
+ * Cap message to 500 characters, appending ellipsis if truncated.
+ */
+function capMessage(message: string): string {
+  if (message.length <= ENHANCED_MESSAGE_CAP) return message;
+  return message.slice(0, ENHANCED_MESSAGE_CAP - 3) + '...';
+}
+
+/**
+ * Emit an enhanced inbox event following the EnhancedInboxEvent schema.
+ * This is the primary entry point for the governance triple-write pattern.
+ *
+ * All fields required by Requirement 12.10 are included:
+ * - targetUsers (specific UIDs) OR targetRole (broadcast to role)
+ * - eventType — the type of state transition
+ * - sourceEntityType + sourceEntityId — reference to the source entity
+ * - message — human-readable, capped at 500 chars
+ * - deepLinkRoute — route to the relevant UI view
+ *
+ * Requirements: 12.1, 12.10
+ */
+export function emitEnhancedInboxEvent(params: {
+  targetUsers?: string[];
+  targetRole?: string;
+  eventType: string;
+  sourceEntityType: string;
+  sourceEntityId: string;
+  message: string;
+  deepLinkRoute: string;
+  projectId: string;
+}): EnhancedSpecInboxEvent {
+  const event: EnhancedSpecInboxEvent = {
+    id: `spec-enhanced-inbox-${enhancedSeq++}`,
+    targetUsers: params.targetUsers,
+    targetRole: params.targetRole,
+    eventType: params.eventType,
+    sourceEntityType: params.sourceEntityType,
+    sourceEntityId: params.sourceEntityId,
+    message: capMessage(params.message),
+    deepLinkRoute: params.deepLinkRoute,
+    createdAt: new Date().toISOString(),
+  };
+
+  enhancedInboxEvents.push(event);
+
+  // Also emit to platform spine inbox event adapter for each target
+  const title = capMessage(params.message);
+  const sourceObjectId = `${params.sourceEntityType}:${params.sourceEntityId}`;
+  const priority: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+
+  if (params.targetRole) {
+    createInboxEvent(params.targetRole, title, sourceObjectId, priority);
+  }
+  if (params.targetUsers) {
+    for (const uid of params.targetUsers) {
+      createInboxEvent(uid, title, sourceObjectId, priority);
+    }
+  }
+
+  return event;
+}
+
+/**
+ * Get all enhanced inbox events, optionally filtered.
+ */
+export function getEnhancedInboxEvents(options?: {
+  eventType?: string;
+  sourceEntityType?: string;
+  sourceEntityId?: string;
+  targetRole?: string;
+}): EnhancedSpecInboxEvent[] {
+  let filtered = [...enhancedInboxEvents];
+
+  if (options?.eventType) {
+    filtered = filtered.filter((e) => e.eventType === options.eventType);
+  }
+  if (options?.sourceEntityType) {
+    filtered = filtered.filter((e) => e.sourceEntityType === options.sourceEntityType);
+  }
+  if (options?.sourceEntityId) {
+    filtered = filtered.filter((e) => e.sourceEntityId === options.sourceEntityId);
+  }
+  if (options?.targetRole) {
+    filtered = filtered.filter((e) => e.targetRole === options.targetRole);
+  }
+
+  return filtered.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+/**
+ * Reset enhanced inbox event state (for testing).
+ */
+export function resetEnhancedInboxState(): void {
+  enhancedInboxEvents.length = 0;
+  enhancedSeq = 1;
+}
+
 // ── Query / State Management ────────────────────────────────────────────────
 
 /**
@@ -394,4 +521,6 @@ export function getSpecInboxEventCount(options?: {
 export function resetSpecInboxState(): void {
   specInboxEvents.length = 0;
   seq = 1;
+  enhancedInboxEvents.length = 0;
+  enhancedSeq = 1;
 }

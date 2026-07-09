@@ -91,6 +91,19 @@ app.use('/api/bim', async (req, res, next) => {
   }
 });
 
+app.use('/api/specforge', async (req, res, next) => {
+  try {
+    const { default: specforgeRouter } = await import('./src/lib/specforge-api-router.ts');
+    return specforgeRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load SpecForge API router:', error);
+    return res.status(500).json({
+      error: 'SpecForge API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 app.use(async (req, res, next) => {
   if (!req.path.startsWith('/api/forms')) return next();
   try {

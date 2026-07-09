@@ -1,10 +1,23 @@
 // ─── RFQ Integration Service ─────────────────────────────────────────────────
 // Handles SpecForge write-back, Project Passport records, and Action Centre events.
-// Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+// Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8
+//
+// The writeBackToSpecForge function delegates to rfqWritebackService which:
+// - Writes to `projects/{projectId}/specProcurement/{entryId}` (correct path)
+// - Applies Zod validation via the repository interface
+// - Writes audit events to `projects/{projectId}/specAuditEvents`
+// - NEVER reads from or writes to legacy path `projects/{projectId}/specforge/entries/{id}/data`
 
 import { getDoc, setDoc } from 'firebase/firestore';
 import { getDemoDoc } from '../../demo-seed/demoFirestore';
 import type { RfqStatus, ProcurementStatus } from './types';
+import {
+  writeBackToSpecForge as writeBackToSpecForgeService,
+  type RfqWritebackParams,
+  type RfqWritebackResult,
+  type RfqWritebackLineItem,
+} from '../specforge/rfqWritebackService';
+import { adminDb } from '@/lib/firebase-admin';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,82 +64,52 @@ function generateId(prefix: string): string {
 
 /**
  * Writes procurement data back to SpecForge on award.
- * For each line item with a specForgeItemId, updates the SpecProcurementEntry
- * with supplier name, confirmed unit rate/total cost, and lead time.
- * Sets status to 'ordered'.
  *
- * If a SpecProcurementEntry no longer exists (orphaned reference), logs a
- * warning to the audit trail and skips that item without blocking the award.
+ * Delegates to `rfqWritebackService.writeBackToSpecForge()` which writes to the
+ * correct path `projects/{projectId}/specProcurement/{entryId}` using the
+ * repository interface with Zod validation and audit logging.
  *
- * Validates: Requirement 8.1, 8.2
+ * NEVER reads from or writes to the legacy path
+ * `projects/{projectId}/specforge/entries/{id}/data`.
+ *
+ * Validates: Requirement 8.1, 8.2, 8.4, 8.8
  */
 export async function writeBackToSpecForge(params: {
   projectId: string;
   rfqId: string;
   updates: SpecForgeProcurementUpdate[];
+  performedBy?: string;
 }): Promise<{ success: boolean; skipped: string[]; errors: string[] }> {
-  const { projectId, rfqId, updates } = params;
-  const skipped: string[] = [];
-  const errors: string[] = [];
+  const { projectId, rfqId, updates, performedBy } = params;
 
-  for (const update of updates) {
-    try {
-      // Check if the SpecForge entry exists
-      const entryRef = getDemoDoc(
-        'projects', projectId,
-        'specforge', 'entries',
-        update.specForgeItemId, 'data'
-      );
-      const entrySnapshot = await getDoc(entryRef);
+  // Map the legacy SpecForgeProcurementUpdate[] to RfqWritebackLineItem[]
+  const lineItems: RfqWritebackLineItem[] = updates.map((update) => ({
+    specItemId: update.specForgeItemId,
+    supplierName: update.supplierName,
+    unitRate: update.unitRate,
+    totalCost: update.totalCost,
+    leadTimeDays: update.leadTimeDays,
+  }));
 
-      if (!entrySnapshot.exists()) {
-        // Orphaned reference — log warning to audit trail, skip update
-        const auditWarning = {
-          action: 'specforge_writeback_orphaned',
-          rfqId,
-          specForgeItemId: update.specForgeItemId,
-          message: `SpecForge entry "${update.specForgeItemId}" no longer exists. Skipping write-back.`,
-          timestamp: new Date().toISOString(),
-          severity: 'warning',
-        };
+  // Derive awarded supplier from the first update (all should be same supplier in an award)
+  const awardedSupplier = updates.length > 0 ? updates[0].supplierName : 'Unknown';
 
-        const auditEventId = generateId('audit');
-        const auditRef = getDemoDoc(
-          'projects', projectId,
-          'rfqs', rfqId,
-          'audit', auditEventId
-        );
-        await setDoc(auditRef, auditWarning);
+  // Delegate to rfqWritebackService — handles Zod validation, audit logging,
+  // and writes to the correct specProcurement collection path
+  const writebackParams: RfqWritebackParams = {
+    projectId,
+    rfqId,
+    awardedSupplier,
+    lineItems,
+    performedBy: performedBy ?? 'system',
+  };
 
-        skipped.push(update.specForgeItemId);
-        continue;
-      }
-
-      // Update the SpecProcurementEntry with award data
-      const procurementRef = getDemoDoc(
-        'projects', projectId,
-        'specforge', 'entries',
-        update.specForgeItemId, 'data'
-      );
-      await setDoc(procurementRef, {
-        ...entrySnapshot.data(),
-        supplierName: update.supplierName,
-        unitRate: update.unitRate,
-        totalCost: update.totalCost,
-        leadTimeDays: update.leadTimeDays,
-        status: 'ordered' as ProcurementStatus,
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      errors.push(`Failed to update ${update.specForgeItemId}: ${errorMessage}`);
-    }
-  }
+  const result: RfqWritebackResult = await writeBackToSpecForgeService(writebackParams);
 
   return {
-    success: errors.length === 0,
-    skipped,
-    errors,
+    success: result.success,
+    skipped: result.skipped,
+    errors: result.errors.map((e) => `Failed to update ${e.specItemId}: ${e.error}`),
   };
 }
 
@@ -257,24 +240,32 @@ export async function logAuditEvent(params: {
  * Enables the bidirectional link: SpecForge workspace displays the current
  * procurement lifecycle stage for each linked item.
  *
- * Validates: Requirement 8.5
+ * Reads from `projects/{projectId}/specProcurement` — the correct SpecForge
+ * procurement collection. NEVER reads from the legacy path
+ * `projects/{projectId}/specforge/entries/{id}/data`.
+ *
+ * Validates: Requirement 8.5, 8.8
  */
 export async function getProcurementStatus(
   projectId: string,
   specForgeItemId: string
 ): Promise<ProcurementStatus | null> {
-  const entryRef = getDemoDoc(
-    'projects', projectId,
-    'specforge', 'entries',
-    specForgeItemId, 'data'
-  );
-  const snapshot = await getDoc(entryRef);
+  // Query specProcurement collection for entries matching this spec item
+  const procurementCol = adminDb
+    .collection('projects')
+    .doc(projectId)
+    .collection('specProcurement');
 
-  if (!snapshot.exists()) {
+  const snapshot = await procurementCol
+    .where('itemId', '==', specForgeItemId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
     return null;
   }
 
-  const data = snapshot.data();
+  const data = snapshot.docs[0].data();
   return (data.status as ProcurementStatus) ?? null;
 }
 
