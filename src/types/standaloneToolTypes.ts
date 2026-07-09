@@ -23,6 +23,7 @@ export type StandaloneToolCategory =
   | 'communication'
   | 'freelancer'
   | 'resource_centre'
+  | 'construction_admin'
   | 'general'
 
 export interface StandaloneToolDef {

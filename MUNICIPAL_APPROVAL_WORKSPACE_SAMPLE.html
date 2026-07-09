@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architex — Municipal Approval Readiness Workspace Design Sample</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #14b8a6;
+      --primary-15: rgba(20, 184, 166, 0.15);
+      --primary-30: rgba(20, 184, 166, 0.30);
+      --background: #0c0a09;
+      --card: #1c1917;
+      --card-border: rgba(68, 64, 60, 0.5);
+      --muted-foreground: #a8a29e;
+      --foreground: #fafaf9;
+      --border: rgba(68, 64, 60, 0.4);
+      --emerald-bg: rgba(16, 185, 129, 0.2);
+      --emerald-text: #34d399;
+      --red-bg: rgba(239, 68, 68, 0.2);
+      --red-text: #f87171;
+      --orange-bg: rgba(249, 115, 22, 0.2);
+      --orange-text: #fb923c;
+      --yellow-bg: rgba(234, 179, 8, 0.2);
+      --yellow-text: #facc15;
+      --purple-bg: rgba(168, 85, 247, 0.2);
+      --purple-text: #c084fc;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      min-height: 100vh;
+    }
+    .os-shell { display: flex; min-height: 100vh; }
+    /* ── Left Sidebar (App Shell — tool navigation) ── */
+    .left-sidebar {
+      width: 240px;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      max-height: 100vh;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      padding: 16px 16px 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: -0.02em;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-group { padding: 12px 0 4px; }
+    .sidebar-group-label {
+      padding: 0 16px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted-foreground);
+    }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; font-size: 13px; color: var(--muted-foreground);
+      cursor: pointer; transition: all 0.12s; border-left: 2px solid transparent;
+      text-decoration: none;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.03); color: var(--foreground); }
+    .sidebar-item.active { background: var(--primary-15); color: var(--foreground); border-left-color: var(--primary); }
+    .sidebar-item .si-icon { width: 16px; font-size: 13px; text-align: center; opacity: 0.7; }
+    .sidebar-item .si-badge {
+      margin-left: auto; font-size: 10px; padding: 1px 6px;
+      border-radius: 9999px; font-weight: 600;
+    }
+    .sidebar-item .si-badge.green { background: var(--emerald-bg); color: var(--emerald-text); }
+    .sidebar-item .si-badge.amber { background: var(--orange-bg); color: var(--orange-text); }
+
+    /* ── Content Area ── */
+    .content-area { flex: 1; padding: 24px 28px; overflow-y: auto; max-height: 100vh; }
+    .workspace { max-width: 1200px; }
+
+    /* ── Header Card (SpecForge pattern) ── */
+    .header-card {
+      background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 20px 24px; margin-bottom: 16px;
+    }
+    .header-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary); margin-bottom: 2px; }
+    .header-title { font-size: 22px; font-weight: 700; color: var(--foreground); }
+    .header-meta { font-size: 13px; color: var(--muted-foreground); margin-top: 2px; }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+    .role-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: var(--primary-15); color: var(--primary); border: none; }
+
+    /* ── Project Toggles (rounded pill buttons) ── */
+    .project-toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .p-toggle {
+      padding: 5px 14px; border-radius: 9999px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all 0.12s; display: flex; align-items: center; gap: 6px;
+    }
+    .p-toggle:hover { border-color: var(--primary-30); color: var(--foreground); }
+    .p-toggle.active { background: var(--primary-15); border-color: var(--primary-30); color: var(--foreground); }
+    .p-toggle .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .p-toggle .dot.green { background: var(--emerald-text); }
+    .p-toggle .dot.amber { background: var(--orange-text); }
+    .p-toggle .dot.slate { background: var(--muted-foreground); }
+
+    /* ── Tabs (shadcn TabsList pattern) ── */
+    .tabs-list {
+      display: flex; gap: 2px; background: rgba(255,255,255,0.03); border-radius: 8px;
+      padding: 3px; margin-bottom: 20px; width: fit-content; border: 1px solid var(--border);
+    }
+    .tab-trigger {
+      padding: 6px 14px; border: none; background: transparent; color: var(--muted-foreground);
+      font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: all 0.12s;
+    }
+    .tab-trigger:hover { color: var(--foreground); }
+    .tab-trigger.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+    /* ── Card (shadcn Card) ── */
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; }
+    .card-header { padding: 16px 20px 12px; }
+    .card-content { padding: 4px 20px 20px; }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--foreground); }
+
+    /* ── Stat Cards ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-card { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.12s; }
+    .stat-card:hover { border-color: var(--primary-30); }
+    .stat-value { font-size: 20px; font-weight: 700; }
+    .stat-value.default { color: var(--foreground); }
+    .stat-value.emerald { color: var(--emerald-text); }
+    .stat-value.destructive { color: var(--red-text); }
+    .stat-value.orange { color: var(--orange-text); }
+    .stat-label { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
+
+    /* ── Advisory Banner ── */
+    .advisory { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 12px; background: var(--orange-bg); color: var(--orange-text); border: 1px solid rgba(249,115,22,0.15); }
+
+    /* ── Severity Badge ── */
+    .sev-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .sev-badge.blocker { background: var(--red-bg); color: var(--red-text); }
+    .sev-badge.high { background: var(--orange-bg); color: var(--orange-text); }
+    .sev-badge.medium { background: var(--yellow-bg); color: var(--yellow-text); }
+    .sev-badge.low { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .sev-badge.pass { background: var(--emerald-bg); color: var(--emerald-text); }
+    .sev-badge.info { background: var(--purple-bg); color: var(--purple-text); }
+
+    /* ── Rows (clickable list items) ── */
+    .list-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 8px; font-size: 13px;
+      cursor: pointer; transition: all 0.12s; border: 1px solid transparent;
+    }
+    .list-row:hover { background: rgba(255,255,255,0.02); border-color: var(--border); }
+    .list-row .row-label { flex: 1; color: var(--foreground); }
+    .list-row .row-meta { font-size: 12px; color: var(--muted-foreground); }
+    .list-row .row-arrow { color: var(--muted-foreground); font-size: 14px; }
+
+    /* ── Department Bars ── */
+    .dept-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; cursor: pointer; transition: opacity 0.12s; }
+    .dept-row:hover { opacity: 0.85; }
+    .dept-name { width: 130px; font-size: 13px; font-weight: 500; }
+    .dept-bar-wrap { flex: 1; height: 20px; background: rgba(255,255,255,0.03); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+    .dept-bar { height: 100%; border-radius: 3px; }
+    .dept-bar.emerald { background: linear-gradient(90deg, rgba(16,185,129,0.5), rgba(16,185,129,0.2)); }
+    .dept-bar.orange { background: linear-gradient(90deg, rgba(249,115,22,0.5), rgba(249,115,22,0.2)); }
+    .dept-bar.red { background: linear-gradient(90deg, rgba(239,68,68,0.5), rgba(239,68,68,0.2)); }
+    .dept-score { width: 36px; font-size: 13px; font-weight: 700; text-align: right; }
+
+    /* ── Document Rows ── */
+    .doc-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 6px; font-size: 13px;
+      cursor: pointer; transition: all 0.12s; border: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+    .doc-row:hover { border-color: var(--primary-30); background: rgba(255,255,255,0.02); }
+    .doc-seq { width: 20px; font-size: 11px; color: var(--muted-foreground); font-weight: 600; font-family: monospace; }
+    .doc-title { flex: 1; }
+    .doc-source { font-size: 11px; color: var(--muted-foreground); }
+
+    /* ── Action Grid ── */
+    .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+    .action-card {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 16px; background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 10px; cursor: pointer; transition: all 0.12s;
+    }
+    .action-card:hover { border-color: var(--primary-30); transform: translateY(-1px); }
+    .action-card .ac-icon { font-size: 18px; margin-bottom: 4px; }
+    .action-card .ac-label { font-size: 13px; font-weight: 600; color: var(--foreground); }
+    .action-card .ac-desc { font-size: 11px; color: var(--muted-foreground); }
+
+    /* ── Primary Button ── */
+    .btn-primary {
+      padding: 8px 16px; background: var(--primary-15); border: 1px solid var(--primary-30);
+      border-radius: 6px; color: var(--primary); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.12s;
+    }
+    .btn-primary:hover { background: var(--primary-30); }
+
+    /* ── Two Col ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── Form fields ── */
+    .form-field { margin-bottom: 10px; }
+    .form-field label { font-size: 11px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
+    .form-field .f-value { font-size: 14px; color: var(--foreground); font-weight: 500; }
+
+    /* ── Certificate Preview ── */
+    .cert-preview {
+      text-align: center; padding: 32px; margin-top: 16px;
+      background: var(--card); border: 1px solid var(--emerald-bg); border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="os-shell">
+  <!-- ════════ LEFT SIDEBAR (App Shell) ════════ -->
+  <aside class="left-sidebar">
+    <div class="sidebar-brand">Architex</div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Municipal Readiness</div>
+      <div class="sidebar-item active"><span class="si-icon">📋</span>Municipal Workspace<span class="si-badge green">✓</span></div>
+      <div class="sidebar-item" onclick="alert('Navigate: Submission Tracker')"><span class="si-icon">📡</span>Submission Tracker</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Municipal Profiles')"><span class="si-icon">🏛️</span>Municipal Profiles</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Land Use Scheme Browser')"><span class="si-icon">🗺️</span>Land Use Schemes</div>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">SANS Compliance</div>
+      <div class="sidebar-item" onclick="alert('Navigate: AI Drawing Checker')"><span class="si-icon">🖼️</span>AI Drawing Checker</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Fenestration N')"><span class="si-icon">🪟</span>Fenestration (N)</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Energy XA')"><span class="si-icon">⚡</span>Energy (XA)</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Fire Safety T')"><span class="si-icon">🔥</span>Fire Safety (T)</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Walls K')"><span class="si-icon">🧱</span>Walls (K)</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Stormwater P')"><span class="si-icon">💧</span>Stormwater (P)</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Areas C')"><span class="si-icon">📐</span>Areas (C)</div>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Professional</div>
+      <div class="sidebar-item" onclick="alert('Navigate: SACAP Verification')"><span class="si-icon">🛡️</span>SACAP Verification</div>
+      <div class="sidebar-item" onclick="alert('Navigate: Drawing Navigator')"><span class="si-icon">📊</span>Drawing Navigator</div>
+      <div class="sidebar-item" onclick="alert('Navigate: H&S Checklist')"><span class="si-icon">⛑️</span>H&S Checklist</div>
+    </div>
+  </aside>
+
+  <!-- ════════ CONTENT AREA ════════ -->
+  <div class="content-area">
+    <div class="workspace">
+
+      <!-- 1. Header Card -->
+      <div class="header-card">
+        <div class="header-row">
+          <div>
+            <p class="header-label">Municipal Approval Readiness</p>
+            <h1 class="header-title" id="project-title">12 Riverside Ave — Residential Extension</h1>
+            <p class="header-meta" id="project-meta">City of Cape Town · Erf 9821 · Building Plan · Zone SR1 · Rev 3</p>
+          </div>
+          <span class="role-badge">PrArch</span>
+        </div>
+      </div>
+
+      <!-- 2. Project Toggles -->
+      <div class="project-toggles">
+        <button class="p-toggle" onclick="switchProject('kloof')"><span class="dot amber"></span>45 Kloof St</button>
+        <button class="p-toggle active" onclick="switchProject('riverside')"><span class="dot green"></span>12 Riverside Ave</button>
+        <button class="p-toggle" onclick="switchProject('sunset')"><span class="dot green"></span>Sunset Views Ph2</button>
+        <button class="p-toggle" onclick="alert('Show all projects overview')"><span class="dot slate"></span>All Projects</button>
+        <button class="p-toggle" onclick="alert('Standalone mode — no project context')">Standalone</button>
+      </div>
+
+      <!-- Advisory -->
+      <div class="advisory">
+        <span>⚠</span>
+        <span>All assessments are indicative and advisory only. Professional review required for all regulatory outputs.</span>
+      </div>
+
+      <!-- 3. Tab Navigation -->
+      <div class="tabs-list">
+        <button class="tab-trigger active" onclick="showTab('overview')">Overview</button>
+        <button class="tab-trigger" onclick="showTab('landuse')">Land Use</button>
+        <button class="tab-trigger" onclick="showTab('simulation')">Circulation</button>
+        <button class="tab-trigger" onclick="showTab('pack')">Submission Pack</button>
+        <button class="tab-trigger" onclick="showTab('certificate')">Certificate</button>
+        <button class="tab-trigger" onclick="showTab('outcomes')">Outcomes</button>
+      </div>
+
+      <!-- ══════ OVERVIEW TAB ══════ -->
+      <div id="tab-overview" class="tab-content">
+        <div class="stat-grid">
+          <div class="stat-card" onclick="showTab('pack')"><div class="stat-value emerald">10/10</div><div class="stat-label">Pack Completeness</div></div>
+          <div class="stat-card" onclick="showTab('simulation')"><div class="stat-value emerald">89%</div><div class="stat-label">Circulation Confidence</div></div>
+          <div class="stat-card" onclick="showTab('certificate')"><div class="stat-value emerald">3/3</div><div class="stat-label">Sign-offs</div></div>
+          <div class="stat-card" onclick="showTab('outcomes')"><div class="stat-value emerald">100%</div><div class="stat-label">First-Time Rate</div></div>
+        </div>
+        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="stat-card" onclick="alert('Property & Municipal Facts detail')"><div class="stat-value emerald">100%</div><div class="stat-label">Property Facts</div></div>
+          <div class="stat-card" onclick="showTab('landuse')"><div class="stat-value emerald">100%</div><div class="stat-label">Land Use & Zoning</div></div>
+          <div class="stat-card" onclick="alert('Professional Team detail')"><div class="stat-value emerald">100%</div><div class="stat-label">Professional Team</div></div>
+          <div class="stat-card" onclick="alert('NBR/SANS Advisory detail')"><div class="stat-value emerald">100%</div><div class="stat-label">NBR/SANS Advisory</div></div>
+        </div>
+
+        <!-- Readiness Findings -->
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header"><div class="card-title">Readiness Findings</div></div>
+          <div class="card-content">
+            <div class="list-row" onclick="alert('No blockers — all clear')">
+              <span class="sev-badge pass">pass</span>
+              <span class="row-label">All readiness checks complete. No blockers remain.</span>
+              <span class="row-arrow">→</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="action-grid">
+          <div class="action-card" onclick="showTab('simulation')"><span class="ac-icon">🔄</span><span class="ac-label">Run Simulation</span><span class="ac-desc">Re-assess 8 departments</span></div>
+          <div class="action-card" onclick="showTab('pack')"><span class="ac-icon">📦</span><span class="ac-label">Export Pack</span><span class="ac-desc">Download PDF bundle</span></div>
+          <div class="action-card" onclick="showTab('certificate')"><span class="ac-icon">📜</span><span class="ac-label">View Certificate</span><span class="ac-desc">Municipal-Ready cert</span></div>
+          <div class="action-card" onclick="showTab('outcomes')"><span class="ac-icon">📊</span><span class="ac-label">Record Outcome</span><span class="ac-desc">Track submission result</span></div>
+          <div class="action-card" onclick="showTab('landuse')"><span class="ac-icon">🏘️</span><span class="ac-label">Land Use Check</span><span class="ac-desc">Validate zone params</span></div>
+          <div class="action-card" onclick="alert('Drawing Intelligence AI analysis')"><span class="ac-icon">🖼️</span><span class="ac-label">Drawing Analysis</span><span class="ac-desc">AI completeness check</span></div>
+        </div>
+      </div>
+
+      <!-- ══════ LAND USE TAB ══════ -->
+      <div id="tab-landuse" class="tab-content" style="display:none;">
+        <div class="two-col" style="grid-template-columns:320px 1fr;gap:20px;">
+          <div class="card"><div class="card-header"><div class="card-title">Land Use Parameters</div></div><div class="card-content">
+            <div class="form-field"><label>Municipality</label><div class="f-value">City of Cape Town</div></div>
+            <div class="form-field"><label>Zone</label><div class="f-value">SR1 — Single Residential 1</div></div>
+            <div class="form-field"><label>Erf Area</label><div class="f-value">820 m²</div></div>
+            <div class="form-field"><label>Coverage</label><div class="f-value">48%</div></div>
+            <div class="form-field"><label>FAR</label><div class="f-value">0.45</div></div>
+            <div class="form-field"><label>Height</label><div class="f-value">5.5m (1 storey)</div></div>
+            <div class="form-field"><label>Front Setback</label><div class="f-value">4.5m</div></div>
+            <div class="form-field"><label>Rear / Sides</label><div class="f-value">3.0m / 1.5m</div></div>
+            <div class="form-field"><label>Parking</label><div class="f-value">2 bays</div></div>
+            <button class="btn-primary" style="margin-top:12px;width:100%;" onclick="alert('Running validation...')">Run Validation</button>
+          </div></div>
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span style="font-size:14px;font-weight:600;">Zoning Compliance Result</span>
+              <span class="sev-badge pass">ALL PASS</span>
+            </div>
+            <div class="list-row" onclick="alert('Coverage: 48% ≤ 50% max. Margin: 2%')"><span class="sev-badge pass">✓</span><span class="row-label">Coverage — 48% ≤ 50% max</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('FAR: 0.45 ≤ 0.6 max. Margin: 0.15')"><span class="sev-badge pass">✓</span><span class="row-label">FAR — 0.45 ≤ 0.6 max</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('Height: 5.5m ≤ 8m max')"><span class="sev-badge pass">✓</span><span class="row-label">Height — 5.5m ≤ 8m max</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('Front BL: 4.5m ≥ 4.0m min')"><span class="sev-badge pass">✓</span><span class="row-label">Front Building Line — 4.5m ≥ 4.0m</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('Rear BL: 3.0m ≥ 2.0m min')"><span class="sev-badge pass">✓</span><span class="row-label">Rear Building Line — 3.0m ≥ 2.0m</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('Sides: 1.5m ≥ 1.0m min')"><span class="sev-badge pass">✓</span><span class="row-label">Side Building Lines — 1.5m ≥ 1.0m</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('Parking: 2 bays ≥ 2 required')"><span class="sev-badge pass">✓</span><span class="row-label">Parking — 2 bays ≥ 2 required</span><span class="row-arrow">→</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ CIRCULATION TAB ══════ -->
+      <div id="tab-simulation" class="tab-content" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div><span style="font-size:14px;font-weight:600;">Parallel Circulation Simulation</span><br><span style="font-size:12px;color:var(--muted-foreground);">Last run: 15 Mar 2026 09:42</span></div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <div style="text-align:right;"><div style="font-size:28px;font-weight:700;color:var(--emerald-text);">89%</div><div style="font-size:11px;color:var(--muted-foreground);">Overall</div></div>
+            <button class="btn-primary" onclick="alert('Running fresh simulation...')">Re-Run</button>
+          </div>
+        </div>
+        <div class="dept-row" onclick="alert('Town Planning: ✓ Use permitted in SR1\n✓ All parameters within limits')"><div class="dept-name">Town Planning</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:95%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">95%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Building Control: ✓ K walls ✓ N fenestration ✓ XA energy ✓ C areas')"><div class="dept-name">Building Control</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:98%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">98%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Fire: ✓ Single residential — no special requirements')"><div class="dept-name">Fire Department</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:92%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">92%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Water: ✓ Existing connection adequate')"><div class="dept-name">Water & Sanitation</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:88%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">88%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Roads: ✓ Residential — no TIA required')"><div class="dept-name">Roads & Transport</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:85%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">85%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Electrical: ✓ No bulk supply upgrade needed')"><div class="dept-name">Electrical</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:90%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">90%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Environmental: ✓ No EIA triggers')"><div class="dept-name">Environmental</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:80%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">80%</div><span class="sev-badge pass">Pass</span></div>
+        <div class="dept-row" onclick="alert('Heritage: ✓ No heritage grading on property')"><div class="dept-name">Heritage</div><div class="dept-bar-wrap"><div class="dept-bar emerald" style="width:75%;"></div></div><div class="dept-score" style="color:var(--emerald-text);">75%</div><span class="sev-badge pass">Pass</span></div>
+        <p style="margin-top:12px;font-size:11px;color:var(--muted-foreground);font-style:italic;">Advisory: Simulation is indicative only. Does not replace official municipal circulation.</p>
+      </div>
+
+      <!-- ══════ SUBMISSION PACK TAB ══════ -->
+      <div id="tab-pack" class="tab-content" style="display:none;">
+        <div class="two-col" style="grid-template-columns:1fr 280px;gap:20px;">
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span style="font-size:14px;font-weight:600;">Submission Pack — City of Cape Town</span>
+              <span class="sev-badge pass">Complete</span>
+            </div>
+            <div class="doc-row" onclick="alert('Preview: Cover Sheet PDF')"><span class="doc-seq">01</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Cover Sheet & Table of Contents</span><span class="doc-source">Auto-generated</span></div>
+            <div class="doc-row" onclick="alert('Preview: TC1 Application Form')"><span class="doc-seq">02</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Application Form (TC1)</span><span class="doc-source">Pre-populated</span></div>
+            <div class="doc-row" onclick="alert('Preview: NBR Form 1')"><span class="doc-seq">03</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">NBR Form 1 — Application for Approval</span><span class="doc-source">Pre-populated</span></div>
+            <div class="doc-row" onclick="alert('Preview: NBR Form 2 — Structural')"><span class="doc-seq">04</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">NBR Form 2 — Structural Declaration</span><span class="doc-source">Signed</span></div>
+            <div class="doc-row" onclick="alert('Preview: NBR Form 4 — Energy')"><span class="doc-seq">05</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">NBR Form 4 — Energy Declaration</span><span class="doc-source">Signed</span></div>
+            <div class="doc-row" onclick="alert('Preview: Title Deed')"><span class="doc-seq">06</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Title Deed — Erf 9821</span><span class="doc-source">Uploaded</span></div>
+            <div class="doc-row" onclick="alert('Preview: Site Plan A001 Rev B')"><span class="doc-seq">07</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Site Plan (1:500) — A001 Rev B</span><span class="doc-source">Signed off</span></div>
+            <div class="doc-row" onclick="alert('Preview: All working drawings')"><span class="doc-seq">08</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Floor Plans, Elevations & Sections</span><span class="doc-source">6 drawings</span></div>
+            <div class="doc-row" onclick="alert('Preview: XA energy cert')"><span class="doc-seq">09</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Energy Compliance Certificate (XA)</span><span class="doc-source">Generated</span></div>
+            <div class="doc-row" onclick="alert('Preview: Structural letter')"><span class="doc-seq">10</span><span class="sev-badge pass" style="font-size:10px;">✓</span><span class="doc-title">Structural Competency Letter</span><span class="doc-source">Uploaded</span></div>
+          </div>
+          <div>
+            <div class="card" style="text-align:center;margin-bottom:12px;"><div class="card-content" style="padding:20px;">
+              <div class="stat-value emerald" style="font-size:36px;">100%</div>
+              <div class="stat-label">Pack Completeness</div>
+              <div style="font-size:11px;color:var(--muted-foreground);margin-top:4px;">10 of 10 included</div>
+            </div></div>
+            <div class="card"><div class="card-header"><div class="card-title">Cross-References</div></div><div class="card-content" style="font-size:12px;">
+              <div style="color:var(--emerald-text);margin-bottom:4px;">✓ Applicant matches title deed</div>
+              <div style="color:var(--emerald-text);margin-bottom:4px;">✓ Drawing numbers match index</div>
+              <div style="color:var(--emerald-text);margin-bottom:4px;">✓ Erf consistent across docs</div>
+              <div style="color:var(--emerald-text);">✓ Professionals verified</div>
+            </div></div>
+            <button class="btn-primary" style="width:100%;margin-top:12px;" onclick="alert('Exporting PDF bundle:\n12-Riverside-Ave_Pack_Rev3.pdf')">Export PDF Bundle</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ CERTIFICATE TAB ══════ -->
+      <div id="tab-certificate" class="tab-content" style="display:none;">
+        <div class="two-col">
+          <div class="card"><div class="card-header"><div class="card-title">Prerequisites</div></div><div class="card-content">
+            <div class="list-row" onclick="showTab('overview')"><span class="sev-badge pass">✓</span><span class="row-label">Readiness score = 100%</span><span style="font-size:12px;color:var(--emerald-text);">100</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="alert('All sign-offs collected')"><span class="sev-badge pass">✓</span><span class="row-label">All sign-offs collected</span><span style="font-size:12px;color:var(--emerald-text);">3/3</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="showTab('pack')"><span class="sev-badge pass">✓</span><span class="row-label">Pack complete (0 missing)</span><span style="font-size:12px;color:var(--emerald-text);">10/10</span><span class="row-arrow">→</span></div>
+            <div class="list-row" onclick="showTab('simulation')"><span class="sev-badge pass">✓</span><span class="row-label">All depts ≥ 70%</span><span style="font-size:12px;color:var(--emerald-text);">75%+</span><span class="row-arrow">→</span></div>
+            <button class="btn-primary" style="width:100%;margin-top:16px;" onclick="alert('Downloading certificate PDF:\nARC-COCT-2026-00142.pdf')">View / Download Certificate</button>
+          </div></div>
+          <div class="card"><div class="card-header"><div class="card-title">Professional Sign-Offs</div></div><div class="card-content">
+            <div class="list-row" onclick="alert('J. van der Merwe — SACAP PrArch 2019/04521\nSigned: 14 Mar 2026')"><span class="sev-badge pass">✓</span><span class="row-label">J. van der Merwe — Architect</span><span style="font-size:11px;color:var(--muted-foreground);">14 Mar</span></div>
+            <div class="list-row" onclick="alert('P. Naidoo — ECSA 20050892\nSigned: 14 Mar 2026')"><span class="sev-badge pass">✓</span><span class="row-label">P. Naidoo — Structural Eng</span><span style="font-size:11px;color:var(--muted-foreground);">14 Mar</span></div>
+            <div class="list-row" onclick="alert('K. Dlamini — SACAP PrArch 2021/01044\nSigned: 15 Mar 2026')"><span class="sev-badge pass">✓</span><span class="row-label">K. Dlamini — Energy Consultant</span><span style="font-size:11px;color:var(--muted-foreground);">15 Mar</span></div>
+          </div></div>
+        </div>
+        <div class="cert-preview">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--primary);">Municipal-Ready Certificate</div>
+          <div style="font-size:22px;font-weight:700;margin-top:6px;">ARC-COCT-2026-00142</div>
+          <div style="font-size:13px;color:var(--muted-foreground);margin-top:4px;">12 Riverside Ave · Erf 9821 · City of Cape Town</div>
+          <div style="font-size:12px;color:var(--muted-foreground);margin-top:10px;">Issued 15 March 2026 · Readiness: 100%</div>
+          <div style="font-size:11px;color:var(--muted-foreground);margin-top:14px;font-style:italic;max-width:500px;margin-left:auto;margin-right:auto;">This certificate confirms algorithmic assessment of submission readiness. It does not constitute professional certification of compliance and does not replace official municipal plan examination.</div>
+        </div>
+      </div>
+
+      <!-- ══════ OUTCOMES TAB ══════ -->
+      <div id="tab-outcomes" class="tab-content" style="display:none;">
+        <div class="two-col" style="grid-template-columns:1fr 260px;gap:20px;">
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span style="font-size:14px;font-weight:600;">Submission History</span>
+              <button class="btn-primary" onclick="alert('Record new submission form')">+ Record Submission</button>
+            </div>
+            <div class="card" style="padding:14px;cursor:pointer;" onclick="alert('Outcome: Approved First Time\nRef: BDM-2026-04521\nDecision: 28 days\nReadiness at submission: 100%')">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div><div style="font-size:14px;font-weight:500;">12 Riverside Ave</div><div style="font-size:12px;color:var(--muted-foreground);">COCT · BDM-2026-04521 · 15 Mar 2026</div></div>
+                <span class="sev-badge pass">Approved First Time</span>
+              </div>
+              <div style="margin-top:6px;font-size:12px;color:var(--muted-foreground);">Score: 100% · Decision in 28 days</div>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="text-align:center;margin-bottom:12px;"><div class="card-content" style="padding:20px;">
+              <div class="stat-value emerald" style="font-size:36px;">100%</div>
+              <div class="stat-label">First-Time Rate</div>
+              <div style="font-size:11px;color:var(--muted-foreground);margin-top:4px;">1 of 1</div>
+            </div></div>
+            <div class="card"><div class="card-header"><div class="card-title">Stats</div></div><div class="card-content" style="font-size:12px;color:var(--muted-foreground);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Total</span><span style="color:var(--foreground);">1</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Approved 1st</span><span style="color:var(--emerald-text);">1</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Returned</span><span>0</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>Avg. time</span><span style="color:var(--foreground);">28d</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- workspace -->
+  </div><!-- content-area -->
+</div><!-- os-shell -->
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tab-trigger').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).style.display = 'block';
+  const map = { overview:0, landuse:1, simulation:2, pack:3, certificate:4, outcomes:5 };
+  if (map[id] !== undefined) document.querySelectorAll('.tab-trigger')[map[id]].classList.add('active');
+}
+
+const projects = {
+  kloof: { title:'45 Kloof Street Mixed-Use Development', meta:'City of Cape Town · Erf 12847 · Building Plan · Zone GB2 · Rev 2' },
+  riverside: { title:'12 Riverside Ave — Residential Extension', meta:'City of Cape Town · Erf 9821 · Building Plan · Zone SR1 · Rev 3' },
+  sunset: { title:'Sunset Views Phase 2 — 6 Unit Residential', meta:'City of Johannesburg · Erf 4492 · Building Plan · Zone GR3 · Rev 4' }
+};
+function switchProject(id) {
+  document.getElementById('project-title').textContent = projects[id].title;
+  document.getElementById('project-meta').textContent = projects[id].meta;
+  document.querySelectorAll('.p-toggle').forEach(el => el.classList.remove('active'));
+  event.target.closest('.p-toggle').classList.add('active');
+  showTab('overview');
+}
+</script>
+</body>
+</html>

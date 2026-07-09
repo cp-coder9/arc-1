@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { UserRoleEnum } from '../../lib/schemas';
+
+// Mock firebase-admin for admin override audit logging tests
+const mockSet = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/firebase-admin', () => ({
+  adminDb: {
+    collection: vi.fn(() => ({
+      doc: vi.fn(() => ({ set: mockSet })),
+    })),
+  },
+}));
+
 import {
   CANONICAL_USER_ROLES,
   assertCanUserPerform,
@@ -117,28 +128,73 @@ describe('permissionService', () => {
     expect(getActiveProjectAccessRoles({ uid: 'supplier-suspended', role: 'supplier' }, packageProject)).toEqual([]);
   });
 
-  it('allows admins to perform governed actions regardless of project membership', () => {
-    expect(canUserPerform({ uid: 'admin-1', role: 'admin' }, 'escrow:release', project)).toBe(true);
-    expect(canUserPerform({ uid: 'claims-admin', admin: true }, 'admin:override', project)).toBe(true);
+  it('evaluates platform_admin against defined permission set without unconditional bypass', () => {
+    const platformAdmin = { uid: 'admin-1', role: 'platform_admin' as const };
+    const adminFlagUser = { uid: 'claims-admin', admin: true, role: 'platform_admin' as const };
+
+    // platform_admin gets project:read on any project without membership
+    expect(canUserPerform(platformAdmin, 'project:read', project)).toBe(true);
+    // platform_admin with admin:true flag also gets project:read
+    expect(canUserPerform(adminFlagUser, 'project:read', project)).toBe(true);
+
+    // platform_admin can perform actions in PLATFORM_ADMIN_PERMISSIONS (non-project-scoped)
+    expect(canUserPerform(platformAdmin, 'verification:review')).toBe(true);
+    expect(canUserPerform(platformAdmin, 'audit:read')).toBe(true);
+    expect(canUserPerform(platformAdmin, 'admin:override')).toBe(true);
+
+    // platform_admin is denied project-scoped writes without project membership
+    expect(canUserPerform(platformAdmin, 'escrow:release', project)).toBe(false);
+    expect(canUserPerform(platformAdmin, 'project:update', project)).toBe(false);
+    expect(canUserPerform(platformAdmin, 'compliance:sign', project)).toBe(false);
+    expect(canUserPerform(platformAdmin, 'municipal:manage', project)).toBe(false);
+    expect(canUserPerform(platformAdmin, 'payment:manage', project)).toBe(false);
+
+    // platform_admin with actual project membership CAN perform writes
+    const adminWithMembership = {
+      ...project,
+      memberships: [
+        ...project.memberships,
+        { userId: 'admin-1', accessRole: 'lead_consultant' as const, status: 'active' as const },
+      ],
+    };
+    expect(canUserPerform(platformAdmin, 'project:update', adminWithMembership)).toBe(true);
+    expect(canUserPerform(platformAdmin, 'compliance:sign', adminWithMembership)).toBe(true);
+    expect(canUserPerform(platformAdmin, 'municipal:manage', adminWithMembership)).toBe(true);
+
+    // platform_admin is denied actions NOT in PLATFORM_ADMIN_PERMISSIONS (non-project-scoped)
+    expect(canUserPerform(platformAdmin, 'profile:read')).toBe(false);
+    expect(canUserPerform(platformAdmin, 'profile:update')).toBe(false);
+
+    // getRolePermissions still returns admin permissions for backward compatibility
     expect(getRolePermissions('admin')).toContain('audit:read');
   });
 
-  it('allows admin separation-of-duty override only with an auditable reason', () => {
-    expect(canAdminOverrideSeparationOfDuty({
-      admin: { uid: 'admin-1', role: 'admin' },
-      policy: 'separation_of_duty',
+  it('allows admin separation-of-duty override only with an auditable reason', async () => {
+    expect(await canAdminOverrideSeparationOfDuty({
+      admin: { uid: 'admin-1', role: 'platform_admin' },
+      action: 'project:update',
+      projectId: 'project-1',
       reason: 'Emergency operational override approved by platform owner',
     })).toBe(true);
 
-    expect(canAdminOverrideSeparationOfDuty({
+    expect(await canAdminOverrideSeparationOfDuty({
+      admin: { uid: 'admin-1', admin: true },
+      action: 'project:update',
+      projectId: 'project-1',
+      reason: 'Emergency operational override approved by platform owner',
+    })).toBe(true);
+
+    expect(await canAdminOverrideSeparationOfDuty({
       admin: { uid: 'client-1', role: 'client' },
-      policy: 'separation_of_duty',
+      action: 'project:update',
+      projectId: 'project-1',
       reason: 'Emergency operational override approved by platform owner',
     })).toBe(false);
 
-    expect(canAdminOverrideSeparationOfDuty({
-      admin: { uid: 'admin-1', role: 'admin' },
-      policy: 'separation_of_duty',
+    expect(await canAdminOverrideSeparationOfDuty({
+      admin: { uid: 'admin-1', role: 'platform_admin' },
+      action: 'project:update',
+      projectId: 'project-1',
       reason: 'too short',
     })).toBe(false);
   });

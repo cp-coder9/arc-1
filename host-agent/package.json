@@ -1,0 +1,17 @@
+{
+  "name": "architex-host-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Architex Remote Desktop Host Agent — Windows desktop application for governed remote access sessions",
+  "main": "dist/main.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
