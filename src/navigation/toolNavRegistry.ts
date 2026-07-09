@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link, Award } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link, Award, MapPin, Calculator } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -289,6 +289,32 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
         items: [
           { id: 'award-recommendations', icon: Award, label: 'Recommendations' },
           { id: 'award-approvals', icon: CheckCircle, label: 'Approvals' },
+        ],
+      },
+    ],
+  },
+  'municipal-refuse-area-calculator': {
+    name: 'Refuse Area Calculator',
+    subtitle: 'Municipal compliance advisory tool',
+    sections: [
+      {
+        label: 'Input',
+        items: [
+          { id: 'municipality', icon: MapPin, label: 'Municipality' },
+          { id: 'building-inputs', icon: Building2, label: 'Building Inputs' },
+        ],
+      },
+      {
+        label: 'Calculation',
+        items: [
+          { id: 'compute', icon: Calculator, label: 'Compute' },
+        ],
+      },
+      {
+        label: 'Results',
+        items: [
+          { id: 'results', icon: FileText, label: 'Results' },
+          { id: 'export', icon: Download, label: 'Export' },
         ],
       },
     ],

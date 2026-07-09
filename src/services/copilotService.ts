@@ -15,7 +15,7 @@
 
 import type { UserRole } from '@/types';
 import type { CopilotCapability, CopilotMessage, CopilotResponse, ConversationThread, CopilotProjectContext, RFIDraftInput, RFIDraftOutput, NarrativeInput, NarrativeOutput, ComplianceGap, ComplianceGapReport, ComplianceGapCategory, ComplianceGapSeverity, StatusSummary, ClauseExplanationInput, ClauseExplanationOutput } from '@/services/copilotTypes';
-import { createHash } from 'node:crypto';
+
 import { CAPABILITY_ROLE_MAP, UNIVERSAL_CAPABILITIES } from '@/services/copilotTypes';
 import { checkRateLimit, recordRequest } from '@/services/copilotRateLimiter';
 import { CopilotMessageInputSchema, RFIDraftInputSchema, NarrativeInputSchema, ClauseExplanationInputSchema } from '@/lib/copilotSchemas';
@@ -1031,6 +1031,7 @@ ${JSON.stringify(context)}`;
 /**
  * Computes a simple hash of the relevant context fields to detect changes.
  * Used for the "no-change since last summary" detection.
+ * Uses a fast non-cryptographic hash suitable for browser environments.
  */
 function computeContextHash(context: CopilotProjectContext): string {
   const relevantData = {
@@ -1042,7 +1043,14 @@ function computeContextHash(context: CopilotProjectContext): string {
     actions: context.pendingActions.map(a => ({ id: a.id, priority: a.priority, dueDate: a.dueDate })),
     audit: context.auditTrail.slice(0, 5).map(e => e.timestamp),
   };
-  return createHash('sha256').update(JSON.stringify(relevantData)).digest('hex').slice(0, 16);
+  const str = JSON.stringify(relevantData);
+  // Simple FNV-1a-inspired hash for change detection (not cryptographic)
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0') + str.length.toString(16).padStart(8, '0');
 }
 
 /**
