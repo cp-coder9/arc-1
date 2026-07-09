@@ -86,19 +86,19 @@ function generateId(): string {
 // ── Collection Constants ─────────────────────────────────────────────────────
 
 const PROJECTS_COL = 'projects';
-const PHASES_COL = 'phases';
+const PROGRAMME_ACTIVITIES_COL = 'programme_activities';
 
 // ── Firestore Path Helpers ───────────────────────────────────────────────────
 
-function phasesCollection(projectId: string) {
+function programmeActivitiesCollection(projectId: string) {
   if (!projectId) throw new Error('projectId is required');
-  return getDemoCol(PROJECTS_COL, projectId, PHASES_COL);
+  return getDemoCol(PROJECTS_COL, projectId, PROGRAMME_ACTIVITIES_COL);
 }
 
-function phaseDocument(projectId: string, activityId: string) {
+function programmeActivityDocument(projectId: string, activityId: string) {
   if (!projectId) throw new Error('projectId is required');
   if (!activityId) throw new Error('activityId is required');
-  return getDemoDoc(PROJECTS_COL, projectId, PHASES_COL, activityId);
+  return getDemoDoc(PROJECTS_COL, projectId, PROGRAMME_ACTIVITIES_COL, activityId);
 }
 
 // ── Date Utility ─────────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ export async function createActivity(
   };
 
   try {
-    await addDoc(phasesCollection(projectId), activity);
+    await addDoc(programmeActivitiesCollection(projectId), activity);
 
     void recordAudit({
       projectId,
@@ -204,7 +204,7 @@ export async function createActivity(
 
     return activity;
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${projectId}/${PHASES_COL}`);
+    handleFirestoreError(error, OperationType.CREATE, `${PROJECTS_COL}/${projectId}/${PROGRAMME_ACTIVITIES_COL}`);
     throw error;
   }
 }
@@ -218,7 +218,7 @@ export async function updateActivity(
   activityId: string,
   data: UpdateActivityData,
 ): Promise<Activity> {
-  const docRef = phaseDocument(projectId, activityId);
+  const docRef = programmeActivityDocument(projectId, activityId);
 
   try {
     const snap = await getDoc(docRef);
@@ -253,7 +253,7 @@ export async function updateActivity(
     if (error instanceof Error && error.message.includes('not found')) {
       throw error;
     }
-    handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${PHASES_COL}/${activityId}`);
+    handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${projectId}/${PROGRAMME_ACTIVITIES_COL}/${activityId}`);
     throw error;
   }
 }
@@ -267,7 +267,7 @@ export async function deleteActivity(
   actorId: string,
   actorName: string,
 ): Promise<void> {
-  const docRef = phaseDocument(projectId, activityId);
+  const docRef = programmeActivityDocument(projectId, activityId);
 
   try {
     const snap = await getDoc(docRef);
@@ -294,7 +294,7 @@ export async function deleteActivity(
     if (error instanceof Error && error.message.includes('not found')) {
       throw error;
     }
-    handleFirestoreError(error, OperationType.DELETE, `${PROJECTS_COL}/${projectId}/${PHASES_COL}/${activityId}`);
+    handleFirestoreError(error, OperationType.DELETE, `${PROJECTS_COL}/${projectId}/${PROGRAMME_ACTIVITIES_COL}/${activityId}`);
     throw error;
   }
 }
@@ -304,11 +304,11 @@ export async function deleteActivity(
  */
 export async function getActivities(projectId: string): Promise<Activity[]> {
   try {
-    const q = query(phasesCollection(projectId));
+    const q = query(programmeActivitiesCollection(projectId));
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Activity));
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, `${PROJECTS_COL}/${projectId}/${PHASES_COL}`);
+    handleFirestoreError(error, OperationType.LIST, `${PROJECTS_COL}/${projectId}/${PROGRAMME_ACTIVITIES_COL}`);
     throw error;
   }
 }
@@ -682,6 +682,8 @@ export const programmeService = {
   getActivitiesOnCriticalPath,
   generateCriticalPathAlerts,
   linkActivityToSpecForge,
+  // Collection path constants (exported for Data Bridge consistency verification)
+  PROGRAMME_ACTIVITIES_COLLECTION_PATH: PROGRAMME_ACTIVITIES_COL,
 };
 
 export default programmeService;

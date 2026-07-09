@@ -19,7 +19,11 @@ import type {
   SpecBoMLineItem,
   SpecCapability,
   SpecProcurementEntry,
+  CatalogueSearchParams,
+  CatalogueSearchResult,
 } from '@/types/specforgeTypes';
+
+import { search as catalogueSearch } from './productCatalogueAdapter';
 
 // ── Role Capabilities ───────────────────────────────────────────────────────
 
@@ -331,17 +335,57 @@ const MOCK_LIBRARY: SpecLibraryItem[] = [
 
 /**
  * Search the spec library by text query and optional scope filter.
- * In production this would query Firestore with full-text search.
+ *
+ * In production mode (VITE_DEMO_MODE !== 'true'), delegates to the
+ * productCatalogueAdapter which queries Firestore, handles Specifile
+ * licensing, scope filtering, pagination, and degraded mode.
+ *
+ * In demo mode, returns results from the in-memory mock library.
+ *
+ * Validates: Requirements 9.1, 12.7
  */
-export function searchSpecLibrary(query: string, scope?: SpecLibraryScope): SpecLibraryItem[] {
+export async function searchSpecLibrary(
+  query: string,
+  scope?: SpecLibraryScope,
+  params?: { userId?: string; firmId?: string; offset?: number; limit?: number },
+): Promise<CatalogueSearchResult> {
+  const isDemoMode = typeof process !== 'undefined'
+    ? process.env.VITE_DEMO_MODE === 'true'
+    : false;
+
+  if (!isDemoMode) {
+    // Production mode: delegate to product catalogue adapter (never use mock data)
+    const searchParams: CatalogueSearchParams = {
+      query,
+      scope,
+      userId: params?.userId ?? '',
+      firmId: params?.firmId ?? '',
+      offset: params?.offset,
+      limit: params?.limit,
+    };
+    return catalogueSearch(searchParams);
+  }
+
+  // Demo mode: use mock library data
   const lowerQuery = query.toLowerCase();
-  return MOCK_LIBRARY.filter((item) => {
+  const filtered = MOCK_LIBRARY.filter((item) => {
     if (scope && item.scope !== scope) return false;
     const searchable = [item.title, item.category, ...(item.tags ?? []), item.typicalSupplier ?? '']
       .join(' ')
       .toLowerCase();
     return searchable.includes(lowerQuery);
   });
+
+  const offset = params?.offset ?? 0;
+  const limit = Math.min(params?.limit ?? 50, 200);
+  const paginated = filtered.slice(offset, offset + limit);
+
+  return {
+    items: paginated,
+    total: filtered.length,
+    offset,
+    limit,
+  };
 }
 
 // ── BoM Generation ──────────────────────────────────────────────────────────

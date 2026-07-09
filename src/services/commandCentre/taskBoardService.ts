@@ -379,6 +379,8 @@ export const taskBoardService = {
   moveTask,
   deleteTask,
   getTasks,
+  // Collection path constants (exported for Data Bridge consistency verification)
+  TASKS_COLLECTION_PATH: TASKS_COL,
 };
 
 export default taskBoardService;

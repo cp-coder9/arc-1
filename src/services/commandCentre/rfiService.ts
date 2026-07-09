@@ -497,6 +497,9 @@ export const rfiService = {
   createEscalationActionEvent,
   // Constants
   DEFAULT_RESPONSE_PERIOD_DAYS,
+  // Collection path constants (exported for Data Bridge consistency verification)
+  RFIS_COLLECTION_PATH: RFIS_COL,
+  SITE_INSTRUCTIONS_COLLECTION_PATH: SITE_INSTRUCTIONS_COL,
 };
 
 export default rfiService;

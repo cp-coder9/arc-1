@@ -5,39 +5,38 @@ import type { UserRole } from '../types';
 import { EDITOR_ROLES } from '@/services/fieldAccessService';
 
 /**
- * Task 16.1 — IssueDashboard wired to Projects → snags section.
- * Validates: Requirements 8.1
+ * Task 3.1 — Legacy Project Module removed from top-level navigation.
+ * Validates: Requirements 2.1, 2.3
  */
-describe('architexNavigationConfig — Projects snags wiring', () => {
-  function getSnagsSection(nav = architexNavigation) {
-    const projects = nav.find((m) => m.key === 'projects');
-    return projects?.sections.find((s) => s.key === 'snags');
-  }
-
-  it('mounts IssueDashboard in the existing snags navigation key', () => {
-    const snags = getSnagsSection();
-    expect(snags).toBeDefined();
-    expect(snags?.component).toBe('IssueDashboard');
+describe('architexNavigationConfig — Legacy Project Module removal', () => {
+  it('has zero navigation items with key "projects" at top level (Req 2.1)', () => {
+    const projects = architexNavigation.find((m) => m.key === 'projects');
+    expect(projects).toBeUndefined();
   });
 
-  it('preserves existing SnagManager functionality alongside IssueDashboard', () => {
-    const snags = getSnagsSection();
-    expect(snags?.preservesComponents).toContain('SnagManager');
-  });
-
-  it('keeps the snags section reachable for site-execution roles via Projects', () => {
-    for (const role of ['site_manager', 'contractor', 'architect'] as const) {
-      const nav = getNavigationForRole(role);
-      const snags = getSnagsSection(nav);
-      expect(snags?.component).toBe('IssueDashboard');
+  it('preserves all legacy project module roles in Command Centre (Req 2.3)', () => {
+    const commandCentre = architexNavigation.find((m) => m.key === 'command_centre');
+    const legacyRoles = [
+      'client', 'architect', 'bep', 'contractor', 'subcontractor', 'supplier',
+      'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional',
+      'fire_engineer', 'site_manager', 'developer', 'firm_admin',
+    ];
+    for (const role of legacyRoles) {
+      expect(commandCentre?.roles).toContain(role);
     }
   });
 
-  it('leaves the snags section metadata intact (label/projectScoped/phaseAware)', () => {
-    const snags = getSnagsSection();
-    expect(snags?.label).toBe('Snags');
-    expect(snags?.projectScoped).toBe(true);
-    expect(snags?.phaseAware).toBe(true);
+  it('ensures legacy project roles can access Command Centre via getNavigationForRole', () => {
+    const legacyRoles: UserRole[] = [
+      'client', 'architect', 'bep', 'contractor', 'subcontractor', 'supplier',
+      'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional',
+      'fire_engineer', 'site_manager', 'developer', 'firm_admin',
+    ];
+    for (const role of legacyRoles) {
+      const nav = getNavigationForRole(role);
+      const cc = nav.find((m) => m.key === 'command_centre');
+      expect(cc).toBeDefined();
+    }
   });
 });
 

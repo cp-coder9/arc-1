@@ -362,6 +362,19 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
+  health_safety: {
+    title: 'H&S Officer Toolbox',
+    subtitle: 'Health and safety file management, incident reporting, permits, and compliance tools.',
+    scope: 'H&S tools for safety compliance, incident tracking, and permit management on construction projects.',
+    primaryResponsibilities: ['Manage health and safety files', 'Track incidents and near-misses', 'Issue and monitor safety permits'],
+    handoffBoundaries: ['Cannot certify professional design compliance', 'Cannot override project-level financial controls'],
+    toolGroups: [
+      { id: 'safety-compliance', label: 'Safety compliance', description: 'Health and safety file management, incident reporting, and permit controls.', tools: [
+        { label: 'H&S File Manager', description: 'Manage health and safety files and compliance evidence.', pageId: 'construction' },
+        { label: 'Incident Reports', description: 'Record and track safety incidents and near-misses.', pageId: 'construction' },
+      ] },
+    ],
+  },
 };
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react';
 import type { ProcurementOrder } from '@/services/commandCentre/types';
+import { LinkChip } from '@/components/commandCentre/LinkChip';
 
 interface ProcurementViewProps {
   projectId: string;
@@ -51,13 +52,14 @@ export default function ProcurementView({ projectId }: ProcurementViewProps) {
                   <th className="text-right py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Value</th>
                   <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Delivery</th>
                   <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">B-BBEE</th>
+                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Spec Link</th>
                   <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <ShoppingCart className="h-8 w-8 opacity-40" />
                         <p>No procurement orders</p>
@@ -80,6 +82,17 @@ export default function ProcurementView({ projectId }: ProcurementViewProps) {
                       <td className="py-2 px-2">
                         {order.bbbeeLevel ? (
                           <Badge variant="outline" className="text-xs">Level {order.bbbeeLevel}</Badge>
+                        ) : '—'}
+                      </td>
+                      <td className="py-2 px-2">
+                        {order.linkedSpecForgeItemId ? (
+                          <LinkChip
+                            link={{
+                              linkedEntityId: order.linkedSpecForgeItemId,
+                              linkedEntityType: 'documents',
+                              label: order.linkedSpecForgeItemTitle ?? `Spec ${order.linkedSpecForgeItemId.slice(0, 8)}`,
+                            }}
+                          />
                         ) : '—'}
                       </td>
                       <td className="py-2 px-2">
