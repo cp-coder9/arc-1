@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link } from 'lucide-react';
+import { LayoutDashboard, Layers, TrendingUp, AlertTriangle, ClipboardList, FlaskConical, ShieldAlert, FileText, Landmark, Calendar, Users, Scale, Building2, BarChart3, Monitor, Settings, Activity, Library, FileEdit, Clock, Download, CheckCircle, Shield, Leaf, Search, ShieldCheck, DollarSign, Receipt, Target, PieChart, XCircle, GitBranch, Upload, Box, Package, Link, Award } from 'lucide-react';
 
 /**
  * Tool Nav configuration registry.
@@ -250,6 +250,45 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
           { id: 'export', icon: Download, label: 'Export' },
           { id: 'procurement', icon: Package, label: 'Procurement' },
           { id: 'specforge-sync', icon: Link, label: 'SpecForge Sync' },
+        ],
+      },
+    ],
+  },
+  'rfq-marketplace': {
+    name: 'RFQ Marketplace',
+    subtitle: 'Supplier procurement & quoting',
+    sections: [
+      {
+        label: 'Overview',
+        items: [
+          { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+        ],
+      },
+      {
+        label: 'RFQ Management',
+        items: [
+          { id: 'rfq-list', icon: FileText, label: 'RFQ List' },
+          { id: 'rfq-create', icon: ClipboardList, label: 'Create RFQ' },
+        ],
+      },
+      {
+        label: 'Supplier Discovery',
+        items: [
+          { id: 'supplier-search', icon: Search, label: 'Search Suppliers' },
+          { id: 'invitation-list', icon: Users, label: 'Invitation Lists' },
+        ],
+      },
+      {
+        label: 'Comparison',
+        items: [
+          { id: 'quote-comparison', icon: Scale, label: 'Quote Comparison' },
+        ],
+      },
+      {
+        label: 'Awards',
+        items: [
+          { id: 'award-recommendations', icon: Award, label: 'Recommendations' },
+          { id: 'award-approvals', icon: CheckCircle, label: 'Approvals' },
         ],
       },
     ],

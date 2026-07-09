@@ -202,6 +202,7 @@ const MunicipalApprovalWorkspacePage = lazyWithChunkRetry(() => import('./compon
 const FormSystemWorkspace = lazyWithChunkRetry(() => import('./components/forms/FormSystemWorkspace'));
 const EIAWorkspace = lazyWithChunkRetry(() => import('./components/eia/EIAWorkspace'));
 const BimWorkspace = lazyWithChunkRetry(() => import('./components/BimWorkspace'));
+const RfqMarketplaceWorkspace = lazyWithChunkRetry(() => import('./components/RfqMarketplaceWorkspace'));
 const FirmCommandCentreDashboard = lazyWithChunkRetry(() => import('./components/FirmCommandCentreDashboard'));
 const LeaveRequestForm = lazyWithChunkRetry(() => import('./components/practiceManagement/LeaveRequestForm'));
 const LeaveCalendar = lazyWithChunkRetry(() => import('./components/practiceManagement/LeaveCalendar'));
@@ -303,6 +304,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
   { id: 'construction', label: 'Construction OS', roles: ['contractor', 'subcontractor', 'supplier', 'site_manager'], group: 'Construction tools', icon: <Construction size={18} />, summary: 'Construction operations shell for site logs, RFIs, programme, and delivery controls.', backedBy: ['SiteLogManager', 'RFIManager'] },
   { id: 'contractor-staff', label: 'Staff, Wages & Plant', roles: ['contractor'], group: 'Construction tools', icon: <Hammer size={18} />, summary: 'Contractor resource-management workspace for staff, wage evidence, and plant records.', backedBy: ['contractor profile/compliance records'] },
   { id: 'procurement', label: 'BoQ / BoM Procurement', roles: ['contractor', 'subcontractor', 'supplier', ...DESIGN_TEAM_ROLES, 'engineer', 'quantity_surveyor'], group: 'Construction tools', icon: <Factory size={18} />, summary: 'BoQ/BoM procurement shell for contractor, package, and supplier workflows.', backedBy: ['package readiness services'] },
+  { id: 'rfq-marketplace', label: 'RFQ Marketplace', roles: ['architect', 'quantity_surveyor', 'contractor', 'supplier'], group: 'Construction tools', icon: <Store size={18} />, summary: 'Supplier RFQ creation, quote comparison, scoring, and award recommendation with B-BBEE compliance.', backedBy: ['RfqMarketplaceWorkspace', 'rfqMarketplace services'] },
   { id: 'packages', label: 'Subcontractor Packages', roles: ['contractor', 'subcontractor', 'supplier', 'site_manager', 'quantity_surveyor'], group: 'Construction tools', icon: <Building2 size={18} />, summary: 'Package-layer shell for subcontractor/supplier scopes and progress.', backedBy: ['package readiness services'] },
   { id: 'ncr-manager', label: 'NCR Manager', roles: ['architect', 'bep', 'contractor', 'subcontractor', 'site_manager', 'engineer', 'quantity_surveyor'], group: 'Construction tools', icon: <AlertTriangle size={18} />, summary: 'Non-conformance report management — defect identification, tracking, and resolution workflows.', backedBy: ['NCRManager', 'ncrService'] },
   { id: 'site-instructions', label: 'Site Instructions', roles: ['architect', 'bep', 'contractor', 'subcontractor', 'site_manager', 'engineer'], group: 'Construction tools', icon: <FileText size={18} />, summary: 'Formal site instruction issuance, acknowledgement, and tracking workflows.', backedBy: ['SiteInstructionManager', 'siteInstructionService'] },
@@ -377,6 +379,7 @@ export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
   'municipal-approval-workspace',
   'form-system',
   'eia-workspace',
+  'rfq-marketplace',
 ]);
 export const PROJECT_WORKFLOW_PAGE_IDS = new Set(['journey', 'programme', 'disputes', 'payments', 'invoicing', 'contracts', 'escrow', 'municipal-tracker', 'construction', 'snagging', 'passport']);
 const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);
@@ -1268,6 +1271,7 @@ function AppContent() {
               {activeTab === 'form-system' && <FormSystemWorkspace user={user} />}
               {activeTab === 'eia-workspace' && <EIAWorkspace user={user} />}
               {activeTab === 'bim-quantity-extraction' && <BimWorkspace user={user} />}
+              {activeTab === 'rfq-marketplace' && <RfqMarketplaceWorkspace user={user} />}
               {activeTab === 'practice-management' && <FirmCommandCentreDashboard user={user} />}
               {activeTab === 'pm-firm-dashboard' && <FirmCommandCentreDashboard user={user} />}
               {activeTab === 'pm-timesheets' && <TimesheetCapture user={user} />}
@@ -1283,7 +1287,7 @@ function AppContent() {
               {activeTab === 'pm-portfolio' && <FirmPortfolioTable user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && activeTab !== 'eia-workspace' && activeTab !== 'bim-quantity-extraction' && !activeTab.startsWith('pm-') && activeTab !== 'practice-management' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'remote-desktop' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && activeTab !== 'form-system' && activeTab !== 'eia-workspace' && activeTab !== 'bim-quantity-extraction' && activeTab !== 'rfq-marketplace' && !activeTab.startsWith('pm-') && activeTab !== 'practice-management' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
