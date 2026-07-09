@@ -64,7 +64,7 @@ export default function CrmPipelineBoard({
     const total = opportunities.length;
     const highConfidence = opportunities.filter((o) => o.isHighConfidence).length;
     const totalWeighted = opportunities.reduce((sum, o) => sum + o.weightedValueCents, 0);
-    const totalFee = opportunities.reduce((sum, o) => sum + (o.estimatedFeeCents ?? 0), 0);
+    const totalFee = opportunities.reduce((sum, o) => sum + (o.estimatedValueCents ?? 0), 0);
     return { total, highConfidence, totalWeighted, totalFee };
   }, [opportunities]);
 

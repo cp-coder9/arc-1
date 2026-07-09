@@ -75,7 +75,7 @@ export function useAutoSave(
     try {
       // Convert fields to the update payload expected by the API
       const fieldUpdates: Record<string, string | null> = {};
-      for (const [fieldId, fieldValue] of Object.entries(currentFields)) {
+      for (const [fieldId, fieldValue] of Object.entries(currentFields) as [string, FormFieldValue][]) {
         if (fieldValue.source === 'manual' || fieldValue.isOverridden) {
           fieldUpdates[fieldId] = typeof fieldValue.value === 'string'
             ? fieldValue.value
@@ -177,7 +177,7 @@ export function useAutoSave(
       // Attempt a synchronous save via sendBeacon
       try {
         const fieldUpdates: Record<string, string | null> = {};
-        for (const [fieldId, fieldValue] of Object.entries(fieldsRef.current)) {
+        for (const [fieldId, fieldValue] of Object.entries(fieldsRef.current) as [string, FormFieldValue][]) {
           if (fieldValue.source === 'manual' || fieldValue.isOverridden) {
             fieldUpdates[fieldId] = typeof fieldValue.value === 'string'
               ? fieldValue.value

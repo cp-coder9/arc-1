@@ -55,14 +55,14 @@ function numericField(min: number, max: number) {
 export const residentialInputsSchema = z.object({
   unitCount: numericField(1, 10_000),
   averageOccupantsPerUnit: numericField(1, 20),
-}) satisfies z.ZodType<ResidentialInputs>;
+}) as unknown as z.ZodType<ResidentialInputs>;
 
 // --- Commercial ---
 
 export const commercialInputsSchema = z.object({
   grossFloorArea: numericField(1, 500_000),
   estimatedOccupantCount: numericField(1, 100_000),
-}) satisfies z.ZodType<CommercialInputs>;
+}) as unknown as z.ZodType<CommercialInputs>;
 
 // --- Industrial ---
 
@@ -73,7 +73,7 @@ export const industrialInputsSchema = z.object({
     required_error: 'Required',
     invalid_type_error: 'Required',
   }),
-}) satisfies z.ZodType<IndustrialInputs>;
+}) as unknown as z.ZodType<IndustrialInputs>;
 
 // --- Mixed-Use Component ---
 
@@ -90,7 +90,7 @@ export const mixedUseComponentSchema: z.ZodType<MixedUseComponent> = z.discrimin
     type: z.literal('industrial'),
     inputs: industrialInputsSchema,
   }),
-]);
+]) as unknown as z.ZodType<MixedUseComponent>;
 
 // --- Mixed-Use Inputs ---
 
@@ -98,7 +98,7 @@ export const mixedUseInputsSchema = z.object({
   components: z
     .array(mixedUseComponentSchema)
     .min(2, { message: 'At least two usage components required' }),
-}) satisfies z.ZodType<MixedUseInputs>;
+}) as unknown as z.ZodType<MixedUseInputs>;
 
 // --- Building Inputs (discriminated union) ---
 
@@ -119,4 +119,4 @@ export const buildingInputsSchema: z.ZodType<BuildingInputs> = z.discriminatedUn
     type: z.literal('mixed-use'),
     data: mixedUseInputsSchema,
   }),
-]);
+]) as unknown as z.ZodType<BuildingInputs>;

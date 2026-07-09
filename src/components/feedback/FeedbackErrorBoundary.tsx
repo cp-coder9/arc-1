@@ -1,7 +1,7 @@
-import * as React from "react"
+import { Component, type ReactNode, type ErrorInfo } from "react"
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 interface State {
@@ -15,17 +15,14 @@ interface State {
  * this boundary catches it, logs to console, and renders nothing.
  * The rest of the app continues unaffected.
  */
-export class FeedbackErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
-  }
+export class FeedbackErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false };
 
   static getDerivedStateFromError(): State {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+  componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("[FeedbackWidget] Caught error in ErrorBoundary:", error, info.componentStack);
   }
 
@@ -33,6 +30,6 @@ export class FeedbackErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return null;
     }
-    return this.props.children;
+    return (this as Component<Props, State>).props.children;
   }
 }

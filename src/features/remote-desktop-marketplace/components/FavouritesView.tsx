@@ -127,6 +127,7 @@ export default function FavouritesView({ onSelectListing }: FavouritesViewProps)
 // ─── Favourite Row ────────────────────────────────────────────────────────────
 
 interface FavouriteRowProps {
+  key?: string | number;
   entry: FavouriteEntry;
   isLast: boolean;
   onSelect: (listingId: string) => void;

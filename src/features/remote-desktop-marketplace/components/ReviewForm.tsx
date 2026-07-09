@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { CreateReviewRequest, ReviewTag } from '../types';
 import { REVIEW_TAGS } from '../constants';
 import { RatingStars } from './shared/RatingStars';

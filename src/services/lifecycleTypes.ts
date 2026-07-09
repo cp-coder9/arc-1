@@ -180,14 +180,17 @@ export interface ProjectPassport {
 
 export interface WorkflowEvent {
   id: string;
-  type: 'approval_required' | 'municipal_blocker' | 'payment_due' | 'task_overdue' | 'risk_detected' | 'project_phase_changed';
+  type: 'approval_required' | 'municipal_blocker' | 'payment_due' | 'task_overdue' | 'risk_detected' | 'project_phase_changed' | 'corrective_action_overdue' | 'permit_expired';
   projectId: string;
   title: string;
-  detail: string;
+  detail?: string;
+  description?: string;
   priority: Priority;
   sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'site' | 'settings_admin' | 'health_safety';
-  assignedRoles: ArchitexRole[];
+  assignedRoles?: ArchitexRole[];
   createdAt: string;
+  actionRequired?: boolean;
+  assignedTo?: string;
 }
 
 export interface AgentRecommendation {

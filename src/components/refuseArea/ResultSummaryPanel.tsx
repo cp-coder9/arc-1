@@ -91,7 +91,7 @@ const sourceInfoStyles: React.CSSProperties = {
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
-function FieldRow({ label, value, notSpecified }: { label: string; value: string | null; notSpecified?: boolean }) {
+function FieldRow({ label, value, notSpecified }: { key?: React.Key; label: string; value: string | null; notSpecified?: boolean }) {
   if (notSpecified || value === null) {
     return (
       <div style={fieldRowStyles}>

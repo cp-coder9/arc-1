@@ -1240,7 +1240,7 @@ function AppContent() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
-              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={selectedProjectId || undefined} />}
+              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={undefined} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}

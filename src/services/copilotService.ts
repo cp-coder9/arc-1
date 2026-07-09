@@ -198,23 +198,12 @@ async function defaultPersistMessage(message: CopilotMessage, projectId: string)
 
 function getDefaultDataSources(): ContextDataSources {
   return {
-    fetchPassport: async () => ({
-      projectName: '',
-      currentPhase: 'onboarding' as const,
-      riskLevel: 'low' as const,
-      leadProfessional: '',
-      keyDates: [],
-      teamMembers: [],
-    }),
-    fetchDocuments: async () => [],
-    fetchPendingActions: async () => [],
-    fetchAuditTrail: async () => [],
-    fetchUserContext: async (userId: string) => ({
-      role: 'client' as UserRole,
-      projectAccessRole: null,
-      displayName: '',
-    }),
-    checkReadPermission: async () => true,
+    getProjectPassport: async () => null,
+    getDocumentRegister: async () => [],
+    getPendingInboxActions: async () => [],
+    getRecentAuditTrail: async () => [],
+    getUserContext: async () => null,
+    getProjectAccessContext: async () => null,
   };
 }
 
@@ -317,7 +306,7 @@ export async function processMessage(params: ProcessMessageParams): Promise<Copi
   const sources = dataSources ?? getDefaultDataSources();
   let contextJson: string;
   try {
-    const projectContext = await assembleContext(projectId, userId, sources);
+    const projectContext = await assembleContext(projectId, userId);
     contextJson = JSON.stringify(projectContext);
   } catch {
     // If context assembly fails entirely, proceed with empty context
@@ -866,11 +855,10 @@ export async function draftRfi(params: DraftRfiParams): Promise<RFIDraftOutput> 
     throw new Error(`Validation failed: ${firstError}`);
   }
 
-  const validatedInput = validation.data;
+  const validatedInput = validation.data as RFIDraftInput;
 
   // 2. Query highest existing RFI number and calculate next sequential number
-  const queryFn = queryHighestRfiNumber ?? defaultQueryHighestRfiNumber;
-  const highestNumber = await queryFn(projectId);
+  const queryFn = queryHighestRfiNumber ?? defaultQueryHighestRfiNumber;  const highestNumber = await queryFn(projectId);
   const rfiNumber = highestNumber + 1;
 
   // 3. Determine addressed-to from project lead consultant
@@ -1417,7 +1405,7 @@ export async function generateNarrative(params: GenerateNarrativeParams): Promis
     throw new Error(`Validation failed: ${firstError}`);
   }
 
-  const validatedInput = validation.data;
+  const validatedInput = validation.data as NarrativeInput;
 
   // 1b. Check for insufficient project context (no project brief data available)
   // Requirement 9.7: return error if no project brief data is available

@@ -89,7 +89,7 @@ export default function PracticeInvoiceBuilder({
   const linkedTimesheetTotal = useMemo(() => {
     return approvedTimesheets
       .filter((t) => selectedTimesheets.includes(t.id))
-      .reduce((sum, t) => sum + (t.hours ?? 0) * 100, 0); // simplified: hours * rate
+      .reduce((sum, t) => sum + ((t.durationMinutes ?? 0) / 60) * 100, 0); // simplified: hours * rate
   }, [approvedTimesheets, selectedTimesheets]);
 
   const linkedExpenseTotal = useMemo(() => {
@@ -375,7 +375,7 @@ export default function PracticeInvoiceBuilder({
                     <td style={{ fontSize: 11, fontFamily: 'monospace' }}>{entry.date}</td>
                     <td style={{ fontSize: 12 }}>{entry.activity}</td>
                     <td style={{ textAlign: 'right', fontSize: 11, fontFamily: 'monospace' }}>
-                      {entry.hours?.toFixed(1) ?? '—'}
+                      {entry.durationMinutes != null ? (entry.durationMinutes / 60).toFixed(1) : '—'}
                     </td>
                   </tr>
                 ))}

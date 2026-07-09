@@ -45,7 +45,7 @@ copilotRouter.post('/copilot/message', async (req: Request, res: Response) => {
       threadId: threadId || null,
       prompt,
       capability: capability || null,
-      userRole: (role as any) || 'client',
+      role: (role as any) || 'client',
     });
 
     if (response.error) {
@@ -165,10 +165,7 @@ copilotRouter.get('/copilot/threads/:threadId/messages', async (req: Request, re
     const { limit, startAfter } = req.query;
 
     const { getMessages } = await import('../services/copilotService');
-    const result = await getMessages(threadId, uid, {
-      limit: limit ? Number(limit) : undefined,
-      startAfter: startAfter as string | undefined,
-    });
+    const result = await getMessages(threadId, uid, limit ? Number(limit) : undefined);
 
     return res.status(200).json(result);
   } catch (err: any) {
@@ -203,7 +200,7 @@ copilotRouter.patch('/copilot/threads/:threadId', async (req: Request, res: Resp
     if (status !== undefined) updates.status = status;
 
     const { updateThread } = await import('../services/copilotService');
-    const thread = await updateThread(threadId, uid, updates);
+    const thread = await updateThread(threadId, uid, uid, updates);
 
     return res.status(200).json({ thread });
   } catch (err: any) {

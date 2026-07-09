@@ -10,7 +10,7 @@ interface ModelSummaryPanelProps {
 
 // ─── Spatial Tree Node Component ─────────────────────────────────────────────
 
-function SpatialTreeNode({ node, depth = 0 }: { node: SpatialNode; depth?: number }) {
+function SpatialTreeNode({ node, depth = 0 }: { key?: React.Key; node: SpatialNode; depth?: number }) {
   const [expanded, setExpanded] = useState(depth < 2); // auto-expand first 2 levels
   const hasChildren = node.children.length > 0;
   const elementCount = node.elementIds.length;

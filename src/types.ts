@@ -630,6 +630,10 @@ export interface Notification {
     clusterId?: string;
     releaseNoteUrl?: string;
     declineReason?: string;
+    expenseClaimId?: string;
+    stage?: string;
+    marginPercent?: number;
+    invoiceId?: string;
   };
   isRead: boolean;
   channels: ('in_app' | 'email' | 'push')[];

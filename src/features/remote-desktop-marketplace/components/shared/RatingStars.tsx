@@ -20,7 +20,7 @@ export type RatingStarsProps = RatingStarsDisplayProps | RatingStarsInputProps;
 
 // ─── Star SVG Helpers ─────────────────────────────────────────────────────────
 
-function FilledStar({ size }: { size: number }) {
+function FilledStar({ size }: { key?: string | number; size: number }) {
   return (
     <svg
       width={size}
@@ -36,7 +36,7 @@ function FilledStar({ size }: { size: number }) {
   );
 }
 
-function HalfStar({ size }: { size: number }) {
+function HalfStar({ size }: { key?: string | number; size: number }) {
   const clipId = React.useId();
   return (
     <svg
@@ -69,7 +69,7 @@ function HalfStar({ size }: { size: number }) {
   );
 }
 
-function EmptyStar({ size }: { size: number }) {
+function EmptyStar({ size }: { key?: string | number; size: number }) {
   return (
     <svg
       width={size}

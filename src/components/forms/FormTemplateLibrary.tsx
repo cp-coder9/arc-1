@@ -338,6 +338,7 @@ export default function FormTemplateLibrary({ projectStage, projectMunicipality 
 // ── Template Card ────────────────────────────────────────────────────────────
 
 interface TemplateCardProps {
+  key?: React.Key;
   template: FormTemplate;
   isRecommended: boolean;
 }

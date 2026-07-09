@@ -7,6 +7,7 @@
  * @requirements 1.2, 1.9, 5.5, 12.3
  */
 
+import React from 'react';
 import { Bird, User } from 'lucide-react';
 import type { CopilotMessage } from '@/services/copilotTypes';
 
@@ -36,7 +37,7 @@ function DisclaimerTag() {
   );
 }
 
-function UserMessage({ message }: { message: CopilotMessage }) {
+function UserMessage({ message }: { key?: React.Key; message: CopilotMessage }) {
   return (
     <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginBottom: 14 }}>
       <div style={{
@@ -55,7 +56,7 @@ function UserMessage({ message }: { message: CopilotMessage }) {
   );
 }
 
-function AssistantMessage({ message }: { message: CopilotMessage }) {
+function AssistantMessage({ message }: { key?: React.Key; message: CopilotMessage }) {
   return (
     <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
       <div style={{

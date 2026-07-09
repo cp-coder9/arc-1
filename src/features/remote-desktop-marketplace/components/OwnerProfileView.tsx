@@ -331,7 +331,7 @@ export function OwnerProfileView({ ownerUid, onBack }: OwnerProfileViewProps) {
 
 // ─── ListingMiniCard ──────────────────────────────────────────────────────────
 
-function ListingMiniCard({ listing }: { listing: ResourceListing }) {
+function ListingMiniCard({ listing }: { key?: string | number; listing: ResourceListing }) {
   return (
     <div
       style={{

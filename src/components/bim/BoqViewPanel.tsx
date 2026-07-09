@@ -135,6 +135,7 @@ export function BoqViewPanel({ boq }: BoqViewPanelProps) {
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
 interface SectionAccordionProps {
+  key?: React.Key;
   section: BoqSection;
   expanded: boolean;
   onToggle: () => void;

@@ -11,7 +11,7 @@
  * @module practiceManagement/ProfitabilityPanel
  */
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PieChart, ChevronDown, ChevronRight } from 'lucide-react';
 import type { UserProfile } from '@/types';
 import type {

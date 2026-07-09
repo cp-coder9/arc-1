@@ -3,12 +3,14 @@
 // Individual listing card in the catalogue grid.
 // Uses `.panel` container with hover state. Uses var(--teal) for interactive elements.
 
+import React from 'react';
 import { Heart } from 'lucide-react';
 import type { ResourceListingSummary } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ResourceCardProps {
+  key?: React.Key;
   listing: ResourceListingSummary;
   isFavourited: boolean;
   onToggleFavourite: (listingId: string) => void;

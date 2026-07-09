@@ -45,6 +45,7 @@ function ReviewItem({
   review,
   showResourceName,
 }: {
+  key?: string | number;
   review: ReviewRecord;
   showResourceName?: boolean;
 }) {

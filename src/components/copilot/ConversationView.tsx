@@ -7,7 +7,7 @@
  * @requirements 1.2, 1.8, 1.9, 5.5
  */
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, RefreshCw, ChevronDown } from 'lucide-react';
 import type { CopilotMessage, CopilotCapability } from '@/services/copilotTypes';
 import MessageHistory from './MessageHistory';

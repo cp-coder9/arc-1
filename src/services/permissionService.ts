@@ -128,6 +128,7 @@ const ROLE_PERMISSIONS: Record<NormalizedUserRole, PermissionAction[]> = {
   ],
   land_surveyor: ['project:read', 'profile:read', 'profile:update', 'municipal:manage'],
   cpm: ['project:read', 'project:update', 'profile:read', 'profile:update', 'payment:read'],
+  health_safety: ['project:read', 'profile:read', 'profile:update'],
 };
 
 const PROJECT_ACCESS_PERMISSIONS: Record<ProjectAccessRole, PermissionAction[]> = {

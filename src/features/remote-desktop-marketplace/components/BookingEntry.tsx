@@ -11,6 +11,7 @@ import { isBookingInLaunchWindow, getCountdownSeconds } from '../services/bookin
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface BookingEntryProps {
+  key?: string | number;
   booking: BookingRecord;
   onCancel: (id: string) => void;
   onLaunchSession: (id: string) => void;

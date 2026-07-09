@@ -38,7 +38,7 @@ const SEVERITY_CONFIG: Record<ValidationSeverity, {
 
 // ─── Finding Row Component ───────────────────────────────────────────────────
 
-function FindingRow({ finding }: { finding: ValidationFinding }) {
+function FindingRow({ finding }: { key?: React.Key; finding: ValidationFinding }) {
   const config = SEVERITY_CONFIG[finding.severity];
   const Icon = config.icon;
 

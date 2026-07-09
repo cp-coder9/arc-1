@@ -11,14 +11,17 @@ export class InvalidStateTransitionError extends Error {
   public readonly attemptedTransition: string;
   public readonly entityType: string;
 
-  constructor(entityType: string, currentState: string, attemptedTransition: string) {
+  constructor(currentStateOrEntityType: string, currentStateOrAttemptedTransition: string, attemptedTransition?: string) {
+    const entityType = attemptedTransition !== undefined ? currentStateOrEntityType : 'entity';
+    const currentState = attemptedTransition !== undefined ? currentStateOrAttemptedTransition : currentStateOrEntityType;
+    const attempted = attemptedTransition !== undefined ? attemptedTransition : currentStateOrAttemptedTransition;
     super(
-      `Invalid state transition for ${entityType}: cannot transition from "${currentState}" via "${attemptedTransition}"`
+      `Invalid state transition for ${entityType}: cannot transition from "${currentState}" via "${attempted}"`
     );
     this.name = 'InvalidStateTransitionError';
     this.entityType = entityType;
     this.currentState = currentState;
-    this.attemptedTransition = attemptedTransition;
+    this.attemptedTransition = attempted;
   }
 }
 
