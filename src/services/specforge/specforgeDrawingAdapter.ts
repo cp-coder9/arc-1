@@ -80,19 +80,30 @@ function setCachedResolution(projectId: string, drawingRef: string, resolution: 
 // ── Drawing Data Source ─────────────────────────────────────────────────────
 
 /**
- * Fetch drawings for a project. In production this would query Firestore;
- * currently uses the document register sample data as a fallback.
- * This function is the integration point — swap implementation for production.
+ * Fetch drawings for a project. In production, queries Firestore via the
+ * Document Register service. In demo/test modes, uses sample data.
  *
- * @throws Error when Drawing Register is unavailable
+ * FAIL-CLOSED: In production (NODE_ENV=production), this throws if no real
+ * data source has been configured via setDrawingDataSource(). This prevents
+ * sample/demo data from leaking into production certificate flows.
+ *
+ * @throws Error when Drawing Register is unavailable in production
  */
-let _fetchDrawingsForProject: (projectId: string) => Promise<DrawingRecord[]> = async (_projectId: string) => {
-  // Default implementation returns sample data (demo/dev mode)
+let _fetchDrawingsForProject: (projectId: string) => Promise<DrawingRecord[]> = async (projectId: string) => {
+  // Production: fail closed — require explicit wiring of Firestore data source
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `Drawing Register data source not configured for project "${projectId}". ` +
+      `Call setDrawingDataSource() during app initialization to wire Firestore.`
+    );
+  }
+  // Dev/demo/test: return sample data for development iteration
   return sampleDrawings;
 };
 
 /**
  * Override the drawing data source (for production Firestore integration or testing).
+ * MUST be called during app startup in production to wire real Firestore queries.
  */
 export function setDrawingDataSource(fetcher: (projectId: string) => Promise<DrawingRecord[]>): void {
   _fetchDrawingsForProject = fetcher;

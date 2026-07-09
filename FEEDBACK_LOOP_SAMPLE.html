@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architex — Intelligent Feedback Loop Design Sample</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       DESIGN TOKENS
+       ═══════════════════════════════════════════════════════════ */
+    :root {
+      --teal: #19B7B0;
+      --deep: #167E79;
+      --jade: #58C8BC;
+      --mint: #BFE9E2;
+      --aqua: #DFF5F2;
+      --ink: #102033;
+      --muted: #657287;
+      --border: rgba(16,32,51,.09);
+      --white: #fff;
+      --shadow: 0 22px 64px rgba(16,32,51,.08);
+      --soft: 0 12px 34px rgba(16,32,51,.055);
+      --green: #4ADE80;
+      --amber: #F5A623;
+      --red: #d95747;
+      --os-nav-width: 56px;
+      --tool-nav-width: 200px;
+      --topbar-height: 36px;
+      --font: "Geist", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(191,233,226,.38), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(223,245,242,.55), transparent 32%),
+        linear-gradient(180deg, #fff 0%, #f7fbfb 100%);
+    }
+    /* ═══════════════════════════════════════════════════════════
+       SHELL LAYOUT
+       ═══════════════════════════════════════════════════════════ */
+    .app-shell {
+      display: grid;
+      grid-template-columns: var(--os-nav-width) var(--tool-nav-width) 1fr;
+      grid-template-rows: var(--topbar-height) 1fr;
+      min-height: 100vh;
+    }
+
+    .os-nav {
+      grid-row: 1 / -1;
+      background: var(--white);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0;
+      gap: 8px;
+    }
+    .os-nav-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 16px; cursor: pointer; transition: all .15s;
+    }
+    .os-nav-icon:hover { background: var(--aqua); color: var(--teal); }
+    .os-nav-icon.active { background: var(--mint); color: var(--deep); }
+    .os-nav-logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--teal), var(--deep));
+      margin-bottom: 12px; display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 14px;
+    }
+
+    .tool-nav {
+      grid-row: 1 / -1;
+      background: var(--white);
+      border-right: 1px solid var(--border);
+      padding: 14px 12px;
+      overflow-y: auto;
+    }
+    .tool-nav-title { font-size: 13px; font-weight: 600; color: var(--deep); margin-bottom: 4px; }
+    .tool-nav-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+    .tool-nav-section { margin-bottom: 14px; }
+    .tool-nav-section-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); margin-bottom: 6px;
+    }
+    .tool-nav-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; border-radius: 8px; font-size: 12.5px;
+      color: var(--ink); cursor: pointer; transition: all .12s;
+    }
+    .tool-nav-item:hover { background: var(--aqua); }
+    .tool-nav-item.active { background: var(--mint); color: var(--deep); font-weight: 500; }
+
+    .top-bar {
+      display: flex; align-items: center; padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.6); backdrop-filter: blur(8px);
+      font-size: 12px; color: var(--muted); gap: 6px;
+    }
+    .top-bar-crumb-active { color: var(--ink); font-weight: 500; }
+
+    .content {
+      padding: 14px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       COMPONENT CATALOG
+       ═══════════════════════════════════════════════════════════ */
+    .hero {
+      border-radius: 28px; padding: 28px 32px;
+      background: radial-gradient(circle at 80% 20%, rgba(191,233,226,.3), transparent 50%), rgba(255,255,255,.82);
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    .hero-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .eyebrow {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1.2px; color: var(--teal); margin-bottom: 6px;
+    }
+    .hero h1 { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+    .hero .sub { font-size: 13px; color: var(--muted); }
+
+    .panel {
+      border: 1px solid var(--border); border-radius: 22px; padding: 22px;
+      background: rgba(255,255,255,.74); box-shadow: var(--soft);
+    }
+    .panel h2 { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 11px; border-radius: 99px; font-size: 11.5px; font-weight: 500;
+      color: var(--teal); background: rgba(25,183,176,.07); border: 1px solid rgba(25,183,176,.18);
+    }
+    .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .pill-success { color: var(--green); background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.18); }
+    .pill-warning { color: var(--amber); background: rgba(245,166,35,.08); border-color: rgba(245,166,35,.18); }
+    .pill-danger { color: var(--red); background: rgba(217,87,71,.06); border-color: rgba(217,87,71,.18); }
+    .pill-muted { color: var(--muted); background: rgba(16,32,51,.04); border-color: var(--border); }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 36px; padding: 0 16px; border-radius: 12px;
+      font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all .15s;
+      border: 1px solid rgba(25,183,176,.25); background: var(--aqua); color: var(--deep);
+    }
+    .btn:hover { background: var(--mint); border-color: var(--teal); }
+    .btn-secondary { border-color: var(--border); background: rgba(255,255,255,.7); color: var(--ink); }
+    .btn-sm { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 8px; }
+
+    .table { width: 100%; border-collapse: collapse; }
+    .table th {
+      text-align: left; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .6px;
+      color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border);
+    }
+    .table td {
+      padding: 10px 12px; font-size: 13px; color: var(--ink);
+      border-bottom: 1px solid var(--border);
+    }
+    .table tbody tr:hover { background: rgba(25,183,176,.03); }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .stat-card {
+      border: 1px solid var(--border); border-radius: 16px; padding: 16px;
+      background: rgba(255,255,255,.7); text-align: center;
+    }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--ink); }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .stat-value.teal { color: var(--teal); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.green { color: var(--green); }
+
+    /* ═══════════════════════════════════════════════════════════
+       FEEDBACK-SPECIFIC STYLES
+       ═══════════════════════════════════════════════════════════ */
+
+    /* Severity bar */
+    .severity-bar {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .severity-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .severity-high { background: var(--red); }
+    .severity-med { background: var(--amber); }
+    .severity-low { background: var(--green); }
+
+    /* Cluster row */
+    .cluster-row {
+      display: grid; grid-template-columns: 1fr 80px 80px 100px 60px 90px;
+      align-items: center; padding: 12px 16px; border-radius: 12px;
+      border: 1px solid var(--border); background: rgba(255,255,255,.6);
+      margin-bottom: 8px; cursor: pointer; transition: all .12s;
+    }
+    .cluster-row:hover { background: var(--aqua); border-color: rgba(25,183,176,.2); }
+    .cluster-title { font-size: 13px; font-weight: 500; color: var(--ink); }
+    .cluster-meta { font-size: 11px; color: var(--muted); }
+
+    /* Trend chart placeholder */
+    .trend-chart {
+      height: 180px; border-radius: 16px; border: 1px solid var(--border);
+      background: rgba(255,255,255,.5); display: flex; align-items: flex-end;
+      padding: 16px 12px 12px; gap: 4px; position: relative;
+    }
+    .chart-bar {
+      flex: 1; border-radius: 4px 4px 0 0; min-height: 8px; transition: height .3s;
+    }
+    .chart-bar.bug { background: var(--red); opacity: .7; }
+    .chart-bar.feature { background: var(--teal); opacity: .7; }
+    .chart-bar.usability { background: var(--amber); opacity: .7; }
+    .chart-bar.praise { background: var(--green); opacity: .7; }
+    .chart-legend {
+      position: absolute; top: 12px; right: 16px;
+      display: flex; gap: 12px; font-size: 10px; color: var(--muted);
+    }
+    .chart-legend-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px;
+    }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 2px; margin-bottom: 14px; }
+    .tab {
+      padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 500;
+      color: var(--muted); cursor: pointer; transition: all .12s; border: none; background: none;
+    }
+    .tab:hover { background: var(--aqua); color: var(--ink); }
+    .tab.active { background: var(--mint); color: var(--deep); }
+
+    /* Feedback Widget (floating button + overlay) */
+    .feedback-trigger {
+      position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--teal), var(--deep));
+      border: none; color: white; font-size: 20px; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(22,126,121,.35);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .feedback-trigger:hover {
+      transform: scale(1.08);
+      box-shadow: 0 12px 32px rgba(22,126,121,.45);
+    }
+
+    .feedback-overlay {
+      position: fixed; bottom: 84px; right: 24px; z-index: 999;
+      width: 380px; max-height: 560px; border-radius: 22px;
+      background: var(--white); border: 1px solid var(--border);
+      box-shadow: var(--shadow); overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .feedback-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .feedback-header h3 { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .feedback-close {
+      width: 28px; height: 28px; border-radius: 8px; border: none;
+      background: rgba(16,32,51,.04); color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .feedback-close:hover { background: rgba(217,87,71,.08); color: var(--red); }
+
+    .feedback-body { padding: 20px; flex: 1; overflow-y: auto; }
+
+    .category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .category-btn {
+      padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+      background: rgba(255,255,255,.7); cursor: pointer; text-align: center;
+      transition: all .12s; font-size: 12px; color: var(--ink);
+    }
+    .category-btn:hover { border-color: rgba(25,183,176,.3); background: var(--aqua); }
+    .category-btn.selected { border-color: var(--teal); background: var(--aqua); color: var(--deep); font-weight: 500; }
+    .category-icon { font-size: 18px; margin-bottom: 4px; display: block; }
+
+    .feedback-textarea {
+      width: 100%; min-height: 100px; border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px; font-size: 13px; font-family: var(--font);
+      color: var(--ink); resize: vertical; margin-bottom: 8px; background: rgba(255,255,255,.5);
+    }
+    .feedback-textarea:focus { outline: none; border-color: var(--teal); }
+    .char-count { font-size: 10px; color: var(--muted); text-align: right; margin-bottom: 12px; }
+
+    .attach-area {
+      border: 1px dashed var(--border); border-radius: 12px; padding: 12px;
+      text-align: center; font-size: 11px; color: var(--muted); margin-bottom: 16px;
+      cursor: pointer; transition: all .12s;
+    }
+    .attach-area:hover { border-color: var(--teal); background: var(--aqua); }
+
+    .feedback-submit {
+      width: 100%; height: 40px; border-radius: 12px; border: none;
+      background: linear-gradient(135deg, var(--teal), var(--deep));
+      color: white; font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .feedback-submit:hover { opacity: .9; }
+
+    /* My Feedback list inside widget */
+    .my-feedback-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .my-feedback-item:last-child { border-bottom: none; }
+    .my-feedback-title { font-size: 12px; color: var(--ink); }
+    .my-feedback-date { font-size: 10px; color: var(--muted); }
+
+    /* Context chip shown in widget */
+    .context-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: 6px; font-size: 10px;
+      background: var(--aqua); color: var(--deep); border: 1px solid rgba(25,183,176,.15);
+      margin-bottom: 12px;
+    }
+
+    /* View toggle */
+    .view-toggle { display: flex; gap: 4px; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .filter-chip {
+      padding: 5px 12px; border-radius: 8px; font-size: 11px;
+      border: 1px solid var(--border); background: var(--white); color: var(--muted);
+      cursor: pointer; transition: all .12s;
+    }
+    .filter-chip:hover { border-color: rgba(25,183,176,.3); }
+    .filter-chip.active { border-color: var(--teal); background: var(--aqua); color: var(--deep); }
+
+    /* Detail panel */
+    .detail-panel {
+      border: 1px solid var(--border); border-radius: 18px; padding: 20px;
+      background: rgba(255,255,255,.82);
+    }
+    .detail-panel h3 { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 12px; }
+
+    /* Status flow */
+    .status-flow {
+      display: flex; align-items: center; gap: 8px; margin: 12px 0;
+    }
+    .status-step {
+      padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 500;
+      background: rgba(16,32,51,.04); color: var(--muted); border: 1px solid var(--border);
+    }
+    .status-step.current { background: var(--aqua); color: var(--deep); border-color: var(--teal); }
+    .status-step.done { background: rgba(74,222,128,.1); color: var(--green); border-color: rgba(74,222,128,.18); }
+    .status-arrow { color: var(--muted); font-size: 12px; }
+
+    /* AI Brief */
+    .ai-brief {
+      border: 1px solid rgba(25,183,176,.2); border-radius: 16px; padding: 16px;
+      background: radial-gradient(circle at 90% 10%, rgba(191,233,226,.2), transparent 40%), rgba(255,255,255,.6);
+    }
+    .ai-brief-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--teal); margin-bottom: 8px;
+    }
+    .ai-brief p { font-size: 12.5px; color: var(--ink); line-height: 1.5; margin-bottom: 8px; }
+
+    /* Page selector */
+    .page-selector {
+      display: flex; gap: 4px; margin-top: 12px; justify-content: center;
+    }
+    .page-selector button {
+      width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--white); color: var(--muted); font-size: 11px; cursor: pointer;
+    }
+    .page-selector button.active { background: var(--aqua); color: var(--deep); border-color: var(--teal); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIEW 1: FEEDBACK ROADMAP DASHBOARD (platform_admin)
+     ═══════════════════════════════════════════════════════════ -->
+
+<div class="app-shell">
+  <!-- OS Nav -->
+  <nav class="os-nav">
+    <div class="os-nav-logo">A</div>
+    <div class="os-nav-icon" title="Command Centre">⌘</div>
+    <div class="os-nav-icon" title="Projects">◈</div>
+    <div class="os-nav-icon" title="Toolboxes">⊞</div>
+    <div class="os-nav-icon" title="Documents">◫</div>
+    <div class="os-nav-icon" title="People">◉</div>
+    <div class="os-nav-icon active" title="Admin">⚙</div>
+  </nav>
+
+  <!-- Tool Nav -->
+  <aside class="tool-nav">
+    <div class="tool-nav-title">Feedback Intelligence</div>
+    <div class="tool-nav-subtitle">Platform feedback & roadmap pipeline</div>
+
+    <div class="tool-nav-section">
+      <div class="tool-nav-section-label">Views</div>
+      <div class="tool-nav-item active">📊 Overview</div>
+      <div class="tool-nav-item">🎯 Clusters</div>
+      <div class="tool-nav-item">📈 Trends</div>
+      <div class="tool-nav-item">⚡ Friction Signals</div>
+    </div>
+
+    <div class="tool-nav-section">
+      <div class="tool-nav-section-label">Actions</div>
+      <div class="tool-nav-item">✓ Pending Review</div>
+      <div class="tool-nav-item">🚀 Shipped</div>
+      <div class="tool-nav-item">✕ Declined</div>
+    </div>
+
+    <div class="tool-nav-section">
+      <div class="tool-nav-section-label">Settings</div>
+      <div class="tool-nav-item">⚙ Thresholds</div>
+      <div class="tool-nav-item">🔔 Notifications</div>
+    </div>
+  </aside>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <span class="top-bar-crumb">Architex</span>
+    <span>›</span>
+    <span class="top-bar-crumb">Admin</span>
+    <span>›</span>
+    <span class="top-bar-crumb-active">Feedback Intelligence</span>
+  </div>
+
+  <!-- Content Area -->
+  <main class="content">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-header">
+        <div>
+          <div class="eyebrow">FEEDBACK INTELLIGENCE</div>
+          <h1>Feedback Roadmap Dashboard</h1>
+          <p class="sub">AI-powered feedback pipeline · 847 submissions · 142 clusters · Last 30 days</p>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <span class="pill pill-danger"><span class="dot"></span> 3 Critical</span>
+          <span class="pill pill-warning"><span class="dot"></span> 12 Pending Review</span>
+          <span class="pill pill-success"><span class="dot"></span> 28 Shipped</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value teal">847</div>
+        <div class="stat-label">Total Submissions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">142</div>
+        <div class="stat-label">Active Clusters</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value red">9.2</div>
+        <div class="stat-label">Top Severity</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value green">78%</div>
+        <div class="stat-label">Loop Closure Rate</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active">Overview</button>
+      <button class="tab">Clusters</button>
+      <button class="tab">Trend Chart</button>
+      <button class="tab">Friction Signals</button>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-chip active">All Categories</div>
+      <div class="filter-chip">🐛 Bugs</div>
+      <div class="filter-chip">✨ Feature Requests</div>
+      <div class="filter-chip">🎨 Usability</div>
+      <div class="filter-chip">👏 Praise</div>
+      <span style="flex:1"></span>
+      <div class="filter-chip">Last 30 days ▾</div>
+      <div class="filter-chip">All Statuses ▾</div>
+    </div>
+
+    <!-- Cluster List -->
+    <div class="panel">
+      <h2>Top Feedback Clusters (sorted by severity)</h2>
+
+      <!-- Cluster Header -->
+      <div style="display:grid; grid-template-columns: 1fr 80px 80px 100px 60px 90px; padding: 0 16px 8px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--muted);">
+        <span>Cluster</span><span>Reports</span><span>Users</span><span>Sentiment</span><span>Score</span><span>Status</span>
+      </div>
+
+      <!-- Cluster Rows -->
+      <div class="cluster-row">
+        <div>
+          <div class="cluster-title">Mobile responsive layout breaks on project dashboard</div>
+          <div class="cluster-meta">bug · first reported 12 days ago · Compliance Hub, Project Dashboard</div>
+        </div>
+        <span style="font-size:13px; font-weight:600;">47</span>
+        <span style="font-size:13px;">23</span>
+        <span class="pill pill-danger" style="font-size:10px;">frustrated</span>
+        <span style="font-size:14px; font-weight:700; color:var(--red);">9</span>
+        <span class="pill pill-warning" style="font-size:10px;">reviewing</span>
+      </div>
+
+      <div class="cluster-row">
+        <div>
+          <div class="cluster-title">Export BoQ to Excel — request for direct download</div>
+          <div class="cluster-meta">feature_request · first reported 22 days ago · Procurement, SpecForge</div>
+        </div>
+        <span style="font-size:13px; font-weight:600;">38</span>
+        <span style="font-size:13px;">31</span>
+        <span class="pill" style="font-size:10px;">negative</span>
+        <span style="font-size:14px; font-weight:700; color:var(--red);">8</span>
+        <span class="pill pill-muted" style="font-size:10px;">received</span>
+      </div>
+
+      <div class="cluster-row">
+        <div>
+          <div class="cluster-title">SANS 10400-XA calculator unclear error messages</div>
+          <div class="cluster-meta">usability · first reported 8 days ago · Compliance Hub</div>
+        </div>
+        <span style="font-size:13px; font-weight:600;">24</span>
+        <span style="font-size:13px;">18</span>
+        <span class="pill pill-warning" style="font-size:10px;">negative</span>
+        <span style="font-size:14px; font-weight:700; color:var(--amber);">7</span>
+        <span class="pill pill-muted" style="font-size:10px;">received</span>
+      </div>
+
+      <div class="cluster-row">
+        <div>
+          <div class="cluster-title">Add bulk invite for project team members</div>
+          <div class="cluster-meta">feature_request · first reported 18 days ago · Project Setup</div>
+        </div>
+        <span style="font-size:13px; font-weight:600;">19</span>
+        <span style="font-size:13px;">15</span>
+        <span class="pill pill-muted" style="font-size:10px;">neutral</span>
+        <span style="font-size:14px; font-weight:700; color:var(--amber);">6</span>
+        <span class="pill" style="font-size:10px;">planned</span>
+      </div>
+
+      <div class="cluster-row">
+        <div>
+          <div class="cluster-title">Drawing upload speed is excellent — great improvement</div>
+          <div class="cluster-meta">praise · first reported 5 days ago · Documents & Drawing</div>
+        </div>
+        <span style="font-size:13px; font-weight:600;">12</span>
+        <span style="font-size:13px;">11</span>
+        <span class="pill pill-success" style="font-size:10px;">positive</span>
+        <span style="font-size:14px; font-weight:700; color:var(--green);">2</span>
+        <span class="pill pill-success" style="font-size:10px;">shipped</span>
+      </div>
+
+      <!-- Pagination -->
+      <div class="page-selector">
+        <button class="active">1</button>
+        <button>2</button>
+        <button>3</button>
+        <button>4</button>
+        <button>5</button>
+        <button>›</button>
+      </div>
+    </div>
+
+    <!-- Trend Chart -->
+    <div class="panel">
+      <h2>Feedback Volume — Last 30 Days</h2>
+      <div class="trend-chart">
+        <div class="chart-legend">
+          <span><span class="chart-legend-dot" style="background:var(--red)"></span> Bug</span>
+          <span><span class="chart-legend-dot" style="background:var(--teal)"></span> Feature</span>
+          <span><span class="chart-legend-dot" style="background:var(--amber)"></span> Usability</span>
+          <span><span class="chart-legend-dot" style="background:var(--green)"></span> Praise</span>
+        </div>
+        <!-- Simulated bar chart -->
+        <div class="chart-bar bug" style="height:45%"></div>
+        <div class="chart-bar feature" style="height:62%"></div>
+        <div class="chart-bar usability" style="height:28%"></div>
+        <div class="chart-bar praise" style="height:15%"></div>
+        <div class="chart-bar bug" style="height:52%"></div>
+        <div class="chart-bar feature" style="height:48%"></div>
+        <div class="chart-bar usability" style="height:35%"></div>
+        <div class="chart-bar praise" style="height:22%"></div>
+        <div class="chart-bar bug" style="height:38%"></div>
+        <div class="chart-bar feature" style="height:72%"></div>
+        <div class="chart-bar usability" style="height:42%"></div>
+        <div class="chart-bar praise" style="height:18%"></div>
+        <div class="chart-bar bug" style="height:65%"></div>
+        <div class="chart-bar feature" style="height:55%"></div>
+        <div class="chart-bar usability" style="height:30%"></div>
+        <div class="chart-bar praise" style="height:12%"></div>
+        <div class="chart-bar bug" style="height:40%"></div>
+        <div class="chart-bar feature" style="height:80%"></div>
+        <div class="chart-bar usability" style="height:50%"></div>
+        <div class="chart-bar praise" style="height:25%"></div>
+        <div class="chart-bar bug" style="height:58%"></div>
+        <div class="chart-bar feature" style="height:45%"></div>
+        <div class="chart-bar usability" style="height:33%"></div>
+        <div class="chart-bar praise" style="height:20%"></div>
+      </div>
+    </div>
+
+    <!-- Cluster Detail Panel (expanded view) -->
+    <div class="detail-panel">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h3>Export BoQ to Excel — request for direct download</h3>
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <span class="pill">feature_request</span>
+            <span class="pill pill-muted">38 reports · 31 users</span>
+          </div>
+        </div>
+        <span style="font-size:28px; font-weight:800; color:var(--red);">8</span>
+      </div>
+
+      <!-- Status Flow -->
+      <div class="status-flow">
+        <span class="status-step done">received</span>
+        <span class="status-arrow">→</span>
+        <span class="status-step current">reviewing</span>
+        <span class="status-arrow">→</span>
+        <span class="status-step">planned</span>
+        <span class="status-arrow">→</span>
+        <span class="status-step">shipped</span>
+      </div>
+
+      <!-- AI-Generated Feature Brief -->
+      <div class="ai-brief" style="margin-top:16px;">
+        <div class="ai-brief-label">✦ AI-Generated Feature Brief</div>
+        <p><strong>Problem Statement:</strong> Users across quantity_surveyor (12), architect (9), and contractor (7) roles report that generating a Bill of Quantities requires manual copy-paste from the platform into Excel. The current export produces a PDF, which is not editable and does not integrate into their existing costing workflows.</p>
+        <p><strong>Affected Roles:</strong> quantity_surveyor, architect, contractor, developer</p>
+        <p><strong>Suggested Scope:</strong> Add XLSX export option to the BoQ/BoM generation pipeline. Include item codes, descriptions, quantities, unit rates, and subtotals. Maintain SpecForge product references as hyperlinks.</p>
+        <p><strong>Estimated Impact:</strong> High — affects procurement workflow efficiency for 31 distinct users. Likely to reduce platform-to-spreadsheet friction and increase SpecForge adoption for specification-driven procurement.</p>
+      </div>
+
+      <!-- Recent Submissions in this cluster -->
+      <div style="margin-top:16px;">
+        <h4 style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px;">Recent Submissions</h4>
+        <table class="table">
+          <thead>
+            <tr><th>User Role</th><th>Page Context</th><th>Date</th><th>Sentiment</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="pill pill-muted" style="font-size:10px;">quantity_surveyor</span></td>
+              <td style="font-size:11px;">/procurement/boq-builder</td>
+              <td style="font-size:11px;">2 Jul 2026</td>
+              <td><span class="pill" style="font-size:10px;">negative</span></td>
+            </tr>
+            <tr>
+              <td><span class="pill pill-muted" style="font-size:10px;">architect</span></td>
+              <td style="font-size:11px;">/specforge/packages</td>
+              <td style="font-size:11px;">1 Jul 2026</td>
+              <td><span class="pill pill-muted" style="font-size:10px;">neutral</span></td>
+            </tr>
+            <tr>
+              <td><span class="pill pill-muted" style="font-size:10px;">contractor</span></td>
+              <td style="font-size:11px;">/procurement/tenders/t-2024</td>
+              <td style="font-size:11px;">29 Jun 2026</td>
+              <td><span class="pill pill-danger" style="font-size:10px;">frustrated</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action Section -->
+      <div style="margin-top:16px; display:flex; gap:8px;">
+        <button class="btn">→ Advance to Planned</button>
+        <button class="btn btn-secondary">✕ Decline</button>
+        <button class="btn btn-secondary">↻ Regenerate Brief</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     FEEDBACK WIDGET (floating, visible on all pages)
+     ═══════════════════════════════════════════════════════════ -->
+
+<!-- Trigger Button -->
+<button class="feedback-trigger" title="Send Feedback (Ctrl+Shift+F)" aria-label="Open feedback panel">
+  💬
+</button>
+
+<!-- Widget Overlay (shown when trigger is clicked) -->
+<div class="feedback-overlay" role="dialog" aria-label="Feedback submission panel">
+  <div class="feedback-header">
+    <h3>Send Feedback</h3>
+    <button class="feedback-close" aria-label="Close feedback panel">✕</button>
+  </div>
+  <div class="feedback-body">
+    <!-- Context auto-captured -->
+    <div class="context-chip">📍 /admin/feedback-roadmap · Admin Module · No project</div>
+
+    <!-- Tabs: Submit | My Feedback -->
+    <div class="tabs" style="margin-bottom:12px;">
+      <button class="tab active" style="padding:6px 12px;">Submit</button>
+      <button class="tab" style="padding:6px 12px;">My Feedback</button>
+    </div>
+
+    <!-- Category Selection -->
+    <div class="category-grid">
+      <div class="category-btn">
+        <span class="category-icon">🐛</span>
+        Bug
+      </div>
+      <div class="category-btn selected">
+        <span class="category-icon">✨</span>
+        Feature Request
+      </div>
+      <div class="category-btn">
+        <span class="category-icon">🎨</span>
+        Usability
+      </div>
+      <div class="category-btn">
+        <span class="category-icon">👏</span>
+        Praise
+      </div>
+    </div>
+
+    <!-- Description -->
+    <textarea class="feedback-textarea" placeholder="Describe your feedback... (min 10 characters)">It would be great if the Roadmap Dashboard could export cluster data as a CSV for sharing with the dev team in sprint planning meetings.</textarea>
+    <div class="char-count">1,847 / 2,000 characters remaining</div>
+
+    <!-- Attachments -->
+    <div class="attach-area">
+      📎 Drag screenshots here or click to browse (PNG/JPEG, max 5MB, up to 3)
+    </div>
+
+    <!-- Submit -->
+    <button class="feedback-submit">Submit Feedback</button>
+  </div>
+</div>
+
+</body>
+</html>

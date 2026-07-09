@@ -763,6 +763,12 @@ marketplaceRouter.put(
         return res.status(404).json({ code: 'NOT_FOUND', message: 'Quote request not found' });
       }
 
+      // Entity-level authorization: verify the authenticated user is the targeted supplier
+      const quoteData = quoteDoc.data();
+      if (quoteData?.supplierId !== uid) {
+        return res.status(403).json({ code: 'ACCESS_DENIED', message: 'Only the targeted supplier can respond to this quote request', details: { reason: 'Entity-level authorization failed' } });
+      }
+
       const now = new Date().toISOString();
 
       // Update quote with supplier's response
