@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Enums
-export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier']);
+export const UserRoleEnum = z.enum(['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'health_safety', 'cpm']);
 export const JobCategoryEnum = z.enum(['Residential', 'Commercial', 'Industrial', 'Renovation', 'Interior', 'Landscape']);
 export const JobStatusEnum = z.enum(['open', 'in-progress', 'completed', 'cancelled']);
 export const ApplicationStatusEnum = z.enum(['pending', 'accepted', 'rejected', 'withdrawn']);
@@ -476,6 +476,100 @@ export const queuedCaptureSchema = z.object({
   status: z.enum(['queued', 'failed']),
 });
 
+// ── ITP (Inspection Test Plans) Schemas ─────────────────────────────────────
+
+export const CONSTRUCTION_STAGES = [
+  'site_establishment', 'earthworks', 'foundations', 'substructure',
+  'superstructure', 'roof', 'external_envelope', 'internal_finishes',
+  'mechanical_electrical', 'external_works', 'commissioning',
+] as const;
+
+export const SANS_TEST_CATEGORIES = [
+  'concrete_7day', 'concrete_28day', 'soil_compaction',
+  'steel_tensile', 'aggregate_grading', 'bituminous_binder',
+] as const;
+
+export const approvedLaboratorySchema = z.object({
+  name: z.string().min(1).max(200),
+  sanasAccreditationNumber: z.string().min(1),
+  accreditedTestMethods: z.array(z.string().min(1)).min(1),
+  isActive: z.boolean(),
+});
+
+export const specificationReferenceSchema = z.string().min(1).max(500).refine(
+  (val) =>
+    /^SANS \d{4,5} clause \d+(\.\d+)*$/.test(val) ||
+    /^NHBRC-/.test(val) ||
+    val.startsWith('SPEC-'),
+  { message: 'Must be SANS clause (e.g. "SANS 10162 clause 13.2"), NHBRC requirement (e.g. "NHBRC-R1"), or project SpecForge ID (e.g. "SPEC-001")' }
+);
+
+export const createITPSchema = z.object({
+  projectId: z.string().min(1),
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).default(''),
+  constructionStage: z.enum(CONSTRUCTION_STAGES),
+});
+
+export const createInspectionItemSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(2000),
+  inspectionType: z.enum(['hold_point', 'witness_point', 'surveillance']),
+  acceptanceCriteria: z.string().min(1).max(2000),
+  responsibleInspectorRole: z.enum(['engineer', 'architect', 'site_manager']),
+  specificationReference: specificationReferenceSchema,
+  specificationCategory: z.string().optional(),
+  linkedMaterialTestIds: z.array(z.string()).max(20).default([]),
+  linkedSpecItemId: z.string().optional(),
+});
+
+export const holdPointRequestSchema = z.object({
+  inspectionItemId: z.string().min(1),
+  requestedInspectionDate: z.string().datetime(),
+});
+
+export const inspectionSignOffSchema = z.object({
+  inspectionItemId: z.string().min(1),
+  outcome: z.enum(['pass', 'fail', 'conditional_pass']),
+  conditions: z.string().max(2000).optional(),
+  conditionsDeadlineDays: z.number().int().min(1).max(30).optional(),
+  observations: z.string().optional(),
+});
+
+export const witnessPointOutcomeSchema = z.object({
+  inspectionItemId: z.string().min(1),
+  outcome: z.enum(['pass', 'fail', 'conditional_pass']),
+  observations: z.string().optional(),
+});
+
+export const createTestingScheduleSchema = z.object({
+  projectId: z.string().min(1),
+  materialType: z.enum(['concrete', 'soil', 'steel', 'aggregate', 'bituminous']),
+  sansTestMethodReference: z.string().min(1),
+  testCategory: z.enum(SANS_TEST_CATEGORIES),
+  testFrequencyRatio: z.number().positive(),
+  testFrequencyQuantity: z.number().positive(),
+  unitOfMeasure: z.string().min(1),
+  minSamplesPerTest: z.number().int().min(1).max(10),
+  acceptanceThreshold: z.number(),
+  thresholdUnit: z.string().min(1),
+  thresholdDirection: z.enum(['gte', 'lte']),
+  expectedTurnaroundDays: z.number().int().min(1).max(90),
+  constructionStage: z.enum(CONSTRUCTION_STAGES),
+  approvedLaboratories: z.array(approvedLaboratorySchema),
+});
+
+export const updateTestingScheduleSchema = createTestingScheduleSchema.partial().omit({ projectId: true });
+
+export const recordLabResultSchema = z.object({
+  materialTestId: z.string().min(1),
+  testDate: z.string().datetime(),
+  resultValue: z.number().min(0).max(999_999_999.99),
+  resultUnit: z.string().min(1),
+  testingLaboratoryName: z.string().min(1).max(200),
+  labReportReference: z.string().min(1).max(50),
+});
+
 // Form validation helpers
 export const validateForm = <T extends z.ZodType>(schema: T, data: unknown): { success: true; data: z.infer<T> } | { success: false; errors: z.ZodError } => {
   const result = schema.safeParse(data);
@@ -493,3 +587,57 @@ export const getFieldErrors = (error: z.ZodError): Record<string, string> => {
   });
   return errors;
 };
+
+
+// ── BIM/IFC Quantity Extraction Bridge Schemas ──────────────────────────────
+
+/** Validates IFC file upload request body */
+export const bimUploadSchema = z.object({
+  file: z.string().min(1, 'Base64-encoded file content is required'),
+  fileName: z.string().endsWith('.ifc', 'File must have a .ifc extension'),
+  projectId: z.string().min(1, 'Project ID is required'),
+});
+
+/** Validates BoQ generation request body */
+export const bimBoqGenerateSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  extractionId: z.string().min(1, 'Extraction ID is required'),
+  options: z.object({
+    currency: z.string().optional(),
+    includeJbccPreambles: z.boolean().optional(),
+    roundingPrecision: z.number().int().min(0).max(6).optional(),
+  }).partial().optional(),
+});
+
+/** Validates mapping rule creation/update request body */
+export const bimMappingRuleSchema = z.object({
+  ifcEntityType: z.string().min(1, 'IFC entity type is required'),
+  predefinedType: z.string().optional(),
+  classificationCode: z.string().optional(),
+  tradeSection: z.string().min(1, 'Trade section is required'),
+  tradeSectionCode: z.string().min(1, 'Trade section code is required'),
+  measurementUnit: z.enum(['m²', 'm³', 'm', 'nr', 'kg', 'item']),
+  scope: z.enum(['default', 'firm', 'project']),
+  scopeId: z.string().optional(),
+});
+
+/** Validates BoQ export request body */
+export const bimExportSchema = z.object({
+  format: z.enum(['csv', 'xlsx', 'json']),
+});
+
+/** Validates procurement package creation request body */
+export const bimProcurementPackageSchema = z.object({
+  boqId: z.string().min(1, 'BoQ ID is required'),
+  selectedSections: z.array(z.string()).min(1, 'At least one trade section must be selected'),
+  selectedLineItems: z.array(z.string()).optional(),
+  coverSheet: z.object({
+    projectName: z.string().min(1, 'Project name is required'),
+    projectNumber: z.string().min(1, 'Project number is required'),
+    packageTitle: z.string().min(1, 'Package title is required'),
+    issueDate: z.string().min(1, 'Issue date is required'),
+    revisionNumber: z.string().min(1, 'Revision number is required'),
+    qsContactName: z.string().min(1, 'QS contact name is required'),
+    qsContactEmail: z.string().email('QS contact email must be a valid email'),
+  }),
+});

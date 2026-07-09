@@ -15,6 +15,9 @@ import { subscribeToMergedQuerySnapshots } from '@/lib/firestoreQueryMerge';
 import { getDemoDoc, getDemoCol } from '../demo-seed/demoFirestore';
 type LoadState = 'loading' | 'ready' | 'error';
 
+/** Maximum disputes shown in cross-project mode */
+const CROSS_PROJECT_LIMIT = 75;
+
 function timestampMs(value: unknown): number {
   if (!value) return 0;
   if (typeof value === 'string' || typeof value === 'number') return new Date(value).getTime() || 0;
@@ -40,13 +43,55 @@ function jobQueriesForUser(user: UserProfile) {
   return [query(jobs, where('status', '==', 'open'), limit(40))];
 }
 
+/**
+ * Build dispute queries scoped by role for cross-project mode.
+ * - admin: all disputes (limited to 75)
+ * - client: disputes on jobs where they are clientId (fetched via job context, plus filed/against)
+ * - architect/bep/freelancer: disputes on assigned jobs (fetched via job context, plus filed/against)
+ * - other roles: only disputes they filed or filed against them
+ */
 function disputeQueriesForUser(user: UserProfile) {
   const disputes = getDemoCol( 'disputes');
-  if (user.role === 'admin') return [query(disputes, limit(75))];
+  if (user.role === 'admin') return [query(disputes, limit(CROSS_PROJECT_LIMIT))];
+  // For client, architect, bep, freelancer: fetch disputes filed by/against them.
+  // Job-based visibility is handled via client-side filtering against loaded jobs.
   return [
-    query(disputes, where('filedBy', '==', user.uid), limit(40)),
-    query(disputes, where('filedAgainst', '==', user.uid), limit(40)),
+    query(disputes, where('filedBy', '==', user.uid), limit(CROSS_PROJECT_LIMIT)),
+    query(disputes, where('filedAgainst', '==', user.uid), limit(CROSS_PROJECT_LIMIT)),
   ];
+}
+
+/**
+ * Filter disputes by role-scoped visibility in cross-project mode.
+ * - admin: sees all disputes
+ * - client: disputes on jobs where they are clientId
+ * - architect/bep/freelancer: disputes on jobs where they are assigned (selectedProfessionalId/selectedBepId/selectedArchitectId)
+ * - other roles: disputes they filed or filed against them
+ */
+export function filterDisputesByRoleScope(disputes: Dispute[], jobs: Job[], user: UserProfile): Dispute[] {
+  if (user.role === 'admin') return disputes.slice(0, CROSS_PROJECT_LIMIT);
+
+  const userJobIds = new Set<string>();
+
+  if (user.role === 'client') {
+    jobs.filter((job) => job.clientId === user.uid).forEach((job) => userJobIds.add(job.id));
+  } else if (user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') {
+    jobs.filter((job) => isSelectedProfessional(job, user.uid)).forEach((job) => userJobIds.add(job.id));
+  }
+
+  // For client/architect/bep/freelancer: disputes on their jobs OR filed by/against them
+  if (user.role === 'client' || user.role === 'architect' || user.role === 'bep' || user.role === 'freelancer') {
+    const filtered = disputes.filter(
+      (dispute) => userJobIds.has(dispute.jobId) || dispute.filedBy === user.uid || dispute.filedAgainst === user.uid
+    );
+    return filtered.slice(0, CROSS_PROJECT_LIMIT);
+  }
+
+  // Other roles: only disputes they filed or filed against them
+  const filtered = disputes.filter(
+    (dispute) => dispute.filedBy === user.uid || dispute.filedAgainst === user.uid
+  );
+  return filtered.slice(0, CROSS_PROJECT_LIMIT);
 }
 
 function counterpartyForJob(user: UserProfile, job?: Job) {
@@ -67,7 +112,13 @@ function statusVariant(status?: string) {
   return 'secondary' as const;
 }
 
-export default function DisputeResolutionPage({ user }: { user: UserProfile }) {
+interface DisputeResolutionPageProps {
+  user: UserProfile;
+  /** When provided, page operates in project-scoped mode — only disputes for this project's job are shown */
+  projectId?: string;
+}
+
+export default function DisputeResolutionPage({ user, projectId }: DisputeResolutionPageProps) {
   const [jobState, setJobState] = useState<LoadState>('loading');
   const [disputeState, setDisputeState] = useState<LoadState>('loading');
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -105,10 +156,26 @@ export default function DisputeResolutionPage({ user }: { user: UserProfile }) {
   }, [user]);
 
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId) ?? jobs[0], [jobs, selectedJobId]);
+
+  // Determine visible disputes based on mode
   const visibleDisputes = useMemo(() => {
-    if (!selectedJob) return disputes;
-    return disputes.filter((dispute) => dispute.jobId === selectedJob.id || dispute.filedBy === user.uid || dispute.filedAgainst === user.uid);
-  }, [disputes, selectedJob, user.uid]);
+    if (projectId) {
+      // Project-scoped mode: show only disputes for jobs belonging to this project
+      // A project's job is identified by the job whose project reference matches, or by the projectId being a job ID
+      // Since Project.jobId links to Job.id, filter disputes whose jobId matches any job associated with this project
+      const projectJobs = jobs.filter((job) => job.id === projectId || (job as unknown as { projectId?: string }).projectId === projectId);
+      const projectJobIds = new Set(projectJobs.map((job) => job.id));
+      // If we couldn't find jobs matching the projectId, try using projectId directly as a jobId
+      if (projectJobIds.size === 0) {
+        projectJobIds.add(projectId);
+      }
+      return disputes.filter((dispute) => projectJobIds.has(dispute.jobId));
+    }
+
+    // Cross-project mode: apply role-scoped visibility with 75-record limit
+    return filterDisputesByRoleScope(disputes, jobs, user);
+  }, [disputes, jobs, user, projectId]);
+
   const canFile = canFileDispute(user, selectedJob);
 
   const submitDispute = async (event: FormEvent<HTMLFormElement>) => {
@@ -181,7 +248,7 @@ export default function DisputeResolutionPage({ user }: { user: UserProfile }) {
           <CardContent className="space-y-3">
             {disputeState === 'loading' && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading disputes...</div>}
             {disputeState === 'error' && <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">Dispute register is unavailable for this role until Firestore rules permit the scoped query.</p>}
-            {disputeState === 'ready' && visibleDisputes.length === 0 && <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">No dispute records are visible.</p>}
+            {disputeState === 'ready' && visibleDisputes.length === 0 && <p className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">No disputes available</p>}
             {visibleDisputes.map((dispute) => (
               <div key={dispute.id} className="rounded-xl border border-border p-4 text-sm">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">

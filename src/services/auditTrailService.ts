@@ -19,6 +19,7 @@ export function createAuditEntry(params: {
   actorId: string;
   action: string;
   sourceObjectId: string;
+  metadata?: Record<string, unknown>;
 }): AuditRecord {
   const record: AuditRecord = {
     auditId: `audit-${auditLog.length + 1}`,

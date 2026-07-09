@@ -99,7 +99,7 @@ async function persistToRetryQueue(event: SpecAuditEvent): Promise<void> {
 export async function logSpecForgeAction(params: {
   action: SpecAuditAction;
   targetId: string;
-  targetType: 'item' | 'section' | 'workspace' | 'snapshot';
+  targetType: 'item' | 'section' | 'workspace' | 'snapshot' | 'procurement' | 'substitution' | 'approval';
   performedBy: string;
   projectId: string;
   previousValue?: string;
@@ -140,6 +140,56 @@ export async function logSpecForgeAction(params: {
   if (!platformSuccess) {
     await persistToRetryQueue(event);
   }
+}
+
+// ── Enhanced Audit Event API (Req 12.1, 12.9) ──────────────────────────────
+
+/**
+ * Emit an enhanced audit event following the EnhancedAuditEvent schema.
+ * This is the primary entry point for the governance triple-write pattern.
+ *
+ * All fields required by Requirement 12.9 are included:
+ * - performedBy (UID), action, targetId, targetType, performedAt (ISO 8601 UTC)
+ * - previousValue/newValue capped at 10,000 characters each
+ *
+ * Requirements: 12.1, 12.9
+ */
+export async function emitEnhancedAuditEvent(params: {
+  action: SpecAuditAction;
+  targetId: string;
+  targetType: 'item' | 'section' | 'workspace' | 'snapshot' | 'procurement' | 'substitution' | 'approval';
+  performedBy: string;
+  projectId: string;
+  previousValue?: string;
+  newValue?: string;
+  details?: string;
+}): Promise<string> {
+  const eventId = generateEventId();
+
+  const event: SpecAuditEvent = {
+    id: eventId,
+    workspaceId: params.projectId,
+    action: params.action,
+    targetId: params.targetId,
+    targetType: params.targetType,
+    performedBy: params.performedBy,
+    performedAt: new Date().toISOString(),
+    previousValue: capValue(params.previousValue),
+    newValue: capValue(params.newValue),
+    details: params.details,
+  };
+
+  // 1. Persist to SpecForge-specific collection
+  const repo = getSpecForgeRepository();
+  await repo.logAuditEvent(event);
+
+  // 2. Persist to platform-wide audit trail (best-effort with durable retry)
+  const platformSuccess = persistToPlatformAudit(event);
+  if (!platformSuccess) {
+    await persistToRetryQueue(event);
+  }
+
+  return eventId;
 }
 
 // ── Test Utilities ──────────────────────────────────────────────────────────

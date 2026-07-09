@@ -151,6 +151,18 @@ const NOTIFICATION_CONFIG: Record<NotificationType, { title: string; channels: (
     title: 'Invoice Ready for Review',
     channels: ['in_app', 'email'],
   },
+  feedback_status_changed: {
+    title: 'Feedback Status Updated',
+    channels: ['in_app', 'email'],
+  },
+  feedback_shipped: {
+    title: 'Your Feedback Was Shipped',
+    channels: ['in_app', 'email'],
+  },
+  feedback_declined: {
+    title: 'Feedback Update',
+    channels: ['in_app', 'email'],
+  },
 };
 
 class NotificationService {
@@ -312,6 +324,9 @@ class NotificationService {
       registration_expiring: '🪪',
       cpd_shortfall: '📊',
       invoice_ready_for_review: '🧾',
+      feedback_status_changed: '📣',
+      feedback_shipped: '🚀',
+      feedback_declined: '📋',
     };
 
     toast(`${icons[type] || '🔔'} ${title}`, {
