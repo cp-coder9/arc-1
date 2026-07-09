@@ -1,9 +1,34 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Mock firebase-admin for project access role assignment/revocation tests
+const mockGet = vi.fn();
+const mockSet = vi.fn().mockResolvedValue(undefined);
+const mockDelete = vi.fn().mockResolvedValue(undefined);
+const mockDocRef = { get: mockGet, set: mockSet, delete: mockDelete };
+const mockDoc = vi.fn(() => mockDocRef);
+const mockCollection = vi.fn(() => ({ doc: mockDoc }));
+
+vi.mock('@/lib/firebase-admin', () => ({
+  adminDb: {
+    collection: vi.fn(() => ({
+      doc: vi.fn(() => ({
+        collection: mockCollection,
+        doc: mockDoc,
+        get: mockGet,
+        set: mockSet,
+        delete: mockDelete,
+      })),
+    })),
+  },
+}));
+
 import {
   buildRoleChangeAuditInput,
   buildRoleChangeDecision,
   buildRoleChangePatch,
   isServerAuthoritativeAdmin,
+  assignProjectAccessRole,
+  revokeProjectAccessRole,
 } from '../adminRoleService';
 
 const adminActor = { uid: 'admin-1', role: 'admin' as const, email: 'admin@example.com' };
@@ -138,6 +163,174 @@ describe('adminRoleService', () => {
         reasonCode: 'verification_approved',
         requiresAdmin: true,
       },
+    });
+  });
+
+  describe('assignProjectAccessRole', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('assigns lead_consultant to a compatible user and writes to Firestore', async () => {
+      mockGet.mockResolvedValue({ exists: false });
+
+      const result = await assignProjectAccessRole(
+        { uid: 'user-1', role: 'architect' },
+        'lead_consultant',
+        'project-1',
+        'admin-1',
+      );
+
+      expect(result).toMatchObject({
+        userId: 'user-1',
+        projectId: 'project-1',
+        accessRole: 'lead_consultant',
+        assignedBy: 'admin-1',
+        userProfessionalRole: 'architect',
+      });
+      expect('error' in result).toBe(false);
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({
+        userId: 'user-1',
+        projectId: 'project-1',
+        accessRole: 'lead_consultant',
+      }));
+    });
+
+    it('assigns project_administrator to a compatible user', async () => {
+      mockGet.mockResolvedValue({ exists: false });
+
+      const result = await assignProjectAccessRole(
+        { uid: 'user-2', role: 'contractor' },
+        'project_administrator',
+        'project-2',
+        'admin-1',
+      );
+
+      expect(result).toMatchObject({
+        userId: 'user-2',
+        projectId: 'project-2',
+        accessRole: 'project_administrator',
+        assignedBy: 'admin-1',
+        userProfessionalRole: 'contractor',
+      });
+      expect('error' in result).toBe(false);
+    });
+
+    it('returns 400 error for incompatible role assignment (client + lead_consultant)', async () => {
+      const result = await assignProjectAccessRole(
+        { uid: 'user-1', role: 'client' },
+        'lead_consultant',
+        'project-1',
+        'admin-1',
+      );
+
+      expect(result).toMatchObject({
+        error: 'Role client is not compatible with project access role lead_consultant',
+        status: 400,
+      });
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 error for incompatible role assignment (freelancer + project_administrator)', async () => {
+      const result = await assignProjectAccessRole(
+        { uid: 'user-1', role: 'freelancer' },
+        'project_administrator',
+        'project-1',
+        'admin-1',
+      );
+
+      expect(result).toMatchObject({
+        error: 'Role freelancer is not compatible with project access role project_administrator',
+        status: 400,
+      });
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 error when user already holds opposite role (mutual exclusivity)', async () => {
+      mockGet.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          userId: 'user-1',
+          projectId: 'project-1',
+          accessRole: 'lead_consultant',
+          assignedBy: 'admin-1',
+          assignedAt: '2026-01-01T00:00:00.000Z',
+          userProfessionalRole: 'architect',
+        }),
+      });
+
+      const result = await assignProjectAccessRole(
+        { uid: 'user-1', role: 'architect' },
+        'project_administrator',
+        'project-1',
+        'admin-2',
+      );
+
+      expect(result).toMatchObject({
+        error: 'User already holds lead_consultant on project project-1; revoke it first',
+        status: 409,
+      });
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('allows re-assignment of the same role (overwrite)', async () => {
+      mockGet.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          userId: 'user-1',
+          projectId: 'project-1',
+          accessRole: 'lead_consultant',
+          assignedBy: 'admin-old',
+          assignedAt: '2026-01-01T00:00:00.000Z',
+          userProfessionalRole: 'architect',
+        }),
+      });
+
+      const result = await assignProjectAccessRole(
+        { uid: 'user-1', role: 'architect' },
+        'lead_consultant',
+        'project-1',
+        'admin-new',
+      );
+
+      // Same role re-assignment is allowed (not mutually exclusive)
+      expect(result).toMatchObject({
+        userId: 'user-1',
+        accessRole: 'lead_consultant',
+        assignedBy: 'admin-new',
+      });
+      expect(mockSet).toHaveBeenCalled();
+    });
+
+    it('returns 400 when user has no role (undefined)', async () => {
+      const result = await assignProjectAccessRole(
+        { uid: 'user-1' },
+        'lead_consultant',
+        'project-1',
+        'admin-1',
+      );
+
+      expect(result).toMatchObject({
+        error: 'Role unknown is not compatible with project access role lead_consultant',
+        status: 400,
+      });
+    });
+  });
+
+  describe('revokeProjectAccessRole', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('deletes the access role document from Firestore', async () => {
+      await revokeProjectAccessRole(
+        { uid: 'user-1', role: 'architect' },
+        'lead_consultant',
+        'project-1',
+        'admin-1',
+      );
+
+      expect(mockDelete).toHaveBeenCalled();
     });
   });
 });

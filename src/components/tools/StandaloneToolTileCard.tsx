@@ -34,6 +34,7 @@ const CATEGORY_COLORS: Record<StandaloneToolCategory, string> = {
   communication: 'bg-fuchsia-100 text-fuchsia-800',
   freelancer: 'bg-magenta-100 text-magenta-800',
   resource_centre: 'bg-gray-100 text-gray-800',
+  construction_admin: 'bg-orange-100 text-orange-800',
   general: 'bg-neutral-100 text-neutral-800',
 }
 

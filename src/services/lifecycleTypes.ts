@@ -60,7 +60,13 @@ export type ProjectRecordType =
   | 'site_instruction'
   | 'snag_register'
   | 'closeout_pack'
-  | 'candidate_supervision_record';
+  | 'candidate_supervision_record'
+  | 'hs_plan_approved'
+  | 'permit_issued'
+  | 'incident_reported'
+  | 'safety_file_score_changed'
+  | 'hs_specification_complete'
+  | 'inspection_test_plan';
 
 export interface AuditMetadata {
   createdBy: string;
@@ -179,7 +185,7 @@ export interface WorkflowEvent {
   title: string;
   detail: string;
   priority: Priority;
-  sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'settings_admin';
+  sourceModule: 'projects' | 'documents' | 'finance' | 'marketplace' | 'messages' | 'site' | 'settings_admin' | 'health_safety';
   assignedRoles: ArchitexRole[];
   createdAt: string;
 }
