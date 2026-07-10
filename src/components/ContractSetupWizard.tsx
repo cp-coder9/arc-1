@@ -41,9 +41,8 @@ import type {
   ValidationFieldError,
 } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function setupContractViaApi(input: ContractSetupInput) {
-  const res = await apiFetch('/api/contract-admin/setup', {
+  const res = await apiFetch(`/api/contract-admin/${input.projectId}/setup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),

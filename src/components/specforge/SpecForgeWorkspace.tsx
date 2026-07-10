@@ -14,6 +14,7 @@ import type {
   SpecProcurementEntry,
   SpecLibraryItem,
   SpecBoMLineItem,
+  SpecForgeWorkspace as SpecForgeWorkspaceType,
 } from '@/types/specforgeTypes';
 import { toSpecForgeRole } from '@/types/specforgeTypes';
 import {
@@ -21,14 +22,18 @@ import {
   getVisibleSpecItems,
   summarizeSpecBudget,
   validateIssueReadiness,
-  createIssueSnapshot,
-  issueSpecification,
   searchSpecLibrary,
   generateBoMFromSpec,
-  advanceProcurementStatus,
 } from '@/services/specforge/specforgeService';
-import { SAMPLE_WORKSPACE, SAMPLE_PROCUREMENT_ENTRIES } from '@/services/specforge/specforgeSampleData';
-import { getSpecForgeRepository } from '@/services/specforge/specforgeRepository';
+import {
+  fetchWorkspace,
+  fetchProcurement,
+  createItem,
+  createSection,
+  issueSpecification,
+  updateProcurement,
+  updateItem,
+} from '@/services/specforge/specforgeApiClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,26 +44,41 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   user: UserProfile;
+  projectId?: string;
 }
 
-export default function SpecForgeWorkspace({ user }: Props) {
+export default function SpecForgeWorkspace({ user, projectId: propProjectId }: Props) {
   const role: SpecForgeRole = toSpecForgeRole(user.role) ?? 'client';
-  const [workspace, setWorkspace] = useState(SAMPLE_WORKSPACE);
+  const [workspace, setWorkspace] = useState<SpecForgeWorkspaceType | null>(null);
   const [activeView, setActiveView] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [roomFilter, setRoomFilter] = useState('all');
   const [pkgFilter, setPkgFilter] = useState('all');
-  const [procurement, setProcurement] = useState<SpecProcurementEntry[]>(SAMPLE_PROCUREMENT_ENTRIES);
+  const [procurement, setProcurement] = useState<SpecProcurementEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load workspace from repository (falls back to SAMPLE_WORKSPACE if null)
-  const projectId = SAMPLE_WORKSPACE.projectId;
+  // Resolve project ID from prop or user context
+  const projectId = propProjectId ?? (user as unknown as { activeProjectId?: string }).activeProjectId;
+
+  // Load workspace from API
   useEffect(() => {
-    const repo = getSpecForgeRepository();
-    repo.getWorkspace(projectId).then((ws) => {
-      if (ws) setWorkspace(ws);
-    });
-    repo.getProcurementEntries(projectId).then((entries) => {
-      if (entries.length > 0) setProcurement(entries);
+    if (!projectId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      fetchWorkspace(projectId),
+      fetchProcurement(projectId),
+    ]).then(([ws, entries]) => {
+      setWorkspace(ws);
+      setProcurement(entries);
+    }).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Failed to load workspace');
+    }).finally(() => {
+      setLoading(false);
     });
   }, [projectId]);
   const [issuedSnapshot, setIssuedSnapshot] = useState<string | null>(null);
@@ -66,6 +86,7 @@ export default function SpecForgeWorkspace({ user }: Props) {
 
   // Derived state
   const visibleItems = useMemo((): SpecItem[] => {
+    if (!workspace) return [];
     let items = getVisibleSpecItems(workspace, role, user.uid);
     if (roomFilter !== 'all') items = items.filter((i) => i.room === roomFilter);
     if (pkgFilter !== 'all') items = items.filter((i) => i.package === pkgFilter);
@@ -73,10 +94,10 @@ export default function SpecForgeWorkspace({ user }: Props) {
   }, [workspace, role, roomFilter, pkgFilter]);
 
   const budget = useMemo(() => summarizeSpecBudget(visibleItems), [visibleItems]);
-  const readiness = useMemo(() => validateIssueReadiness(workspace), [workspace]);
+  const readiness = useMemo(() => workspace ? validateIssueReadiness(workspace) : [], [workspace]);
   const bomItems = useMemo(() => generateBoMFromSpec(visibleItems), [visibleItems]);
-  const rooms = useMemo(() => [...new Set(workspace.items.map((i) => i.room))], [workspace]);
-  const packages = useMemo(() => [...new Set(workspace.items.map((i) => i.package))], [workspace]);
+  const rooms = useMemo(() => workspace ? [...new Set(workspace.items.map((i) => i.room))] : [], [workspace]);
+  const packages = useMemo(() => workspace ? [...new Set(workspace.items.map((i) => i.package))] : [], [workspace]);
 
   // Library search
   const libraryResults = useMemo(() => {
@@ -88,8 +109,8 @@ export default function SpecForgeWorkspace({ user }: Props) {
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSection, setNewSection] = useState({ code: '', title: '', discipline: '' });
 
-  const handleAddSection = useCallback(() => {
-    if (!newSection.code || !newSection.title) return;
+  const handleAddSection = useCallback(async () => {
+    if (!newSection.code || !newSection.title || !projectId) return;
     const section: SpecSection = {
       id: `sec-${Date.now()}`,
       code: newSection.code,
@@ -99,10 +120,15 @@ export default function SpecForgeWorkspace({ user }: Props) {
       reviewerRole: undefined,
       status: 'draft',
     };
-    setWorkspace((ws) => ({ ...ws, sections: [...ws.sections, section] }));
-    setNewSection({ code: '', title: '', discipline: '' });
-    setShowAddSection(false);
-  }, [newSection, role]);
+    try {
+      const created = await createSection(projectId, section);
+      setWorkspace((ws) => ws ? { ...ws, sections: [...ws.sections, created] } : ws);
+      setNewSection({ code: '', title: '', discipline: '' });
+      setShowAddSection(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add section');
+    }
+  }, [newSection, role, projectId]);
 
   // Item add form
   const [showAddItem, setShowAddItem] = useState(false);
@@ -113,8 +139,8 @@ export default function SpecForgeWorkspace({ user }: Props) {
     clientDecision: false,
   });
 
-  const handleAddItem = useCallback(() => {
-    if (!newItem.code || !newItem.title || !newItem.sectionId) return;
+  const handleAddItem = useCallback(async () => {
+    if (!newItem.code || !newItem.title || !newItem.sectionId || !projectId || !workspace) return;
     const item: SpecItem = {
       id: `item-${Date.now()}`,
       sectionId: newItem.sectionId,
@@ -137,40 +163,66 @@ export default function SpecForgeWorkspace({ user }: Props) {
       sourceRevision: workspace.revision,
       supersededBy: null,
     };
-    setWorkspace((ws) => ({ ...ws, items: [...ws.items, item] }));
-    setNewItem({
-      sectionId: '', code: '', title: '', room: '', package: '',
-      supplier: '', model: '', finish: '', dimensions: '',
-      budgetAllowance: '', estimatedCost: '', leadTimeDays: '',
-      clientDecision: false,
-    });
-    setShowAddItem(false);
-  }, [newItem, role, workspace.revision]);
+    try {
+      const created = await createItem(projectId, item);
+      setWorkspace((ws) => ws ? { ...ws, items: [...ws.items, created] } : ws);
+      setNewItem({
+        sectionId: '', code: '', title: '', room: '', package: '',
+        supplier: '', model: '', finish: '', dimensions: '',
+        budgetAllowance: '', estimatedCost: '', leadTimeDays: '',
+        clientDecision: false,
+      });
+      setShowAddItem(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add item');
+    }
+  }, [newItem, role, workspace, projectId]);
 
   // Issue workflow
-  const handleIssue = useCallback(() => {
+  const handleIssue = useCallback(async () => {
+    if (!projectId || !workspace) return;
     try {
       setIssueError(null);
-      const issuer = { userId: user.uid, name: user.displayName, role };
       const recipients: SpecIssueRecipient[] = (workspace.team ?? []).map((m) => ({
         userId: m.userId,
         name: m.name,
         role: m.role,
         scope: m.responsibility,
       }));
-      const result = issueSpecification(workspace, issuer, recipients);
+      const result = await issueSpecification(projectId, recipients);
       setIssuedSnapshot(result.snapshot.snapshotId);
     } catch (err: unknown) {
       setIssueError(err instanceof Error ? err.message : 'Issue failed');
     }
-  }, [workspace, user, role]);
+  }, [workspace, projectId]);
 
   // Procurement status advance
-  const handleAdvanceProcurement = useCallback((entryId: string) => {
+  const PROCUREMENT_STATUS_ORDER: SpecProcurementEntry['status'][] = [
+    'not_started', 'rfq_sent', 'quoted', 'ordered', 'dispatched', 'delivered', 'installed', 'closed',
+  ];
+
+  const handleAdvanceProcurement = useCallback(async (entryId: string) => {
+    if (!projectId) return;
+    const entry = procurement.find((e) => e.id === entryId);
+    if (!entry) return;
+    const currentIdx = PROCUREMENT_STATUS_ORDER.indexOf(entry.status);
+    if (currentIdx < 0 || currentIdx >= PROCUREMENT_STATUS_ORDER.length - 1) return;
+    const nextStatus = PROCUREMENT_STATUS_ORDER[currentIdx + 1];
+
+    // Optimistic update
     setProcurement((entries) =>
-      entries.map((e) => (e.id === entryId ? advanceProcurementStatus(e) : e)),
+      entries.map((e) => (e.id === entryId ? { ...e, status: nextStatus } : e)),
     );
-  }, []);
+    try {
+      await updateProcurement(projectId, entryId, { status: nextStatus });
+    } catch (err: unknown) {
+      // Revert optimistic update on failure
+      setProcurement((entries) =>
+        entries.map((e) => (e.id === entryId ? { ...e, status: entry.status } : e)),
+      );
+      setError(err instanceof Error ? err.message : 'Failed to advance procurement');
+    }
+  }, [projectId, procurement]);
 
   // Populate item from library
   const handleLibrarySelect = useCallback((libItem: SpecLibraryItem) => {
@@ -190,6 +242,43 @@ export default function SpecForgeWorkspace({ user }: Props) {
   const canIssue = specRoleCan(role, 'issue_spec');
 
   // ── Render ──────────────────────────────────────────────────────────────
+
+  if (!projectId) {
+    return (
+      <div className="flex items-center justify-center p-12" data-testid="specforge-workspace">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <p className="text-lg font-medium">Select a project</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              SpecForge requires an active project context. Please select a project to continue.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12" data-testid="specforge-workspace">
+        <p className="text-sm text-muted-foreground">Loading workspace…</p>
+      </div>
+    );
+  }
+
+  if (error || !workspace) {
+    return (
+      <div className="flex items-center justify-center p-12" data-testid="specforge-workspace">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <p className="text-lg font-medium text-red-400">Failed to load workspace</p>
+            <p className="mt-2 text-sm text-muted-foreground">{error ?? 'Workspace data unavailable.'}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6" data-testid="specforge-workspace">
       {/* Header */}
@@ -395,13 +484,27 @@ export default function SpecForgeWorkspace({ user }: Props) {
                       {specRoleCan(role, 'approve_client_decision') && item.clientDecision && (
                         <Button
                           size="sm"
-                          onClick={() => {
-                            setWorkspace((ws) => ({
+                          onClick={async () => {
+                            if (!projectId) return;
+                            // Optimistic update
+                            setWorkspace((ws) => ws ? {
                               ...ws,
                               items: ws.items.map((i) =>
                                 i.id === item.id ? { ...i, status: 'approved' } : i,
                               ),
-                            }));
+                            } : ws);
+                            try {
+                              await updateItem(projectId, item.id, { status: 'approved' });
+                            } catch (err: unknown) {
+                              // Revert optimistic update
+                              setWorkspace((ws) => ws ? {
+                                ...ws,
+                                items: ws.items.map((i) =>
+                                  i.id === item.id ? { ...i, status: 'needs_decision' } : i,
+                                ),
+                              } : ws);
+                              setError(err instanceof Error ? err.message : 'Failed to approve item');
+                            }
                           }}
                         >
                           Approve

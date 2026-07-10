@@ -90,7 +90,8 @@ function requireCapability(capability: SpecCapability): RequestHandler {
 /**
  * Middleware that verifies the authenticated user is a member of the project team.
  * Checks the project doc's `teamMembers` array for the user's UID.
- * If the project doesn't exist or has no team data, allows access (graceful degradation).
+ * Fail-closed: denies access when project membership cannot be verified,
+ * except for admin/platform_admin roles which bypass membership checks.
  *
  * Requirements: 6.2
  */
@@ -100,18 +101,26 @@ const requireProjectMember: RequestHandler = async (req: Request, res: Response,
     next();
     return;
   }
+
+  // Admin/platform_admin bypass — always allowed
+  const userRole = req.authContext!.role;
+  if (userRole === 'admin' || userRole === 'platform_admin') {
+    next();
+    return;
+  }
+
   try {
     const projectSnap = await adminDb.collection('projects').doc(projectId).get();
     if (!projectSnap.exists) {
-      // Project doesn't exist — allow access (graceful degradation for new projects)
-      next();
+      // Project doesn't exist — deny access (fail-closed)
+      res.status(403).json({ error: 'Project not found' });
       return;
     }
     const projectData = projectSnap.data()!;
     const teamMembers: Array<{ userId?: string; uid?: string }> = projectData.teamMembers ?? [];
     if (teamMembers.length === 0) {
-      // No team data — allow access (graceful degradation)
-      next();
+      // No team data — deny access (fail-closed)
+      res.status(403).json({ error: 'Not a member of this project' });
       return;
     }
     const uid = req.authContext!.uid;
@@ -125,14 +134,14 @@ const requireProjectMember: RequestHandler = async (req: Request, res: Response,
       projectData.leadBepId === uid ||
       projectData.leadArchitectId === uid;
 
-    if (!isMember && !isOwner && req.authContext!.role !== 'admin' && req.authContext!.role !== 'platform_admin') {
+    if (!isMember && !isOwner) {
       res.status(403).json({ error: 'Not a member of this project' });
       return;
     }
     next();
   } catch {
-    // On failure to check, allow access (graceful degradation)
-    next();
+    // On failure to check, deny access (fail-closed)
+    res.status(500).json({ error: 'Unable to verify project membership' });
   }
 };
 

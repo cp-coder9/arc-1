@@ -28,52 +28,6 @@ interface TaskMarketplaceProps {
   user: UserProfile;
 }
 
-const mockTasks: TaskPosting[] = [
-  {
-    id: 'task-1',
-    professionalId: 'prof-1',
-    tenantId: 'prof-1',
-    title: 'Structural Load Calculation — Residential Extension',
-    description: 'Perform structural load calculations for a 45m² ground-floor extension with suspended slab above. Deliver certified calculation sheet.',
-    estimatedHours: 12,
-    paymentAmount: 8500,
-    requiredTools: ['structural-load-calculator'],
-    deliverableFormat: 'pdf',
-    deadline: '2026-07-20T23:59:59.000Z',
-    status: 'open',
-    createdAt: '2026-06-12T08:00:00.000Z',
-  },
-  {
-    id: 'task-2',
-    professionalId: 'prof-2',
-    tenantId: 'prof-2',
-    title: 'Energy Compliance Report — SANS 10400-XA',
-    description: 'Complete XA compliance report and fenestration schedule for a 3-bedroom residential dwelling in Midrand.',
-    estimatedHours: 8,
-    paymentAmount: 5200,
-    requiredTools: ['energy-compliance-tool', 'fenestration-analyser'],
-    deliverableFormat: 'pdf',
-    deadline: '2026-07-15T23:59:59.000Z',
-    status: 'open',
-    createdAt: '2026-06-14T10:00:00.000Z',
-  },
-  {
-    id: 'task-3',
-    professionalId: 'prof-1',
-    tenantId: 'prof-1',
-    title: 'Fire Safety Drawing Review',
-    description: 'Review architectural drawings for fire regulation compliance per SANS 10400-T. Mark-up non-compliant areas.',
-    estimatedHours: 6,
-    paymentAmount: 4000,
-    requiredTools: ['fire-safety-analyser'],
-    deliverableFormat: 'image',
-    deadline: '2026-07-25T23:59:59.000Z',
-    status: 'in_progress',
-    assignedFreelancerId: 'freelancer-1',
-    createdAt: '2026-06-10T14:00:00.000Z',
-  },
-];
-
 function formatCurrency(amount: number): string {
   return `R ${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
 }
@@ -103,13 +57,15 @@ function getFormatLabel(format: DeliverableFormat): string {
 
 export default function TaskMarketplace({ user }: TaskMarketplaceProps) {
   const [activeTab, setActiveTab] = useState('available');
-  const [_tasks, setTasks] = useState<TaskPosting[]>(mockTasks);
+  const [_tasks, setTasks] = useState<TaskPosting[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch('/api/marketplace/tasks')
       .then((r) => r.json())
       .then((d) => setTasks(d.tasks || []))
-      .catch(() => setTasks(mockTasks));
+      .catch(() => setTasks([]))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -136,6 +92,11 @@ export default function TaskMarketplace({ user }: TaskMarketplaceProps) {
 
         {/* Available Tasks */}
         <TabsContent value="available">
+          {loading ? (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">Loading...</p></div>
+          ) : _tasks.filter((t) => t.status === 'open').length === 0 ? (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No tasks found</p></div>
+          ) : (
           <div className="space-y-4">
             {_tasks.filter((t) => t.status === 'open').map((task) => (
               <Card key={task.id} className="bg-surface-800/70 backdrop-blur border-surface-700/50">
@@ -187,6 +148,7 @@ export default function TaskMarketplace({ user }: TaskMarketplaceProps) {
               </Card>
             ))}
           </div>
+          )}
         </TabsContent>
 
         {/* Applications */}

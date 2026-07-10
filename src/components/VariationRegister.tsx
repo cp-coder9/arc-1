@@ -53,9 +53,8 @@ import type {
 } from '@/services/contractAdmin/client';
 import { VARIATION_TRANSITIONS } from '@/services/contractAdmin/client';
 
-// TODO: wire to real API endpoint
 async function createVariationViaApi(input: VariationInput) {
-  const res = await apiFetch('/api/contract-admin/variations/create', {
+  const res = await apiFetch(`/api/contract-admin/${input.projectId}/variations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -64,49 +63,44 @@ async function createVariationViaApi(input: VariationInput) {
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function transitionVariationViaApi(projectId: string, variationId: string, newStatus: VariationStatus, userId: string) {
-  const res = await apiFetch('/api/contract-admin/variations/transition', {
-    method: 'POST',
+async function transitionVariationViaApi(projectId: string, variationId: string, newStatus: VariationStatus, _userId: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/variations/${variationId}/transition`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, variationId, newStatus, userId }),
+    body: JSON.stringify({ toStatus: newStatus }),
   });
   if (!res.ok) throw new Error(`Transition failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
-async function valueVariationViaApi(projectId: string, variationId: string, costImpact: { type: 'addition' | 'omission'; amount: number }, timeImpact: number, userId: string) {
-  const res = await apiFetch('/api/contract-admin/variations/value', {
-    method: 'POST',
+async function valueVariationViaApi(projectId: string, variationId: string, costImpact: { type: 'addition' | 'omission'; amount: number }, timeImpact: number, _userId: string) {
+  const res = await apiFetch(`/api/contract-admin/${projectId}/variations/${variationId}/value`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, variationId, costImpact, timeImpact, userId }),
+    body: JSON.stringify({ costImpact, timeImpactDays: timeImpact }),
   });
   if (!res.ok) throw new Error(`Valuation failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function getCumulativeSummaryViaApi(projectId: string): Promise<VariationCumulativeSummary> {
-  const res = await apiFetch(`/api/contract-admin/variations/summary?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/variations/summary`);
   if (!res.ok) throw new Error(`Failed to load summary: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function linkToSpecForgeViaApi(projectId: string, variationId: string, specForgeRef: string) {
-  const res = await apiFetch('/api/contract-admin/variations/link-specforge', {
-    method: 'POST',
+  const res = await apiFetch(`/api/contract-admin/${projectId}/variations/${variationId}/link-specforge`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, variationId, specForgeRef }),
+    body: JSON.stringify({ specForgeRef }),
   });
   if (!res.ok) throw new Error(`Link failed: ${res.statusText}`);
   return res.json();
 }
 
-// TODO: wire to real API endpoint
 async function getContractConfigViaApi(projectId: string): Promise<ContractConfig | null> {
-  const res = await apiFetch(`/api/contract-admin/config?projectId=${encodeURIComponent(projectId)}`);
+  const res = await apiFetch(`/api/contract-admin/${projectId}/config`);
   if (!res.ok) return null;
   return res.json();
 }
