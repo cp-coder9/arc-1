@@ -4,102 +4,359 @@
  * Express 5 router providing all REST endpoints for the Session Broker component.
  * Mounted at /api/remote-desktop/ in the main api-router.ts.
  *
- * Handles: host registration/heartbeat, session token issuance, session lifecycle,
- * file manifest/approval, billing finalisation, and audit event queries.
+ * Handles: session start/end, host registration/heartbeat, app allowlist,
+ * incidents, file manifest approval/rejection, audit events, and agent version.
  *
- * Requirements: 3.1, 4.1, 1.1, 2.4, 8.3, 11.3, 12.1
+ * All routes require Firebase Auth middleware. Role-based access control is
+ * enforced per-endpoint using the authenticated user's role from authContext.
+ *
+ * Requirements: 1, 2, 3, 4, 5, 7, 8, 9, 11, 12
  */
 
 import express from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
-import { requireAuth } from './roleMiddleware';
+import { requireAuth, requireAdmin } from './roleMiddleware';
 import {
-  HardwareSpecsSchema,
-  HostConfigurationSchema,
-  RemoteDesktopAppSchema,
-  SessionTokenPayloadSchema,
-} from '../services/remoteDesktop/schemas';
-import {
+  // Session gate
+  evaluateSessionGate,
+  type SessionGateInput,
+
+  // Token service
   generateSessionToken,
-  validateSessionToken,
-  revokeSessionToken,
-  createSession,
+
+  // Session broker
   endSession,
-  getSessionState,
-  writeAuditEvent,
-  queryAuditEvents,
-  calculateBilling,
-  getFileManifest,
-  approveFileHandoff,
-} from '../services/remoteDesktop/remoteDesktopService';
+  getSession,
+  type EndSessionInput,
+  type DisconnectionReason,
+
+  // Host registry
+  registerHost,
+  processHeartbeat,
+  getHostApps,
+  CURRENT_AGENT_VERSION,
+  MIN_SUPPORTED_VERSION,
+  type RegisterHostInput,
+
+  // Incidents
+  createIncident,
+  updateIncidentStatus,
+  type CreateIncidentInput,
+  type UpdateIncidentStatusInput,
+
+  // File handoff
+  approveManifest,
+  rejectFiles,
+
+  // Audit events (async, role-scoped)
+  querySessionEvents,
+} from '../services/remoteDesktop';
+
+// Use sessionAuditService ActorRole ('Platform_Admin' | 'Owner' | 'Consumer')
+type AuditActorRole = 'Platform_Admin' | 'Owner' | 'Consumer';
 
 // ─── Request Validation Schemas ───────────────────────────────────────────────
 
-const RegisterHostBodySchema = z.object({
-  machineName: z.string().min(1).max(64),
-  osVersion: z.string().min(1),
-  hardwareSpecs: HardwareSpecsSchema,
-  configuration: HostConfigurationSchema,
-});
-
-const HeartbeatBodySchema = z.object({
-  status: z.enum(['online', 'offline', 'in_session']),
-  cpuUtilisation: z.number().min(0).max(100),
-  availableRamMb: z.number().min(0),
-});
-
-const UpdateAppsBodySchema = z.object({
-  apps: z.array(
-    z.object({
-      displayName: z.string().min(1).max(128),
-      executablePath: z.string().min(1).max(512),
-      softwareCategory: z.string().min(1).max(64),
-    }),
-  ).min(1).max(20),
-});
-
-const GenerateTokenBodySchema = z.object({
+const StartSessionBodySchema = z.object({
   bookingId: z.string().min(1),
-  consumerUid: z.string().min(1),
   hostId: z.string().min(1),
-  windowStart: z.number().int(),
-  windowEnd: z.number().int(),
-  gracePeriodSeconds: z.number().int().min(60).max(1800),
+  /** Pre-fetched booking data for gate evaluation */
+  booking: z.object({
+    status: z.string(),
+    approvedBy: z.string().optional(),
+    startsAt: z.string(),
+    endsAt: z.string(),
+    resourceId: z.string(),
+  }).optional(),
+  /** Pre-fetched host data for gate evaluation */
+  host: z.object({
+    status: z.string(),
+    lastHeartbeat: z.string(),
+    resourceListingId: z.string(),
+    agentVersion: z.string(),
+  }).optional(),
+  appCount: z.number().int().min(0).optional(),
 });
 
 const EndSessionBodySchema = z.object({
-  reason: z.string().min(1).max(256),
+  sessionId: z.string().min(1),
+  reason: z.enum([
+    'user_initiated',
+    'booking_window_expired',
+    'uac_terminated',
+    'connection_lost',
+    'owner_revoked',
+    'system_error',
+    'governance_cancelled',
+    'connection_failed',
+  ]),
 });
 
-const ApproveFilesBodySchema = z.object({
-  approvedFileNames: z.array(z.string().min(1)).min(1),
-});
-
-const BillingBodySchema = z.object({
-  billedDurationMinutes: z.number().int().min(1).max(1440),
-  ownerApproved: z.boolean(),
-});
-
-const AuditQuerySchema = z.object({
+const SessionEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
+  startAfterEventId: z.string().optional(),
 });
+
+const RegisterHostBodySchema = z.object({
+  resourceListingId: z.string().min(1),
+  machineName: z.string().min(1).max(64),
+  osVersion: z.string().min(1).max(64),
+  hardwareSpecs: z.object({
+    cpu: z.string().min(1).max(128),
+    ramMb: z.number().int().min(0),
+    gpu: z.string().min(1).max(128),
+    storageGb: z.number().int().min(0),
+  }),
+  agentVersion: z.string().min(1).max(20),
+  config: z.object({
+    gracePeriodSeconds: z.number().int().min(0).max(900),
+    clipboardPolicy: z.enum(['enabled', 'disabled']),
+    recordingEnabled: z.boolean(),
+    sessionWorkspacePath: z.string().min(1).max(512),
+    consentTextVersion: z.string().min(1).max(32),
+  }),
+});
+
+const HeartbeatBodySchema = z.object({
+  status: z.enum(['online', 'idle', 'in_session']),
+});
+
+const CreateIncidentBodySchema = z.object({
+  sessionId: z.string().min(1),
+  bookingId: z.string().min(1),
+  category: z.enum(['connection_quality', 'app_not_working', 'security_concern', 'billing_dispute', 'other']),
+  description: z.string().min(10).max(1000),
+  screenshotRef: z.string().max(512).optional(),
+});
+
+const UpdateIncidentBodySchema = z.object({
+  status: z.enum(['investigating', 'resolved', 'escalated', 'closed']),
+  resolutionNote: z.string().min(10).max(2000).optional(),
+});
+
+const RejectFilesBodySchema = z.object({
+  fileNames: z.array(z.string().min(1)).min(1),
+  reason: z.string().min(1).max(500).optional(),
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function isSessionParticipant(
+  uid: string,
+  session: { consumerUid: string; ownerUid: string },
+): boolean {
+  return uid === session.consumerUid || uid === session.ownerUid;
+}
+
+function mapRoleToActorRole(role: string | undefined): AuditActorRole {
+  if (role === 'admin' || role === 'platform_admin') return 'Platform_Admin';
+  if (role === 'client' || role === 'freelancer' || role === 'developer') return 'Consumer';
+  return 'Owner';
+}
 
 // ─── Router ─────────────────────────────────────────────────────────────────────
 
 const router = express.Router();
 
-// All remote desktop routes require authentication
+// All remote desktop routes require Firebase Auth
 router.use(requireAuth);
 
-// ─── Host Registration & Management ──────────────────────────────────────────
+// ─── Session Routes ─────────────────────────────────────────────────────────────
+
+/**
+ * POST /sessions/start
+ * Gate check (booking confirmed, owner approved, time window, host online) and token mint.
+ * Requirements: 4.1, 4.2, 4.5, 7.1, 12.1
+ */
+router.post('/sessions/start', async (req: Request, res: Response) => {
+  try {
+    const parsed = StartSessionBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { bookingId, hostId } = parsed.data;
+    const consumerUid = req.authContext!.uid;
+
+    // Build gate input from request data
+    const gateInput: SessionGateInput = {
+      bookingId,
+      consumerUid,
+      hostId,
+      currentTime: new Date().toISOString(),
+      booking: (parsed.data.booking as SessionGateInput['booking']) ?? {
+        status: 'pending' as any,
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 3600000).toISOString(),
+        resourceId: '',
+      },
+      host: (parsed.data.host as SessionGateInput['host']) ?? {
+        status: 'offline',
+        lastHeartbeat: new Date(0).toISOString(),
+        resourceListingId: '',
+        agentVersion: CURRENT_AGENT_VERSION,
+      },
+      appCount: parsed.data.appCount ?? 0,
+    };
+
+    // Evaluate session gate — all preconditions must pass
+    const gateResult = evaluateSessionGate(gateInput);
+
+    if (!gateResult.canStart) {
+      return res.status(403).json({
+        error: 'Session gate check failed',
+        conditions: gateResult.conditions,
+        errors: gateResult.errors,
+      });
+    }
+
+    // Gate passed — mint session token
+    const token = generateSessionToken({
+      bookingId,
+      consumerUid,
+      hostId,
+      windowStart: new Date(gateInput.booking.startsAt).getTime(),
+      windowEnd: new Date(gateInput.booking.endsAt).getTime(),
+      gracePeriodSeconds: 300,
+      recordingRequired: false,
+    });
+
+    return res.status(201).json({
+      sessionToken: token.signature,
+      tokenId: token.tokenId,
+      expiresAt: token.expiresAt,
+      gateConditions: gateResult.conditions,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+/**
+ * POST /sessions/end
+ * Graceful session termination.
+ * Requirements: 4.1, 10.4
+ */
+router.post('/sessions/end', async (req: Request, res: Response) => {
+  try {
+    const parsed = EndSessionBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { sessionId, reason } = parsed.data;
+    const uid = req.authContext!.uid;
+
+    // Verify the user is a participant in this session
+    const session = getSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    if (!isSessionParticipant(uid, session) && !req.authContext!.isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to end this session' });
+    }
+
+    // Determine termination actor
+    const terminatedBy: EndSessionInput['terminatedBy'] =
+      uid === session.consumerUid ? 'consumer' :
+      uid === session.ownerUid ? 'owner' : 'system';
+
+    const result = endSession({
+      sessionId,
+      reason: reason as DisconnectionReason,
+      terminatedBy,
+    });
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+/**
+ * GET /sessions/:id
+ * Session details (role-scoped: consumer, owner, or admin).
+ * Requirements: 4.1, 8.1
+ */
+router.get('/sessions/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    const session = getSession(id);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const uid = req.authContext!.uid;
+    if (!isSessionParticipant(uid, session) && !req.authContext!.isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to view this session' });
+    }
+
+    return res.status(200).json(session);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+/**
+ * GET /sessions/:id/events
+ * Paginated session events (role-scoped: consumer, owner, or admin).
+ * Requirements: 8.1, 8.4
+ */
+router.get('/sessions/:id/events', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    const parsed = SessionEventsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const uid = req.authContext!.uid;
+    const actorRole = mapRoleToActorRole(req.authContext!.role);
+    const { limit, startAfterEventId } = parsed.data;
+
+    const result = await querySessionEvents(id, uid, actorRole, {
+      limit,
+      startAfterEventId,
+    });
+
+    return res.status(200).json({
+      sessionId: id,
+      events: result.events,
+      pagination: {
+        limit,
+        hasMore: result.hasMore,
+        lastEventId: result.lastEventId ?? null,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// ─── Host Routes ────────────────────────────────────────────────────────────────
 
 /**
  * POST /hosts/register
- * Register a new host machine with the platform.
- * Requirement: 1.1
+ * Register a new host with the platform.
+ * Requirements: 1.5, 5.1, 11.2, 13.1
  */
 router.post('/hosts/register', async (req: Request, res: Response) => {
   try {
@@ -111,38 +368,37 @@ router.post('/hosts/register', async (req: Request, res: Response) => {
       });
     }
 
-    const { machineName, osVersion, hardwareSpecs, configuration } = parsed.data;
     const ownerUid = req.authContext!.uid;
+    const hostData = parsed.data;
 
-    // TODO: Wire to Firestore write in remote_desktop_hosts collection
-    const hostId = `host_${Date.now()}`;
-    const host = {
-      hostId,
+    const host = registerHost({
       ownerUid,
-      machineName,
-      osVersion,
-      hardwareSpecs,
-      status: 'online' as const,
-      lastHeartbeat: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
-      registrationTimestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
-      configuration,
-    };
+      resourceListingId: hostData.resourceListingId,
+      machineName: hostData.machineName,
+      osVersion: hostData.osVersion,
+      hardwareSpecs: hostData.hardwareSpecs as RegisterHostInput['hardwareSpecs'],
+      agentVersion: hostData.agentVersion,
+      config: hostData.config as RegisterHostInput['config'],
+    });
 
     return res.status(201).json(host);
   } catch (err: any) {
+    if (err.message?.includes('unsupported') || err.message?.includes('version')) {
+      return res.status(400).json({ error: err.message, code: 'agent_version_unsupported' });
+    }
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
 /**
- * POST /hosts/:hostId/heartbeat
- * Receive heartbeat from a registered host.
- * Requirement: 1.2
+ * PUT /hosts/:id/heartbeat
+ * Heartbeat update from a registered host.
+ * Requirements: 4.1, 13.1
  */
-router.post('/hosts/:hostId/heartbeat', async (req: Request, res: Response) => {
+router.put('/hosts/:id/heartbeat', async (req: Request, res: Response) => {
   try {
-    const { hostId } = req.params;
-    if (!hostId) {
+    const { id } = req.params;
+    if (!id) {
       return res.status(400).json({ error: 'Host ID is required' });
     }
 
@@ -154,66 +410,97 @@ router.post('/hosts/:hostId/heartbeat', async (req: Request, res: Response) => {
       });
     }
 
-    const { status, cpuUtilisation, availableRamMb } = parsed.data;
-
-    // TODO: Update host record in Firestore, return latest config/allowlist
-    const acknowledgement = {
-      hostId,
-      status,
-      lastHeartbeat: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
-      configVersion: 1,
-      allowlistVersion: 1,
-    };
-
-    return res.status(200).json(acknowledgement);
+    const result = processHeartbeat(id, parsed.data.status);
+    return res.status(200).json(result);
   } catch (err: any) {
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Host not found' });
+    }
+    if (err.message?.includes('maintenance')) {
+      return res.status(409).json({ error: err.message });
+    }
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
 /**
- * GET /hosts/:hostId/config
- * Get host configuration and current app allowlist.
- * Requirement: 1.4, 2.4
+ * GET /hosts/:id/apps
+ * Get the app allowlist for a host.
+ * Requirements: 1.1, 13.2
  */
-router.get('/hosts/:hostId/config', async (req: Request, res: Response) => {
+router.get('/hosts/:id/apps', async (req: Request, res: Response) => {
   try {
-    const { hostId } = req.params;
-    if (!hostId) {
+    const { id } = req.params;
+    if (!id) {
       return res.status(400).json({ error: 'Host ID is required' });
     }
 
-    // TODO: Fetch from Firestore remote_desktop_hosts + remote_desktop_apps
-    const config = {
-      hostId,
-      configuration: {
-        gracePeriodSeconds: 300,
-        clipboardPolicy: 'disabled' as const,
-        sessionWorkspacePath: `C:\\ArchitexSessions`,
-        recordingEnabled: false,
-      },
-      apps: [] as Array<{ appId: string; displayName: string; executablePath: string; softwareCategory: string }>,
+    const apps = getHostApps(id);
+    return res.status(200).json({ hostId: id, apps });
+  } catch (err: any) {
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Host not found' });
+    }
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// ─── Incident Routes ────────────────────────────────────────────────────────────
+
+/**
+ * POST /incidents
+ * Create a new incident report.
+ * Requirements: 3.1, 3.2, 3.3, 3.4, 3.7, 3.8
+ */
+router.post('/incidents', async (req: Request, res: Response) => {
+  try {
+    const parsed = CreateIncidentBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const uid = req.authContext!.uid;
+    const role = req.authContext!.role;
+    const reporterRole = (role === 'client' || role === 'freelancer' || role === 'developer')
+      ? 'consumer' as const
+      : 'owner' as const;
+
+    const input: CreateIncidentInput = {
+      sessionId: parsed.data.sessionId,
+      bookingId: parsed.data.bookingId,
+      reporterUid: uid,
+      reporterRole,
+      category: parsed.data.category,
+      description: parsed.data.description,
+      screenshotRef: parsed.data.screenshotRef,
     };
 
-    return res.status(200).json(config);
+    const incident = createIncident(input);
+    return res.status(201).json(incident);
   } catch (err: any) {
+    if (err.message?.includes('reporting window')) {
+      return res.status(403).json({ error: err.message });
+    }
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
 /**
- * PUT /hosts/:hostId/apps
- * Update the application allowlist for a host.
- * Requirement: 2.4
+ * PUT /incidents/:id
+ * Update incident status (admin only).
+ * Requirements: 3.5
  */
-router.put('/hosts/:hostId/apps', async (req: Request, res: Response) => {
+router.put('/incidents/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { hostId } = req.params;
-    if (!hostId) {
-      return res.status(400).json({ error: 'Host ID is required' });
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Incident ID is required' });
     }
 
-    const parsed = UpdateAppsBodySchema.safeParse(req.body);
+    const parsed = UpdateIncidentBodySchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
         error: 'Validation failed',
@@ -221,34 +508,66 @@ router.put('/hosts/:hostId/apps', async (req: Request, res: Response) => {
       });
     }
 
-    const { apps } = parsed.data;
-    const ownerUid = req.authContext!.uid;
+    const input: UpdateIncidentStatusInput = {
+      incidentId: id,
+      status: parsed.data.status,
+      resolutionNote: parsed.data.resolutionNote,
+      adminUid: req.authContext!.uid,
+    };
 
-    // TODO: Validate ownership, write to remote_desktop_apps collection
-    const updatedApps = apps.map((app, idx) => ({
-      appId: `app_${hostId}_${idx}`,
-      hostId,
-      ...app,
-      validationStatus: 'valid' as const,
-      lastValidatedTimestamp: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 },
-    }));
-
-    return res.status(200).json({ hostId, ownerUid, apps: updatedApps });
+    const incident = updateIncidentStatus(input);
+    return res.status(200).json(incident);
   } catch (err: any) {
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Incident not found' });
+    }
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
-// ─── Session Token ──────────────────────────────────────────────────────────────
+// ─── File Manifest Routes ───────────────────────────────────────────────────────
 
 /**
- * POST /sessions/token
- * Generate a session token for a confirmed booking.
- * Requirement: 3.1
+ * POST /file-manifests/:id/approve
+ * Approve file handoff (owner only).
+ * Requirements: 9.3, 9.4
  */
-router.post('/sessions/token', async (req: Request, res: Response) => {
+router.post('/file-manifests/:id/approve', async (req: Request, res: Response) => {
   try {
-    const parsed = GenerateTokenBodySchema.safeParse(req.body);
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Manifest ID is required' });
+    }
+
+    const result = approveManifest(id);
+    return res.status(200).json(result);
+  } catch (err: any) {
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Manifest not found' });
+    }
+    if (err.message?.includes('expired')) {
+      return res.status(410).json({ error: 'Manifest has expired' });
+    }
+    if (err.message?.includes('Cannot approve')) {
+      return res.status(409).json({ error: err.message });
+    }
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+/**
+ * POST /file-manifests/:id/reject
+ * Reject files from the manifest (owner only).
+ * Requirements: 9.4
+ */
+router.post('/file-manifests/:id/reject', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: 'Manifest ID is required' });
+    }
+
+    const parsed = RejectFilesBodySchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
         error: 'Validation failed',
@@ -256,216 +575,34 @@ router.post('/sessions/token', async (req: Request, res: Response) => {
       });
     }
 
-    const { bookingId, consumerUid, hostId, windowStart, windowEnd, gracePeriodSeconds } = parsed.data;
-
-    const tokenPayload = generateSessionToken(
-      bookingId,
-      consumerUid,
-      hostId,
-      windowStart,
-      windowEnd,
-      gracePeriodSeconds,
-    );
-
-    return res.status(201).json({
-      sessionToken: tokenPayload,
-      expiresAt: windowEnd + (gracePeriodSeconds * 1000),
-    });
+    const result = rejectFiles(id, parsed.data.fileNames);
+    return res.status(200).json(result);
   } catch (err: any) {
-    const statusCode = err.code === 'token_generation_failed' ? 500 :
-                       err.code === 'awaiting_owner_confirmation' ? 403 :
-                       err.code === 'booking_conflict' ? 409 :
-                       err.code === 'booking_cancelled' ? 410 :
-                       err.code === 'booking_expired' ? 410 : 500;
-    return res.status(statusCode).json({
-      error: err.message || 'Token generation failed',
-      code: err.code || 'token_generation_failed',
-      retryable: err.retryable ?? true,
-    });
-  }
-});
-
-// ─── Session Lifecycle ──────────────────────────────────────────────────────────
-
-/**
- * GET /sessions/:sessionId
- * Get the current state of a session.
- * Requirement: 4.1
- */
-router.get('/sessions/:sessionId', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
+    if (err.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Manifest not found' });
     }
-
-    const session = getSessionState(sessionId);
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+    if (err.message?.includes('Cannot reject')) {
+      return res.status(409).json({ error: err.message });
     }
-
-    return res.status(200).json(session);
-  } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
-/**
- * POST /sessions/:sessionId/end
- * End an active session (voluntary disconnect or termination).
- * Requirement: 4.1
- */
-router.post('/sessions/:sessionId/end', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
-    }
-
-    const parsed = EndSessionBodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { reason } = parsed.data;
-    const session = endSession(sessionId, reason);
-
-    return res.status(200).json(session);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Internal server error' });
-  }
-});
-
-// ─── File Manifest & Handoff ────────────────────────────────────────────────────
+// ─── Agent Version Route ────────────────────────────────────────────────────────
 
 /**
- * GET /sessions/:sessionId/manifest
- * Get the file manifest for a session.
- * Requirement: 8.3
+ * GET /agent/version
+ * Latest agent version info for Host_Agent update checks.
+ * Requirements: 11.2, 11.3
  */
-router.get('/sessions/:sessionId/manifest', async (req: Request, res: Response) => {
+router.get('/agent/version', async (_req: Request, res: Response) => {
   try {
-    const { sessionId } = req.params;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
-    }
-
-    const manifest = getFileManifest(sessionId);
-    if (!manifest) {
-      return res.status(404).json({ error: 'File manifest not found for this session' });
-    }
-
-    return res.status(200).json(manifest);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Internal server error' });
-  }
-});
-
-/**
- * POST /sessions/:sessionId/approve-files
- * Approve file handoff from the session workspace to FileManager.
- * Requirement: 8.3
- */
-router.post('/sessions/:sessionId/approve-files', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
-    }
-
-    const parsed = ApproveFilesBodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { approvedFileNames } = parsed.data;
-    const ownerUid = req.authContext!.uid;
-
-    // TODO: Look up manifest by session, call approveFileHandoff service
-    const manifest = approveFileHandoff(sessionId, approvedFileNames, ownerUid);
-
-    return res.status(200).json(manifest);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Internal server error' });
-  }
-});
-
-// ─── Billing ────────────────────────────────────────────────────────────────────
-
-/**
- * POST /sessions/:sessionId/billing
- * Finalise billing for a completed session.
- * Requirement: 12.1
- */
-router.post('/sessions/:sessionId/billing', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
-    }
-
-    const parsed = BillingBodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { billedDurationMinutes, ownerApproved } = parsed.data;
-
-    // TODO: Wire to sessionBillingService
-    const billingResult = calculateBilling(sessionId);
-
     return res.status(200).json({
-      sessionId,
-      billedDurationMinutes,
-      ownerApproved,
-      ...billingResult,
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Internal server error' });
-  }
-});
-
-// ─── Audit Events ───────────────────────────────────────────────────────────────
-
-/**
- * GET /audit/:sessionId/events
- * Query audit events for a session (role-scoped access).
- * Requirement: 11.3
- */
-router.get('/audit/:sessionId/events', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID is required' });
-    }
-
-    const parsed = AuditQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { limit, offset } = parsed.data;
-    const actorUid = req.authContext!.uid;
-    const actorRole = req.authContext!.role || 'unknown';
-
-    const events = queryAuditEvents(sessionId, actorUid, actorRole, { limit, offset });
-
-    return res.status(200).json({
-      sessionId,
-      events,
-      pagination: { limit, offset, count: events.length },
+      currentVersion: CURRENT_AGENT_VERSION,
+      minimumSupportedVersion: MIN_SUPPORTED_VERSION,
+      downloadUrl: '/api/remote-desktop/agent/download',
+      releaseNotes: 'App-level window capture, POPIA consent integration, chain-hashed audit events.',
+      releasedAt: new Date().toISOString(),
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Internal server error' });

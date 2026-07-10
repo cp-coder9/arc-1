@@ -2,11 +2,11 @@
  * File Handoff Service — Unit Tests
  *
  * Tests workspace creation, file monitoring, manifest generation,
- * SHA-256 hashing, and final manifest compilation.
+ * SHA-256 hashing, final manifest compilation, and approval gate
+ * (createManifest, approveManifest, rejectFiles, checkExpiry,
+ * updateTransferStatus, associateProjectReference).
  *
- * Requirements: 8.1, 8.2, 8.3
- *
-
+ * Requirements: 8.1, 8.2, 8.3, 9.1, 9.3, 9.4, 9.5, 9.6, 9.8
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -26,18 +26,33 @@ import {
   getFinalManifest,
   getFinalManifestBySession,
   isMonitoring,
+  createManifest,
+  approveManifest,
+  rejectFiles,
+  checkExpiry,
+  updateTransferStatus,
+  associateProjectReference,
+  getApprovalManifest,
+  getProjectAssociation,
   _clearAllState,
   _getWorkspaceCount,
   _getFinalManifestCount,
+  _getApprovalManifestCount,
+  _getProjectAssociationCount,
   _injectManifest,
   _injectWorkspaceInfo,
+  _injectApprovalManifest,
   DEFAULT_BASE_PATH,
   MAX_REPORT_INTERVAL_MS,
   MAX_MANIFEST_FILES,
+  HANDOFF_MAX_FILE_SIZE_BYTES,
+  FILE_HANDOFF_EXPIRY_MS,
   type SessionWorkspaceInfo,
   type FinalManifestInput,
+  type CreateManifestInput,
 } from '../fileHandoffService';
-import type { FileManifestEntry } from '../types';
+import type { FileManifestEntry, FileManifest } from '../types';
+import { DEFAULT_DENY_LIST_EXTENSIONS } from '../types';
 
 // ─── Test Helpers ───────────────────────────────────────────────────────────────
 
@@ -665,5 +680,607 @@ describe('_clearAllState', () => {
     expect(isMonitoring('s1')).toBe(false);
     expect(getFileManifest('s1')).toEqual([]);
     expect(getWorkspaceInfo('s1')).toBeUndefined();
+  });
+});
+
+
+// ─── createManifest ─────────────────────────────────────────────────────────────
+
+describe('createManifest', () => {
+  const baseInput: CreateManifestInput = {
+    sessionId: 'session-m-1',
+    bookingId: 'booking-m-1',
+    consumerUid: 'consumer-m-1',
+    ownerUid: 'owner-m-1',
+    files: [
+      { name: 'design.dwg', sizeBytes: 1024 },
+      { name: 'report.pdf', sizeBytes: 2048 },
+    ],
+  };
+
+  it('should create a manifest with valid files', () => {
+    const result = createManifest(baseInput);
+
+    expect(result.manifest.manifestId).toBeDefined();
+    expect(result.manifest.sessionId).toBe('session-m-1');
+    expect(result.manifest.bookingId).toBe('booking-m-1');
+    expect(result.manifest.consumerUid).toBe('consumer-m-1');
+    expect(result.manifest.ownerUid).toBe('owner-m-1');
+    expect(result.manifest.files).toHaveLength(2);
+    expect(result.manifest.ownerApprovalStatus).toBe('pending');
+    expect(result.manifest.approvalTimestamp).toBeNull();
+    expect(result.manifest.expiryTimestamp).toBeDefined();
+    expect(result.blockedFiles).toHaveLength(0);
+    expect(result.oversizedFiles).toHaveLength(0);
+  });
+
+  it('should filter out files with deny-listed extensions', () => {
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [
+        { name: 'design.dwg', sizeBytes: 1024 },
+        { name: 'malware.exe', sizeBytes: 512 },
+        { name: 'script.bat', sizeBytes: 256 },
+        { name: 'helper.dll', sizeBytes: 4096 },
+        { name: 'report.pdf', sizeBytes: 2048 },
+      ],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files).toHaveLength(2);
+    expect(result.manifest.files.map(f => f.name)).toEqual(['design.dwg', 'report.pdf']);
+    expect(result.blockedFiles).toHaveLength(3);
+    expect(result.blockedFiles.map(f => f.name).sort()).toEqual(['helper.dll', 'malware.exe', 'script.bat']);
+  });
+
+  it('should filter deny-listed extensions case-insensitively', () => {
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [
+        { name: 'virus.EXE', sizeBytes: 512 },
+        { name: 'SCRIPT.PS1', sizeBytes: 256 },
+        { name: 'notes.txt', sizeBytes: 100 },
+      ],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files).toHaveLength(1);
+    expect(result.manifest.files[0].name).toBe('notes.txt');
+    expect(result.blockedFiles).toHaveLength(2);
+  });
+
+  it('should reject files exceeding 500 MB', () => {
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [
+        { name: 'small.dwg', sizeBytes: 1024 },
+        { name: 'huge.rvt', sizeBytes: HANDOFF_MAX_FILE_SIZE_BYTES + 1 },
+      ],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files).toHaveLength(1);
+    expect(result.manifest.files[0].name).toBe('small.dwg');
+    expect(result.oversizedFiles).toHaveLength(1);
+    expect(result.oversizedFiles[0].name).toBe('huge.rvt');
+  });
+
+  it('should accept files at exactly 500 MB', () => {
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [
+        { name: 'exactly500.bin', sizeBytes: HANDOFF_MAX_FILE_SIZE_BYTES },
+      ],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files).toHaveLength(1);
+    expect(result.oversizedFiles).toHaveLength(0);
+  });
+
+  it('should cap manifest at 200 files', () => {
+    const files = Array.from({ length: 210 }, (_, i) => ({
+      name: `file-${i}.txt`,
+      sizeBytes: 100,
+    }));
+    const input: CreateManifestInput = { ...baseInput, files };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files.length).toBeLessThanOrEqual(MAX_MANIFEST_FILES);
+  });
+
+  it('should use custom deny-list when provided', () => {
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [
+        { name: 'design.dwg', sizeBytes: 1024 },
+        { name: 'model.rvt', sizeBytes: 2048 },
+      ],
+      denyList: ['.dwg'],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files).toHaveLength(1);
+    expect(result.manifest.files[0].name).toBe('model.rvt');
+    expect(result.blockedFiles).toHaveLength(1);
+    expect(result.blockedFiles[0].name).toBe('design.dwg');
+  });
+
+  it('should compute SHA-256 hash from content when provided', () => {
+    const content = Buffer.from('Hello Architex');
+    const expectedHash = createHash('sha256').update(content).digest('hex');
+
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [{ name: 'test.txt', sizeBytes: content.length, content }],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files[0].sha256Hash).toBe(expectedHash);
+  });
+
+  it('should use provided sha256Hash when available', () => {
+    const input: CreateManifestInput = {
+      ...baseInput,
+      files: [{ name: 'test.txt', sizeBytes: 100, sha256Hash: 'a'.repeat(64) }],
+    };
+
+    const result = createManifest(input);
+
+    expect(result.manifest.files[0].sha256Hash).toBe('a'.repeat(64));
+  });
+
+  it('should set expiryTimestamp to 72 hours from now', () => {
+    const before = Date.now();
+    const result = createManifest(baseInput);
+    const after = Date.now();
+
+    const expiryTime = new Date(result.manifest.expiryTimestamp).getTime();
+    expect(expiryTime).toBeGreaterThanOrEqual(before + FILE_HANDOFF_EXPIRY_MS);
+    expect(expiryTime).toBeLessThanOrEqual(after + FILE_HANDOFF_EXPIRY_MS);
+  });
+
+  it('should throw when sessionId is empty', () => {
+    expect(() => createManifest({ ...baseInput, sessionId: '' })).toThrow();
+  });
+
+  it('should throw when bookingId is empty', () => {
+    expect(() => createManifest({ ...baseInput, bookingId: '' })).toThrow();
+  });
+
+  it('should store manifest and allow retrieval', () => {
+    const result = createManifest(baseInput);
+    const retrieved = getApprovalManifest(result.manifest.manifestId);
+    expect(retrieved).toBeDefined();
+    expect(retrieved!.manifestId).toBe(result.manifest.manifestId);
+  });
+});
+
+// ─── approveManifest ────────────────────────────────────────────────────────────
+
+describe('approveManifest', () => {
+  function createPendingManifest(): FileManifest {
+    const result = createManifest({
+      sessionId: 's1',
+      bookingId: 'b1',
+      consumerUid: 'c1',
+      ownerUid: 'o1',
+      files: [
+        { name: 'design.dwg', sizeBytes: 1024 },
+        { name: 'report.pdf', sizeBytes: 2048 },
+      ],
+    });
+    return result.manifest;
+  }
+
+  it('should approve a pending manifest', () => {
+    const manifest = createPendingManifest();
+    const result = approveManifest(manifest.manifestId);
+
+    expect(result.manifestId).toBe(manifest.manifestId);
+    expect(result.ownerApprovalStatus).toBe('approved');
+    expect(result.approvedFiles).toHaveLength(2);
+    expect(result.approvalTimestamp).toBeDefined();
+  });
+
+  it('should set approval timestamp on the stored manifest', () => {
+    const manifest = createPendingManifest();
+    approveManifest(manifest.manifestId);
+
+    const stored = getApprovalManifest(manifest.manifestId);
+    expect(stored!.approvalTimestamp).not.toBeNull();
+    expect(stored!.ownerApprovalStatus).toBe('approved');
+  });
+
+  it('should throw for non-existent manifest', () => {
+    expect(() => approveManifest('nonexistent')).toThrow();
+  });
+
+  it('should throw for empty manifest ID', () => {
+    expect(() => approveManifest('')).toThrow();
+  });
+
+  it('should throw when manifest is already approved', () => {
+    const manifest = createPendingManifest();
+    approveManifest(manifest.manifestId);
+    expect(() => approveManifest(manifest.manifestId)).toThrow();
+  });
+
+  it('should throw when manifest is expired', () => {
+    const expired: FileManifest = {
+      manifestId: 'expired-1',
+      sessionId: 's1',
+      bookingId: 'b1',
+      consumerUid: 'c1',
+      ownerUid: 'o1',
+      files: [{ name: 'f.txt', sizeBytes: 100, extension: 'txt', sha256Hash: 'a'.repeat(64), transferStatus: 'pending' }],
+      manifestTimestamp: new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString(),
+      ownerApprovalStatus: 'pending',
+      approvalTimestamp: null,
+      expiryTimestamp: new Date(Date.now() - 1000).toISOString(), // already expired
+    };
+    _injectApprovalManifest(expired);
+
+    expect(() => approveManifest('expired-1')).toThrow();
+    const stored = getApprovalManifest('expired-1');
+    expect(stored!.ownerApprovalStatus).toBe('expired');
+  });
+});
+
+// ─── rejectFiles ────────────────────────────────────────────────────────────────
+
+describe('rejectFiles', () => {
+  function createTestManifest(): FileManifest {
+    const result = createManifest({
+      sessionId: 's-reject',
+      bookingId: 'b-reject',
+      consumerUid: 'c-reject',
+      ownerUid: 'o-reject',
+      files: [
+        { name: 'file1.dwg', sizeBytes: 1024 },
+        { name: 'file2.pdf', sizeBytes: 2048 },
+        { name: 'file3.rvt', sizeBytes: 3072 },
+      ],
+    });
+    return result.manifest;
+  }
+
+  it('should reject specified files and mark them rejected', () => {
+    const manifest = createTestManifest();
+    const result = rejectFiles(manifest.manifestId, ['file1.dwg']);
+
+    expect(result.rejectedFiles).toEqual(['file1.dwg']);
+    expect(result.remainingFiles).toContain('file2.pdf');
+    expect(result.remainingFiles).toContain('file3.rvt');
+
+    const stored = getApprovalManifest(manifest.manifestId);
+    const rejectedFile = stored!.files.find(f => f.name === 'file1.dwg');
+    expect(rejectedFile!.transferStatus).toBe('rejected');
+  });
+
+  it('should reject multiple files at once', () => {
+    const manifest = createTestManifest();
+    const result = rejectFiles(manifest.manifestId, ['file1.dwg', 'file3.rvt']);
+
+    expect(result.rejectedFiles).toHaveLength(2);
+    expect(result.remainingFiles).toEqual(['file2.pdf']);
+  });
+
+  it('should mark manifest as rejected when all files are rejected', () => {
+    const manifest = createTestManifest();
+    const result = rejectFiles(manifest.manifestId, ['file1.dwg', 'file2.pdf', 'file3.rvt']);
+
+    expect(result.ownerApprovalStatus).toBe('rejected');
+    const stored = getApprovalManifest(manifest.manifestId);
+    expect(stored!.ownerApprovalStatus).toBe('rejected');
+  });
+
+  it('should keep pending status when some files remain', () => {
+    const manifest = createTestManifest();
+    const result = rejectFiles(manifest.manifestId, ['file1.dwg']);
+
+    expect(result.ownerApprovalStatus).toBe('pending');
+  });
+
+  it('should throw for non-existent manifest', () => {
+    expect(() => rejectFiles('nonexistent', ['f.txt'])).toThrow();
+  });
+
+  it('should throw for empty file names array', () => {
+    const manifest = createTestManifest();
+    expect(() => rejectFiles(manifest.manifestId, [])).toThrow();
+  });
+
+  it('should throw for empty manifest ID', () => {
+    expect(() => rejectFiles('', ['file.txt'])).toThrow();
+  });
+});
+
+// ─── checkExpiry ────────────────────────────────────────────────────────────────
+
+describe('checkExpiry', () => {
+  it('should report not expired for a fresh manifest', () => {
+    const result = createManifest({
+      sessionId: 's-exp',
+      bookingId: 'b-exp',
+      consumerUid: 'c-exp',
+      ownerUid: 'o-exp',
+      files: [{ name: 'f.txt', sizeBytes: 100 }],
+    });
+
+    const check = checkExpiry(result.manifest.manifestId);
+
+    expect(check.isExpired).toBe(false);
+    expect(check.ownerApprovalStatus).toBe('pending');
+  });
+
+  it('should detect expired manifest (72 hours elapsed)', () => {
+    const expired: FileManifest = {
+      manifestId: 'expired-check',
+      sessionId: 's1',
+      bookingId: 'b1',
+      consumerUid: 'c1',
+      ownerUid: 'o1',
+      files: [{ name: 'f.txt', sizeBytes: 100, extension: 'txt', sha256Hash: 'a'.repeat(64), transferStatus: 'pending' }],
+      manifestTimestamp: new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString(),
+      ownerApprovalStatus: 'pending',
+      approvalTimestamp: null,
+      expiryTimestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    };
+    _injectApprovalManifest(expired);
+
+    const check = checkExpiry('expired-check');
+
+    expect(check.isExpired).toBe(true);
+    expect(check.ownerApprovalStatus).toBe('expired');
+  });
+
+  it('should update stored manifest status to expired', () => {
+    const expired: FileManifest = {
+      manifestId: 'expired-update',
+      sessionId: 's1',
+      bookingId: 'b1',
+      consumerUid: 'c1',
+      ownerUid: 'o1',
+      files: [{ name: 'f.txt', sizeBytes: 100, extension: 'txt', sha256Hash: 'a'.repeat(64), transferStatus: 'pending' }],
+      manifestTimestamp: new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString(),
+      ownerApprovalStatus: 'pending',
+      approvalTimestamp: null,
+      expiryTimestamp: new Date(Date.now() - 1000).toISOString(),
+    };
+    _injectApprovalManifest(expired);
+
+    checkExpiry('expired-update');
+
+    const stored = getApprovalManifest('expired-update');
+    expect(stored!.ownerApprovalStatus).toBe('expired');
+  });
+
+  it('should throw for non-existent manifest', () => {
+    expect(() => checkExpiry('nonexistent')).toThrow();
+  });
+
+  it('should throw for empty manifest ID', () => {
+    expect(() => checkExpiry('')).toThrow();
+  });
+});
+
+// ─── updateTransferStatus ───────────────────────────────────────────────────────
+
+describe('updateTransferStatus', () => {
+  function createApprovedManifest(): FileManifest {
+    const result = createManifest({
+      sessionId: 's-status',
+      bookingId: 'b-status',
+      consumerUid: 'c-status',
+      ownerUid: 'o-status',
+      files: [
+        { name: 'file1.dwg', sizeBytes: 1024 },
+        { name: 'file2.pdf', sizeBytes: 2048 },
+      ],
+    });
+    approveManifest(result.manifest.manifestId);
+    return result.manifest;
+  }
+
+  it('should transition pending → transferring for approved manifest', () => {
+    const manifest = createApprovedManifest();
+    const result = updateTransferStatus(manifest.manifestId, 'file1.dwg', 'transferring');
+
+    expect(result.transferStatus).toBe('transferring');
+  });
+
+  it('should transition transferring → completed', () => {
+    const manifest = createApprovedManifest();
+    updateTransferStatus(manifest.manifestId, 'file1.dwg', 'transferring');
+    const result = updateTransferStatus(manifest.manifestId, 'file1.dwg', 'completed');
+
+    expect(result.transferStatus).toBe('completed');
+  });
+
+  it('should transition transferring → failed', () => {
+    const manifest = createApprovedManifest();
+    updateTransferStatus(manifest.manifestId, 'file1.dwg', 'transferring');
+    const result = updateTransferStatus(manifest.manifestId, 'file1.dwg', 'failed');
+
+    expect(result.transferStatus).toBe('failed');
+  });
+
+  it('should transition pending → rejected', () => {
+    const manifest = createApprovedManifest();
+    const result = updateTransferStatus(manifest.manifestId, 'file1.dwg', 'rejected');
+
+    expect(result.transferStatus).toBe('rejected');
+  });
+
+  it('should throw for invalid transition completed → pending', () => {
+    const manifest = createApprovedManifest();
+    updateTransferStatus(manifest.manifestId, 'file1.dwg', 'transferring');
+    updateTransferStatus(manifest.manifestId, 'file1.dwg', 'completed');
+
+    expect(() => updateTransferStatus(manifest.manifestId, 'file1.dwg', 'pending')).toThrow();
+  });
+
+  it('should throw when trying to upload without manifest approval', () => {
+    const result = createManifest({
+      sessionId: 's-no-approve',
+      bookingId: 'b-no-approve',
+      consumerUid: 'c-no-approve',
+      ownerUid: 'o-no-approve',
+      files: [{ name: 'file1.dwg', sizeBytes: 1024 }],
+    });
+
+    expect(() => updateTransferStatus(result.manifest.manifestId, 'file1.dwg', 'transferring')).toThrow();
+  });
+
+  it('should throw for non-existent manifest', () => {
+    expect(() => updateTransferStatus('nonexistent', 'file.txt', 'completed')).toThrow();
+  });
+
+  it('should throw for non-existent file', () => {
+    const manifest = createApprovedManifest();
+    expect(() => updateTransferStatus(manifest.manifestId, 'nonexistent.txt', 'transferring')).toThrow();
+  });
+});
+
+// ─── associateProjectReference ──────────────────────────────────────────────────
+
+describe('associateProjectReference', () => {
+  function createCompletedManifest(): FileManifest {
+    const result = createManifest({
+      sessionId: 's-assoc',
+      bookingId: 'b-assoc',
+      consumerUid: 'c-assoc',
+      ownerUid: 'o-assoc',
+      files: [
+        { name: 'file1.dwg', sizeBytes: 1024 },
+        { name: 'file2.pdf', sizeBytes: 2048 },
+      ],
+    });
+    approveManifest(result.manifest.manifestId);
+    updateTransferStatus(result.manifest.manifestId, 'file1.dwg', 'transferring');
+    updateTransferStatus(result.manifest.manifestId, 'file1.dwg', 'completed');
+    updateTransferStatus(result.manifest.manifestId, 'file2.pdf', 'transferring');
+    updateTransferStatus(result.manifest.manifestId, 'file2.pdf', 'completed');
+    return result.manifest;
+  }
+
+  it('should associate completed files with a project reference', () => {
+    const manifest = createCompletedManifest();
+    const result = associateProjectReference(manifest.manifestId, 'project-123');
+
+    expect(result.manifestId).toBe(manifest.manifestId);
+    expect(result.sessionId).toBe('s-assoc');
+    expect(result.projectReference).toBe('project-123');
+    expect(result.files).toHaveLength(2);
+    expect(result.files[0].name).toBe('file1.dwg');
+    expect(result.files[0].sha256Hash).toBeDefined();
+    expect(result.files[0].uploadTimestamp).toBeDefined();
+  });
+
+  it('should store and allow retrieval of association', () => {
+    const manifest = createCompletedManifest();
+    associateProjectReference(manifest.manifestId, 'project-456');
+
+    const retrieved = getProjectAssociation(manifest.manifestId);
+    expect(retrieved).toBeDefined();
+    expect(retrieved!.projectReference).toBe('project-456');
+  });
+
+  it('should throw when no completed files exist', () => {
+    const result = createManifest({
+      sessionId: 's-no-complete',
+      bookingId: 'b-no-complete',
+      consumerUid: 'c-no-complete',
+      ownerUid: 'o-no-complete',
+      files: [{ name: 'file.txt', sizeBytes: 100 }],
+    });
+    approveManifest(result.manifest.manifestId);
+
+    expect(() => associateProjectReference(result.manifest.manifestId, 'project-x')).toThrow();
+  });
+
+  it('should throw for empty project reference', () => {
+    const manifest = createCompletedManifest();
+    expect(() => associateProjectReference(manifest.manifestId, '')).toThrow();
+  });
+
+  it('should throw for non-existent manifest', () => {
+    expect(() => associateProjectReference('nonexistent', 'proj')).toThrow();
+  });
+});
+
+// ─── Property 6: File Extension Deny-List ───────────────────────────────────────
+
+describe('Property 6: File Extension Deny-List', () => {
+  /**
+   * **Validates: Requirements 9.5**
+   *
+   * ∀ manifest: FileManifest, denyList: string[],
+   *   manifest.files.every(f => !denyList.includes(f.extension.toLowerCase()))
+   */
+  it('should never include deny-listed extensions in the manifest', () => {
+    const denyExtensions = DEFAULT_DENY_LIST_EXTENSIONS.map(e => e.replace('.', ''));
+
+    // Create manifest with a mix of valid and deny-listed files
+    const files = [
+      { name: 'design.dwg', sizeBytes: 1024 },
+      { name: 'malware.exe', sizeBytes: 512 },
+      { name: 'script.bat', sizeBytes: 256 },
+      { name: 'helper.dll', sizeBytes: 4096 },
+      { name: 'report.pdf', sizeBytes: 2048 },
+      { name: 'command.cmd', sizeBytes: 128 },
+      { name: 'power.ps1', sizeBytes: 64 },
+      { name: 'visual.vbs', sizeBytes: 32 },
+      { name: 'registry.reg', sizeBytes: 16 },
+      { name: 'driver.sys', sizeBytes: 8192 },
+      { name: 'model.rvt', sizeBytes: 10000 },
+    ];
+
+    const result = createManifest({
+      sessionId: 'prop6-session',
+      bookingId: 'prop6-booking',
+      consumerUid: 'prop6-consumer',
+      ownerUid: 'prop6-owner',
+      files,
+    });
+
+    // Property: no file in the manifest has a deny-listed extension
+    for (const file of result.manifest.files) {
+      expect(denyExtensions).not.toContain(file.extension.toLowerCase());
+    }
+
+    // Only safe files should remain
+    expect(result.manifest.files.map(f => f.name).sort()).toEqual(['design.dwg', 'model.rvt', 'report.pdf']);
+  });
+
+  it('should enforce deny-list regardless of extension casing', () => {
+    const denyExtensions = DEFAULT_DENY_LIST_EXTENSIONS.map(e => e.replace('.', ''));
+
+    const files = [
+      { name: 'virus.EXE', sizeBytes: 512 },
+      { name: 'SCRIPT.Bat', sizeBytes: 256 },
+      { name: 'driver.SYS', sizeBytes: 4096 },
+      { name: 'good.pdf', sizeBytes: 2048 },
+    ];
+
+    const result = createManifest({
+      sessionId: 'prop6-case',
+      bookingId: 'b-case',
+      consumerUid: 'c-case',
+      ownerUid: 'o-case',
+      files,
+    });
+
+    for (const file of result.manifest.files) {
+      expect(denyExtensions).not.toContain(file.extension.toLowerCase());
+    }
   });
 });
