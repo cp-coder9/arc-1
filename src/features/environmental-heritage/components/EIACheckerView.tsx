@@ -168,7 +168,7 @@ export function EIACheckerView({ user, projectId, projectName }: EIACheckerViewP
     if (result.success) {
       setScreeningReport(result.data);
     } else {
-      setError(result.error.message);
+      setError((result as Extract<typeof result, { success: false }>).error.message);
     }
   }, [selectedActivities, geographicContext, projectId, projectName, user]);
 

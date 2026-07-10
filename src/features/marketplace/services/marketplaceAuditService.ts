@@ -70,26 +70,20 @@ export interface LogMarketplaceActionParams {
  * Designed to complete within 5 seconds under normal conditions.
  */
 async function persistToFirestore(entry: MarketplaceAuditEntry): Promise<void> {
-  try {
-    const { adminDb } = await import('@/lib/firebase-admin');
-    await adminDb
-      .collection('marketplace_audit_trail')
-      .doc(entry.id)
-      .set({
-        actorId: entry.actorId,
-        actionType: entry.actionType,
-        timestamp: entry.timestamp,
-        entityId: entry.entityId,
-        entityType: entry.entityType,
-        ...(entry.beforeStatus !== undefined && { beforeStatus: entry.beforeStatus }),
-        ...(entry.afterStatus !== undefined && { afterStatus: entry.afterStatus }),
-        ...(entry.metadata && { metadata: entry.metadata }),
-      });
-  } catch (error) {
-    // Non-blocking: log failure but do not throw to caller.
-    // The platform audit trail write (synchronous) ensures no action goes unrecorded.
-    console.error('[MarketplaceAudit] Failed to persist audit entry to Firestore:', error);
-  }
+  const { adminDb } = await import('@/lib/firebase-admin');
+  await adminDb
+    .collection('marketplace_audit_trail')
+    .doc(entry.id)
+    .set({
+      actorId: entry.actorId,
+      actionType: entry.actionType,
+      timestamp: entry.timestamp,
+      entityId: entry.entityId,
+      entityType: entry.entityType,
+      ...(entry.beforeStatus !== undefined && { beforeStatus: entry.beforeStatus }),
+      ...(entry.afterStatus !== undefined && { afterStatus: entry.afterStatus }),
+      ...(entry.metadata && { metadata: entry.metadata }),
+    });
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -140,10 +134,8 @@ export async function logMarketplaceAction(
     sourceObjectId: entry.entityId,
   });
 
-  // Fire-and-forget Firestore persistence (non-blocking, completes within 5s)
-  persistToFirestore(entry).catch((err) => {
-    console.error('[MarketplaceAudit] Background persistence failed:', err);
-  });
+  // Durable Firestore persistence — if audit cannot be written, the operation fails
+  await persistToFirestore(entry);
 
   return entry;
 }

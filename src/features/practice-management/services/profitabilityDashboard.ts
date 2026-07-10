@@ -203,7 +203,7 @@ export function calculateFirmProfitability(
         success: false,
         error: {
           code: 'PROJECT_CALC_FAILED',
-          message: `Profitability calculation failed for project ${project.projectId}: ${result.error.message}`,
+          message: `Profitability calculation failed for project ${project.projectId}: ${(result as Extract<typeof result, { success: false }>).error.message}`,
           details: { projectId: project.projectId },
         },
       };

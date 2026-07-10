@@ -24,41 +24,6 @@ interface FreelancerHubProps {
   user: UserProfile;
 }
 
-const mockProfile: FreelancerProfile = {
-  userId: 'freelancer-1',
-  skills: [
-    { toolId: 'structural-load-calculator', label: 'Structural Load Calculator' },
-    { toolId: 'fenestration-analyser', label: 'Fenestration Analyser' },
-    { toolId: 'energy-compliance-tool', label: 'Energy Compliance Tool' },
-  ],
-  cpdStatus: 'compliant',
-  taskHistory: [
-    { taskId: 't-1', title: 'Structural Analysis — Mixed Use', completedAt: '2026-05-20', rating: 5 },
-    { taskId: 't-2', title: 'Energy Compliance — Residential', completedAt: '2026-04-15', rating: 4 },
-    { taskId: 't-3', title: 'Load Calc — Industrial Mezzanine', completedAt: '2026-03-08', rating: 5 },
-    { taskId: 't-4', title: 'Fenestration Schedule — Office Block', completedAt: '2026-02-20', rating: 4 },
-  ],
-  availability: 'available',
-  yearsExperience: 8,
-  trustScore: 92,
-  completedTaskCount: 47,
-  averageRating: 4.7,
-  badges: ['top_10_percent'],
-  createdAt: '2025-01-15T09:00:00.000Z',
-  updatedAt: '2026-06-14T10:00:00.000Z',
-};
-
-const mockProfileView: FreelancerProfileView = {
-  profile: mockProfile,
-  toolUsageFrequency: {
-    'structural-load-calculator': 28,
-    'fenestration-analyser': 15,
-    'energy-compliance-tool': 12,
-  },
-  aiAuditPassRate: 96.2,
-  disputeHistory: [],
-};
-
 function getAvailabilityColor(availability: string): string {
   switch (availability) {
     case 'available': return 'bg-green-500/20 text-green-400 border-green-500/30';
@@ -74,7 +39,8 @@ function renderStars(rating: number): string {
 
 export default function FreelancerHub({ user }: FreelancerHubProps) {
   const [activeTab, setActiveTab] = useState('profile');
-  const [_profile, setProfile] = useState<FreelancerProfileView>(mockProfileView);
+  const [_profile, setProfile] = useState<FreelancerProfileView | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch(`/api/marketplace/freelancer-profile/${user.uid}`)
@@ -82,8 +48,17 @@ export default function FreelancerHub({ user }: FreelancerHubProps) {
       .then((d) => {
         if (d && d.profile) setProfile(d);
       })
-      .catch(() => { /* keep mock fallback */ });
+      .catch(() => { /* no fallback */ })
+      .finally(() => setLoading(false));
   }, [user.uid]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">Loading...</p></div>;
+  }
+
+  if (!_profile) {
+    return <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No profile found</p></div>;
+  }
 
   return (
     <div className="space-y-6">

@@ -255,12 +255,12 @@ export default function WarrantyPanel({
           <CardTitle className="text-lg font-semibold text-foreground">Warranty Register</CardTitle>
           {canModify && (
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-              <DialogTrigger asChild>
+              <DialogTrigger render={
                 <Button size="sm" className="gap-1">
                   <Plus className="h-4 w-4" />
                   Add Warranty
                 </Button>
-              </DialogTrigger>
+              } />
               <DialogContent className="bg-surface-900 border-surface-700">
                 <DialogHeader>
                   <DialogTitle>Add Warranty Item</DialogTitle>

@@ -113,14 +113,14 @@ export default function TimesheetView({
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
 
   // Filter entries for current week
-  const weekEntries = useMemo(() => {
+  const weekEntries = useMemo<TimesheetEntry[]>(() => {
     const start = formatDate(weekDates[0]);
     const end = formatDate(weekDates[6]);
     return entries.filter((e) => e.date >= start && e.date <= end);
   }, [entries, weekDates]);
 
   // Daily totals
-  const dailyTotals = useMemo(() => {
+  const dailyTotals = useMemo<number[]>(() => {
     return weekDates.map((date) => {
       const dateStr = formatDate(date);
       const dayEntries = weekEntries.filter((e) => e.date === dateStr);
@@ -149,7 +149,7 @@ export default function TimesheetView({
   const canSubmit = draftEntries.length > 0;
 
   // Group entries by project
-  const entriesByProject = useMemo(() => {
+  const entriesByProject = useMemo<Record<string, TimesheetEntry[]>>(() => {
     const grouped: Record<string, TimesheetEntry[]> = {};
     for (const entry of weekEntries) {
       if (!grouped[entry.projectId]) {
@@ -277,7 +277,7 @@ export default function TimesheetView({
 
               {/* Entry Rows by Project */}
               {Object.entries(entriesByProject).length > 0 ? (
-                Object.entries(entriesByProject).map(([projectId, projectEntries]) => {
+                (Object.entries(entriesByProject) as [string, TimesheetEntry[]][]).map(([projectId, projectEntries]) => {
                   const projectTotal = projectEntries.reduce((sum, e) => sum + e.hours, 0);
                   return (
                     <div

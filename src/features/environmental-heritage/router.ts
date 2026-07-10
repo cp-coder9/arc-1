@@ -189,7 +189,6 @@ export function createEnvironmentalRouter(deps: EnvironmentalRouterDeps): Router
 
       // Persist to Firestore
       const screening = result.data;
-      const screening = result.data;
       await db
         .collection(`projects/${data.projectId}/environmental/screenings`)
         .doc(screening.id)

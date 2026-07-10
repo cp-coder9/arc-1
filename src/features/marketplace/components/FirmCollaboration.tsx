@@ -28,52 +28,6 @@ interface FirmCollaborationProps {
   user: UserProfile;
 }
 
-const mockCollaborations: FirmCollaborationPosting[] = [
-  {
-    id: 'collab-1',
-    firmId: 'firm-1',
-    tenantId: 'firm-1',
-    createdByUserId: 'admin-1',
-    title: 'Multi-Disciplinary Residential Complex — Phase 1',
-    description: 'Seeking structural engineer, MEP engineer, and landscape architect for a 48-unit residential complex. Full compliance package required.',
-    requiredDisciplines: ['Structural Engineering', 'MEP Engineering', 'Landscape Architecture'],
-    teamSize: 5,
-    budgetPerRole: {
-      'Structural Engineer': 450000,
-      'MEP Engineer': 380000,
-      'Landscape Architect': 220000,
-    },
-    timeline: { startDate: '2026-07-01T00:00:00.000Z', endDate: '2027-03-31T00:00:00.000Z' },
-    linkedTools: ['structural-load-calculator', 'energy-compliance-tool'],
-    status: 'published',
-    teamMembers: [
-      { userId: 'user-1', role: 'Lead Architect', invitedAt: '2026-06-01', acceptedAt: '2026-06-02' },
-      { userId: 'user-2', role: 'Structural Engineer', invitedAt: '2026-06-05' },
-    ],
-    createdAt: '2026-06-01T09:00:00.000Z',
-  },
-  {
-    id: 'collab-2',
-    firmId: 'firm-2',
-    tenantId: 'firm-2',
-    createdByUserId: 'admin-2',
-    title: 'Heritage Building Restoration — Pretoria CBD',
-    description: 'Collaboration for heritage restoration requiring NHRA Section 38 expertise. Team to include heritage consultant, structural specialist, and conservation architect.',
-    requiredDisciplines: ['Heritage Conservation', 'Structural Engineering', 'Conservation Architecture'],
-    teamSize: 4,
-    budgetPerRole: {
-      'Heritage Consultant': 320000,
-      'Structural Specialist': 280000,
-      'Conservation Architect': 350000,
-    },
-    timeline: { startDate: '2026-08-15T00:00:00.000Z', endDate: '2027-06-30T00:00:00.000Z' },
-    linkedTools: [],
-    status: 'published',
-    teamMembers: [],
-    createdAt: '2026-06-10T14:00:00.000Z',
-  },
-];
-
 function formatCurrency(amount: number): string {
   return `R ${amount.toLocaleString('en-ZA')}`;
 }
@@ -91,7 +45,8 @@ function getCollabStatusColor(status: string): string {
 
 export default function FirmCollaboration({ user }: FirmCollaborationProps) {
   const [activeTab, setActiveTab] = useState('postings');
-  const [_collaborations, setCollaborations] = useState<FirmCollaborationPosting[]>(mockCollaborations);
+  const [_collaborations, setCollaborations] = useState<FirmCollaborationPosting[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch('/api/marketplace/collaborations')
@@ -102,7 +57,8 @@ export default function FirmCollaboration({ user }: FirmCollaborationProps) {
       .then((d) => {
         if (d && d.collaborations) setCollaborations(d.collaborations);
       })
-      .catch(() => { /* keep mock fallback */ });
+      .catch(() => { /* no fallback */ })
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -129,6 +85,11 @@ export default function FirmCollaboration({ user }: FirmCollaborationProps) {
 
         {/* Collaboration Postings */}
         <TabsContent value="postings">
+          {loading ? (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">Loading...</p></div>
+          ) : _collaborations.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[200px]"><p className="text-surface-400 text-sm">No collaborations found</p></div>
+          ) : (
           <div className="space-y-4">
             {_collaborations.map((collab) => (
               <Card key={collab.id} className="bg-surface-800/70 backdrop-blur border-surface-700/50">
@@ -186,6 +147,7 @@ export default function FirmCollaboration({ user }: FirmCollaborationProps) {
               </Card>
             ))}
           </div>
+          )}
         </TabsContent>
 
         {/* Team Invitations */}
@@ -217,7 +179,7 @@ export default function FirmCollaboration({ user }: FirmCollaborationProps) {
               <div>
                 <p className="text-xs uppercase tracking-wider text-surface-400 mb-2">Current Team Members</p>
                 <div className="space-y-2">
-                  {_collaborations[0].teamMembers.map((member) => (
+                  {(_collaborations[0]?.teamMembers || []).map((member) => (
                     <div key={member.userId} className="flex items-center justify-between p-3 rounded-lg bg-surface-900/50 border border-surface-700/30">
                       <div className="flex items-center gap-3">
                         <Shield className="h-4 w-4 text-primary-400" />

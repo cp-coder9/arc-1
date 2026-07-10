@@ -99,7 +99,7 @@ function UtilisationBadge({ percentage }: { percentage: number }) {
 
 // ─── Helper: Forecast Bar ─────────────────────────────────────────────────────
 
-function ForecastBar({ forecast }: { forecast: CapacityForecast }) {
+function ForecastBar({ forecast }: { forecast: CapacityForecast; key?: React.Key }) {
   const allocatedPct = forecast.totalCapacity > 0
     ? Math.min((forecast.totalAllocated / forecast.totalCapacity) * 100, 100)
     : 0;
@@ -190,9 +190,9 @@ export default function CapacityView({
 
   // ── Capacity Alerts ──
   const alerts = useMemo(() => {
-    const result = evaluateCapacityAlerts(staff, allocations, leave, pipeline, conversionRates);
+    const result = evaluateCapacityAlerts(forecastData);
     return result.success ? result.data : [];
-  }, [staff, allocations, leave, pipeline, conversionRates]);
+  }, [forecastData]);
 
   // ── Leave Recording ──
   const handleRecordLeave = () => {

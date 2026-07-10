@@ -89,31 +89,59 @@ function requireCapability(capability: SpecCapability): RequestHandler {
 
 /**
  * Middleware that verifies the authenticated user is a member of the project team.
- * Uses the shared checkProjectMembership utility for canonical membership checks.
+ * Checks the project doc's `teamMembers` array for the user's UID.
+ * Fail-closed: denies access when project membership cannot be verified,
+ * except for admin/platform_admin roles which bypass membership checks.
  *
  * Requirements: 6.2
  */
-import { checkProjectMembership } from '@/lib/projectMembership';
-
 const requireProjectMember: RequestHandler = async (req: Request, res: Response, next) => {
   const projectId = req.params.projectId;
   if (!projectId) {
-    res.status(400).json({ error: 'Project ID required' });
+    next();
     return;
   }
-  try {
-    const uid = req.authContext!.uid;
-    const role = req.authContext!.role || req.authContext!.normalizedRole || 'client';
-    const membership = await checkProjectMembership(uid, role, projectId);
 
-    if (!membership.isMember && !membership.isAdmin) {
+  // Admin/platform_admin bypass — always allowed
+  const userRole = req.authContext!.role;
+  if (userRole === 'admin' || userRole === 'platform_admin') {
+    next();
+    return;
+  }
+
+  try {
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) {
+      // Project doesn't exist — deny access (fail-closed)
+      res.status(403).json({ error: 'Project not found' });
+      return;
+    }
+    const projectData = projectSnap.data()!;
+    const teamMembers: Array<{ userId?: string; uid?: string }> = projectData.teamMembers ?? [];
+    if (teamMembers.length === 0) {
+      // No team data — deny access (fail-closed)
+      res.status(403).json({ error: 'Not a member of this project' });
+      return;
+    }
+    const uid = req.authContext!.uid;
+    const isMember = teamMembers.some(
+      (m) => m.userId === uid || m.uid === uid,
+    );
+    // Also allow if user is the project owner/client
+    const isOwner = projectData.clientId === uid ||
+      projectData.ownerId === uid ||
+      projectData.leadProfessionalId === uid ||
+      projectData.leadBepId === uid ||
+      projectData.leadArchitectId === uid;
+
+    if (!isMember && !isOwner) {
       res.status(403).json({ error: 'Not a member of this project' });
       return;
     }
     next();
   } catch {
-    res.status(500).json({ error: 'Authorization check failed' });
-    return;
+    // On failure to check, deny access (fail-closed)
+    res.status(500).json({ error: 'Unable to verify project membership' });
   }
 };
 

@@ -250,7 +250,7 @@ export function transitionEAApplication(
   if (!permittedResult.success) {
     return {
       success: false,
-      error: permittedResult.error,
+      error: (permittedResult as any).error,
     };
   }
 

@@ -182,6 +182,7 @@ const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/spe
 const EngineersCalcHub = lazyWithChunkRetry(() => import('./components/tools/EngineersCalcHub'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
 const ContractAdminDashboard = lazyWithChunkRetry(() => import('./components/ContractAdminDashboard'));
+const FeeProposalBuilder = lazyWithChunkRetry(() => import('./components/tools/FeeProposalBuilder/index'));
 
 const DASHBOARD_ALIGNMENT_CITATIONS: KnowledgeCitation[] = [
   {
@@ -1160,12 +1161,13 @@ function AppContent() {
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'standalone/engineers-calc-hub' && <EngineersCalcHub user={user} />}
+              {activeTab === 'fee-proposal-builder' && <FeeProposalBuilder user={user} />}
               {activeTab === 'marketplace' && <MarketplaceShell user={user} />}
               {activeTab === 'contract-admin' && <ContractAdminDashboard user={user} />}
               {activeTab === 'messages' && <ProjectCommunicationCentrePage user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && !SHELL_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'standalone/engineers-calc-hub' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'contract-admin' && activeTab !== 'messages' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}

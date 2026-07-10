@@ -9,8 +9,18 @@ import type { SpecForgeRepository } from '@/services/specforge/specforgeReposito
 import type { SpecAuditEvent } from '@/types/specforgeTypes';
 
 // Mock firebase-admin to prevent Firestore initialization in tests
+const { mockFirestoreSet } = vi.hoisted(() => {
+  const mockFirestoreSet = vi.fn().mockResolvedValue(undefined);
+  return { mockFirestoreSet };
+});
 vi.mock('@/lib/firebase-admin', () => ({
-  adminDb: {},
+  adminDb: {
+    collection: vi.fn().mockReturnValue({
+      doc: vi.fn().mockReturnValue({
+        set: mockFirestoreSet,
+      }),
+    }),
+  },
 }));
 
 // Mock the Firestore repository to prevent Firebase SDK import
@@ -25,8 +35,6 @@ vi.mock('@/services/auditTrailService', () => ({
 
 import {
   logSpecForgeAction,
-  _getRetryQueueLength,
-  _clearRetryQueue,
   VALUE_CAP_LIMIT,
 } from '@/services/specforge/specforgeAuditAdapter';
 import { setSpecForgeRepository } from '@/services/specforge/specforgeRepository';
@@ -67,7 +75,6 @@ describe('specforgeAuditAdapter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    _clearRetryQueue();
     mockRepo = createMockRepository();
     setSpecForgeRepository(mockRepo);
   });
@@ -214,7 +221,7 @@ describe('specforgeAuditAdapter', () => {
       expect(details.auditHash).toBe('a3f8b2c1');
     });
 
-    it('queues for retry when platform audit service throws', async () => {
+    it('persists to Firestore retry queue when platform audit service throws', async () => {
       mockedCreateAuditEntry.mockImplementation(() => {
         throw new Error('Platform audit unavailable');
       });
@@ -229,8 +236,18 @@ describe('specforgeAuditAdapter', () => {
 
       // Event still persisted to SpecForge collection
       expect(mockRepo.logAuditEvent).toHaveBeenCalledTimes(1);
-      // Retry was queued
-      expect(_getRetryQueueLength()).toBeGreaterThanOrEqual(0);
+      // Failed event persisted to Firestore retry queue
+      expect(mockFirestoreSet).toHaveBeenCalledTimes(1);
+      expect(mockFirestoreSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'pending',
+          attempts: 0,
+          event: expect.objectContaining({
+            action: 'created',
+            targetId: 'item-001',
+          }),
+        }),
+      );
     });
 
     it('does not throw when platform audit service fails', async () => {

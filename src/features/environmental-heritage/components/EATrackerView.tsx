@@ -192,12 +192,12 @@ export default function EATrackerView({
         <h2 className="text-lg font-semibold text-foreground">EA Applications</h2>
         {canModify && (
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
+            <DialogTrigger render={
               <Button size="sm" className="gap-1">
                 <Plus className="h-4 w-4" />
                 New Application
               </Button>
-            </DialogTrigger>
+            } />
             <DialogContent className="bg-surface-900 border-surface-700 max-w-lg">
               <DialogHeader>
                 <DialogTitle>Create EA Application</DialogTitle>
@@ -322,6 +322,7 @@ export default function EATrackerView({
 // ─── EA Application Card ──────────────────────────────────────────────────────
 
 interface EAApplicationCardProps {
+  key?: React.Key;
   application: EAApplication;
   canModify: boolean;
   onAdvanceStage?: (applicationId: string, targetStage: EAStage) => void;
@@ -455,6 +456,7 @@ function EAApplicationCard({ application, canModify, onAdvanceStage }: EAApplica
 // ─── Timeframe Indicator ──────────────────────────────────────────────────────
 
 interface TimeframeIndicatorProps {
+  key?: React.Key;
   timeframe: RegulatoryTimeframeStatus;
 }
 

@@ -110,7 +110,7 @@ export {
 
 export {
   NHBRCEnrolmentView,
-  EnrolmentChecklist,
+  EnrolmentChecklist as EnrolmentChecklistComponent,
   FeeCalculator,
   InspectionTrackerView,
   InspectionOutcomeForm,

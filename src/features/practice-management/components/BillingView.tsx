@@ -113,7 +113,7 @@ export default function BillingView({
       setDraftError(null);
       setShowDraftPreview(true);
     } else {
-      setDraftError(result.error.message);
+      setDraftError((result as any).error.message);
       setCurrentDraft(null);
       setShowDraftPreview(false);
     }

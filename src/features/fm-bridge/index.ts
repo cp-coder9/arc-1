@@ -77,7 +77,7 @@ export {
   executeHandoverTransition,
 } from './services/handoverTransition';
 export type {
-  ServiceResult,
+  ServiceResult as HandoverServiceResult,
   ProjectHandoverData,
   ActorIdentity,
   HandoverTransitionResult,

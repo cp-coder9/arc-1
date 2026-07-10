@@ -1,917 +1,586 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architex OS — BoM Builder &amp; Material Takeoff</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
-            surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' },
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .glass-card { background: rgba(30,41,59,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(148,163,184,0.1); border-radius: 0.5rem; }
-    .status-pass { color: #22c55e; }
-    .status-fail { color: #ef4444; }
-    .status-pending { color: #f59e0b; }
-    .status-na { color: #64748b; }
-    input[type="number"], select, input[type="text"] {
-      background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 0.375rem;
-      padding: 0.375rem 0.625rem; font-size: 0.8125rem;
-    }
-    input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-    .tab-trigger {
-      padding: 0.5rem 1rem; font-size: 0.75rem; font-weight: 500;
-      color: #94a3b8; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s;
-    }
-    .tab-trigger:hover { color: #e2e8f0; }
-    .tab-trigger.active { color: #3b82f6; border-bottom-color: #3b82f6; }
-    .drop-zone {
-      border: 2px dashed #334155; border-radius: 0.5rem; transition: all 0.2s;
-    }
-    .drop-zone:hover, .drop-zone.dragover { border-color: #3b82f6; background: rgba(59,130,246,0.04); }
-    .conf-bar { width: 40px; height: 4px; background: #1e293b; border-radius: 2px; overflow: hidden; }
-    .conf-fill { height: 100%; border-radius: 2px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoM Builder - Architex OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d2520; --bg-deep: #081a16; --bg-os-nav: #061410;
+  --primary: #005b4e; --primary-light: #007666; --secondary: #aeefe3;
+  --text-primary: #ffffff; --text-muted: rgba(255,255,255,0.62);
+  --text-low: rgba(255,255,255,0.42);
+  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(174,239,227,0.24);
+  --glass-glow: rgba(0,118,102,0.38);
+  --panel-bg: rgba(255,255,255,0.05); --card-bg: #11302a;
+  --btn-gradient: linear-gradient(180deg, #c5f6d4, #aeefe3); --btn-text: #00201b;
+  --gold: #F1D39A; --danger: #d95747; --green: #4ADE80; --amber: #F5A623;
+  --grid-lines: rgba(174,239,227,0.06); --radius: 10px; --radius-sm: 6px;
+  --font-heading: 'Space Grotesk', sans-serif; --font-body: 'Inter', sans-serif;
+  --os-nav-width: 56px; --tool-nav-width: 220px; --topbar-height: 40px;
+  --input-bg: rgba(255,255,255,0.06); --input-border: rgba(174,239,227,0.2);
+}
+html, body { height:100%; background:var(--bg); color:var(--text-primary);
+  font-family:var(--font-body); font-size:15px; line-height:1.6; overflow:hidden; }
+body::before { content:''; position:fixed; inset:0;
+  background: radial-gradient(ellipse 60% 50% at 30% 40%, var(--glass-glow) 0%, transparent 70%),
+  radial-gradient(ellipse 40% 40% at 75% 60%, rgba(174,239,227,0.04) 0%, transparent 60%);
+  pointer-events:none; z-index:0; }
+body::after { content:''; position:fixed; inset:0;
+  background-image: linear-gradient(var(--grid-lines) 1px, transparent 1px),
+  linear-gradient(90deg, var(--grid-lines) 1px, transparent 1px);
+  background-size:56px 56px; pointer-events:none; z-index:0; }
+</style>
+<style>
+.app-shell { display:grid; grid-template-columns:var(--os-nav-width) var(--tool-nav-width) 1fr;
+  grid-template-rows:var(--topbar-height) 1fr; height:100vh; position:relative; z-index:1; }
+.os-nav { grid-row:1/-1; background:var(--bg-os-nav); border-right:1px solid rgba(174,239,227,0.12);
+  display:flex; flex-direction:column; align-items:center; padding:12px 0; z-index:100; }
+.os-nav-logo { width:32px; height:32px; margin-bottom:20px; color:var(--secondary); }
+.os-nav-logo svg { width:100%; height:100%; }
+.os-nav-items { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+.os-nav-item { width:40px; height:40px; border-radius:10px; display:flex; align-items:center;
+  justify-content:center; color:var(--text-low); cursor:pointer; transition:all 0.2s; position:relative; }
+.os-nav-item:hover { background:rgba(174,239,227,0.08); color:var(--text-primary); }
+.os-nav-item.active { color:var(--secondary); }
+.os-nav-item.active::after { content:''; position:absolute; right:-2px; top:50%; transform:translateY(-50%);
+  width:4px; height:4px; border-radius:50%; background:var(--secondary); box-shadow:0 0 6px var(--secondary); }
+.os-nav-item svg { width:20px; height:20px; }
+.tool-nav { grid-row:1/-1; background:var(--glass-bg); border-right:1px solid var(--glass-border);
+  backdrop-filter:blur(16px); display:flex; flex-direction:column; overflow-y:auto; padding:10px 0; position:relative; }
+.tool-nav-header { padding:8px 14px 14px; border-bottom:1px solid var(--glass-border); margin-bottom:6px; }
+.tool-nav-header h2 { font-family:var(--font-heading); font-size:17px; font-weight:700; color:var(--secondary); }
+.tool-nav-header .sub { font-size:11px; color:var(--text-low); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+.nav-section-label { padding:10px 14px 4px; font-size:10px; text-transform:uppercase;
+  letter-spacing:1.2px; color:var(--text-low); font-weight:600; }
+.nav-item { display:flex; align-items:center; gap:8px; padding:8px 14px; cursor:pointer;
+  color:var(--text-muted); font-size:13px; transition:all 0.2s; border-left:3px solid transparent; }
+.nav-item:hover { color:var(--text-primary); background:rgba(174,239,227,0.05); border-left-color:rgba(174,239,227,0.3); }
+.nav-item.active { color:var(--secondary); background:rgba(174,239,227,0.08);
+  border-left-color:var(--secondary); font-weight:500; }
+.nav-item svg { width:15px; height:15px; flex-shrink:0; opacity:0.7; }
+.nav-item.active svg { opacity:1; }
+.top-bar { background:var(--bg-os-nav); border-bottom:1px solid var(--glass-border);
+  display:flex; align-items:center; padding:0 16px; gap:10px; font-size:13px; }
+.breadcrumb { color:var(--text-low); }
+.breadcrumb .sep { color:rgba(174,239,227,0.3); margin:0 5px; }
+.breadcrumb .cur { color:var(--secondary); font-weight:500; }
+.top-bar-spacer { flex:1; }
+.btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:var(--radius-sm);
+  font-size:12px; font-weight:500; font-family:var(--font-body); cursor:pointer; transition:all 0.2s; border:none; white-space:nowrap; }
+.btn-primary { background:var(--btn-gradient); color:var(--btn-text); font-weight:600; }
+.btn-primary:hover { box-shadow:0 0 14px rgba(174,239,227,0.4); transform:translateY(-1px); }
+.btn-secondary { background:transparent; color:var(--text-muted); border:1px solid var(--glass-border); }
+.btn-secondary:hover { border-color:var(--secondary); color:var(--text-primary); }
+.btn-danger { background:rgba(217,87,71,0.15); color:var(--danger); border:1px solid rgba(217,87,71,0.3); }
+.btn-gold { background:var(--gold); color:var(--btn-text); font-weight:600; }
+</style>
+<style>
+.main-content { overflow-y:auto; padding:20px; position:relative; }
+.panel { background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius);
+  backdrop-filter:blur(16px); padding:18px; margin-bottom:16px; transition:border-color 0.3s; }
+.panel:hover { border-color:rgba(174,239,227,0.4); }
+.panel-title { font-family:var(--font-heading); font-size:14px; font-weight:600;
+  color:var(--text-primary); margin-bottom:12px; display:flex; align-items:center; gap:7px; }
+.panel-title .dot { width:6px; height:6px; border-radius:50%; background:var(--secondary); }
+.chip { display:inline-flex; align-items:center; padding:3px 8px; border-radius:4px;
+  font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+.chip-approved { background:rgba(74,222,128,0.15); color:var(--green); }
+.chip-flagged { background:rgba(245,166,35,0.2); color:var(--amber); }
+.chip-blocker { background:rgba(217,87,71,0.2); color:var(--danger); }
+.chip-extracted { background:rgba(174,239,227,0.12); color:var(--secondary); }
+.chip-draft { background:rgba(255,255,255,0.08); color:var(--text-muted); }
+.chip-ordered { background:rgba(174,239,227,0.1); color:var(--secondary); border:1px solid rgba(174,239,227,0.15); }
+.badge { display:inline-flex; align-items:center; padding:3px 7px; border-radius:3px;
+  font-size:11px; font-weight:500; background:rgba(174,239,227,0.1); color:var(--secondary); border:1px solid rgba(174,239,227,0.15); }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; }
+.stat-card { background:var(--panel-bg); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:14px; text-align:center; }
+.stat-value { font-family:var(--font-heading); font-size:24px; font-weight:700; color:var(--secondary); }
+.stat-label { font-size:12px; color:var(--text-low); margin-top:3px; }
+.bom-table { width:100%; border-collapse:collapse; font-size:13px; }
+.bom-table th { text-align:left; padding:10px 12px; color:var(--text-low); font-size:11px;
+  text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--glass-border); font-weight:600; }
+.bom-table td { padding:10px 12px; border-bottom:1px solid rgba(174,239,227,0.08); }
+.bom-table tr:hover td { background:rgba(174,239,227,0.03); }
+.bom-table .code-col { font-family:monospace; color:var(--primary-light); }
+.bom-table .num-col { text-align:right; font-family:'Space Grotesk', monospace; }
+.conf-bar { width:44px; height:5px; background:rgba(255,255,255,0.08); border-radius:2px;
+  overflow:hidden; display:inline-block; vertical-align:middle; margin-right:5px; }
+.conf-fill { height:100%; border-radius:2px; }
+.drop-zone { border:2px dashed var(--glass-border); border-radius:var(--radius); padding:36px;
+  text-align:center; transition:all 0.25s; cursor:pointer; }
+.drop-zone:hover { border-color:var(--secondary); background:rgba(174,239,227,0.04); }
+.view-panel { display:none; }
+.view-panel.active { display:block; animation:fadeIn 0.2s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.ai-card { background:linear-gradient(135deg, rgba(0,91,78,0.3), rgba(174,239,227,0.08));
+  border:1px solid rgba(174,239,227,0.3); border-radius:var(--radius-sm); padding:14px; margin-bottom:16px; }
+.ai-card .ai-label { font-size:11px; text-transform:uppercase; letter-spacing:1px;
+  color:var(--secondary); margin-bottom:4px; font-weight:600; }
+.ai-card .ai-body { font-size:13px; color:var(--text-muted); line-height:1.6; }
+.trade-chip { display:inline-flex; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:500; }
+.trade-masonry { background:rgba(241,211,154,0.12); color:var(--gold); }
+.trade-concrete { background:rgba(255,255,255,0.06); color:var(--text-muted); }
+.trade-electrical { background:rgba(96,165,250,0.12); color:#60a5fa; }
+.trade-plumbing { background:rgba(34,211,238,0.12); color:#22d3ee; }
+.trade-roofing { background:rgba(217,87,71,0.12); color:var(--danger); }
+.trade-doors-windows { background:rgba(174,239,227,0.12); color:var(--secondary); }
+.trade-finishes { background:rgba(74,222,128,0.12); color:var(--green); }
+.pipeline-board { display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; }
+.pipeline-col { background:var(--panel-bg); border:1px solid var(--glass-border);
+  border-radius:var(--radius); padding:10px; min-height:100px; }
+.pipeline-col-title { font-family:var(--font-heading); font-size:10px; font-weight:600;
+  color:var(--text-low); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;
+  padding-bottom:5px; border-bottom:1px solid var(--glass-border); text-align:center; }
+.pipeline-card { background:var(--card-bg); border:1px solid var(--glass-border);
+  border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:5px; font-size:12px; }
+.pipeline-card:hover { border-color:rgba(174,239,227,0.4); }
+.flag-card { background:var(--panel-bg); border:1px solid var(--glass-border);
+  border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+.flag-card.warning { border-left:3px solid var(--amber); }
+.flag-card.blocker { border-left:3px solid var(--danger); }
+.project-switcher { position:relative; display:inline-block; }
+.project-dropdown { display:none; position:absolute; top:100%; right:0; margin-top:4px; width:300px;
+  background:var(--card-bg); border:1px solid var(--glass-border); border-radius:var(--radius);
+  box-shadow:0 12px 40px rgba(0,0,0,0.5); z-index:200; overflow:hidden; }
+.project-dropdown.open { display:block; }
+.project-option { padding:10px 12px; cursor:pointer; transition:background 0.15s; border-bottom:1px solid rgba(174,239,227,0.08); }
+.project-option:hover { background:rgba(174,239,227,0.05); }
+.project-option.active { background:rgba(174,239,227,0.08); border:1px solid rgba(174,239,227,0.2); border-radius:var(--radius-sm); }
+.project-option .name { font-size:13px; font-weight:500; }
+.project-option .meta { font-size:11px; color:var(--text-low); margin-top:2px; }
+</style>
 </head>
-<body class="bg-surface-950 text-surface-200 min-h-screen">
+<body>
+<div class="app-shell">
+  <!-- OS NAV -->
+  <nav class="os-nav">
+    <div class="os-nav-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></div>
+    <div class="os-nav-items">
+      <div class="os-nav-item" title="Command Centre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
+      <div class="os-nav-item" title="Projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg></div>
+      <div class="os-nav-item active" title="Toolboxes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
+      <div class="os-nav-item" title="SpecForge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
+      <div class="os-nav-item" title="Documents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+      <div class="os-nav-item" title="Payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+    </div>
+  </nav>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       ARCHITEX OS SHELL (provided by App.tsx — simulated here)
-       ═══════════════════════════════════════════════════════════ -->
+  <!-- TOOL NAV -->
+  <aside class="tool-nav">
+    <div class="tool-nav-header"><h2>BoM Builder</h2><div class="sub">Costing &amp; Procurement</div></div>
+    <div class="nav-section-label">Views</div>
+    <div class="nav-item active" data-view="takeoff" onclick="switchView('takeoff')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg><span>Drawing Takeoff</span></div>
+    <div class="nav-item" data-view="bomlines" onclick="switchView('bomlines')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg><span>BoM Lines (47)</span></div>
+    <div class="nav-item" data-view="flagged" onclick="switchView('flagged')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg><span>Flagged (4)</span></div>
+    <div class="nav-item" data-view="procurement" onclick="switchView('procurement')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg><span>Procurement</span></div>
+    <div class="nav-item" data-view="programme" onclick="switchView('programme')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>Programme Link</span></div>
+    <div class="nav-item" data-view="specforge" onclick="switchView('specforge')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg><span>SpecForge</span></div>
+    <div class="nav-section-label">Workflows</div>
+    <div class="nav-item" data-view="qs-review" onclick="switchView('qs-review')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg><span>QS Review</span></div>
+    <div class="nav-item" data-view="tender" onclick="switchView('tender')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg><span>Tender Generation</span></div>
+    <div class="nav-item" data-view="export" onclick="switchView('export')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>Document Export</span></div>
+    <div class="nav-section-label">Integrations</div>
+    <div class="nav-item" data-view="agents" onclick="switchView('agents')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg><span>AI Agents</span></div>
+    <div class="nav-item" data-view="audit" onclick="switchView('audit')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Audit Trail</span></div>
+  </aside>
 
-  <!-- OS Header (sticky) -->
-  <header class="border-b border-surface-700/50 bg-surface-900/80 backdrop-blur-sm sticky top-0 z-50">
-    <div class="max-w-[1600px] mx-auto px-4 h-12 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-md bg-primary-600 flex items-center justify-center">
-          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+  <!-- TOP BAR with Project Switcher -->
+  <div class="top-bar">
+    <div class="breadcrumb">Toolboxes <span class="sep">/</span> Costing &amp; Procurement <span class="sep">/</span> <span class="cur">BoM Builder</span></div>
+    <div class="top-bar-spacer"></div>
+    <div class="project-switcher" id="projectSwitcherWrap">
+      <button class="btn btn-secondary" onclick="toggleProjectSwitcher()" style="gap:6px;">
+        <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+        <span id="activeProjectName">Camps Bay Residence</span>
+        <svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="project-dropdown" id="projectDropdown">
+        <div style="padding:10px 12px; border-bottom:1px solid var(--glass-border); font-size:11px; color:var(--text-low); text-transform:uppercase; letter-spacing:0.8px; font-weight:600;">Switch Project</div>
+        <div class="project-option active" onclick="selectProject('Camps Bay Residence')">
+          <div class="name" style="color:var(--secondary);">Camps Bay Residence</div>
+          <div class="meta">Stage: Procurement - Rev C - 47 items</div>
         </div>
-        <span class="text-sm font-semibold text-white">Architex<span class="text-primary-400">OS</span></span>
-        <span class="text-surface-500 text-xs ml-3">/</span>
-        <span class="text-surface-400 text-xs ml-1">Costing &amp; Procurement</span>
-        <span class="text-surface-500 text-xs ml-1">/</span>
-        <span class="text-surface-200 text-xs ml-1 font-medium">BoM Builder</span>
-      </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-surface-400">Camps Bay Residence — Rev C</span>
-        <div class="w-7 h-7 rounded-full bg-primary-600/20 border border-primary-500/30 flex items-center justify-center text-[10px] text-primary-300 font-medium">GT</div>
+        <div class="project-option" onclick="selectProject('Sandton Mixed-Use')">
+          <div class="name">Sandton Mixed-Use Complex</div>
+          <div class="meta">Stage: Design - Rev B - 128 items</div>
+        </div>
+        <div class="project-option" onclick="selectProject('Rosebank Fit-out')">
+          <div class="name">Rosebank Lobby Fit-out</div>
+          <div class="meta">Stage: Tender - Rev P01 - 62 items</div>
+        </div>
+        <div style="padding:10px 12px; border-top:1px solid var(--glass-border);">
+          <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="selectProject('New Project')">+ Start New Independent BoM</button>
+        </div>
       </div>
     </div>
-  </header>
-
-  <div class="max-w-[1600px] mx-auto flex">
-
-    <!-- ═══════════════════════════════════════════════
-         MINIMISED PRIMARY NAV (Costing & Procurement module)
-         ═══════════════════════════════════════════════ -->
-    <aside class="w-12 min-h-[calc(100vh-3rem)] border-r border-surface-700/50 bg-surface-900/50 py-3 flex-shrink-0 sticky top-12 h-[calc(100vh-3rem)] flex flex-col items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-primary-600/20 border border-primary-500/30 flex items-center justify-center" title="Costing & Procurement">
-        <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-      </div>
-      <div class="w-6 border-t border-surface-700/50"></div>
-      <!-- Active: BoM Builder -->
-      <div class="w-8 h-8 rounded-lg bg-primary-500/10 border border-primary-500/20 flex items-center justify-center" title="BoM Builder (active)">
-        <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-      </div>
-      <!-- BoQ Summary -->
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="BoQ Summary">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-      </div>
-      <!-- Drawing Takeoff -->
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="Drawing Takeoff">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      </div>
-      <!-- Supplier Catalogue -->
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="Supplier Catalogue">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-      </div>
-      <!-- RFQ Manager -->
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="RFQ Manager">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-      </div>
-      <!-- SpecForge -->
-      <div class="w-6 border-t border-surface-700/50 mt-2"></div>
-      <div class="w-8 h-8 rounded-lg bg-surface-800/50 flex items-center justify-center hover:bg-surface-800 cursor-pointer transition" title="SpecForge">
-        <svg class="w-4 h-4 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-      </div>
-    </aside>
-
-    <!-- ═══════════════════════════════════════════════
-         TOOL CONTENT AREA
-         Header Card → Tabs → Active Content
-         ═══════════════════════════════════════════════ -->
-    <main class="flex-1 p-6 overflow-y-auto space-y-6">
-
-      <!-- ─── TOOL HEADER CARD ─── -->
-      <div class="glass-card p-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
-              <svg class="w-6 h-6 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-              Bill of Materials Builder
-            </h1>
-            <p class="text-xs text-surface-400 mt-1">AI-powered material takeoff from drawings &amp; models → editable BoM → procurement pipeline → SpecForge integration</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="px-3 py-1.5 text-xs font-medium rounded-md bg-surface-800 border border-surface-700 text-surface-300 hover:bg-surface-700 transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-              Export CSV
-            </button>
-            <button class="px-3 py-1.5 text-xs font-medium rounded-md bg-surface-800 border border-surface-700 text-surface-300 hover:bg-surface-700 transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-              Export PDF
-            </button>
-            <button class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              Add Line Item
-            </button>
-          </div>
-        </div>
-        <!-- Project context row -->
-        <div class="flex items-center gap-4 mt-4 pt-3 border-t border-surface-700/50">
-          <div class="flex items-center gap-1.5 text-xs text-surface-400">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            Camps Bay Residence
-          </div>
-          <div class="flex items-center gap-1.5 text-xs text-surface-400">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            Stage: Procurement
-          </div>
-          <div class="flex items-center gap-1.5 text-xs text-surface-400">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Source: 6 Drawings (Arch Rev C)
-          </div>
-          <div class="flex items-center gap-1.5 text-xs">
-            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span class="text-amber-400">4 flags pending review</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── TABS ─── -->
-      <div class="border-b border-surface-700/50 flex" id="tabBar">
-        <div class="tab-trigger active" data-tab="takeoff">Drawing Takeoff</div>
-        <div class="tab-trigger" data-tab="bom">BoM Lines (47)</div>
-        <div class="tab-trigger" data-tab="flagged">Flagged (4)</div>
-        <div class="tab-trigger" data-tab="procurement">Procurement</div>
-        <div class="tab-trigger" data-tab="programme">Programme Link</div>
-        <div class="tab-trigger" data-tab="specforge">SpecForge</div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB 1: DRAWING TAKEOFF — Source Upload + Extraction
-           ═══════════════════════════════════════════════ -->
-      <div class="tab-content" id="tab-takeoff">
-
-        <!-- AI Insight -->
-        <div class="glass-card p-4 border-l-4 border-l-primary-500 mb-6">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-            <span class="text-xs font-semibold text-primary-400 uppercase tracking-wider">AI Co-Pilot</span>
-          </div>
-          <p class="text-sm text-surface-300">Upload architectural/structural drawings, IFC models, or CSV schedules. AI will auto-extract quantities, classify by trade package, assign cost codes, and flag assumptions requiring QS review.</p>
-        </div>
-
-        <!-- Drop Zone -->
-        <div class="drop-zone p-8 text-center mb-6" id="dropZone">
-          <svg class="w-12 h-12 mx-auto text-surface-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-          <p class="text-sm font-medium text-surface-300">Drop drawings or files here to extract BoM quantities</p>
-          <p class="text-xs text-surface-500 mt-1">or click to browse files</p>
-          <div class="flex flex-wrap justify-center gap-2 mt-4">
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">PDF (Vector)</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">PDF (Raster/Scan)</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">DWG</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">DXF</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">IFC (BIM)</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">Revit Export</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">CSV Schedule</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-surface-800 border border-surface-700 text-surface-400">XLSX</span>
-          </div>
-        </div>
-
-        <!-- Takeoff Sources Table -->
-        <div class="glass-card overflow-hidden">
-          <div class="px-4 py-3 border-b border-surface-700/50 flex items-center justify-between">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400">Extraction Sources</h3>
-            <span class="text-[10px] text-surface-500">6 sources • last extracted 2 hrs ago</span>
-          </div>
-          <table class="w-full text-xs">
-            <thead class="bg-surface-800/50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">File</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Type</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Drawing Ref</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Items Extracted</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Confidence</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-800/50">
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">A-101_Ground_Floor_Plan.pdf</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">PDF Vector</span></td>
-                <td class="px-4 py-2.5 text-surface-400 font-mono">A-101 Rev C</td>
-                <td class="px-4 py-2.5 text-surface-300">14 items</td>
-                <td class="px-4 py-2.5"><span class="text-green-400">91%</span></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Complete</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">A-102_First_Floor_Plan.pdf</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">PDF Vector</span></td>
-                <td class="px-4 py-2.5 text-surface-400 font-mono">A-102 Rev C</td>
-                <td class="px-4 py-2.5 text-surface-300">12 items</td>
-                <td class="px-4 py-2.5"><span class="text-green-400">88%</span></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Complete</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">S-201_Structural_Model.ifc</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20">IFC BIM</span></td>
-                <td class="px-4 py-2.5 text-surface-400 font-mono">S-201 Rev B</td>
-                <td class="px-4 py-2.5 text-surface-300">8 items</td>
-                <td class="px-4 py-2.5"><span class="text-green-400">95%</span></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Complete</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">Electrical_Layout_Scan.pdf</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">PDF Raster</span></td>
-                <td class="px-4 py-2.5 text-surface-400 font-mono">E-101 Rev A</td>
-                <td class="px-4 py-2.5 text-surface-300">6 items</td>
-                <td class="px-4 py-2.5"><span class="text-amber-400">62%</span></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Needs Review</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">Window_Schedule.csv</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-surface-700 text-surface-400 border border-surface-600">CSV</span></td>
-                <td class="px-4 py-2.5 text-surface-400 font-mono">WS-001</td>
-                <td class="px-4 py-2.5 text-surface-300">4 items</td>
-                <td class="px-4 py-2.5"><span class="text-green-400">99%</span></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Complete</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">Roof_Detail.dwg</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">DWG</span></td>
-                <td class="px-4 py-2.5 text-surface-400 font-mono">A-301 Rev C</td>
-                <td class="px-4 py-2.5 text-surface-300">3 items</td>
-                <td class="px-4 py-2.5"><span class="text-green-400">91%</span></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Complete</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB 2: BOM LINES — Full Material List
-           ═══════════════════════════════════════════════ -->
-      <div class="tab-content hidden" id="tab-bom">
-
-        <!-- Summary Stats -->
-        <div class="grid grid-cols-5 gap-4 mb-6">
-          <div class="glass-card p-4">
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 font-medium">Total BoM Value</p>
-            <p class="text-xl font-bold text-primary-400 mt-1">R 4,287,350</p>
-            <p class="text-[10px] text-surface-500 mt-0.5">47 items • 7 trades</p>
-          </div>
-          <div class="glass-card p-4">
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 font-medium">Approved</p>
-            <p class="text-xl font-bold text-green-400 mt-1">31</p>
-            <p class="text-[10px] text-surface-500 mt-0.5">66% reviewed</p>
-          </div>
-          <div class="glass-card p-4">
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 font-medium">Flagged</p>
-            <p class="text-xl font-bold text-amber-400 mt-1">4</p>
-            <p class="text-[10px] text-surface-500 mt-0.5">2 blocker • 2 warning</p>
-          </div>
-          <div class="glass-card p-4">
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 font-medium">RFQs Out</p>
-            <p class="text-xl font-bold text-surface-200 mt-1">8</p>
-            <p class="text-[10px] text-surface-500 mt-0.5">3 quotes received</p>
-          </div>
-          <div class="glass-card p-4">
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 font-medium">Programme Linked</p>
-            <p class="text-xl font-bold text-surface-200 mt-1">89%</p>
-            <p class="text-[10px] text-surface-500 mt-0.5">42/47 activities</p>
-          </div>
-        </div>
-
-        <!-- Filter Bar + Table -->
-        <div class="glass-card overflow-hidden">
-          <div class="px-4 py-3 border-b border-surface-700/50 flex items-center gap-3">
-            <input type="text" placeholder="Search items, materials, trade packages..." class="w-56 text-xs">
-            <div class="flex gap-1.5">
-              <span class="text-[10px] px-2 py-1 rounded-full bg-primary-500/10 text-primary-400 border border-primary-500/20 cursor-pointer">All</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Masonry</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Concrete</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Electrical</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Plumbing</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Roofing</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Doors/Win</span>
-              <span class="text-[10px] px-2 py-1 rounded-full bg-surface-800 text-surface-400 border border-surface-700 cursor-pointer hover:border-surface-600">Finishes</span>
-            </div>
-            <span class="ml-auto text-[10px] text-surface-500">Source: Arch Rev C (6 sheets)</span>
-          </div>
-          <table class="w-full text-xs">
-            <thead class="bg-surface-800/50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Code</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Description</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Trade</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Unit</th>
-                <th class="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-surface-500 font-medium">Qty</th>
-                <th class="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-surface-500 font-medium">Rate (R)</th>
-                <th class="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-surface-500 font-medium">Total (R)</th>
-                <th class="px-4 py-2.5 text-center text-[10px] uppercase tracking-wider text-surface-500 font-medium">Conf.</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Status</th>
-                <th class="px-4 py-2.5 text-center text-[10px] uppercase tracking-wider text-surface-500 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-800/50">
-              <!-- Row 1 - Approved -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">001-MAS</td>
-                <td class="px-4 py-2.5 text-surface-200">External walls — 230mm clay face brick (NFP)</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">Masonry</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m²</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">342</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">680</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">232,560</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:92%"></div></div><span class="text-green-400">92%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-              <!-- Row 2 - Approved -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">002-MAS</td>
-                <td class="px-4 py-2.5 text-surface-200">Internal walls — 110mm brick plastered both sides</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">Masonry</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m²</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">487</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">520</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">253,240</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:88%"></div></div><span class="text-green-400">88%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-              <!-- Row 3 - Approved -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">003-CON</td>
-                <td class="px-4 py-2.5 text-surface-200">Reinforced concrete raft foundation — 25MPa</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-surface-700 text-surface-300 border border-surface-600">Concrete</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m³</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">86</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">2,450</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">210,700</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:95%"></div></div><span class="text-green-400">95%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-              <!-- Row 4 - Flagged Warning -->
-              <tr class="hover:bg-surface-800/30 transition bg-amber-500/[0.02]">
-                <td class="px-4 py-2.5 font-mono text-surface-400">004-MAS</td>
-                <td class="px-4 py-2.5 text-surface-200">DPC membrane — below all masonry walls</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">Masonry</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">128</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">85</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">10,880</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-amber-400" style="width:62%"></div></div><span class="text-amber-400">62%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">⚠ Flagged</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20">Review</button></td>
-              </tr>
-              <!-- Row 5 - Approved -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">005-DW</td>
-                <td class="px-4 py-2.5 text-surface-200">Aluminium sliding doors — 3m × 2.4m thermally broken</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20">Doors/Win</span></td>
-                <td class="px-4 py-2.5 text-surface-400">nr</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">6</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">28,500</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">171,000</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:98%"></div></div><span class="text-green-400">98%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-              <!-- Row 6 - Blocker -->
-              <tr class="hover:bg-surface-800/30 transition bg-red-500/[0.02]">
-                <td class="px-4 py-2.5 font-mono text-surface-400">006-ELE</td>
-                <td class="px-4 py-2.5 text-surface-200">DB board — 3-phase 48-way + earth leakage</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">Electrical</span></td>
-                <td class="px-4 py-2.5 text-surface-400">nr</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">2</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">18,200</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">36,400</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-red-400" style="width:41%"></div></div><span class="text-red-400">41%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">🛑 Blocker</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">Review</button></td>
-              </tr>
-              <!-- Row 7 -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">007-PLU</td>
-                <td class="px-4 py-2.5 text-surface-200">110mm uPVC soil stack — full height (3 storey)</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Plumbing</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">24</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">850</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">20,400</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:87%"></div></div><span class="text-green-400">87%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-              <!-- Row 8 -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">008-ROO</td>
-                <td class="px-4 py-2.5 text-surface-200">Klip-Lok 700 roof sheeting — 0.58mm Colorbond</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20">Roofing</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m²</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">210</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">385</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">80,850</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:91%"></div></div><span class="text-green-400">91%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Extracted</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-              <!-- Row 9 -->
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 font-mono text-surface-400">009-FIN</td>
-                <td class="px-4 py-2.5 text-surface-200">Porcelain floor tiles 600×600 — matt finish</td>
-                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">Finishes</span></td>
-                <td class="px-4 py-2.5 text-surface-400">m²</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">185</td>
-                <td class="px-4 py-2.5 text-right text-surface-400">145</td>
-                <td class="px-4 py-2.5 text-right text-surface-200 font-medium">26,825</td>
-                <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><div class="conf-bar"><div class="conf-fill bg-green-400" style="width:85%"></div></div><span class="text-green-400">85%</span></div></td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-center"><button class="text-surface-500 hover:text-surface-300">⋯</button></td>
-              </tr>
-            </tbody>
-          </table>
-          <!-- Totals Footer -->
-          <div class="px-4 py-3 border-t border-surface-700/50 bg-surface-800/30 flex items-center justify-between">
-            <div class="flex items-center gap-6">
-              <div>
-                <p class="text-[10px] uppercase tracking-wider text-surface-500">Material Subtotal</p>
-                <p class="text-sm font-bold text-surface-200">R 3,522,100</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase tracking-wider text-surface-500">Labour (Est)</p>
-                <p class="text-sm font-bold text-surface-200">R 612,450</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase tracking-wider text-surface-500">Prelims (8%)</p>
-                <p class="text-sm font-bold text-surface-200">R 152,800</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase tracking-wider text-surface-500">VAT (15%)</p>
-                <p class="text-sm font-bold text-surface-200">R 643,103</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase tracking-wider text-surface-500">Project Total</p>
-                <p class="text-sm font-bold text-primary-400">R 4,930,453</p>
-              </div>
-            </div>
-            <button class="px-3 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              Submit for QS Review
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB 3: FLAGGED — Items needing review
-           ═══════════════════════════════════════════════ -->
-      <div class="tab-content hidden" id="tab-flagged">
-        <div class="space-y-4">
-          <!-- Flag 1 -->
-          <div class="glass-card p-4 border-l-4 border-l-amber-500">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">WARNING</span>
-                  <span class="font-mono text-xs text-surface-400">004-MAS</span>
-                </div>
-                <p class="text-sm text-surface-200 font-medium">DPC membrane — quantity assumption</p>
-                <p class="text-xs text-surface-400 mt-1">Linear metres calculated from external wall perimeter only. Internal DPC runs (party walls, wet areas) not included. Verify with structural drawings.</p>
-                <div class="flex items-center gap-3 mt-2">
-                  <span class="text-[10px] text-surface-500">Source: A-101 Rev C • Page 2</span>
-                  <span class="text-[10px] text-surface-500">SANS Ref: 10400-K §4.4</span>
-                  <span class="text-[10px] text-amber-400">Confidence: 62%</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button class="text-xs px-2.5 py-1 rounded bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">Approve</button>
-                <button class="text-xs px-2.5 py-1 rounded bg-surface-800 text-surface-300 border border-surface-700 hover:bg-surface-700">Edit</button>
-                <button class="text-xs px-2.5 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">Reject</button>
-              </div>
-            </div>
-            <div class="mt-3 p-2.5 rounded bg-surface-900/50 border border-surface-700/50">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-1">AI Suggested Action</p>
-              <p class="text-xs text-surface-300">Request structural engineer drawings to confirm internal DPC locations. Expected revised quantity: ~195m (including party walls and wet areas).</p>
-            </div>
-          </div>
-
-          <!-- Flag 2 - Blocker -->
-          <div class="glass-card p-4 border-l-4 border-l-red-500">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-medium">BLOCKER</span>
-                  <span class="font-mono text-xs text-surface-400">006-ELE</span>
-                </div>
-                <p class="text-sm text-surface-200 font-medium">DB board — specification incomplete for CoC</p>
-                <p class="text-xs text-surface-400 mt-1">Earth leakage rating not specified in source drawing. SANS 10142-1 requires EL specification for Certificate of Compliance. Cannot proceed to procurement without this.</p>
-                <div class="flex items-center gap-3 mt-2">
-                  <span class="text-[10px] text-surface-500">Source: E-101 Rev A (raster scan)</span>
-                  <span class="text-[10px] text-surface-500">SANS Ref: 10142-1</span>
-                  <span class="text-[10px] text-red-400">Confidence: 41%</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button class="text-xs px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20">Request Info</button>
-                <button class="text-xs px-2.5 py-1 rounded bg-surface-800 text-surface-300 border border-surface-700 hover:bg-surface-700">Edit</button>
-              </div>
-            </div>
-            <div class="mt-3 p-2.5 rounded bg-surface-900/50 border border-surface-700/50">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-1">AI Suggested Action</p>
-              <p class="text-xs text-surface-300">Request electrical engineer to confirm DB board spec: brand, EL rating (30mA/100mA), surge protection requirement. Block procurement until resolved.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB 4: PROCUREMENT — Supplier + Orders
-           ═══════════════════════════════════════════════ -->
-      <div class="tab-content hidden" id="tab-procurement">
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <!-- Supplier Allocation -->
-          <div class="glass-card p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 mb-3 flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-              Supplier Allocation
-            </h3>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-surface-300">Corobrik (Masonry)</span>
-                <span class="text-surface-400">R 496,680 — <span class="text-blue-400">RFQ sent</span></span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-surface-300">AfriSam ReadyMix</span>
-                <span class="text-surface-400">R 210,700 — <span class="text-green-400">Quote received</span></span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-surface-300">Swartland Windows</span>
-                <span class="text-surface-400">R 171,000 — <span class="text-amber-400">12-wk lead</span></span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-surface-300">CTM (Tiles)</span>
-                <span class="text-surface-400">R 26,825 — <span class="text-green-400">In stock</span></span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 text-xs">
-                <span class="text-surface-300">Cashbuild (General)</span>
-                <span class="text-surface-400">R 31,280 — <span class="text-surface-500">Pending</span></span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Lead Time Risk -->
-          <div class="glass-card p-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 mb-3 flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              Lead Time Risk
-            </h3>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-red-400 font-medium">🛑 Aluminium fenestration</span>
-                <span class="text-red-400">12 weeks — Critical path</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-amber-400">⚠ DB boards (imported)</span>
-                <span class="text-amber-400">6 weeks — Monitor</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-green-400">✓ Clay face brick</span>
-                <span class="text-green-400">3 days — Available</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-surface-800/50 text-xs">
-                <span class="text-green-400">✓ Concrete (ReadyMix)</span>
-                <span class="text-green-400">24hr — Available</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 text-xs">
-                <span class="text-green-400">✓ Roof sheeting</span>
-                <span class="text-green-400">5 days — Available</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Order Pipeline -->
-        <div class="glass-card overflow-hidden">
-          <div class="px-4 py-3 border-b border-surface-700/50 flex items-center justify-between">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400">Order Pipeline</h3>
-            <button class="text-xs px-2.5 py-1 rounded bg-primary-600 text-white hover:bg-primary-700 transition">+ Create RFQ</button>
-          </div>
-          <div class="grid grid-cols-5 gap-0 divide-x divide-surface-700/50">
-            <div class="p-3">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-2">Awaiting Quote (3)</p>
-              <div class="space-y-1.5">
-                <div class="p-2 rounded bg-surface-800/50 text-[10px] text-surface-300">Electrical — CBI</div>
-                <div class="p-2 rounded bg-surface-800/50 text-[10px] text-surface-300">Plumbing — Builders</div>
-                <div class="p-2 rounded bg-surface-800/50 text-[10px] text-surface-300">Finishes — CTM</div>
-              </div>
-            </div>
-            <div class="p-3">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-2">Quoted (2)</p>
-              <div class="space-y-1.5">
-                <div class="p-2 rounded bg-blue-500/5 border border-blue-500/10 text-[10px] text-surface-300">AfriSam — R 210K</div>
-                <div class="p-2 rounded bg-blue-500/5 border border-blue-500/10 text-[10px] text-surface-300">Swartland — R 171K</div>
-              </div>
-            </div>
-            <div class="p-3">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-2">Ordered (3)</p>
-              <div class="space-y-1.5">
-                <div class="p-2 rounded bg-purple-500/5 border border-purple-500/10 text-[10px] text-surface-300">Corobrik brick</div>
-                <div class="p-2 rounded bg-purple-500/5 border border-purple-500/10 text-[10px] text-surface-300">AfriSam concrete</div>
-                <div class="p-2 rounded bg-purple-500/5 border border-purple-500/10 text-[10px] text-surface-300">Roof sheeting</div>
-              </div>
-            </div>
-            <div class="p-3">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-2">In Transit (1)</p>
-              <div class="space-y-1.5">
-                <div class="p-2 rounded bg-amber-500/5 border border-amber-500/10 text-[10px] text-surface-300">Roof sheeting — ETA 3d</div>
-              </div>
-            </div>
-            <div class="p-3">
-              <p class="text-[10px] uppercase tracking-wider text-surface-500 mb-2">Delivered (2)</p>
-              <div class="space-y-1.5">
-                <div class="p-2 rounded bg-green-500/5 border border-green-500/10 text-[10px] text-surface-300">Concrete ✓</div>
-                <div class="p-2 rounded bg-green-500/5 border border-green-500/10 text-[10px] text-surface-300">Brickwork ✓</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB 5: PROGRAMME LINK — Gantt / Drawdown
-           ═══════════════════════════════════════════════ -->
-      <div class="tab-content hidden" id="tab-programme">
-        <div class="glass-card p-4 border-l-4 border-l-primary-500 mb-6">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <span class="text-xs font-semibold text-primary-400 uppercase tracking-wider">Programme & Cashflow</span>
-          </div>
-          <p class="text-xs text-surface-300">BoM items linked to programme activities with automatic order-by date calculation based on lead times. Enables cashflow forecasting and just-in-time procurement.</p>
-        </div>
-
-        <div class="glass-card overflow-hidden">
-          <table class="w-full text-xs">
-            <thead class="bg-surface-800/50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Activity</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">BoM Items</th>
-                <th class="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-surface-500 font-medium">Material Value</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Start</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Order By</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-800/50">
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-200">Substructure &amp; Foundations</td>
-                <td class="px-4 py-2.5 font-mono text-surface-400">003, 004</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">R 221,580</td>
-                <td class="px-4 py-2.5 text-surface-400">Week 1</td>
-                <td class="px-4 py-2.5 text-green-400">✓ Ordered</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Delivered</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-200">Superstructure — Masonry</td>
-                <td class="px-4 py-2.5 font-mono text-surface-400">001, 002</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">R 485,800</td>
-                <td class="px-4 py-2.5 text-surface-400">Week 4</td>
-                <td class="px-4 py-2.5 text-green-400">✓ Ordered</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">In Transit</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-200">Roof Structure &amp; Covering</td>
-                <td class="px-4 py-2.5 font-mono text-surface-400">008</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">R 80,850</td>
-                <td class="px-4 py-2.5 text-surface-400">Week 10</td>
-                <td class="px-4 py-2.5 text-amber-400">Order by Wk 8</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400 border border-surface-600">Pending</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition bg-red-500/[0.02]">
-                <td class="px-4 py-2.5 text-surface-200">Windows &amp; External Doors</td>
-                <td class="px-4 py-2.5 font-mono text-surface-400">005</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">R 171,000</td>
-                <td class="px-4 py-2.5 text-surface-400">Week 12</td>
-                <td class="px-4 py-2.5 text-red-400 font-medium">⚠ Order NOW</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Critical</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition bg-red-500/[0.02]">
-                <td class="px-4 py-2.5 text-surface-200">Electrical First Fix</td>
-                <td class="px-4 py-2.5 font-mono text-surface-400">006</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">R 36,400</td>
-                <td class="px-4 py-2.5 text-surface-400">Week 8</td>
-                <td class="px-4 py-2.5 text-surface-500">Week 6</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">🛑 Blocked</span></td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-200">Finishes &amp; Tiling</td>
-                <td class="px-4 py-2.5 font-mono text-surface-400">009</td>
-                <td class="px-4 py-2.5 text-right text-surface-200">R 26,825</td>
-                <td class="px-4 py-2.5 text-surface-400">Week 16</td>
-                <td class="px-4 py-2.5 text-surface-500">Week 14</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400 border border-surface-600">Pending</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════
-           TAB 6: SPECFORGE — Specification Integration
-           ═══════════════════════════════════════════════ -->
-      <div class="tab-content hidden" id="tab-specforge">
-        <div class="glass-card p-4 border-l-4 border-l-green-500 mb-6">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-            <span class="text-xs font-semibold text-green-400 uppercase tracking-wider">SpecForge Integration</span>
-          </div>
-          <p class="text-xs text-surface-300"><strong class="text-surface-200">38 of 47 BoM items</strong> linked to SpecForge specifications. 9 items need spec entries (finishes + electrical). Client approval pending on 3 substitutions.</p>
-        </div>
-
-        <div class="grid grid-cols-3 gap-4 mb-6">
-          <div class="glass-card p-4 text-center">
-            <p class="text-2xl font-bold text-green-400">38</p>
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 mt-1">Linked to Spec</p>
-          </div>
-          <div class="glass-card p-4 text-center">
-            <p class="text-2xl font-bold text-amber-400">9</p>
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 mt-1">Spec Missing</p>
-          </div>
-          <div class="glass-card p-4 text-center">
-            <p class="text-2xl font-bold text-purple-400">3</p>
-            <p class="text-[10px] uppercase tracking-wider text-surface-500 mt-1">Substitution Pending</p>
-          </div>
-        </div>
-
-        <div class="glass-card overflow-hidden">
-          <div class="px-4 py-3 border-b border-surface-700/50 flex items-center justify-between">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400">BoM → Spec Mapping</h3>
-            <button class="text-xs px-2.5 py-1 rounded bg-green-600 text-white hover:bg-green-700 transition">Create Missing Spec Items</button>
-          </div>
-          <table class="w-full text-xs">
-            <thead class="bg-surface-800/50">
-              <tr>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">BoM Item</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Spec Section</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Spec Item</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Spec Status</th>
-                <th class="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-surface-500 font-medium">Client Approved</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-800/50">
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">001 — External walls 230mm</td>
-                <td class="px-4 py-2.5 text-surface-400">S02 — Envelope</td>
-                <td class="px-4 py-2.5 text-primary-400 cursor-pointer hover:underline">S02-001 Face Brick</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Issued</span></td>
-                <td class="px-4 py-2.5 text-green-400">✓</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">005 — Aluminium sliders</td>
-                <td class="px-4 py-2.5 text-surface-400">S03 — Fenestration</td>
-                <td class="px-4 py-2.5 text-primary-400 cursor-pointer hover:underline">S03-002 Sliding Doors</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Needs Decision</span></td>
-                <td class="px-4 py-2.5 text-amber-400">Substitution pending</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition bg-amber-500/[0.02]">
-                <td class="px-4 py-2.5 text-surface-300">006 — DB board</td>
-                <td class="px-4 py-2.5 text-surface-400">S05 — Electrical</td>
-                <td class="px-4 py-2.5 text-surface-500 italic">— No spec item —</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400 border border-surface-600">Not Created</span></td>
-                <td class="px-4 py-2.5 text-surface-500">—</td>
-              </tr>
-              <tr class="hover:bg-surface-800/30 transition">
-                <td class="px-4 py-2.5 text-surface-300">009 — Porcelain tiles</td>
-                <td class="px-4 py-2.5 text-surface-400">S06 — Finishes</td>
-                <td class="px-4 py-2.5 text-primary-400 cursor-pointer hover:underline">S06-003 Floor Tiles</td>
-                <td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">Approved</span></td>
-                <td class="px-4 py-2.5 text-green-400">✓</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ─── AUDIT TRAIL (always visible below active tab) ─── -->
-      <div class="glass-card p-4 mt-6">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 mb-3 flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Audit Trail
-        </h3>
-        <div class="space-y-3">
-          <div class="flex gap-3 items-start">
-            <div class="w-2 h-2 rounded-full bg-primary-400 mt-1.5 flex-shrink-0"></div>
-            <div>
-              <p class="text-xs text-surface-300"><span class="font-medium text-surface-200">AI extraction completed</span> — 47 items from 6 drawings (Arch Rev C)</p>
-              <p class="text-[10px] text-surface-500">Today, 09:14 — System</p>
-            </div>
-          </div>
-          <div class="flex gap-3 items-start">
-            <div class="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0"></div>
-            <div>
-              <p class="text-xs text-surface-300"><span class="font-medium text-surface-200">QS batch-approved 31 items</span> — masonry + concrete trades</p>
-              <p class="text-[10px] text-surface-500">Today, 10:22 — Sarah Mokoena (QS)</p>
-            </div>
-          </div>
-          <div class="flex gap-3 items-start">
-            <div class="w-2 h-2 rounded-full bg-amber-400 mt-1.5 flex-shrink-0"></div>
-            <div>
-              <p class="text-xs text-surface-300"><span class="font-medium text-surface-200">4 items flagged</span> — DPC quantity assumption, DB board spec unclear</p>
-              <p class="text-[10px] text-surface-500">Today, 10:25 — System (AI flag)</p>
-            </div>
-          </div>
-          <div class="flex gap-3 items-start">
-            <div class="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0"></div>
-            <div>
-              <p class="text-xs text-surface-300"><span class="font-medium text-surface-200">RFQ issued to Swartland</span> — aluminium fenestration package</p>
-              <p class="text-[10px] text-surface-500">Today, 11:03 — Greg Tarb (Architect)</p>
-            </div>
-          </div>
-          <div class="flex gap-3 items-start">
-            <div class="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0"></div>
-            <div>
-              <p class="text-xs text-surface-300"><span class="font-medium text-surface-200">SpecForge sync</span> — 38 items linked to spec sections S01–S05</p>
-              <p class="text-[10px] text-surface-500">Today, 11:15 — System</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </main>
+    <button class="btn btn-secondary">Export</button>
+    <button class="btn btn-primary">+ Add Item</button>
   </div>
 
-  <!-- ═══════════════════════════════════════════════
-       TAB SWITCHING SCRIPT
-       ═══════════════════════════════════════════════ -->
-  <script>
-    // Tab switching
-    const tabs = document.querySelectorAll('.tab-trigger');
-    const panels = document.querySelectorAll('.tab-content');
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const target = tab.dataset.tab;
-        panels.forEach(p => {
-          p.classList.toggle('hidden', p.id !== `tab-${target}`);
-        });
-      });
-    });
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
 
-    // Drop zone interaction
-    const dropZone = document.getElementById('dropZone');
-    if (dropZone) {
-      ['dragenter','dragover'].forEach(evt => {
-        dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-      });
-      ['dragleave','drop'].forEach(evt => {
-        dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
-      });
-      dropZone.addEventListener('drop', (e) => {
-        const files = e.dataTransfer?.files;
-        if (files?.length) {
-          alert(`Would extract BoM from: ${Array.from(files).map(f => f.name).join(', ')}\n\nSupported: PDF, DWG, DXF, IFC, Revit, CSV, XLSX`);
-        }
-      });
-      dropZone.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = true;
-        input.accept = '.pdf,.dwg,.dxf,.ifc,.rvt,.csv,.xlsx';
-        input.onchange = () => {
-          if (input.files?.length) {
-            alert(`Would extract BoM from: ${Array.from(input.files).map(f => f.name).join(', ')}`);
-          }
-        };
-        input.click();
-      });
-    }
-  </script>
+    <!-- VIEW: DRAWING TAKEOFF -->
+    <div class="view-panel active" id="view-takeoff">
+      <div class="ai-card">
+        <div class="ai-label">AI Co-Pilot - BoM Intelligence</div>
+        <div class="ai-body">Upload architectural, structural, or services drawings in any format. AI auto-extracts quantities, classifies by trade package, assigns cost codes, and flags assumptions. <strong>47 items extracted</strong> from 6 sources. 4 flags pending QS review.</div>
+      </div>
+      <div class="drop-zone" id="dropZone" style="margin-bottom:16px;">
+        <div style="font-size:28px; margin-bottom:8px; color:var(--secondary);">+</div>
+        <div style="font-family:var(--font-heading); font-size:15px; font-weight:600; margin-bottom:6px;">Drop drawings or files to extract BoM quantities</div>
+        <div style="font-size:13px; color:var(--text-low); margin-bottom:12px;">AI extracts materials, quantities, and trade classifications from all drawing formats</div>
+        <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px;">
+          <span class="badge">PDF Vector</span><span class="badge">PDF Raster/Scan</span><span class="badge">DWG</span>
+          <span class="badge">DXF</span><span class="badge">IFC (BIM)</span><span class="badge">Revit Export</span>
+          <span class="badge">CSV Schedule</span><span class="badge">XLSX</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Extraction Sources<span style="margin-left:auto; font-size:12px; color:var(--text-low);">6 sources - last extracted 2 hrs ago</span></div>
+        <table class="bom-table">
+          <thead><tr><th>File</th><th>Type</th><th>Drawing Ref</th><th>Items</th><th>Confidence</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>A-101_Ground_Floor_Plan.pdf</td><td><span class="badge">PDF Vector</span></td><td class="code-col">A-101 Rev C</td><td>14</td><td><span class="conf-bar"><span class="conf-fill" style="width:91%;background:var(--green)"></span></span> 91%</td><td><span class="chip chip-approved">Complete</span></td></tr>
+            <tr><td>A-102_First_Floor_Plan.pdf</td><td><span class="badge">PDF Vector</span></td><td class="code-col">A-102 Rev C</td><td>12</td><td><span class="conf-bar"><span class="conf-fill" style="width:88%;background:var(--green)"></span></span> 88%</td><td><span class="chip chip-approved">Complete</span></td></tr>
+            <tr><td>S-201_Structural_Model.ifc</td><td><span class="badge">IFC BIM</span></td><td class="code-col">S-201 Rev B</td><td>8</td><td><span class="conf-bar"><span class="conf-fill" style="width:95%;background:var(--green)"></span></span> 95%</td><td><span class="chip chip-approved">Complete</span></td></tr>
+            <tr><td>Electrical_Layout_Scan.pdf</td><td><span class="badge" style="background:rgba(241,211,154,0.1);color:var(--gold);border-color:rgba(241,211,154,0.2);">PDF Raster</span></td><td class="code-col">E-101 Rev A</td><td>6</td><td><span class="conf-bar"><span class="conf-fill" style="width:62%;background:var(--amber)"></span></span> 62%</td><td><span class="chip chip-flagged">Needs Review</span></td></tr>
+            <tr><td>Window_Schedule.csv</td><td><span class="badge">CSV</span></td><td class="code-col">WS-001</td><td>4</td><td><span class="conf-bar"><span class="conf-fill" style="width:99%;background:var(--green)"></span></span> 99%</td><td><span class="chip chip-approved">Complete</span></td></tr>
+            <tr><td>Roof_Detail.dwg</td><td><span class="badge">DWG</span></td><td class="code-col">A-301 Rev C</td><td>3</td><td><span class="conf-bar"><span class="conf-fill" style="width:91%;background:var(--green)"></span></span> 91%</td><td><span class="chip chip-approved">Complete</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW: BOM LINES -->
+    <div class="view-panel" id="view-bomlines">
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-value">R 4.29M</div><div class="stat-label">Total BoM Value</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--green);">31</div><div class="stat-label">Approved</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--amber);">4</div><div class="stat-label">Flagged</div></div>
+        <div class="stat-card"><div class="stat-value">8</div><div class="stat-label">RFQs Out</div></div>
+        <div class="stat-card"><div class="stat-value">89%</div><div class="stat-label">Programme Linked</div></div>
+      </div>
+      <div class="panel" style="padding:0; overflow:hidden;">
+        <div style="padding:12px 14px; border-bottom:1px solid var(--glass-border); display:flex; align-items:center; gap:8px;">
+          <input type="text" placeholder="Search items..." style="background:var(--input-bg); border:1px solid var(--input-border); border-radius:6px; padding:6px 12px; font-size:13px; color:var(--text-primary); width:220px; font-family:var(--font-body);">
+          <span class="chip chip-extracted" style="cursor:pointer;">All</span>
+          <span class="trade-chip trade-masonry" style="cursor:pointer;">Masonry</span>
+          <span class="trade-chip trade-concrete" style="cursor:pointer;">Concrete</span>
+          <span class="trade-chip trade-electrical" style="cursor:pointer;">Electrical</span>
+          <span class="trade-chip trade-plumbing" style="cursor:pointer;">Plumbing</span>
+          <span class="trade-chip trade-roofing" style="cursor:pointer;">Roofing</span>
+          <span class="trade-chip trade-doors-windows" style="cursor:pointer;">Doors/Win</span>
+          <span class="trade-chip trade-finishes" style="cursor:pointer;">Finishes</span>
+        </div>
+        <table class="bom-table">
+          <thead><tr><th>Code</th><th>Description</th><th>Trade</th><th>Unit</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Total (R)</th><th>Conf.</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="code-col">001-MAS</td><td>External walls - 230mm clay face brick (NFP)</td><td><span class="trade-chip trade-masonry">Masonry</span></td><td>m2</td><td class="num-col">342</td><td class="num-col">680</td><td class="num-col" style="font-weight:600;">232,560</td><td><span class="conf-bar"><span class="conf-fill" style="width:92%;background:var(--green)"></span></span> 92%</td><td><span class="chip chip-approved">Approved</span></td></tr>
+            <tr><td class="code-col">002-MAS</td><td>Internal walls - 110mm brick plastered both sides</td><td><span class="trade-chip trade-masonry">Masonry</span></td><td>m2</td><td class="num-col">487</td><td class="num-col">520</td><td class="num-col" style="font-weight:600;">253,240</td><td><span class="conf-bar"><span class="conf-fill" style="width:88%;background:var(--green)"></span></span> 88%</td><td><span class="chip chip-approved">Approved</span></td></tr>
+            <tr><td class="code-col">003-CON</td><td>Reinforced concrete raft foundation - 25MPa</td><td><span class="trade-chip trade-concrete">Concrete</span></td><td>m3</td><td class="num-col">86</td><td class="num-col">2,450</td><td class="num-col" style="font-weight:600;">210,700</td><td><span class="conf-bar"><span class="conf-fill" style="width:95%;background:var(--green)"></span></span> 95%</td><td><span class="chip chip-approved">Approved</span></td></tr>
+            <tr style="background:rgba(245,166,35,0.03);"><td class="code-col">004-MAS</td><td>DPC membrane - below all masonry walls</td><td><span class="trade-chip trade-masonry">Masonry</span></td><td>m</td><td class="num-col">128</td><td class="num-col">85</td><td class="num-col" style="font-weight:600;">10,880</td><td><span class="conf-bar"><span class="conf-fill" style="width:62%;background:var(--amber)"></span></span> 62%</td><td><span class="chip chip-flagged">Flagged</span></td></tr>
+            <tr><td class="code-col">005-DW</td><td>Aluminium sliding doors - 3m x 2.4m thermally broken</td><td><span class="trade-chip trade-doors-windows">Doors/Win</span></td><td>nr</td><td class="num-col">6</td><td class="num-col">28,500</td><td class="num-col" style="font-weight:600;">171,000</td><td><span class="conf-bar"><span class="conf-fill" style="width:98%;background:var(--green)"></span></span> 98%</td><td><span class="chip chip-approved">Approved</span></td></tr>
+            <tr style="background:rgba(217,87,71,0.03);"><td class="code-col">006-ELE</td><td>DB board - 3-phase 48-way + earth leakage</td><td><span class="trade-chip trade-electrical">Electrical</span></td><td>nr</td><td class="num-col">2</td><td class="num-col">18,200</td><td class="num-col" style="font-weight:600;">36,400</td><td><span class="conf-bar"><span class="conf-fill" style="width:41%;background:var(--danger)"></span></span> 41%</td><td><span class="chip chip-blocker">Blocker</span></td></tr>
+            <tr><td class="code-col">007-PLU</td><td>110mm uPVC soil stack - full height (3 storey)</td><td><span class="trade-chip trade-plumbing">Plumbing</span></td><td>m</td><td class="num-col">24</td><td class="num-col">850</td><td class="num-col" style="font-weight:600;">20,400</td><td><span class="conf-bar"><span class="conf-fill" style="width:87%;background:var(--green)"></span></span> 87%</td><td><span class="chip chip-approved">Approved</span></td></tr>
+            <tr><td class="code-col">008-ROO</td><td>Klip-Lok 700 roof sheeting - 0.58mm Colorbond</td><td><span class="trade-chip trade-roofing">Roofing</span></td><td>m2</td><td class="num-col">210</td><td class="num-col">385</td><td class="num-col" style="font-weight:600;">80,850</td><td><span class="conf-bar"><span class="conf-fill" style="width:91%;background:var(--green)"></span></span> 91%</td><td><span class="chip chip-extracted">Extracted</span></td></tr>
+            <tr><td class="code-col">009-FIN</td><td>Porcelain floor tiles 600x600 - matt finish</td><td><span class="trade-chip trade-finishes">Finishes</span></td><td>m2</td><td class="num-col">185</td><td class="num-col">145</td><td class="num-col" style="font-weight:600;">26,825</td><td><span class="conf-bar"><span class="conf-fill" style="width:85%;background:var(--green)"></span></span> 85%</td><td><span class="chip chip-approved">Approved</span></td></tr>
+          </tbody>
+        </table>
+        <div style="padding:12px 14px; border-top:1px solid var(--glass-border); display:flex; align-items:center; justify-content:space-between; background:var(--panel-bg);">
+          <div style="display:flex; gap:24px; font-size:13px; color:var(--text-muted);">
+            <span>Material: <strong style="color:var(--text-primary);">R 3,522,100</strong></span>
+            <span>Labour: <strong style="color:var(--text-primary);">R 612,450</strong></span>
+            <span>Prelims 8%: <strong style="color:var(--text-primary);">R 152,800</strong></span>
+            <span>VAT 15%: <strong style="color:var(--text-primary);">R 643,103</strong></span>
+            <span>Total: <strong style="color:var(--secondary);">R 4,930,453</strong></span>
+          </div>
+          <button class="btn btn-primary">Submit for QS Review</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: FLAGGED -->
+    <div class="view-panel" id="view-flagged">
+      <div class="flag-card warning">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><span class="chip chip-flagged">Warning</span><span style="font-family:monospace; font-size:13px; color:var(--primary-light);">004-MAS</span></div>
+        <div style="font-family:var(--font-heading); font-size:15px; font-weight:600; margin-bottom:6px;">DPC membrane - quantity assumption</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Linear metres calculated from external wall perimeter only. Internal DPC runs (party walls, wet areas) not included. Verify with structural engineer drawings.</div>
+        <div style="display:flex; gap:16px; font-size:12px; color:var(--text-low); margin-bottom:12px;"><span>Source: A-101 Rev C, Page 2</span><span>SANS Ref: 10400-K S4.4</span><span style="color:var(--amber);">Confidence: 62%</span></div>
+        <div class="ai-card" style="margin-bottom:12px;"><div class="ai-label">AI Suggested Action</div><div class="ai-body">Request structural engineer drawings to confirm internal DPC locations. Expected revised quantity: ~195m (including party walls and wet areas).</div></div>
+        <div style="display:flex; gap:8px;"><button class="btn btn-primary">Approve</button><button class="btn btn-secondary">Edit &amp; Approve</button><button class="btn btn-danger">Reject</button></div>
+      </div>
+      <div class="flag-card blocker">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><span class="chip chip-blocker">Blocker</span><span style="font-family:monospace; font-size:13px; color:var(--primary-light);">006-ELE</span></div>
+        <div style="font-family:var(--font-heading); font-size:15px; font-weight:600; margin-bottom:6px;">DB board - specification incomplete for CoC</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Earth leakage rating not specified in source drawing. SANS 10142-1 requires EL specification for Certificate of Compliance. Cannot proceed to procurement.</div>
+        <div style="display:flex; gap:16px; font-size:12px; color:var(--text-low); margin-bottom:12px;"><span>Source: E-101 Rev A (raster scan)</span><span>SANS Ref: 10142-1</span><span style="color:var(--danger);">Confidence: 41%</span></div>
+        <div class="ai-card" style="margin-bottom:12px;"><div class="ai-label">AI Suggested Action</div><div class="ai-body">Request electrical engineer to confirm DB board spec: brand, EL rating (30mA/100mA), surge protection. Block procurement until resolved.</div></div>
+        <div style="display:flex; gap:8px;"><button class="btn btn-gold">Request Info</button><button class="btn btn-secondary">Edit</button></div>
+      </div>
+    </div>
+
+    <!-- VIEW: PROCUREMENT -->
+    <div class="view-panel" id="view-procurement">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div class="panel"><div class="panel-title"><span class="dot"></span>Supplier Allocation</div>
+          <div style="font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>Corobrik (Masonry)</span><span style="color:var(--text-low);">R 496,680 - <span style="color:var(--secondary);">RFQ sent</span></span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>AfriSam ReadyMix</span><span style="color:var(--text-low);">R 210,700 - <span style="color:var(--green);">Quote received</span></span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>Swartland Windows</span><span style="color:var(--text-low);">R 171,000 - <span style="color:var(--amber);">12-wk lead</span></span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>CTM (Tiles)</span><span style="color:var(--text-low);">R 26,825 - <span style="color:var(--green);">In stock</span></span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>Cashbuild (General)</span><span style="color:var(--text-low);">R 31,280 - Pending</span></div>
+          </div>
+        </div>
+        <div class="panel"><div class="panel-title"><span class="dot" style="background:var(--amber);"></span>Lead Time Risk</div>
+          <div style="font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span style="color:var(--danger); font-weight:500;">Aluminium fenestration</span><span style="color:var(--danger);">12 weeks - Critical</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span style="color:var(--amber);">DB boards (imported)</span><span style="color:var(--amber);">6 weeks - Monitor</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span style="color:var(--green);">Clay face brick</span><span style="color:var(--green);">3 days</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span style="color:var(--green);">Concrete (ReadyMix)</span><span style="color:var(--green);">24hr</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0;"><span style="color:var(--green);">Roof sheeting</span><span style="color:var(--green);">5 days</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="padding:12px;"><div class="panel-title"><span class="dot"></span>Order Pipeline</div>
+        <div class="pipeline-board">
+          <div class="pipeline-col"><div class="pipeline-col-title">Awaiting Quote</div><div class="pipeline-card">Electrical - CBI<br><span style="font-size:11px;color:var(--text-low);">006-ELE</span></div><div class="pipeline-card">Plumbing - Builders<br><span style="font-size:11px;color:var(--text-low);">007-PLU</span></div><div class="pipeline-card">Finishes - CTM<br><span style="font-size:11px;color:var(--text-low);">009-FIN</span></div></div>
+          <div class="pipeline-col"><div class="pipeline-col-title">Quoted</div><div class="pipeline-card">AfriSam - R 210K<br><span style="font-size:11px;color:var(--text-low);">003-CON</span></div><div class="pipeline-card">Swartland - R 171K<br><span style="font-size:11px;color:var(--text-low);">005-DW</span></div></div>
+          <div class="pipeline-col"><div class="pipeline-col-title">Ordered</div><div class="pipeline-card">Corobrik brick<br><span style="font-size:11px;color:var(--text-low);">001, 002-MAS</span></div><div class="pipeline-card">AfriSam concrete<br><span style="font-size:11px;color:var(--text-low);">003-CON</span></div></div>
+          <div class="pipeline-col"><div class="pipeline-col-title">In Transit</div><div class="pipeline-card">Roof sheeting<br><span style="font-size:11px;color:var(--text-low);">ETA 3 days</span></div></div>
+          <div class="pipeline-col"><div class="pipeline-col-title">Delivered</div><div class="pipeline-card" style="border-color:rgba(74,222,128,0.3);">Concrete<br><span style="font-size:11px;color:var(--green);">003-CON</span></div><div class="pipeline-card" style="border-color:rgba(74,222,128,0.3);">Brickwork<br><span style="font-size:11px;color:var(--green);">001, 002-MAS</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: PROGRAMME LINK -->
+    <div class="view-panel" id="view-programme">
+      <div class="ai-card"><div class="ai-label">Programme &amp; Cashflow</div><div class="ai-body">BoM items linked to programme activities with auto order-by date calculation based on lead times. Enables cashflow forecasting and just-in-time procurement.</div></div>
+      <div class="panel" style="padding:0; overflow:hidden;">
+        <table class="bom-table">
+          <thead><tr><th>Activity</th><th>BoM Items</th><th style="text-align:right;">Material Value</th><th>Start</th><th>Order By</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Substructure &amp; Foundations</td><td class="code-col">003, 004</td><td class="num-col">R 221,580</td><td>Week 1</td><td style="color:var(--green);">Ordered</td><td><span class="chip chip-approved">Delivered</span></td></tr>
+            <tr><td>Superstructure - Masonry</td><td class="code-col">001, 002</td><td class="num-col">R 485,800</td><td>Week 4</td><td style="color:var(--green);">Ordered</td><td><span class="chip chip-ordered">In Transit</span></td></tr>
+            <tr><td>Roof Structure &amp; Covering</td><td class="code-col">008</td><td class="num-col">R 80,850</td><td>Week 10</td><td style="color:var(--amber);">Order by Wk 8</td><td><span class="chip chip-draft">Pending</span></td></tr>
+            <tr style="background:rgba(217,87,71,0.03);"><td>Windows &amp; External Doors</td><td class="code-col">005</td><td class="num-col">R 171,000</td><td>Week 12</td><td style="color:var(--danger); font-weight:600;">Order NOW (12-wk lead)</td><td><span class="chip chip-blocker">Critical</span></td></tr>
+            <tr style="background:rgba(217,87,71,0.03);"><td>Electrical First Fix</td><td class="code-col">006</td><td class="num-col">R 36,400</td><td>Week 8</td><td style="color:var(--text-low);">Week 6</td><td><span class="chip chip-blocker">Blocked</span></td></tr>
+            <tr><td>Finishes &amp; Tiling</td><td class="code-col">009</td><td class="num-col">R 26,825</td><td>Week 16</td><td style="color:var(--text-low);">Week 14</td><td><span class="chip chip-draft">Pending</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW: SPECFORGE -->
+    <div class="view-panel" id="view-specforge">
+      <div class="ai-card" style="border-color:rgba(74,222,128,0.3); background:linear-gradient(135deg, rgba(0,91,78,0.2), rgba(74,222,128,0.06));"><div class="ai-label" style="color:var(--green);">SpecForge Integration</div><div class="ai-body"><strong>38 of 47 BoM items</strong> linked to SpecForge specs. 9 items need spec entries (finishes + electrical). Client approval pending on 3 substitutions.</div></div>
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-value" style="color:var(--green);">38</div><div class="stat-label">Linked to Spec</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--amber);">9</div><div class="stat-label">Spec Missing</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--gold);">3</div><div class="stat-label">Substitution Pending</div></div>
+      </div>
+      <div class="panel" style="padding:0; overflow:hidden;">
+        <div style="padding:12px 14px; border-bottom:1px solid var(--glass-border); display:flex; align-items:center; justify-content:space-between;"><span class="panel-title" style="margin:0;"><span class="dot"></span>BoM to Spec Mapping</span><button class="btn btn-primary">Create Missing Spec Items</button></div>
+        <table class="bom-table">
+          <thead><tr><th>BoM Item</th><th>Spec Section</th><th>Spec Item</th><th>Spec Status</th><th>Client</th></tr></thead>
+          <tbody>
+            <tr><td>001 - External walls 230mm</td><td>S02 - Envelope</td><td style="color:var(--secondary); cursor:pointer;">S02-001 Face Brick</td><td><span class="chip chip-approved">Issued</span></td><td style="color:var(--green);">Yes</td></tr>
+            <tr><td>005 - Aluminium sliders</td><td>S03 - Fenestration</td><td style="color:var(--secondary); cursor:pointer;">S03-002 Sliding Doors</td><td><span class="chip chip-flagged">Needs Decision</span></td><td style="color:var(--amber);">Substitution</td></tr>
+            <tr style="background:rgba(245,166,35,0.03);"><td>006 - DB board</td><td>S05 - Electrical</td><td style="color:var(--text-low); font-style:italic;">No spec item</td><td><span class="chip chip-draft">Not Created</span></td><td style="color:var(--text-low);">-</td></tr>
+            <tr><td>009 - Porcelain tiles</td><td>S06 - Finishes</td><td style="color:var(--secondary); cursor:pointer;">S06-003 Floor Tiles</td><td><span class="chip chip-approved">Approved</span></td><td style="color:var(--green);">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW: QS REVIEW -->
+    <div class="view-panel" id="view-qs-review">
+      <div class="ai-card"><div class="ai-label">QS Review Workflow</div><div class="ai-body">Quantity Surveyor oversight gate - all BoM items must pass QS review before procurement or tender issue. AI pre-checks rates against market data, flags quantity anomalies, and verifies cost code allocation.</div></div>
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-value" style="color:var(--green);">31</div><div class="stat-label">QS Approved</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--amber);">12</div><div class="stat-label">Awaiting QS</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--danger);">4</div><div class="stat-label">QS Flagged</div></div>
+        <div class="stat-card"><div class="stat-value">R 178K</div><div class="stat-label">Budget Variance</div></div>
+        <div class="stat-card"><div class="stat-value">87%</div><div class="stat-label">Rate Confidence</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>QS Review Queue<span style="margin-left:auto; font-size:12px; color:var(--text-low);">Assigned: Sarah Mokoena (QS)</span></div>
+        <table class="bom-table">
+          <thead><tr><th>Code</th><th>Description</th><th style="text-align:right;">AI Rate</th><th style="text-align:right;">Market Rate</th><th>Variance</th><th>QS Decision</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td class="code-col">004-MAS</td><td>DPC membrane - below masonry walls</td><td class="num-col">R 85/m</td><td class="num-col">R 78-92/m</td><td><span class="chip chip-approved">In range</span></td><td><span class="chip chip-flagged">Qty Review</span></td><td><button class="btn btn-secondary">Review</button></td></tr>
+            <tr><td class="code-col">006-ELE</td><td>DB board - 3-phase 48-way</td><td class="num-col">R 18,200/nr</td><td class="num-col">R 15.5-22K</td><td><span class="chip chip-approved">In range</span></td><td><span class="chip chip-blocker">Spec Incomplete</span></td><td><button class="btn btn-secondary">Review</button></td></tr>
+            <tr><td class="code-col">008-ROO</td><td>Klip-Lok 700 roof sheeting</td><td class="num-col">R 385/m2</td><td class="num-col">R 340-395/m2</td><td><span class="chip chip-approved">In range</span></td><td><span class="chip chip-draft">Pending</span></td><td><button class="btn btn-primary">Approve</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>QS Sign-Off Gate</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">QS must certify the BoM before it can be issued for tender or procurement. Creates an immutable audit record and triggers downstream workflows.</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+          <div style="flex:1; min-width:220px; padding:12px; border:1px solid var(--glass-border); border-radius:var(--radius-sm); background:var(--panel-bg);">
+            <div style="font-size:11px; color:var(--text-low); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Pre-Conditions</div>
+            <div style="font-size:13px; line-height:2;"><span style="color:var(--green);">&#10003;</span> All items have cost codes<br><span style="color:var(--green);">&#10003;</span> Rates within market range (43/47)<br><span style="color:var(--amber);">!</span> 4 flags unresolved<br><span style="color:var(--danger);">&#10007;</span> 2 blocker items outstanding</div>
+          </div>
+          <div style="flex:1; min-width:220px; padding:12px; border:1px solid var(--glass-border); border-radius:var(--radius-sm); background:var(--panel-bg);">
+            <div style="font-size:11px; color:var(--text-low); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Post Sign-Off Actions</div>
+            <div style="font-size:13px; line-height:2; color:var(--secondary);">-&gt; Unlock Tender Generation<br>-&gt; Notify Project Passport<br>-&gt; Push to SpecForge procurement<br>-&gt; Trigger RFQ Agent workflow</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;"><button class="btn btn-primary" style="opacity:0.5; cursor:not-allowed;">QS Certify &amp; Sign-Off (blockers remain)</button><button class="btn btn-gold">Batch Approve</button><button class="btn btn-secondary">Request Clarification</button></div>
+      </div>
+    </div>
+
+    <!-- VIEW: TENDER GENERATION -->
+    <div class="view-panel" id="view-tender">
+      <div class="ai-card"><div class="ai-label">Tender Document Generation</div><div class="ai-body">Generate contractor tender packages from approved BoM/BoQ data. AI assembles trade-specific packages, calculates preliminaries, applies overhead/profit margins, and produces JBCC/NEC-format tender documents ready for bidder distribution.</div></div>
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-value">R 4.93M</div><div class="stat-label">Tender Value (incl VAT)</div></div>
+        <div class="stat-card"><div class="stat-value">7</div><div class="stat-label">Trade Packages</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--amber);">2</div><div class="stat-label">Packages Blocked</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--green);">5</div><div class="stat-label">Ready for Issue</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="dot"></span>Tender Package Configuration</div>
+        <table class="bom-table">
+          <thead><tr><th>Package</th><th>Trade</th><th>Items</th><th style="text-align:right;">Value (R)</th><th>QS Status</th><th>Tender Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:500;">PKG-01 Masonry &amp; Brickwork</td><td><span class="trade-chip trade-masonry">Masonry</span></td><td>4</td><td class="num-col">507,560</td><td><span class="chip chip-approved">Certified</span></td><td><span class="chip chip-approved">Ready</span></td><td><button class="btn btn-primary">Generate</button></td></tr>
+            <tr><td style="font-weight:500;">PKG-02 Concrete &amp; Foundations</td><td><span class="trade-chip trade-concrete">Concrete</span></td><td>3</td><td class="num-col">280,400</td><td><span class="chip chip-approved">Certified</span></td><td><span class="chip chip-approved">Ready</span></td><td><button class="btn btn-primary">Generate</button></td></tr>
+            <tr><td style="font-weight:500;">PKG-03 Roofing</td><td><span class="trade-chip trade-roofing">Roofing</span></td><td>3</td><td class="num-col">120,850</td><td><span class="chip chip-approved">Certified</span></td><td><span class="chip chip-approved">Ready</span></td><td><button class="btn btn-primary">Generate</button></td></tr>
+            <tr><td style="font-weight:500;">PKG-04 Doors &amp; Windows</td><td><span class="trade-chip trade-doors-windows">Doors/Win</span></td><td>6</td><td class="num-col">245,000</td><td><span class="chip chip-approved">Certified</span></td><td><span class="chip chip-approved">Ready</span></td><td><button class="btn btn-primary">Generate</button></td></tr>
+            <tr><td style="font-weight:500;">PKG-05 Plumbing</td><td><span class="trade-chip trade-plumbing">Plumbing</span></td><td>8</td><td class="num-col">186,200</td><td><span class="chip chip-approved">Certified</span></td><td><span class="chip chip-approved">Ready</span></td><td><button class="btn btn-primary">Generate</button></td></tr>
+            <tr style="background:rgba(217,87,71,0.03);"><td style="font-weight:500;">PKG-06 Electrical</td><td><span class="trade-chip trade-electrical">Electrical</span></td><td>6</td><td class="num-col">148,400</td><td><span class="chip chip-blocker">Blocked</span></td><td><span class="chip chip-blocker">Spec Incomplete</span></td><td><button class="btn btn-secondary" style="opacity:0.5;">Locked</button></td></tr>
+            <tr><td style="font-weight:500;">PKG-07 Finishes</td><td><span class="trade-chip trade-finishes">Finishes</span></td><td>5</td><td class="num-col">92,825</td><td><span class="chip chip-approved">Certified</span></td><td><span class="chip chip-approved">Ready</span></td><td><button class="btn btn-primary">Generate</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div class="panel"><div class="panel-title"><span class="dot"></span>Document Settings</div>
+          <div style="font-size:13px; line-height:2.2;"><span style="color:var(--text-low);">Contract Form:</span> JBCC Series 2000<br><span style="color:var(--text-low);">Preliminaries:</span> 8.0% (R 152,800)<br><span style="color:var(--text-low);">Contingency:</span> 5.0% (R 95,500)<br><span style="color:var(--text-low);">Retention:</span> 10% held until practical completion<br><span style="color:var(--text-low);">Tender Return:</span> 14 days from issue<br><span style="color:var(--text-low);">Pricing Format:</span> Priced BoQ - lump sum with re-measure</div>
+        </div>
+        <div class="panel"><div class="panel-title"><span class="dot"></span>Bidder List</div>
+          <div style="font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>BuildCo Construction (Pty) Ltd</span><span class="badge">B-BBEE Level 2</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>Magwa Group</span><span class="badge">B-BBEE Level 1</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(174,239,227,0.08);"><span>Stefanutti Stocks (Cape)</span><span class="badge">B-BBEE Level 3</span></div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0;"><span>WBHO Construction</span><span class="badge">B-BBEE Level 2</span></div>
+          </div>
+          <button class="btn btn-secondary" style="margin-top:10px;">+ Add Bidder from Catalogue</button>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:16px;"><button class="btn btn-primary">Generate All Ready Packages</button><button class="btn btn-gold">Issue to Bidders via Action Centre</button><button class="btn btn-secondary">Preview Tender Document</button></div>
+    </div>
+
+    <!-- VIEW: DOCUMENT EXPORT -->
+    <div class="view-panel" id="view-export">
+      <div class="ai-card"><div class="ai-label">Document Export Engine</div><div class="ai-body">Generate professional BoM/BoQ documents in multiple formats. All exports include QS certification stamp, project metadata, revision history, and SANS compliance cross-reference. Documents stored in Drawing Register and linked to Project Passport.</div></div>
+      <div class="panel"><div class="panel-title"><span class="dot"></span>Export Templates</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+          <div style="padding:16px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(174,239,227,0.5)'" onmouseout="this.style.borderColor=''"><div style="font-family:var(--font-heading); font-size:14px; font-weight:600; margin-bottom:6px;">Full BoM Schedule</div><div style="font-size:12px; color:var(--text-low); margin-bottom:10px;">All 47 items with rates, totals, trade breakdown, confidence scores, source refs.</div><div style="display:flex; gap:5px;"><span class="badge">PDF</span><span class="badge">XLSX</span><span class="badge">CSV</span></div></div>
+          <div style="padding:16px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(174,239,227,0.5)'" onmouseout="this.style.borderColor=''"><div style="font-family:var(--font-heading); font-size:14px; font-weight:600; margin-bottom:6px;">Priced BoQ (Tender)</div><div style="font-size:12px; color:var(--text-low); margin-bottom:10px;">JBCC-format priced document with prelims, contingency, P&amp;G, retention schedule.</div><div style="display:flex; gap:5px;"><span class="badge">PDF</span><span class="badge">XLSX</span></div></div>
+          <div style="padding:16px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(174,239,227,0.5)'" onmouseout="this.style.borderColor=''"><div style="font-family:var(--font-heading); font-size:14px; font-weight:600; margin-bottom:6px;">Trade Package BoQ</div><div style="font-size:12px; color:var(--text-low); margin-bottom:10px;">Individual trade-scoped documents for subcontractor pricing with scope and exclusions.</div><div style="display:flex; gap:5px;"><span class="badge">PDF</span><span class="badge">XLSX</span></div></div>
+          <div style="padding:16px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(174,239,227,0.5)'" onmouseout="this.style.borderColor=''"><div style="font-family:var(--font-heading); font-size:14px; font-weight:600; margin-bottom:6px;">Procurement Schedule</div><div style="font-size:12px; color:var(--text-low); margin-bottom:10px;">Material ordering schedule with lead times, order-by dates, supplier allocation.</div><div style="display:flex; gap:5px;"><span class="badge">PDF</span><span class="badge">XLSX</span><span class="badge">MS Project</span></div></div>
+          <div style="padding:16px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(174,239,227,0.5)'" onmouseout="this.style.borderColor=''"><div style="font-family:var(--font-heading); font-size:14px; font-weight:600; margin-bottom:6px;">QS Cost Report</div><div style="font-size:12px; color:var(--text-low); margin-bottom:10px;">Budget variance analysis, rate benchmarking, risk register, QS sign-off certificate.</div><div style="display:flex; gap:5px;"><span class="badge">PDF</span></div></div>
+          <div style="padding:16px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(174,239,227,0.5)'" onmouseout="this.style.borderColor=''"><div style="font-family:var(--font-heading); font-size:14px; font-weight:600; margin-bottom:6px;">Cashflow Forecast</div><div style="font-size:12px; color:var(--text-low); margin-bottom:10px;">Month-by-month drawdown forecast linked to programme activities and payment milestones.</div><div style="display:flex; gap:5px;"><span class="badge">PDF</span><span class="badge">XLSX</span></div></div>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-title"><span class="dot"></span>Export History</div>
+        <table class="bom-table">
+          <thead><tr><th>Document</th><th>Format</th><th>Generated</th><th>By</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>Full BoM Schedule v3</td><td><span class="badge">PDF</span></td><td>Today 10:45</td><td>Sarah Mokoena (QS)</td><td><span class="chip chip-approved">Certified</span></td><td><button class="btn btn-secondary">Download</button></td></tr>
+            <tr><td>PKG-01 Masonry BoQ</td><td><span class="badge">XLSX</span></td><td>Today 11:30</td><td>Greg Tarb (Arch)</td><td><span class="chip chip-ordered">Issued</span></td><td><button class="btn btn-secondary">Download</button></td></tr>
+            <tr><td>Procurement Schedule</td><td><span class="badge">PDF</span></td><td>Yesterday</td><td>System (AI)</td><td><span class="chip chip-draft">Draft</span></td><td><button class="btn btn-secondary">Download</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW: AI AGENTS -->
+    <div class="view-panel" id="view-agents">
+      <div class="ai-card"><div class="ai-label">Agentic Workflow Integration</div><div class="ai-body">The BoM Builder connects to multiple AI agents across Architex OS. Agents consume BoM data, produce recommendations, and trigger downstream actions automatically based on project state changes.</div></div>
+      <div class="panel"><div class="panel-title"><span class="dot"></span>Active Agent Connections</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div style="padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); position:relative; overflow:hidden;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--btn-gradient);opacity:0.6;"></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5);animation:pulse 2s infinite;"></div><span style="font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--secondary);">Quantity Takeoff Agent</span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Extracts quantities from uploaded drawings. Classifies by trade, assigns cost codes, flags assumptions.</div><div style="font-size:12px;display:flex;justify-content:space-between;"><span style="color:var(--text-low);">Trigger: Drawing upload</span><span style="color:var(--green);">Active</span></div></div>
+          <div style="padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); position:relative; overflow:hidden;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--btn-gradient);opacity:0.6;"></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5);animation:pulse 2s infinite;"></div><span style="font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--secondary);">Rate Benchmarking Agent</span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Cross-references extracted rates against SA market data. Flags outliers for QS review.</div><div style="font-size:12px;display:flex;justify-content:space-between;"><span style="color:var(--text-low);">Trigger: New BoM line created</span><span style="color:var(--green);">Active</span></div></div>
+          <div style="padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); position:relative; overflow:hidden;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--btn-gradient);opacity:0.6;"></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5);animation:pulse 2s infinite;"></div><span style="font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--secondary);">SANS Compliance Agent</span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Validates material specs against SANS 10400 (K, N, T, XA). Flags non-compliant items.</div><div style="font-size:12px;display:flex;justify-content:space-between;"><span style="color:var(--text-low);">Trigger: Item approval</span><span style="color:var(--green);">Active</span></div></div>
+          <div style="padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); position:relative; overflow:hidden;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--btn-gradient);opacity:0.6;"></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(74,222,128,0.5);animation:pulse 2s infinite;"></div><span style="font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--secondary);">Procurement Agent</span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Auto-generates RFQs from approved items. Matches suppliers from catalogue. Monitors lead times.</div><div style="font-size:12px;display:flex;justify-content:space-between;"><span style="color:var(--text-low);">Trigger: QS sign-off</span><span style="color:var(--green);">Active</span></div></div>
+          <div style="padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); position:relative; overflow:hidden;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--btn-gradient);opacity:0.6;"></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 5px rgba(245,166,35,0.5);animation:pulse 2s infinite;"></div><span style="font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--secondary);">Tender Evaluation Agent</span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Evaluates returned bids against BoQ baseline. Scores on price, B-BBEE, capacity, programme.</div><div style="font-size:12px;display:flex;justify-content:space-between;"><span style="color:var(--text-low);">Trigger: Bid received</span><span style="color:var(--amber);">Standby</span></div></div>
+          <div style="padding:14px; border:1px solid var(--glass-border); border-radius:var(--radius); background:var(--panel-bg); position:relative; overflow:hidden;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--btn-gradient);opacity:0.6;"></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 5px rgba(245,166,35,0.5);animation:pulse 2s infinite;"></div><span style="font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--secondary);">Payment Drawdown Agent</span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Links BoM to payment milestones. Generates valuation certificates from site progress data.</div><div style="font-size:12px;display:flex;justify-content:space-between;"><span style="color:var(--text-low);">Trigger: Site progress update</span><span style="color:var(--amber);">Standby</span></div></div>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-title"><span class="dot"></span>Data Flow - BoM Integration Map</div>
+        <div style="font-size:13px; color:var(--text-muted); line-height:2.2; padding-left:16px; border-left:2px solid var(--glass-border);">
+          <span style="color:var(--secondary); font-weight:500;">Drawing Upload</span> -&gt; Takeoff Agent -&gt; BoM Lines<br>
+          <span style="color:var(--secondary); font-weight:500;">BoM Lines</span> -&gt; Rate Agent -&gt; QS Review Queue<br>
+          <span style="color:var(--secondary); font-weight:500;">QS Sign-Off</span> -&gt; Procurement Agent -&gt; RFQ Manager<br>
+          <span style="color:var(--secondary); font-weight:500;">QS Sign-Off</span> -&gt; Tender Agent -&gt; Tender Document<br>
+          <span style="color:var(--secondary); font-weight:500;">Tender Return</span> -&gt; Eval Agent -&gt; Award Recommendation<br>
+          <span style="color:var(--secondary); font-weight:500;">Site Progress</span> -&gt; Payment Agent -&gt; Valuation Certificate<br>
+          <span style="color:var(--secondary); font-weight:500;">All Actions</span> -&gt; Project Passport + Audit Trail + Action Centre
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: AUDIT TRAIL -->
+    <div class="view-panel" id="view-audit">
+      <div class="panel"><div class="panel-title"><span class="dot"></span>Project Audit Trail</div>
+        <div style="font-size:13px; line-height:2.4;">
+          <div style="display:flex; gap:12px; align-items:center;"><div style="width:7px;height:7px;border-radius:50%;background:var(--secondary);flex-shrink:0;"></div><span><strong>AI extraction completed</strong> - 47 items from 6 drawings (Arch Rev C) <span style="color:var(--text-low); font-size:11px;">Today, 09:14 - System</span></span></div>
+          <div style="display:flex; gap:12px; align-items:center;"><div style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><span><strong>QS batch-approved 31 items</strong> - masonry + concrete trades <span style="color:var(--text-low); font-size:11px;">Today, 10:22 - Sarah Mokoena (QS)</span></span></div>
+          <div style="display:flex; gap:12px; align-items:center;"><div style="width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0;"></div><span><strong>4 items flagged</strong> - DPC quantity assumption, DB board spec unclear <span style="color:var(--text-low); font-size:11px;">Today, 10:25 - System (AI flag)</span></span></div>
+          <div style="display:flex; gap:12px; align-items:center;"><div style="width:7px;height:7px;border-radius:50%;background:var(--secondary);flex-shrink:0;"></div><span><strong>RFQ issued to Swartland</strong> - aluminium fenestration package <span style="color:var(--text-low); font-size:11px;">Today, 11:03 - Greg Tarb (Architect)</span></span></div>
+          <div style="display:flex; gap:12px; align-items:center;"><div style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><span><strong>SpecForge sync</strong> - 38 items linked to spec sections S01-S05 <span style="color:var(--text-low); font-size:11px;">Today, 11:15 - System</span></span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+function switchView(viewId) {
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const panel = document.getElementById('view-' + viewId);
+  if (panel) panel.classList.add('active');
+  const nav = document.querySelector('.nav-item[data-view="' + viewId + '"]');
+  if (nav) nav.classList.add('active');
+}
+function toggleProjectSwitcher() {
+  document.getElementById('projectDropdown').classList.toggle('open');
+}
+function selectProject(name) {
+  const el = document.getElementById('activeProjectName');
+  document.getElementById('projectDropdown').classList.remove('open');
+  if (name === 'New Project') {
+    el.textContent = 'New BoM (Untitled)';
+    alert('Starting a new independent BoM project.\\nThis creates a standalone workspace not linked to an existing project.\\nYou can link it to a project later from Project Passport.');
+  } else {
+    el.textContent = name;
+  }
+}
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('projectSwitcherWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('projectDropdown').classList.remove('open');
+  }
+});
+// Drop zone interaction
+const dz = document.getElementById('dropZone');
+if (dz) {
+  ['dragenter','dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.style.borderColor = 'var(--secondary)'; dz.style.background = 'rgba(174,239,227,0.04)'; }));
+  ['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.style.borderColor = ''; dz.style.background = ''; }));
+  dz.addEventListener('drop', ev => { const files = ev.dataTransfer?.files; if (files?.length) alert('Would extract BoM from: ' + Array.from(files).map(f => f.name).join(', ')); });
+  dz.addEventListener('click', () => { const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.accept = '.pdf,.dwg,.dxf,.ifc,.rvt,.csv,.xlsx'; input.onchange = () => { if (input.files?.length) alert('Would extract BoM from: ' + Array.from(input.files).map(f => f.name).join(', ')); }; input.click(); });
+}
+</script>
 </body>
 </html>
