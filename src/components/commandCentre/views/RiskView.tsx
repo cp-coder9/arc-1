@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, AlertTriangle, Shield, ArrowUp } from 'lucide-react';
 import type { RiskItem } from '@/services/commandCentre/types';
+import { LinkChip } from '@/components/commandCentre/LinkChip';
 
 interface RiskViewProps {
   projectId: string;
@@ -66,13 +67,14 @@ export default function RiskView({ projectId }: RiskViewProps) {
                   <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Severity</th>
                   <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Owner</th>
                   <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Status</th>
+                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Budget Link</th>
                   <th className="text-right py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {risks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <Shield className="h-8 w-8 opacity-40" />
                         <p>No risks recorded</p>
@@ -96,6 +98,17 @@ export default function RiskView({ projectId }: RiskViewProps) {
                       </td>
                       <td className="py-2 px-2 text-muted-foreground">{risk.ownerName}</td>
                       <td className="py-2 px-2 capitalize text-muted-foreground">{risk.status}</td>
+                      <td className="py-2 px-2">
+                        {risk.linkedBudgetPackageId ? (
+                          <LinkChip
+                            link={{
+                              linkedEntityId: risk.linkedBudgetPackageId,
+                              linkedEntityType: 'budget',
+                              label: risk.linkedBudgetPackageName ?? `Package ${risk.linkedBudgetPackageId.slice(0, 8)}`,
+                            }}
+                          />
+                        ) : '—'}
+                      </td>
                       <td className="text-right py-2 px-2">
                         <Button size="sm" variant="ghost" className="h-7 px-2">
                           <ArrowUp className="h-3.5 w-3.5" />

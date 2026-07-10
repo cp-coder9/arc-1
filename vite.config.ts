@@ -11,6 +11,20 @@ export default defineConfig(({ mode }) => {
        react(),
        tailwindcss(),
        {
+         name: 'architex-reject-node-builtins',
+         enforce: 'pre',
+         resolveId(source) {
+           // Fail the build if any client-side code tries to import node: builtins
+           if (/^node:/.test(source)) {
+             this.error(
+               `Node built-in "${source}" cannot be imported in client-side code. ` +
+               `Move this import to a .server.ts file or use the Web Crypto API instead.`
+             );
+           }
+           return null;
+         },
+       },
+       {
          name: 'architex-build-info-meta',
          transformIndexHtml(html) {
            try {

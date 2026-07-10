@@ -18,12 +18,14 @@ const CONTRACT_VALUE_THRESHOLD = 5_000_000;
 
 /** Views available in Simple mode — a focused subset for smaller projects. */
 export const SIMPLE_MODE_VIEWS: CommandCentreView[] = [
+  'dashboard',
   'tasks',
   'milestones',
   'budget',
   'site-diary',
   'quality',
   'documents',
+  'actions',
 ];
 
 /** All navigable views within the Command Centre. */
@@ -48,6 +50,9 @@ export const ALL_VIEWS: CommandCentreView[] = [
   'settings',
   'actions',
   'notifications',
+  'passport',
+  'form-system',
+  'audit-trail',
 ];
 
 // ── Role-View Matrix ─────────────────────────────────────────────────────────
@@ -99,6 +104,15 @@ const ROLE_VIEW_MAP: Record<UserRole, CommandCentreView[]> = {
 
   // Freelancer: task and document access
   freelancer: ['dashboard', 'tasks', 'documents', 'notifications'],
+
+  // Land surveyor: survey and document access
+  land_surveyor: ['dashboard', 'programme', 'tasks', 'documents', 'quality'],
+
+  // H&S Officer: safety-focused execution views
+  health_safety: ['dashboard', 'programme', 'tasks', 'site-diary', 'quality', 'documents', 'notifications'],
+
+  // Construction Project Manager: execution-focused
+  cpm: ['dashboard', 'programme', 'tasks', 'site-diary', 'rfis', 'quality', 'procurement', 'documents'],
 };
 
 // ── Public API ───────────────────────────────────────────────────────────────

@@ -1,128 +1,81 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Plus, CheckCircle, AlertCircle, Clock, Wrench } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { auth } from '@/lib/firebase';
+import { useProjectContext } from '@/components/commandCentre/ProjectContextProvider';
+import SnagManager from '@/components/SnagManager';
+import NCRManager from '@/components/NCRManager';
 
 interface QualityViewProps {
   projectId: string;
 }
 
-interface SnagItem {
-  id: string;
-  description: string;
-  location: string;
-  severity: 'high' | 'medium' | 'low';
-  assignedParty: string;
-  status: 'open' | 'rectifying' | 'resolved' | 'closed';
-  createdAt: string;
-}
-
+/**
+ * QualityView — Command Centre subsystem view for Quality & Snags.
+ *
+ * Renders the existing SnagManager and NCRManager components with full CRUD
+ * and lifecycle management. Both managers subscribe to their respective
+ * Firestore collections ordered by createdAt descending via onSnapshot,
+ * ensuring bidirectional data consistency with standalone manager instances.
+ *
+ * Requirements: 3.1, 3.2, 3.7
+ */
 export default function QualityView({ projectId }: QualityViewProps) {
-  const [snags, setSnags] = useState<SnagItem[]>([]);
+  const { context } = useProjectContext();
+  const currentUserId = auth.currentUser?.uid ?? '';
 
-  useEffect(() => {
-    void projectId;
-  }, [projectId]);
-
-  const stats = {
-    openSnags: snags.filter((s) => s.status === 'open').length,
-    resolvedThisWeek: 0,
-    activeNCRs: 0,
-    inspectionsDue: 0,
-  };
+  // Requirement 3.7: Show project selection prompt when no active project is selected
+  if (!projectId || !context?.projectId) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="panel" style={{ textAlign: 'center', padding: '48px 22px' }}>
+          <AlertCircle style={{ width: 40, height: 40, color: 'var(--muted)', margin: '0 auto 16px' }} />
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
+            No Project Selected
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 400, margin: '0 auto' }}>
+            Select a project from the project switcher to view quality tracking, snag lists, and non-conformance reports.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Quality Tracker</h2>
-        <Button size="sm" className="gap-1">
-          <Plus className="h-3.5 w-3.5" />
-          Log Snag
-        </Button>
-      </div>
-
-      {/* Quality Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-400" />
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Open Snags</p>
-            </div>
-            <p className="text-2xl font-bold mt-1">{stats.openSnags}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-400" />
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Resolved This Week</p>
-            </div>
-            <p className="text-2xl font-bold mt-1">{stats.resolvedThisWeek}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-amber-400" />
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Active NCRs</p>
-            </div>
-            <p className="text-2xl font-bold mt-1">{stats.activeNCRs}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary-400" />
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Inspections Due</p>
-            </div>
-            <p className="text-2xl font-bold mt-1">{stats.inspectionsDue}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Snag Table */}
-      <Card className="bg-surface-800/70 backdrop-blur border-surface-700/50">
-        <CardContent className="pt-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-700/50">
-                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Description</th>
-                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Location</th>
-                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Severity</th>
-                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Assigned</th>
-                  <th className="text-left py-2 px-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {snags.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No snags recorded
-                    </td>
-                  </tr>
-                ) : (
-                  snags.map((snag) => (
-                    <tr key={snag.id} className="border-b border-surface-700/30">
-                      <td className="py-2 px-2 font-medium truncate max-w-xs">{snag.description}</td>
-                      <td className="py-2 px-2 text-muted-foreground">{snag.location}</td>
-                      <td className="py-2 px-2">
-                        <Badge variant="outline" className="text-xs capitalize">{snag.severity}</Badge>
-                      </td>
-                      <td className="py-2 px-2 text-muted-foreground">{snag.assignedParty}</td>
-                      <td className="py-2 px-2 capitalize text-muted-foreground">{snag.status}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Hero */}
+      <div className="hero">
+        <div className="hero-header">
+          <div>
+            <div className="eyebrow">QUALITY & SNAGS</div>
+            <h1>Quality Tracker</h1>
+            <p className="sub">Snag management and non-conformance reports</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="hero-pills">
+          <span className="pill">
+            <span className="dot"></span> Active
+          </span>
+        </div>
+      </div>
+
+      {/* Requirement 3.1: SnagManager in compact mode with full CRUD (create, read, update, close)
+          The SnagManager internally subscribes to projects/{projectId}/snags/ ordered by createdAt desc
+          via onSnapshot, providing real-time updates and bidirectional data consistency. */}
+      <SnagManager
+        projectId={projectId}
+        currentUserId={currentUserId}
+        compact={false}
+      />
+
+      {/* Requirement 3.2: NCRManager in compact mode with full lifecycle (raise, investigate, resolve, close)
+          The NCRManager internally subscribes to projects/{projectId}/ncrs/ ordered by createdAt desc
+          via onSnapshot, providing real-time updates and bidirectional data consistency. */}
+      <NCRManager
+        projectId={projectId}
+        currentUserId={currentUserId}
+        compact={false}
+      />
     </div>
   );
 }

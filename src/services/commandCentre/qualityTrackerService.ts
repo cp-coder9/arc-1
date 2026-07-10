@@ -334,6 +334,8 @@ export const qualityTrackerService = {
   computeResolutionRate,
   isWithinCurrentWeek,
   computeQualityStatsFromSnags,
+  // Collection path constants (exported for Data Bridge consistency verification)
+  SNAGS_COLLECTION_PATH: SNAGS_COL,
 };
 
 export default qualityTrackerService;

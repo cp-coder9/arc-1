@@ -7,7 +7,7 @@
  * @module commandCentre/realtimeService
  */
 
-import { onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { onSnapshot, query, orderBy, where, limit } from 'firebase/firestore';
 import { getDemoCol } from '@/demo-seed/demoFirestore';
 import type {
   TaskBoardItem,
@@ -16,6 +16,7 @@ import type {
   CommandCentreAction,
   AIRecommendation,
 } from '@/services/commandCentre/types';
+import type { SnagItem, NonConformanceReport, SiteInstruction } from '@/types';
 
 // ── Collection Constants ─────────────────────────────────────────────────────
 
@@ -151,6 +152,83 @@ export function subscribeRecommendations(
   );
 }
 
+// ── Quality & Site Listeners (Data Bridge — same paths as standalone managers) ──
+
+/**
+ * Subscribes to real-time snag updates for a project.
+ * Uses the same collection path as standalone SnagManager: projects/{projectId}/snags/
+ */
+export function subscribeSnags(
+  projectId: string,
+  onData: RealtimeCallback<SnagItem>,
+  onError?: RealtimeErrorCallback,
+): Unsubscribe {
+  const col = getDemoCol(PROJECTS_COL, projectId, 'snags');
+  const q = query(col, orderBy('createdAt', 'desc'), limit(50));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const snags = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as SnagItem));
+      onData(snags);
+    },
+    (error) => {
+      console.error('[RealtimeService] Snags listener error:', error.message);
+      onError?.(error);
+    },
+  );
+}
+
+/**
+ * Subscribes to real-time NCR updates for a project.
+ * Uses the same collection path as standalone NCRManager: projects/{projectId}/ncrs/
+ */
+export function subscribeNcrs(
+  projectId: string,
+  onData: RealtimeCallback<NonConformanceReport>,
+  onError?: RealtimeErrorCallback,
+): Unsubscribe {
+  const col = getDemoCol(PROJECTS_COL, projectId, 'ncrs');
+  const q = query(col, orderBy('createdAt', 'desc'), limit(50));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const ncrs = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as NonConformanceReport));
+      onData(ncrs);
+    },
+    (error) => {
+      console.error('[RealtimeService] NCRs listener error:', error.message);
+      onError?.(error);
+    },
+  );
+}
+
+/**
+ * Subscribes to real-time site instruction updates for a project.
+ * Uses the same collection path as standalone SiteInstructionManager: projects/{projectId}/site_instructions/
+ */
+export function subscribeSiteInstructions(
+  projectId: string,
+  onData: RealtimeCallback<SiteInstruction>,
+  onError?: RealtimeErrorCallback,
+): Unsubscribe {
+  const col = getDemoCol(PROJECTS_COL, projectId, 'site_instructions');
+  const q = query(col, orderBy('createdAt', 'desc'), limit(50));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const instructions = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as SiteInstruction));
+      onData(instructions);
+    },
+    (error) => {
+      console.error('[RealtimeService] Site Instructions listener error:', error.message);
+      onError?.(error);
+    },
+  );
+}
+
 // ── Service Export ───────────────────────────────────────────────────────────
 
 export const realtimeService = {
@@ -159,6 +237,9 @@ export const realtimeService = {
   subscribeRisks,
   subscribeActions,
   subscribeRecommendations,
+  subscribeSnags,
+  subscribeNcrs,
+  subscribeSiteInstructions,
 };
 
 export default realtimeService;

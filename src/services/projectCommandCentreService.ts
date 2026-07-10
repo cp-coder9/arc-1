@@ -337,6 +337,7 @@ const ROLE_STAGE_ACTIONS: Record<UserRole, Partial<Record<CanonicalProjectStage,
   platform_admin: {},
   land_surveyor: {},
   cpm: {},
+  health_safety: {},
 };
 
 function canonicalStage(input: ProjectCommandCentreInput): CanonicalProjectStage {

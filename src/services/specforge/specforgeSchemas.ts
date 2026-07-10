@@ -230,7 +230,7 @@ export const specAuditEventSchema = z.object({
   workspaceId: z.string().min(1),
   action: specAuditActionSchema,
   targetId: z.string().min(1),
-  targetType: z.enum(['item', 'section', 'workspace', 'snapshot']),
+  targetType: z.enum(['item', 'section', 'workspace', 'snapshot', 'procurement', 'substitution', 'approval']),
   performedBy: z.string().min(1),
   performedAt: z.string().min(1),
   details: z.string().optional(),
@@ -276,3 +276,81 @@ export const specProcurementEntrySchema = z.object({
   quotedCost: z.number().min(0).optional(),
   notes: z.string().optional(),
 });
+
+// ── Endpoint Request Schemas ────────────────────────────────────────────────
+
+/**
+ * Client Decision schema — validates the POST body for client approval/rejection.
+ * Validates: Requirements 5.2
+ */
+export const clientDecisionSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  comment: z.string().max(2000).optional(),
+});
+
+/**
+ * QS Review schema — validates the POST body for quantity surveyor budget reviews.
+ * Validates: Requirements 6.2, 6.3
+ */
+export const qsReviewSchema = z.object({
+  reviewStatus: z.enum(['approved', 'flagged', 'requires_revision']),
+  comments: z.string().min(1).max(2000),
+  revisedEstimate: z.number().min(0.01).max(999_999_999.99).optional(),
+});
+
+/**
+ * Substitution Request schema — validates the POST body for substitution requests.
+ * Validates: Requirements 11.10
+ */
+export const substitutionRequestSchema = z.object({
+  originalItemId: z.string().min(1),
+  proposedTitle: z.string().min(1).max(200),
+  reason: z.string().min(1).max(1000),
+  proposedSupplier: z.string().optional(),
+  proposedCost: z.number().min(0).optional(),
+});
+
+/**
+ * Substitution Approval schema — validates the PATCH body for substitution decisions.
+ * Validates: Requirements 11.10
+ */
+export const substitutionApprovalSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  comments: z.string().max(2000).optional(),
+});
+
+/**
+ * Standalone Workspace Creation schema — validates the POST body for creating
+ * a standalone SpecForge workspace without an active Architex project.
+ * Validates: Requirements 4.2, 4.10
+ */
+export const standaloneWorkspaceCreateSchema = z.object({
+  projectReference: z.string().min(1).max(500),
+  scope: z.enum(['user', 'firm']),
+  firmId: z.string().optional(),
+  name: z.string().min(1).max(200),
+});
+
+/**
+ * Package Assignment schema — validates the POST body for assigning a package
+ * scope to a supplier or subcontractor.
+ * Validates: Requirements 7.3
+ */
+export const packageAssignmentSchema = z.object({
+  packageId: z.string().min(1),
+  supplierUid: z.string().min(1),
+  firmName: z.string().min(1),
+  sectionIds: z.array(z.string()).default([]),
+  itemIds: z.array(z.string()).default([]),
+});
+
+// ── CSV Upload Constraints ──────────────────────────────────────────────────
+
+/**
+ * Constants for CSV product catalogue upload validation.
+ * Validates: Requirements 9.3
+ */
+export const csvUploadConstraints = {
+  maxFileSize: 10 * 1024 * 1024,  // 10 MB
+  maxRows: 5000,
+} as const;

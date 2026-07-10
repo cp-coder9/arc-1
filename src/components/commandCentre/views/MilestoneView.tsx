@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Target } from 'lucide-react';
 import type { CommandCentreMilestone } from '@/services/commandCentre/types';
+import { LinkChip } from '@/components/commandCentre/LinkChip';
 
 interface MilestoneViewProps {
   projectId: string;
@@ -77,7 +78,17 @@ export default function MilestoneView({ projectId }: MilestoneViewProps) {
                           {m.status.replace(/_/g, ' ')}
                         </Badge>
                       </td>
-                      <td className="py-2 px-2 text-muted-foreground">{m.linkedCertificateId ?? '—'}</td>
+                      <td className="py-2 px-2 text-muted-foreground">
+                        {m.linkedCertificateId ? (
+                          <LinkChip
+                            link={{
+                              linkedEntityId: m.linkedCertificateId,
+                              linkedEntityType: 'valuations',
+                              label: m.linkedCertificateName ?? `Certificate #${m.linkedCertificateId.slice(0, 8)}`,
+                            }}
+                          />
+                        ) : '—'}
+                      </td>
                     </tr>
                   ))
                 )}

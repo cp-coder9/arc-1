@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architex — Integrated Form System Design Sample</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --teal: #19B7B0;
+      --deep: #167E79;
+      --jade: #58C8BC;
+      --mint: #BFE9E2;
+      --aqua: #DFF5F2;
+      --ink: #102033;
+      --muted: #657287;
+      --border: rgba(16,32,51,.09);
+      --shadow: 0 22px 64px rgba(16,32,51,.08);
+      --soft: 0 12px 34px rgba(16,32,51,.055);
+      --green: #4ADE80;
+      --amber: #F5A623;
+      --red: #d95747;
+      --os-nav-width: 56px;
+      --tool-nav-width: 200px;
+      --topbar-height: 36px;
+      --font: "Geist", Inter, system-ui, -apple-system, sans-serif;
+    }
+    body {
+      font-family: var(--font);
+      background:
+        radial-gradient(circle at 16% 10%, rgba(191,233,226,.38), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(223,245,242,.55), transparent 32%),
+        linear-gradient(180deg, #fff 0%, #f7fbfb 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    /* ── Shell Layout ── */
+    .shell { display: grid; grid-template-columns: var(--os-nav-width) var(--tool-nav-width) 1fr; grid-template-rows: var(--topbar-height) 1fr; min-height: 100vh; }
+
+    /* ── OS Nav (56px icon strip) ── */
+    .os-nav {
+      grid-row: 1 / -1; background: #fff; border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px;
+    }
+    .os-nav-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--teal); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+    .os-nav-item { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .12s; font-size: 16px; color: var(--muted); }
+    .os-nav-item:hover { background: var(--aqua); color: var(--teal); }
+    .os-nav-item.active { background: rgba(25,183,176,.12); color: var(--teal); }
+
+    /* ── Tool Nav (200px) ── */
+    .tool-nav {
+      grid-row: 1 / -1; background: #fff; border-right: 1px solid var(--border);
+      padding: 14px 0; overflow-y: auto;
+    }
+    .tool-nav-header { padding: 0 14px 12px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+    .tool-nav-title { font-size: 13px; font-weight: 700; color: var(--deep); }
+    .tool-nav-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .tool-nav-group { padding: 8px 0; }
+    .tool-nav-group-label { padding: 0 14px 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .tool-nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 13px; color: var(--muted); cursor: pointer; border-left: 2px solid transparent; transition: all .12s; }
+    .tool-nav-item:hover { background: var(--aqua); color: var(--ink); }
+    .tool-nav-item.active { background: rgba(25,183,176,.08); color: var(--deep); border-left-color: var(--teal); font-weight: 500; }
+    .tool-nav-item .tn-icon { width: 16px; text-align: center; font-size: 13px; }
+    .tool-nav-item .tn-badge { margin-left: auto; font-size: 10px; padding: 1px 6px; border-radius: 9999px; font-weight: 600; background: rgba(25,183,176,.1); color: var(--teal); }
+
+    /* ── Top Bar (36px) ── */
+    .topbar {
+      display: flex; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.85); backdrop-filter: blur(8px); font-size: 12px; color: var(--muted); gap: 6px;
+    }
+    .topbar-crumb { display: flex; align-items: center; gap: 4px; }
+    .topbar-crumb span { color: var(--muted); }
+    .topbar-crumb .active { color: var(--ink); font-weight: 500; }
+    .topbar-sep { color: var(--border); }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    /* ── Content Area ── */
+    .content { padding: 14px; overflow-y: auto; max-height: calc(100vh - var(--topbar-height)); }
+
+    /* ── Panel ── */
+    .panel { border: 1px solid var(--border); border-radius: 22px; padding: 22px; background: rgba(255,255,255,.74); box-shadow: var(--soft); margin-bottom: 14px; }
+
+    /* ── Hero ── */
+    .hero { border-radius: 28px; padding: 28px; background: rgba(255,255,255,.82); box-shadow: var(--shadow); margin-bottom: 14px; position: relative; overflow: hidden; }
+    .hero::before { content: ''; position: absolute; top: -30%; right: -10%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(191,233,226,.4), transparent 70%); pointer-events: none; }
+    .eyebrow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--teal); margin-bottom: 4px; }
+    .hero h1 { font-size: 22px; font-weight: 700; color: var(--ink); }
+    .hero .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Pill ── */
+    .pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; border: 1px solid rgba(25,183,176,.18); background: rgba(25,183,176,.08); color: var(--teal); }
+    .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+    .pill.success { color: var(--green); background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.18); }
+    .pill.success .dot { background: var(--green); }
+    .pill.warning { color: var(--amber); background: rgba(245,166,35,.08); border-color: rgba(245,166,35,.18); }
+    .pill.warning .dot { background: var(--amber); }
+    .pill.muted { color: var(--muted); background: rgba(16,32,51,.04); border-color: var(--border); }
+    .pill.muted .dot { background: var(--muted); }
+
+    /* ── Button ── */
+    .btn { padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .12s; border: 1px solid rgba(25,183,176,.2); background: var(--aqua); color: var(--deep); }
+    .btn:hover { background: var(--mint); border-color: var(--teal); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 8px; }
+    .btn-ghost { background: transparent; border-color: var(--border); color: var(--muted); }
+    .btn-ghost:hover { background: var(--aqua); color: var(--ink); border-color: rgba(25,183,176,.2); }
+
+    /* ── Stat Cards ── */
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .stat-card { border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; background: rgba(255,255,255,.7); }
+    .stat-value { font-size: 20px; font-weight: 700; color: var(--deep); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.red { color: var(--red); }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 2px; background: rgba(16,32,51,.03); border-radius: 12px; padding: 3px; width: fit-content; border: 1px solid var(--border); margin-bottom: 14px; }
+    .tab { padding: 6px 14px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; border-radius: 9px; cursor: pointer; transition: all .12s; font-family: var(--font); }
+    .tab:hover { color: var(--ink); }
+    .tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16,32,51,.08); }
+
+    /* ── Form Section ── */
+    .form-section { margin-bottom: 18px; }
+    .form-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .form-section-icon { font-size: 16px; }
+    .form-section-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+
+    /* ── Form Fields ── */
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+    .field-group { display: flex; flex-direction: column; gap: 3px; }
+    .field-group.full { grid-column: 1 / -1; }
+    .field-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+    .field-label .required { color: var(--red); }
+    .field-input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: var(--font); color: var(--ink); background: #fff; transition: all .15s; }
+    .field-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(25,183,176,.1); }
+    .field-input.auto-filled { background: rgba(25,183,176,.04); border-color: rgba(25,183,176,.2); }
+    .field-input.overridden { background: rgba(245,166,35,.04); border-color: rgba(245,166,35,.2); }
+    .field-input.error { border-color: var(--red); background: rgba(217,87,71,.03); }
+    .field-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+    .field-badge.auto { background: rgba(25,183,176,.1); color: var(--teal); }
+    .field-badge.manual { background: rgba(245,166,35,.1); color: var(--amber); }
+    .field-error { font-size: 11px; color: var(--red); margin-top: 2px; }
+    select.field-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23657287' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+
+    /* ── Template Card ── */
+    .template-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .template-card { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: rgba(255,255,255,.7); cursor: pointer; transition: all .15s; }
+    .template-card:hover { border-color: rgba(25,183,176,.3); transform: translateY(-2px); box-shadow: var(--soft); }
+    .template-card.recommended { border-color: rgba(25,183,176,.25); background: rgba(223,245,242,.3); }
+    .template-card .tc-icon { font-size: 22px; margin-bottom: 8px; }
+    .template-card .tc-name { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .template-card .tc-meta { font-size: 11px; color: var(--muted); }
+    .template-card .tc-badge { margin-top: 8px; }
+
+    /* ── Draft Row ── */
+    .draft-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; cursor: pointer; transition: all .12s; }
+    .draft-row:hover { border-color: rgba(25,183,176,.25); background: rgba(223,245,242,.15); }
+    .draft-row .dr-icon { font-size: 18px; }
+    .draft-row .dr-info { flex: 1; }
+    .draft-row .dr-title { font-size: 13px; font-weight: 500; color: var(--ink); }
+    .draft-row .dr-meta { font-size: 11px; color: var(--muted); }
+    .draft-row .dr-status { }
+
+    /* ── Signature Area ── */
+    .sig-pad { border: 2px dashed var(--border); border-radius: 12px; height: 120px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; cursor: crosshair; transition: border-color .15s; }
+    .sig-pad:hover { border-color: var(--teal); }
+    .sig-pad.signed { border-style: solid; border-color: var(--green); background: rgba(74,222,128,.04); }
+
+    /* ── Audit Timeline ── */
+    .audit-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .audit-item:last-child { border-bottom: none; }
+    .audit-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); margin-top: 5px; flex-shrink: 0; }
+    .audit-dot.export { background: var(--green); }
+    .audit-dot.sign { background: #8b5cf6; }
+    .audit-content { flex: 1; }
+    .audit-text { font-size: 13px; color: var(--ink); }
+    .audit-time { font-size: 11px; color: var(--muted); }
+
+    /* ── Collaborator Presence ── */
+    .collab-bar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; background: rgba(25,183,176,.06); border: 1px solid rgba(25,183,176,.12); margin-bottom: 10px; }
+    .collab-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+    .collab-text { font-size: 11px; color: var(--muted); }
+
+    /* ── Search Bar ── */
+    .search-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; margin-bottom: 14px; }
+    .search-bar input { border: none; outline: none; flex: 1; font-size: 13px; font-family: var(--font); color: var(--ink); background: transparent; }
+    .search-bar input::placeholder { color: var(--muted); }
+    .search-bar .search-icon { color: var(--muted); font-size: 14px; }
+
+    /* ── Hidden tabs ── */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Two column layout ── */
+    .two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <!-- OS Nav -->
+  <nav class="os-nav">
+    <div class="os-nav-logo">A</div>
+    <div class="os-nav-item" title="Command Centre">🏠</div>
+    <div class="os-nav-item" title="Projects">📂</div>
+    <div class="os-nav-item" title="Toolbox">🧰</div>
+    <div class="os-nav-item active" title="Compliance">🏛️</div>
+    <div class="os-nav-item" title="Documents">📄</div>
+    <div class="os-nav-item" title="Payments">💰</div>
+  </nav>
+
+  <!-- Tool Nav -->
+  <aside class="tool-nav">
+    <div class="tool-nav-header">
+      <div class="tool-nav-title">Form System</div>
+      <div class="tool-nav-sub">Auto-fill & manage documents</div>
+    </div>
+    <div class="tool-nav-group">
+      <div class="tool-nav-group-label">Forms</div>
+      <div class="tool-nav-item active"><span class="tn-icon">📋</span>Template Library</div>
+      <div class="tool-nav-item" onclick="showTab('editor')"><span class="tn-icon">✏️</span>Form Editor</div>
+      <div class="tool-nav-item" onclick="showTab('drafts')"><span class="tn-icon">💾</span>My Drafts<span class="tn-badge">3</span></div>
+      <div class="tool-nav-item"><span class="tn-icon">🕐</span>Recent Forms</div>
+    </div>
+    <div class="tool-nav-group">
+      <div class="tool-nav-group-label">Management</div>
+      <div class="tool-nav-item" onclick="showTab('export')"><span class="tn-icon">⬇️</span>Export Queue</div>
+      <div class="tool-nav-item"><span class="tn-icon">✅</span>Approvals</div>
+      <div class="tool-nav-item" onclick="showTab('audit')"><span class="tn-icon">🛡️</span>Audit Trail</div>
+    </div>
+    <div class="tool-nav-group">
+      <div class="tool-nav-group-label">Integration</div>
+      <div class="tool-nav-item"><span class="tn-icon">📡</span>Document Register</div>
+      <div class="tool-nav-item"><span class="tn-icon">🏛️</span>Municipal Readiness</div>
+      <div class="tool-nav-item"><span class="tn-icon">📋</span>Project Passport</div>
+    </div>
+  </aside>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-crumb">
+      <span>Architex</span> <span class="topbar-sep">›</span>
+      <span>Compliance Hub</span> <span class="topbar-sep">›</span>
+      <span class="active">Form System</span>
+    </div>
+    <div class="topbar-right">
+      <span class="pill"><span class="dot"></span>12 Riverside Ave</span>
+      <span style="font-size:11px; color:var(--muted)">PrArch 4521</span>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="content" id="main-content"></main>
+</div>
+
+<script>
+// Tab content renderer
+const mainContent = document.getElementById('main-content');
+
+function showTab(tab) {
+  // Update tool nav active state
+  document.querySelectorAll('.tool-nav-item').forEach(i => i.classList.remove('active'));
+  const tabs = { library: 0, editor: 1, drafts: 2, export: 4, audit: 6 };
+  const items = document.querySelectorAll('.tool-nav-item');
+  if (items[tabs[tab]]) items[tabs[tab]].classList.add('active');
+
+  const renderers = { library: renderLibrary, editor: renderEditor, drafts: renderDrafts, export: renderExport, audit: renderAudit };
+  if (renderers[tab]) renderers[tab]();
+}
+
+function renderLibrary() {
+  mainContent.innerHTML = `
+    <div class="hero">
+      <div class="eyebrow">FORM SYSTEM</div>
+      <h1>Template Library</h1>
+      <p class="sub">12 Riverside Ave · City of Cape Town · Comply Stage · Rev 3</p>
+      <div style="margin-top:10px; display:flex; gap:6px;">
+        <span class="pill success"><span class="dot"></span>6 Forms Exported</span>
+        <span class="pill warning"><span class="dot"></span>2 Drafts Pending</span>
+        <span class="pill muted"><span class="dot"></span>Standalone Available</span>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-value">42</div><div class="stat-label">Templates Available</div></div>
+      <div class="stat-card"><div class="stat-value green">6</div><div class="stat-label">Exported This Project</div></div>
+      <div class="stat-card"><div class="stat-value amber">2</div><div class="stat-label">Drafts In Progress</div></div>
+      <div class="stat-card"><div class="stat-value">8</div><div class="stat-label">Stage Recommended</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active">Recommended</button>
+      <button class="tab">Municipal</button>
+      <button class="tab">Contracts</button>
+      <button class="tab">Construction</button>
+      <button class="tab">All Templates</button>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Search templates by name, category, or municipality...">
+      <button class="btn-sm btn-ghost">Filter</button>
+    </div>
+
+    <p style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); margin-bottom:8px;">Recommended for Comply Stage</p>
+
+    <div class="template-grid">
+      <div class="template-card recommended" onclick="showTab('editor')">
+        <div class="tc-icon">🏛️</div>
+        <div class="tc-name">Building Plan Application</div>
+        <div class="tc-meta">City of Cape Town · Municipal Submission</div>
+        <div class="tc-badge"><span class="pill" style="font-size:9px; padding:2px 8px;">Recommended</span></div>
+      </div>
+      <div class="template-card recommended">
+        <div class="tc-icon">📜</div>
+        <div class="tc-name">Power of Attorney (A19)</div>
+        <div class="tc-meta">City of Cape Town · POA + Application Types</div>
+        <div class="tc-badge"><span class="pill" style="font-size:9px; padding:2px 8px;">Recommended</span></div>
+      </div>
+      <div class="template-card recommended">
+        <div class="tc-icon">🏢</div>
+        <div class="tc-name">Company Resolution</div>
+        <div class="tc-meta">Generic · Juristic Person Authorization</div>
+        <div class="tc-badge"><span class="pill" style="font-size:9px; padding:2px 8px;">Recommended</span></div>
+      </div>
+      <div class="template-card">
+        <div class="tc-icon">✅</div>
+        <div class="tc-name">SANS Compliance Declaration</div>
+        <div class="tc-meta">Generic · All Municipalities</div>
+      </div>
+      <div class="template-card">
+        <div class="tc-icon">📐</div>
+        <div class="tc-name">SACAP Form 2 — Notification</div>
+        <div class="tc-meta">SACAP · Professional Registration</div>
+      </div>
+      <div class="template-card">
+        <div class="tc-icon">🌿</div>
+        <div class="tc-name">Environmental Assessment</div>
+        <div class="tc-meta">NEMA · EIA Notification</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderEditor() {
+  mainContent.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+      <div>
+        <div class="eyebrow">BUILDING PLAN APPLICATION</div>
+        <h1 style="font-size:18px; font-weight:700;">City of Cape Town — Municipal Submission</h1>
+        <p style="font-size:12px; color:var(--muted); margin-top:2px;">Template v2.1 · Auto-filled from 12 Riverside Ave project data</p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm">💾 Save Draft</button>
+        <button class="btn btn-sm" onclick="showTab('export')">⬇️ Export PDF</button>
+      </div>
+    </div>
+
+    <div class="collab-bar">
+      <div class="collab-avatar">JS</div>
+      <div class="collab-avatar" style="background:var(--amber);">MT</div>
+      <span class="collab-text">Joshil S. editing <b>Client Section</b> · Mike T. viewing</span>
+      <span style="margin-left:auto; font-size:10px; color:var(--teal);">● Live</span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active">All Sections</button>
+      <button class="tab">Professional</button>
+      <button class="tab">Client</button>
+      <button class="tab">Project</button>
+      <button class="tab">Company Res.</button>
+      <button class="tab">POA</button>
+      <button class="tab">Signatures</button>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <!-- Professional Section -->
+        <div class="panel">
+          <div class="form-section">
+            <div class="form-section-header">
+              <span class="form-section-icon">🏛️</span>
+              <span class="form-section-title">Architect / Professional Information</span>
+              <span class="pill" style="margin-left:auto; font-size:9px; padding:2px 8px;">8/8 Auto-filled</span>
+            </div>
+            <div class="field-grid">
+              <div class="field-group">
+                <label class="field-label">Title</label>
+                <input class="field-input auto-filled" value="Mr" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Full Name & Surname <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="Joshil Dodhia" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">SACAP Reg. No. <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="PrArch 4521" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Practice / Company</label>
+                <input class="field-input auto-filled" value="Millimetre Architecture" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Email</label>
+                <input class="field-input auto-filled" value="joshil@millimetre-architecture.com" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Telephone / Cell</label>
+                <input class="field-input auto-filled" value="+27 82 933 0414" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group full">
+                <label class="field-label">Physical / Practice Address</label>
+                <input class="field-input auto-filled" value="14 Long Street, Cape Town, 8001" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">ID Number</label>
+                <input class="field-input auto-filled" value="850612 5123 082" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Client Section -->
+        <div class="panel">
+          <div class="form-section">
+            <div class="form-section-header">
+              <span class="form-section-icon">👤</span>
+              <span class="form-section-title">Client / Registered Owner</span>
+              <span class="pill warning" style="margin-left:auto; font-size:9px; padding:2px 8px;">1 Manual Override</span>
+            </div>
+            <div class="field-grid">
+              <div class="field-group">
+                <label class="field-label">Full Name & Surname <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="David van der Merwe" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">ID Number <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="7503125234081" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Relationship to Property</label>
+                <input class="field-input overridden" value="Director of Company">
+                <span class="field-badge manual">✎ Override</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Email</label>
+                <input class="field-input auto-filled" value="david@riverside-dev.co.za" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group full">
+                <label class="field-label">Residential / Physical Address <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="12 Riverside Avenue, Rondebosch, Cape Town, 7700" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Company Reg. No.</label>
+                <input class="field-input auto-filled" value="2019/452318/07" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Project Section -->
+        <div class="panel">
+          <div class="form-section">
+            <div class="form-section-header">
+              <span class="form-section-icon">📐</span>
+              <span class="form-section-title">Project Information</span>
+              <span class="pill" style="margin-left:auto; font-size:9px; padding:2px 8px;">6/9 Auto-filled</span>
+            </div>
+            <div class="field-grid">
+              <div class="field-group">
+                <label class="field-label">Municipality <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="City of Cape Town" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Erf / Stand Number <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="9821" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Township <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="Rondebosch" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Project Type <span class="required">*</span></label>
+                <select class="field-input auto-filled"><option>Residential Extension</option></select>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Submission Date</label>
+                <input class="field-input" type="date" value="2026-07-15">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Building Classification</label>
+                <select class="field-input"><option value="">— Select —</option><option>H4</option><option>H3</option><option>A1</option></select>
+                <span style="font-size:10px; color:var(--amber);">⚠ Manual entry required</span>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Building Complexity</label>
+                <select class="field-input"><option value="">— Select —</option><option>Low</option><option selected>Medium</option><option>High</option></select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Environmental Assessment</label>
+                <select class="field-input auto-filled"><option>Not Required</option></select>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+              <div class="field-group full">
+                <label class="field-label">Project / Street Address <span class="required">*</span></label>
+                <input class="field-input auto-filled" value="12 Riverside Avenue, Rondebosch, Cape Town, 7700" readonly>
+                <span class="field-badge auto">⚡ Auto</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right sidebar -->
+      <div>
+        <div class="panel" style="position:sticky; top:0;">
+          <p style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); margin-bottom:8px;">Form Status</p>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;"><span>Auto-filled</span><span style="font-weight:600; color:var(--teal);">22/25</span></div>
+            <div style="height:6px; background:rgba(25,183,176,.1); border-radius:3px; overflow:hidden;"><div style="width:88%; height:100%; background:var(--teal); border-radius:3px;"></div></div>
+            <div style="display:flex; justify-content:space-between; font-size:12px;"><span>Manual Override</span><span style="font-weight:600; color:var(--amber);">1</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:12px;"><span>Needs Entry</span><span style="font-weight:600; color:var(--red);">2</span></div>
+          </div>
+
+          <p style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); margin-bottom:6px; margin-top:14px;">Signatures Required</p>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:12px;"><span style="color:var(--green);">✓</span> Architect (PrArch)</div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:12px;"><span style="color:var(--muted);">○</span> Client / Owner</div>
+          </div>
+
+          <p style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); margin-bottom:6px; margin-top:14px;">Data Sources</p>
+          <div style="display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted);">
+            <span>📋 Project Passport → 6 fields</span>
+            <span>👤 User Profile → 8 fields</span>
+            <span>🏢 Client Record → 6 fields</span>
+            <span>🏛️ Firm Record → 2 fields</span>
+          </div>
+
+          <div style="margin-top:14px; display:flex; flex-direction:column; gap:6px;">
+            <button class="btn" style="width:100%;" onclick="showTab('export')">⬇️ Export PDF</button>
+            <button class="btn btn-ghost" style="width:100%;">👁️ Preview</button>
+            <button class="btn btn-ghost" style="width:100%;">🏛️ View in Municipal Readiness</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDrafts() {
+  mainContent.innerHTML = `
+    <div class="hero">
+      <div class="eyebrow">MY DRAFTS</div>
+      <h1>Saved Form Drafts</h1>
+      <p class="sub">Resume partially completed forms across projects</p>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Search drafts...">
+      <button class="btn-sm btn-ghost">All Projects</button>
+    </div>
+
+    <div class="draft-row" onclick="showTab('editor')">
+      <span class="dr-icon">🏛️</span>
+      <div class="dr-info">
+        <div class="dr-title">Building Plan Application — 12 Riverside Ave</div>
+        <div class="dr-meta">City of Cape Town · Last edited 2 hours ago · 88% complete</div>
+      </div>
+      <span class="pill warning" style="font-size:9px; padding:2px 8px;"><span class="dot"></span>In Progress</span>
+    </div>
+    <div class="draft-row">
+      <span class="dr-icon">📜</span>
+      <div class="dr-info">
+        <div class="dr-title">Power of Attorney (A19) — 45 Kloof St</div>
+        <div class="dr-meta">City of Cape Town · Last edited 3 days ago · 60% complete</div>
+      </div>
+      <span class="pill warning" style="font-size:9px; padding:2px 8px;"><span class="dot"></span>In Progress</span>
+    </div>
+    <div class="draft-row">
+      <span class="dr-icon">🏢</span>
+      <div class="dr-info">
+        <div class="dr-title">Company Resolution — Sunset Views Ph2</div>
+        <div class="dr-meta">Generic · Last edited 1 week ago · 40% complete</div>
+      </div>
+      <span class="pill muted" style="font-size:9px; padding:2px 8px;"><span class="dot"></span>Paused</span>
+    </div>
+  `;
+}
+
+function renderExport() {
+  mainContent.innerHTML = `
+    <div class="hero">
+      <div class="eyebrow">PDF EXPORT</div>
+      <h1>Export & Download</h1>
+      <p class="sub">Generate formatted PDFs for submission to authorities</p>
+    </div>
+
+    <div class="panel">
+      <div class="form-section-header">
+        <span class="form-section-icon">📄</span>
+        <span class="form-section-title">Building Plan Application — 12 Riverside Ave</span>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span style="color:var(--green);">✓</span> All required fields populated (25/25)</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span style="color:var(--green);">✓</span> Validation passed — no errors</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span style="color:var(--green);">✓</span> Architect signature applied</div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span style="color:var(--amber);">○</span> Client signature outstanding</div>
+      </div>
+
+      <div style="padding:16px; border:1px solid var(--border); border-radius:12px; background:rgba(25,183,176,.03); margin-bottom:14px;">
+        <p style="font-size:12px; font-weight:600; margin-bottom:6px;">Export Options</p>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:4px; cursor:pointer;"><input type="radio" name="export" checked> Single PDF (Building Plan Application)</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:4px; cursor:pointer;"><input type="radio" name="export"> Combined: Application + POA + Resolution</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><input type="radio" name="export"> All project forms (6 documents)</label>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button class="btn">⬇️ Generate PDF</button>
+        <button class="btn btn-ghost">👁️ Preview First</button>
+      </div>
+
+      <p style="font-size:11px; color:var(--muted); margin-top:10px;">PDF will be registered in the Document Register and Compliance Hub will be updated.</p>
+    </div>
+
+    <div class="panel">
+      <div class="form-section-header">
+        <span class="form-section-icon">✍️</span>
+        <span class="form-section-title">Digital Signature</span>
+      </div>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">Sign as: Joshil Dodhia · PrArch 4521 · Millimetre Architecture</p>
+      <div class="sig-pad signed">✓ Signed 2026-07-10 14:32</div>
+      <p style="font-size:11px; color:var(--muted); margin-top:6px;">Credential verified against SACAP registration. Signature embedded in form.</p>
+    </div>
+  `;
+}
+
+function renderAudit() {
+  mainContent.innerHTML = `
+    <div class="hero">
+      <div class="eyebrow">AUDIT TRAIL</div>
+      <h1>Form History</h1>
+      <p class="sub">Building Plan Application — 12 Riverside Ave · Complete change log</p>
+    </div>
+
+    <div class="panel">
+      <div class="audit-item">
+        <div class="audit-dot export"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>PDF Exported</b> — Building Plan Application v1.2</div>
+          <div class="audit-time">2026-07-10 14:35 · Joshil Dodhia</div>
+        </div>
+      </div>
+      <div class="audit-item">
+        <div class="audit-dot sign"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>Signature Applied</b> — Architect (PrArch 4521)</div>
+          <div class="audit-time">2026-07-10 14:32 · Joshil Dodhia</div>
+        </div>
+      </div>
+      <div class="audit-item">
+        <div class="audit-dot"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>Field Modified</b> — Relationship to Property: "Registered Owner" → "Director of Company"</div>
+          <div class="audit-time">2026-07-10 14:28 · Joshil Dodhia · Manual override</div>
+        </div>
+      </div>
+      <div class="audit-item">
+        <div class="audit-dot"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>Field Modified</b> — Building Classification: "" → "H4"</div>
+          <div class="audit-time">2026-07-10 14:25 · Joshil Dodhia · Manual entry</div>
+        </div>
+      </div>
+      <div class="audit-item">
+        <div class="audit-dot"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>Collaborator Added</b> — Mike Thompson granted edit access</div>
+          <div class="audit-time">2026-07-10 14:20 · Joshil Dodhia</div>
+        </div>
+      </div>
+      <div class="audit-item">
+        <div class="audit-dot"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>Auto-Fill Completed</b> — 22 fields resolved from platform data</div>
+          <div class="audit-time">2026-07-10 14:15 · System</div>
+        </div>
+      </div>
+      <div class="audit-item">
+        <div class="audit-dot"></div>
+        <div class="audit-content">
+          <div class="audit-text"><b>Form Created</b> — Building Plan Application (City of Cape Town v2.1)</div>
+          <div class="audit-time">2026-07-10 14:15 · Joshil Dodhia</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Load library by default
+renderLibrary();
+</script>
+</body>
+</html>

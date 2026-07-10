@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Design Workshop HTML Reminder",
+  "description": "When a new component or feature TSX file is created, reminds the agent to create or update the corresponding sample HTML file at the project root for visual design workshopping.",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "src/components/**/*.tsx",
+      "src/features/**/*.tsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new component/feature file was just created. Per the design-workshop steering rule, check if a corresponding sample HTML file exists at the project root (using UPPER_SNAKE_CASE naming like FEATURE_NAME_SAMPLE.html). If one doesn't exist yet and this is a new tool, dashboard, or workspace view, create a self-contained HTML design sample with the Architex dark theme, realistic data, and the layout structure that matches the React component being built. If a sample already exists, update it to reflect the new component."
+  },
+  "workspaceFolderName": "arc-1",
+  "shortName": "design-workshop-html"
+}
