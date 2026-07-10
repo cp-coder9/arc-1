@@ -65,10 +65,10 @@ describe('energy_certificate_v1 — intensity + rating', () => {
     const clause = result.clauseResults[0]
     expect(clause.outcome).toBe('pass')
     expect(clause.threshold).toContain('200')
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'epc_energy_thresholds',
       version: '2020.1',
-    })
+    }))
   })
 
   it('fails when intensity exceeds the norm and rates G', () => {

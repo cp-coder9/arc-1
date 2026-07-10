@@ -126,7 +126,7 @@ describe('Property 2 — no hidden constants (Requirement 10.4)', () => {
   it('traces every consumed table version in sourceVersions', () => {
     const result = runCalculator(makeDef(), INPUT, ROWS, { tables: allTables })
     // Default resolution picks the latest non-superseded version (2024.1).
-    expect(result.sourceVersions).toContainEqual({ guideline: 'xa_zone_limits', version: '2024.1' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'xa_zone_limits', version: '2024.1' }))
   })
 })
 
@@ -147,7 +147,7 @@ describe('Property 1 — version pinning determinism (Requirement 3.3)', () => {
 
     expect(snapshot.calculatorDefinitionId).toBe('xa_fenestration_test_v1')
     expect(snapshot.scheduleRows).toEqual(ROWS)
-    expect(snapshot.guidelineVersions).toContainEqual({ guideline: 'xa_zone_limits', version: '2023.1' })
+    expect(snapshot.guidelineVersions).toContainEqual(expect.objectContaining({ guideline: 'xa_zone_limits', version: '2023.1' }))
     expect(snapshot.clauseResults).toEqual(result.clauseResults)
   })
 

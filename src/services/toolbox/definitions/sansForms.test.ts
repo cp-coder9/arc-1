@@ -148,9 +148,9 @@ describe('sans_forms_v1 — source traceability', () => {
       },
       annexuresProvided: ['fire_report', 'structural_report'],
     })
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'sans_form_requirements',
       version: '2024.1',
-    })
+    }))
   })
 })

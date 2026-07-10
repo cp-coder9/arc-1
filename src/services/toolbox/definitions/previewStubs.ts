@@ -112,7 +112,7 @@ export const progressViewerPreview = stub('progress_viewer_v1', 'progress_viewer
 export const paymentDashboardPreview = stub('payment_dashboard_v1', 'payment_dashboard', 'Payment Status Dashboard')
 export const rfiGeneratorPreview = stub('rfi_generator_v1', 'rfi_generator', 'RFI / Site Instruction Generator')
 export const snagCreatorPreview = stub('snag_creator_v1', 'snag_creator', 'Snag List Creator')
-export const tenderBidBenchPreview = stub('tender_bid_bench_v1', 'tender_bid_bench', 'Tender / Bid Workbench')
+// tender_bid_bench_v1 promoted to full — see tenderBidBench.ts
 export const snagEvidenceUploadPreview = stub('snag_evidence_upload_v1', 'snag_evidence_upload', 'Snag / Closeout Evidence Upload')
 export const rfiResponsePreview = stub('rfi_response_v1', 'rfi_response', 'RFI / Site Instruction Response')
 export const packageScopeViewerPreview = stub('package_scope_viewer_v1', 'package_scope_viewer', 'Package Scope Viewer')

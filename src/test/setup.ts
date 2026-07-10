@@ -1,60 +1,62 @@
 import '@testing-library/jest-dom';
-import { jest } from '@jest/globals';
+
+// With globals: true, vi is available as a global during setup
+const vi = (globalThis as any).vi;
 
 Object.defineProperty(globalThis, 'jest', {
   configurable: true,
-  value: jest,
+  value: vi,
 });
 
 // Mock Firebase with full implementation
 const mockDb = {
-  collection: jest.fn<any>(() => ({
-    doc: jest.fn<any>(() => mockDb),
-    add: jest.fn<any>(),
-    where: jest.fn<any>(() => mockDb),
-    orderBy: jest.fn<any>(() => mockDb),
-    get: jest.fn<any>(),
-    onSnapshot: jest.fn<any>(),
+  collection: vi.fn<any>(() => ({
+    doc: vi.fn<any>(() => mockDb),
+    add: vi.fn<any>(),
+    where: vi.fn<any>(() => mockDb),
+    orderBy: vi.fn<any>(() => mockDb),
+    get: vi.fn<any>(),
+    onSnapshot: vi.fn<any>(),
   })),
-  doc: jest.fn<any>(() => ({
-    get: jest.fn<any>(),
-    set: jest.fn<any>(),
-    update: jest.fn<any>(),
-    delete: jest.fn<any>(),
+  doc: vi.fn<any>(() => ({
+    get: vi.fn<any>(),
+    set: vi.fn<any>(),
+    update: vi.fn<any>(),
+    delete: vi.fn<any>(),
   })),
-  getDoc: jest.fn<any>(),
-  setDoc: jest.fn<any>(),
-  updateDoc: jest.fn<any>(),
-  addDoc: jest.fn<any>(),
-  deleteDoc: jest.fn<any>(),
-  query: jest.fn<any>(),
-  where: jest.fn<any>(),
-  orderBy: jest.fn<any>(),
-  onSnapshot: jest.fn<any>(),
-  writeBatch: jest.fn<any>(() => ({
-    set: jest.fn<any>(),
-    update: jest.fn<any>(),
-    delete: jest.fn<any>(),
-    commit: jest.fn<any>(),
+  getDoc: vi.fn<any>(),
+  setDoc: vi.fn<any>(),
+  updateDoc: vi.fn<any>(),
+  addDoc: vi.fn<any>(),
+  deleteDoc: vi.fn<any>(),
+  query: vi.fn<any>(),
+  where: vi.fn<any>(),
+  orderBy: vi.fn<any>(),
+  onSnapshot: vi.fn<any>(),
+  writeBatch: vi.fn<any>(() => ({
+    set: vi.fn<any>(),
+    update: vi.fn<any>(),
+    delete: vi.fn<any>(),
+    commit: vi.fn<any>(),
   })),
 };
 
 const mockAuth = {
   currentUser: { uid: 'test-user-id', email: 'test@example.com' },
-  onAuthStateChanged: jest.fn<any>((callback: any) => {
+  onAuthStateChanged: vi.fn<any>((callback: any) => {
     callback(mockAuth.currentUser);
-    return jest.fn();
+    return vi.fn();
   }),
-  signInWithEmailAndPassword: jest.fn<any>(),
-  createUserWithEmailAndPassword: jest.fn<any>(),
-  signOut: jest.fn<any>(),
-  GoogleAuthProvider: jest.fn<any>(),
+  signInWithEmailAndPassword: vi.fn<any>(),
+  createUserWithEmailAndPassword: vi.fn<any>(),
+  signOut: vi.fn<any>(),
+  GoogleAuthProvider: vi.fn<any>(),
 };
 
-jest.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/firebase', () => ({
   db: mockDb,
   auth: mockAuth,
-  handleFirestoreError: jest.fn<any>(),
+  handleFirestoreError: vi.fn<any>(),
   OperationType: {
     CREATE: 'CREATE',
     READ: 'READ',
@@ -68,12 +70,12 @@ jest.mock('@/lib/firebase', () => ({
 }));
 
 // Mock Vercel Blob
-jest.mock('@vercel/blob', () => ({
-  put: jest.fn<any>().mockResolvedValue({
+vi.mock('@vercel/blob', () => ({
+  put: vi.fn<any>().mockResolvedValue({
     url: 'https://mock.blob.url/test.pdf',
     downloadUrl: 'https://mock.blob.url/test.pdf?download=1',
   }),
-  del: jest.fn<any>().mockResolvedValue(undefined),
+  del: vi.fn<any>().mockResolvedValue(undefined),
 }));
 
 // Mock environment variables
@@ -97,38 +99,38 @@ Object.defineProperty(globalThis, 'crypto', {
   value: {
     ...(globalThis as any).crypto,
     subtle: {
-      digest: jest.fn<any>().mockResolvedValue(new ArrayBuffer(16)),
+      digest: vi.fn<any>().mockResolvedValue(new ArrayBuffer(16)),
     },
   },
 });
 
 // Mock ResizeObserver
-(global as any).ResizeObserver = jest.fn<any>().mockImplementation(() => ({
-  observe: jest.fn<any>(),
-  unobserve: jest.fn<any>(),
-  disconnect: jest.fn<any>(),
+(global as any).ResizeObserver = vi.fn<any>().mockImplementation(() => ({
+  observe: vi.fn<any>(),
+  unobserve: vi.fn<any>(),
+  disconnect: vi.fn<any>(),
 }));
 
 // Mock IntersectionObserver
-(global as any).IntersectionObserver = jest.fn<any>().mockImplementation(() => ({
-  observe: jest.fn<any>(),
-  unobserve: jest.fn<any>(),
-  disconnect: jest.fn<any>(),
+(global as any).IntersectionObserver = vi.fn<any>().mockImplementation(() => ({
+  observe: vi.fn<any>(),
+  unobserve: vi.fn<any>(),
+  disconnect: vi.fn<any>(),
 }));
 
 // Mock matchMedia when a browser-like environment is available.
 if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: jest.fn<any>().mockImplementation(query => ({
+    value: vi.fn<any>().mockImplementation(query => ({
       matches: false,
       media: query as any,
       onchange: null,
-      addListener: jest.fn<any>(),
-      removeListener: jest.fn<any>(),
-      addEventListener: jest.fn<any>(),
-      removeEventListener: jest.fn<any>(),
-      dispatchEvent: jest.fn<any>(),
+      addListener: vi.fn<any>(),
+      removeListener: vi.fn<any>(),
+      addEventListener: vi.fn<any>(),
+      removeEventListener: vi.fn<any>(),
+      dispatchEvent: vi.fn<any>(),
     })),
   });
 }
@@ -155,5 +157,5 @@ afterAll(() => {
 
 // Clean up after each test
 afterEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });

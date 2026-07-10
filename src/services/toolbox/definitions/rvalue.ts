@@ -70,8 +70,8 @@ export type ElementType = (typeof ELEMENT_TYPES)[number]
  * Together these resolve the applicable minimum R-value + surface resistances row.
  */
 export const rvalueInputSchema = z.object({
-  /** SANS 10400-XA climate zone (1–6). */
-  climateZone: z.number().int().min(1).max(6),
+  /** SANS 10400-XA climate zone (1–7). */
+  climateZone: z.number().int().min(1).max(7),
   /** Envelope element this assembly represents (roof / wall / floor). */
   elementType: z.enum(ELEMENT_TYPES),
 })
@@ -260,12 +260,23 @@ function compute(ctx: ComputeContext<RValueInput, RValueLayer>): CalculationResu
 
   const { clauseResults, complianceScore } = evaluateClauseSet(rvalueClauseSet, ctx)
 
+  // Build sourceVersions from consumed guideline tables (Req 12.4)
+  const sourceVersions = []
+  const matTable = ctx.tables.material_r_values
+  if (matTable) {
+    sourceVersions.push({ guideline: matTable.id, version: matTable.version, effectiveFrom: matTable.effectiveFrom, status: matTable.status })
+  }
+  const rminTable = ctx.tables.xa_rvalue_minimums
+  if (rminTable) {
+    sourceVersions.push({ guideline: rminTable.id, version: rminTable.version, effectiveFrom: rminTable.effectiveFrom, status: rminTable.status })
+  }
+
   return {
     lineResults,
     aggregates,
     clauseResults: clauseResults as ClauseResult[],
     complianceScore,
-    sourceVersions: [],
+    sourceVersions,
     disclaimers: DISCLAIMERS,
     warnings: assembly.warnings,
   }

@@ -172,9 +172,9 @@ describe('cad_upload_check_v1 — source traceability', () => {
       revision: 'A',
       isSitePlan: false,
     })
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'cad_upload_standards',
       version: '2024.1',
-    })
+    }))
   })
 })

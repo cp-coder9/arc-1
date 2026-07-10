@@ -290,7 +290,12 @@ function baseOnlyInput(input: FeeMethodInput, overrides: Partial<FeeServiceInput
 }
 
 function sourceVersionsFrom(ctx: ComputeContext<FeeMethodInput>): GuidelineVersionRef[] {
-  return Object.values(ctx.tables).map((t) => ({ guideline: t.id, version: t.version }))
+  return Object.values(ctx.tables).map((t) => ({
+    guideline: t.id,
+    version: t.version,
+    effectiveFrom: t.effectiveFrom,
+    status: t.status,
+  }))
 }
 
 /** Map a fee-service result into the framework's `CalculationResult`. */

@@ -1,27 +1,74 @@
+import { createHash } from 'crypto';
 import type { AuditSnapshot, ToolRun } from './types';
 import { iso } from './ids';
 
-export class AuditSnapshotService {
-  create(run: ToolRun, reason: string): AuditSnapshot {
-    const snapshotSource = JSON.stringify({
-      tenantId: run.tenantId,
-      userId: run.userId,
-      toolId: run.toolId,
-      toolVersion: run.toolVersion,
-      assignment: run.assignment,
-      input: run.input,
-      output: run.output,
-      reason,
-    });
-    return { hash: fnv1a(snapshotSource), algorithm: 'fnv1a-32-spine', reason, createdAt: iso(), locked: true };
-  }
+/**
+ * Produces a stable JSON string with keys sorted alphabetically.
+ * Used to ensure deterministic hashing of input/output objects.
+ */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.keys(val as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((sorted, k) => {
+          sorted[k] = (val as Record<string, unknown>)[k];
+          return sorted;
+        }, {});
+    }
+    return val;
+  });
 }
 
-function fnv1a(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
+export class AuditSnapshotService {
+  /**
+   * Creates an audit snapshot for the given ToolRun.
+   * Computes SHA-256 of: runId|toolId|toolVersion|sortedInput|sortedOutput|issuedAt
+   * Fields joined by pipe `|` delimiter.
+   * Input/output: JSON.stringify with keys sorted alphabetically (stable sort replacer).
+   * issuedAt in ISO 8601 UTC format.
+   *
+   * Requirement 10.1: SHA-256 hash computation
+   * Requirement 10.2: Store hash and set locked=true in same atomic operation
+   */
+  create(run: ToolRun, reason: string): AuditSnapshot {
+    const issuedAt = run.issuedAt ?? iso();
+    const hash = this.computeHash(run, issuedAt);
+    return {
+      hash,
+      algorithm: 'sha256',
+      reason,
+      createdAt: iso(),
+      locked: true,
+    };
   }
-  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+
+  /**
+   * Verifies that a ToolRun's audit snapshot hash matches a fresh computation.
+   * Returns true if the stored hash matches the recomputed hash.
+   */
+  verify(run: ToolRun): boolean {
+    if (!run.auditSnapshot || !run.issuedAt) return false;
+    const recomputed = this.computeHash(run, run.issuedAt);
+    return recomputed === run.auditSnapshot.hash;
+  }
+
+  /**
+   * Computes SHA-256 hash of the canonical representation:
+   * SHA-256(UTF-8(runId | toolId | toolVersion | sortedInput | sortedOutput | issuedAt))
+   */
+  private computeHash(run: ToolRun, issuedAt: string): string {
+    const sortedInput = stableStringify(run.input);
+    const sortedOutput = stableStringify(run.output);
+    const payload = [
+      run.id,
+      run.toolId,
+      run.toolVersion,
+      sortedInput,
+      sortedOutput,
+      issuedAt,
+    ].join('|');
+
+    return createHash('sha256').update(payload, 'utf8').digest('hex');
+  }
 }

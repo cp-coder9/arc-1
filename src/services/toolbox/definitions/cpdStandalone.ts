@@ -149,7 +149,7 @@ function compute(ctx: ComputeContext<CpdStandaloneInput, CpdStandaloneRow>): Cal
   // Look up cpd_body_rules if available
   const bodyRulesTable = ctx.tables['cpd_body_rules']
   const sourceVersions = bodyRulesTable
-    ? [{ guideline: 'cpd_body_rules', version: bodyRulesTable.version }]
+    ? [{ guideline: 'cpd_body_rules', version: bodyRulesTable.version, effectiveFrom: bodyRulesTable.effectiveFrom, status: bodyRulesTable.status }]
     : []
 
   // Clause evaluation

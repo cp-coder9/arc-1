@@ -171,7 +171,7 @@ function compute(ctx: ComputeContext<TimesheetInput, TimesheetRow>): Calculation
     },
     clauseResults: clauseResults as ClauseResult[],
     complianceScore,
-    sourceVersions: [{ guideline: 'SARS PAYE/UIF/SDL', version: '2024.1' }],
+    sourceVersions: [{ guideline: 'SARS PAYE/UIF/SDL', version: '2024.1', effectiveFrom: '2024-03-01', status: 'mandatory' }],
     disclaimers: DISCLAIMERS,
     warnings,
   }

@@ -228,10 +228,10 @@ describe('Task 4.3 — run → save → reopen → assign (Req 9.2, 9.3)', () =>
     expect(handoff.projectRecord.jobRef).toBe('JOB-2024-017')
     expect(handoff.projectRecord.sourceRunId).toBe(reopened!.runId)
     expect(handoff.projectRecord.calculatorDefinitionId).toBe('xa_fenestration_test_v1')
-    expect(handoff.projectRecord.guidelineVersions).toContainEqual({
+    expect(handoff.projectRecord.guidelineVersions).toContainEqual(expect.objectContaining({
       guideline: 'xa_zone_limits',
       version: '2023.1',
-    })
+    }))
     expect(handoff.projectRecord.clauseResults).toEqual(result.clauseResults)
 
     // Document-adapter entry created from the run.

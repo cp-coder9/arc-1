@@ -22,6 +22,11 @@ export class ToolDefinitionRegistry {
     return tool;
   }
 
+  /** Non-throwing lookup: returns the definition or undefined. */
+  getDefinition(toolId: string): ToolDefinition | undefined {
+    return this.definitions.get(toolId);
+  }
+
   listForRole(role: string): ToolDefinition[] {
     return [...this.definitions.values()].filter((tool) => tool.roles.includes(role));
   }

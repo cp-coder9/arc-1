@@ -7,6 +7,35 @@ export type ToolCategory =
   | 'site-execution'
   | 'governance';
 
+/**
+ * Error codes for ToolRun failures across the execution pipeline.
+ * Each code maps to a specific failure point in the engine pipeline.
+ */
+export type ToolRunErrorCode =
+  | 'NO_DEFINITION'
+  | 'INVALID_INPUT'
+  | 'INVALID_SCHEDULE_ROW'
+  | 'GENERIC_OUTPUT_DETECTED'
+  | 'COMPUTE_FAILED'
+  | 'UNSUPPORTED_JURISDICTION'
+  | 'RUN_LOCKED'
+  | 'REASSIGNMENT_NOT_PERMITTED';
+
+/**
+ * Structured error thrown by the ToolboxEngine when a tool run fails
+ * at any stage of the execution pipeline.
+ */
+export class ToolRunError extends Error {
+  constructor(
+    public readonly code: ToolRunErrorCode,
+    message: string,
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = 'ToolRunError';
+  }
+}
+
 export type ToolRunStatus = 'draft' | 'completed' | 'issued' | 'superseded' | 'failed';
 
 export interface ToolContext {
@@ -43,6 +72,12 @@ export interface ToolDefinition<TInput = unknown, TOutput = unknown> {
   inputSchema: Record<string, string>;
   outputSchema: Record<string, string>;
   governance: GovernanceProfile;
+  /**
+   * Optional link to a CalculatorDefinition id in the definition registry.
+   * When set, the engine resolves the Calculator_Definition and validates
+   * input (and schedule rows) against its Zod schemas before executing.
+   */
+  calculatorDefinitionId?: string;
   execute: (input: TInput, context: ToolContext) => Promise<TOutput> | TOutput;
 }
 
@@ -60,10 +95,12 @@ export interface ToolRun {
   error?: string;
   exports: ExportRecord[];
   auditSnapshot?: AuditSnapshot;
+  locked: boolean;
+  previewDisclaimer?: string;
+  supersedesRunId?: string;
   createdAt: string;
   updatedAt: string;
   issuedAt?: string;
-  supersedesRunId?: string;
 }
 
 export interface ExportRecord {
@@ -92,4 +129,35 @@ export interface IntegrationEvent {
   message: string;
   payload: Record<string, unknown>;
   createdAt: string;
+}
+
+/**
+ * Generic paginated result wrapper for cursor-based pagination.
+ * Used by repository list methods to return paged data.
+ */
+export interface PaginatedResult<T> {
+  items: T[];
+  cursor: string | null;  // createdAt of last item for startAfter
+  hasMore: boolean;
+}
+
+/**
+ * Parameters for listing tool runs by tool, scoped to a tenant and user.
+ */
+export interface ListByToolParams {
+  tenantId: string;
+  userId: string;
+  toolId: string;
+  pageSize?: number;  // default 20, max 50
+  cursor?: string;    // startAfter createdAt
+}
+
+/**
+ * Parameters for listing tool runs by project, scoped to a tenant.
+ */
+export interface ListByProjectParams {
+  tenantId: string;
+  projectId: string;
+  pageSize?: number;  // default 20, max 50
+  cursor?: string;    // startAfter createdAt
 }

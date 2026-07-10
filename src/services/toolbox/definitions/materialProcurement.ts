@@ -140,8 +140,36 @@ function compute(ctx: ComputeContext<MaterialProcurementInput, MaterialRow>): Ca
   const { input, rows } = ctx
   const warnings: string[] = []
 
+  // Handle edge case: all rows invalid (Req 13.6) — return empty results with warning
+  if (rows.length === 0) {
+    return {
+      lineResults: [],
+      aggregates: {
+        projectName: input.projectName,
+        orderReference: input.orderReference,
+        deliveryDate: input.deliveryDate,
+        itemCount: 0,
+        subtotal: 0,
+        contingencyPercent: input.contingencyPercent,
+        contingencyAmount: 0,
+        subtotalWithContingency: 0,
+        vatRate: VAT_RATE * 100,
+        vatAmount: 0,
+        totalOrderValue: 0,
+        highPriorityItems: 0,
+        mediumPriorityItems: 0,
+        lowPriorityItems: 0,
+      },
+      clauseResults: [],
+      complianceScore: undefined,
+      sourceVersions: [],
+      disclaimers: DISCLAIMERS,
+      warnings: ['No valid material rows provided — all rows failed validation.'],
+    }
+  }
+
   // Compute per-row costs
-  const lineResults = rows.map((row) => {
+  const allLineResults = rows.map((row) => {
     const cost = row.quantity * row.unitRate
     const result: Record<string, number | string> = {
       description: row.description,
@@ -155,6 +183,12 @@ function compute(ctx: ComputeContext<MaterialProcurementInput, MaterialRow>): Ca
     if (row.leadTimeDays !== undefined) result.leadTimeDays = row.leadTimeDays
     return result
   })
+
+  // Group output by priority level (Req 13.5)
+  const priorityOrder: MaterialPriority[] = ['high', 'medium', 'low']
+  const lineResults = priorityOrder.flatMap((priority) =>
+    allLineResults.filter((r) => r.priority === priority),
+  )
 
   // Flag items with zero unit rate
   rows.forEach((row, i) => {

@@ -9244,4 +9244,289 @@ router.get("/projects/:projectId/itps/:itpId/compliance-report", async (req, res
   }
 });
 
+// ── Toolbox Engine Routes (Depth Audit Spine) ────────────────────────────────
+// Requirements: 1.1, 3.3, 3.4, 4.4, 5.6, 10.4
+
+import { ToolRunError } from '@/services/toolboxEngine/types';
+import type { ToolContext, ProjectAssignment } from '@/services/toolboxEngine/types';
+import { createToolboxEngine, ToolDefinitionRegistry } from '@/services/toolboxEngine';
+import { AuditClassificationService } from '@/services/toolbox/auditClassificationService';
+
+/** Map ToolRunError codes to HTTP status codes per design doc Error Handling table. */
+function toolRunErrorStatus(code: string): number {
+  switch (code) {
+    case 'NO_DEFINITION':
+    case 'UNSUPPORTED_JURISDICTION':
+      return 400;
+    case 'INVALID_INPUT':
+    case 'INVALID_SCHEDULE_ROW':
+      return 422;
+    case 'RUN_LOCKED':
+    case 'REASSIGNMENT_NOT_PERMITTED':
+      return 409;
+    case 'GENERIC_OUTPUT_DETECTED':
+    case 'COMPUTE_FAILED':
+      return 500;
+    default:
+      return 500;
+  }
+}
+
+/**
+ * Lazily creates a shared ToolboxEngine instance for API routes.
+ * Uses InMemoryToolRunRepository by default; switches to Firestore when USE_FIRESTORE_RUNS=true.
+ */
+let _toolboxEngine: ReturnType<typeof createToolboxEngine> | null = null;
+function getToolboxEngine() {
+  if (!_toolboxEngine) {
+    const registry = new ToolDefinitionRegistry();
+    _toolboxEngine = createToolboxEngine({ registry, firestore: adminDb });
+  }
+  return _toolboxEngine;
+}
+
+// POST /api/toolbox/run — Execute a toolbox tool
+router.post("/api/toolbox/run", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { toolId, input, assignment, issueImmediately } = req.body;
+
+    if (!toolId) {
+      return res.status(400).json({ error: "toolId is required" });
+    }
+
+    const context: ToolContext = {
+      tenantId: decoded.uid,
+      userId: decoded.uid,
+      userRole: (decoded as any).role || 'architect',
+    };
+
+    const engine = getToolboxEngine();
+    const run = await engine.runTool({
+      toolId,
+      input: input ?? {},
+      context,
+      assignment: assignment ?? { mode: 'none' },
+      issueImmediately: issueImmediately ?? false,
+    });
+
+    res.status(201).json(run);
+  } catch (err: any) {
+    if (err instanceof ToolRunError) {
+      return res.status(toolRunErrorStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.details,
+      });
+    }
+    console.error("POST /api/toolbox/run error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// GET /api/toolbox/history/:toolId — Paginated run history by tool
+router.get("/api/toolbox/history/:toolId", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { toolId } = req.params;
+    const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
+    const cursor = req.query.cursor as string | undefined;
+
+    const engine = getToolboxEngine();
+    const result = await (engine as any).repository.listByTool({
+      tenantId: decoded.uid,
+      userId: decoded.uid,
+      toolId,
+      pageSize,
+      cursor,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("GET /api/toolbox/history/:toolId error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// GET /api/toolbox/history/project/:projectId — Paginated run history by project
+router.get("/api/toolbox/history/project/:projectId", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { projectId } = req.params;
+    const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
+    const cursor = req.query.cursor as string | undefined;
+
+    const engine = getToolboxEngine();
+    const result = await (engine as any).repository.listByProject({
+      tenantId: decoded.uid,
+      projectId,
+      pageSize,
+      cursor,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("GET /api/toolbox/history/project/:projectId error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// GET /api/toolbox/runs/:runId — Get a single tool run
+router.get("/api/toolbox/runs/:runId", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { runId } = req.params;
+
+    const engine = getToolboxEngine();
+    const run = await (engine as any).repository.getById(runId, decoded.uid);
+
+    if (!run) {
+      return res.status(404).json({ error: "Run not found" });
+    }
+
+    res.json(run);
+  } catch (err: any) {
+    console.error("GET /api/toolbox/runs/:runId error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// GET /api/toolbox/runs/:runId/export/:format — Get export for a run
+router.get("/api/toolbox/runs/:runId/export/:format", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { runId, format } = req.params;
+
+    const engine = getToolboxEngine();
+    const run = await (engine as any).repository.getById(runId, decoded.uid);
+
+    if (!run) {
+      return res.status(404).json({ error: "Run not found" });
+    }
+
+    const exportRecord = run.exports?.find((e: any) => e.format === format);
+    if (!exportRecord) {
+      return res.status(404).json({ error: `No ${format} export available for this run` });
+    }
+
+    res.setHeader('Content-Type', exportRecord.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${exportRecord.filename}"`);
+    res.send(exportRecord.content);
+  } catch (err: any) {
+    console.error("GET /api/toolbox/runs/:runId/export/:format error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// POST /api/toolbox/runs/:runId/issue — Issue a completed run (lock + audit snapshot)
+router.post("/api/toolbox/runs/:runId/issue", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { runId } = req.params;
+
+    const context: ToolContext = {
+      tenantId: decoded.uid,
+      userId: decoded.uid,
+      userRole: (decoded as any).role || 'architect',
+    };
+
+    const engine = getToolboxEngine();
+    const run = await engine.issueRun(runId, context);
+
+    res.json(run);
+  } catch (err: any) {
+    if (err instanceof ToolRunError) {
+      return res.status(toolRunErrorStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.details,
+      });
+    }
+    console.error("POST /api/toolbox/runs/:runId/issue error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// POST /api/toolbox/runs/:runId/revise — Revise a locked run (creates new draft)
+router.post("/api/toolbox/runs/:runId/revise", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { runId } = req.params;
+    const { input, assignment } = req.body;
+
+    const context: ToolContext = {
+      tenantId: decoded.uid,
+      userId: decoded.uid,
+      userRole: (decoded as any).role || 'architect',
+    };
+
+    const engine = getToolboxEngine();
+    const run = await engine.reviseRun(
+      runId,
+      input ?? {},
+      context,
+      assignment ?? { mode: 'none' },
+    );
+
+    res.status(201).json(run);
+  } catch (err: any) {
+    if (err instanceof ToolRunError) {
+      return res.status(toolRunErrorStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.details,
+      });
+    }
+    console.error("POST /api/toolbox/runs/:runId/revise error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// PATCH /api/toolbox/runs/:runId/assignment — Reassign a run's project assignment
+router.patch("/api/toolbox/runs/:runId/assignment", apiLimiter, async (req, res) => {
+  try {
+    const decoded = await verifyAuth(req.headers);
+    const { runId } = req.params;
+    const { assignment } = req.body;
+
+    if (!assignment) {
+      return res.status(400).json({ error: "assignment is required" });
+    }
+
+    const context: ToolContext = {
+      tenantId: decoded.uid,
+      userId: decoded.uid,
+      userRole: (decoded as any).role || 'architect',
+    };
+
+    const engine = getToolboxEngine();
+    const run = await engine.reassignRun(runId, assignment as ProjectAssignment, context);
+
+    res.json(run);
+  } catch (err: any) {
+    if (err instanceof ToolRunError) {
+      return res.status(toolRunErrorStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.details,
+      });
+    }
+    console.error("PATCH /api/toolbox/runs/:runId/assignment error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
+// GET /api/toolbox/audit/classification — Run classification audit on all tools
+router.get("/api/toolbox/audit/classification", apiLimiter, async (req, res) => {
+  try {
+    await verifyAuth(req.headers);
+    const service = new AuditClassificationService();
+    const report = service.classifyAll();
+    res.json(report);
+  } catch (err: any) {
+    console.error("GET /api/toolbox/audit/classification error:", err);
+    res.status(err.status || 500).json({ error: "Internal server error", message: err.message });
+  }
+});
+
 export default router;

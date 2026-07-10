@@ -192,7 +192,9 @@ function compute(ctx: ComputeContext<PaymentClaimInput, PaymentClaimRow>): Calcu
     },
     clauseResults: clauseResults as ClauseResult[],
     complianceScore,
-    sourceVersions: [],
+    sourceVersions: [
+      { guideline: 'JBCC/NEC Payment Claim', version: '2024', effectiveFrom: '2024-01-01', status: 'indicative' },
+    ],
     disclaimers: DISCLAIMERS,
     warnings,
   }

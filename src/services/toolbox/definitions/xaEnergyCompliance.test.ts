@@ -58,8 +58,8 @@ describe('xa_energy_compliance_v1 — envelope + glazing checks', () => {
     expect(roof?.threshold).toContain('3.7')
     expect(glazing?.threshold).toContain('15%')
     expect(result.aggregates.glazingRatioPct).toBeCloseTo(10.0, 1)
-    expect(result.sourceVersions).toContainEqual({ guideline: 'xa_rvalue_minimums', version: '2021.1' })
-    expect(result.sourceVersions).toContainEqual({ guideline: 'xa_zone_limits', version: '2021.1' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'xa_rvalue_minimums', version: '2021.1' }))
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'xa_zone_limits', version: '2021.1' }))
   })
 
   it('fails roof insulation and glazing ratio when out of limits', () => {

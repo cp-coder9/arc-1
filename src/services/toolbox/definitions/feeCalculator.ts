@@ -291,12 +291,27 @@ function computeFeeCalculator(ctx: ComputeContext<FeeCalculatorInput>): Calculat
   // 9. Total
   const total = roundMoney(feeAfterDiscount + disbursements + statutoryFees + vatAmount)
 
-  // 10. Build line results
+  // 10. Build line results — per-stage fee breakdown (Req 11.3)
   const lineResults: Array<Record<string, number | string>> = [
     { label: 'Base professional fee (bracket)', amount: roundMoney(baseFee), category: 'professional_fee' },
-    { label: `Stage apportionment (${(stageShare * 100).toFixed(0)}%)`, amount: roundMoney(baseFee * stageShare), category: 'professional_fee' },
-    { label: `Complexity factor (×${complexityFactor})`, amount: professionalFee, category: 'professional_fee' },
   ]
+
+  // Per-stage breakdown: show individual stage amounts when specific stages are selected,
+  // otherwise show all stages from the fee_stages table with their apportioned amounts.
+  const stagesToShow = selectedStages.length > 0
+    ? stageRows.filter((r) => selectedStages.includes(r.stage))
+    : stageRows
+  for (const stage of stagesToShow) {
+    const stageAmount = roundMoney(baseFee * (stage.percentage / 100) * complexityFactor)
+    lineResults.push({
+      label: `${stage.stage} (${stage.percentage}%)`,
+      amount: stageAmount,
+      category: 'stage_fee',
+    })
+  }
+
+  lineResults.push({ label: `Complexity factor (×${complexityFactor})`, amount: professionalFee, category: 'professional_fee' })
+
   if (additionalServicesAmount > 0) {
     lineResults.push({ label: 'Additional services', amount: additionalServicesAmount, category: 'professional_fee' })
   }
@@ -331,10 +346,20 @@ function computeFeeCalculator(ctx: ComputeContext<FeeCalculatorInput>): Calculat
   // 12. Source versions
   const sourceVersions: GuidelineVersionRef[] = []
   if (bracketTable) {
-    sourceVersions.push({ guideline: bracketTable.id, version: bracketTable.version })
+    sourceVersions.push({
+      guideline: bracketTable.id,
+      version: bracketTable.version,
+      effectiveFrom: bracketTable.effectiveFrom,
+      status: bracketTable.status,
+    })
   }
   if (stageTable) {
-    sourceVersions.push({ guideline: stageTable.id, version: stageTable.version })
+    sourceVersions.push({
+      guideline: stageTable.id,
+      version: stageTable.version,
+      effectiveFrom: stageTable.effectiveFrom,
+      status: stageTable.status,
+    })
   }
 
   // 13. Warnings

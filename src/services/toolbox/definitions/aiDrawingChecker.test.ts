@@ -145,9 +145,9 @@ describe('ai_drawing_checker_v1 — source traceability', () => {
       drawingNumber: 'A-101',
       paperSize: 'A1',
     })
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'drawing_check_requirements',
       version: '2024.1',
-    })
+    }))
   })
 })

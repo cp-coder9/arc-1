@@ -112,8 +112,8 @@ describe('xa_fenestration_v1 — runs through runCalculator with seeded tables',
     expect(result.aggregates.glazingRatioPct).toBeCloseTo(8.3, 1)
     expect(result.clauseResults).toHaveLength(4)
     // Traceability: the consumed tables appear in sourceVersions (design Property 2).
-    expect(result.sourceVersions).toContainEqual({ guideline: 'xa_zone_limits', version: '2021.1' })
-    expect(result.sourceVersions).toContainEqual({ guideline: 'glazing_props', version: '1.0.0' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'xa_zone_limits', version: '2021.1' }))
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'glazing_props', version: '1.0.0' }))
     expect(result.disclaimers.length).toBeGreaterThan(0)
   })
 

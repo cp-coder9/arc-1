@@ -33,7 +33,7 @@ describe('rvalueLayerSchema / rvalueInputSchema validation', () => {
   })
 
   it('rejects an out-of-range climate zone and an invalid element type', () => {
-    expect(rvalueInputSchema.safeParse({ climateZone: 7, elementType: 'wall' }).success).toBe(false)
+    expect(rvalueInputSchema.safeParse({ climateZone: 8, elementType: 'wall' }).success).toBe(false)
     expect(rvalueInputSchema.safeParse({ climateZone: 4, elementType: 'door' }).success).toBe(false)
   })
 })
@@ -96,8 +96,8 @@ describe('rvalue_calc_v1 — runs through runCalculator with seeded tables', () 
     expect(clause?.threshold).toContain('0.35')
     expect(clause?.threshold).toContain('zone 4')
     // Traceability: both consumed tables appear in sourceVersions (design Property 2).
-    expect(result.sourceVersions).toContainEqual({ guideline: 'xa_rvalue_minimums', version: '2021.1' })
-    expect(result.sourceVersions).toContainEqual({ guideline: 'material_r_values', version: '1.0.0' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'xa_rvalue_minimums', version: '2021.1' }))
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'material_r_values', version: '1.0.0' }))
   })
 
   it('fails when a thin uninsulated wall misses the minimum', () => {

@@ -208,7 +208,7 @@ describe('percentageFee — flat and banded', () => {
       { percentageTableId: 'fee_percentage' },
     )
     expect(aggNum(r, 'originalProfessionalFee')).toBe(120_000)
-    expect(r.sourceVersions).toContainEqual({ guideline: 'fee_percentage', version: '2.0.0' })
+    expect(r.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'fee_percentage', version: '2.0.0' }))
   })
 })
 
@@ -424,6 +424,6 @@ describe('integration — provider invoked inside a definition via runCalculator
     }
     const result = runCalculator(def, { valueForFeePurposes: 2_000_000 }, [], { tables: [bracketTable] })
     expect(result.aggregates.originalProfessionalFee).toBe(160_000)
-    expect(result.sourceVersions).toContainEqual({ guideline: 'fee_brackets', version: '1.0.0' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'fee_brackets', version: '1.0.0' }))
   })
 })

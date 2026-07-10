@@ -164,9 +164,9 @@ describe('fire_compliance_check_v1 — source traceability', () => {
       occupantCount: 100,
       sprinklered: false,
     })
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'sans_10400_t_thresholds',
       version: '2012.1',
-    })
+    }))
   })
 })

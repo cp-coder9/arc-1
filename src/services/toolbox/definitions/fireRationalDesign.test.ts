@@ -141,9 +141,9 @@ describe('fire_rational_design_v1 — source traceability', () => {
       structuralFireResistanceMin: 90,
       fireRegime: 'fuel_controlled',
     })
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'fire_rational_parameters',
       version: '2012.1',
-    })
+    }))
   })
 })

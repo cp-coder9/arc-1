@@ -24,12 +24,14 @@
 
 import { z } from 'zod'
 import {
+  CalculatorError,
   type CalculationResult,
   type CalculatorDefinition,
   type ClauseCheckDef,
   type ClauseResult,
   type ComputeContext,
   type GuidelineTable,
+  type GuidelineVersionRef,
 } from '@/services/toolbox/types'
 import { evaluateClauseSet } from '@/services/toolbox/engine'
 import { registerCalculatorDefinition } from './definitionRegistry'
@@ -74,18 +76,37 @@ function resolveMinimum(
   ctx: ComputeContext<XaEnergyInput>,
   element: 'roof' | 'wall',
 ): RValueMinimumRow {
-  const table = ctx.tables.xa_rvalue_minimums as GuidelineTable<RValueMinimumRow>
+  const table = ctx.tables.xa_rvalue_minimums as GuidelineTable<RValueMinimumRow> | undefined
+  if (!table || !Array.isArray(table.rows) || table.rows.length === 0) {
+    throw new CalculatorError('MISSING_TABLE', 'Guideline table "xa_rvalue_minimums" not found or empty.', {
+      tableId: 'xa_rvalue_minimums',
+    })
+  }
   const row = table.rows.find((r) => r.zone === ctx.input.climateZone && r.element === element)
   if (!row) {
-    throw new Error(`No xa_rvalue_minimums row for zone ${ctx.input.climateZone} / element ${element}`)
+    throw new CalculatorError('MISSING_TABLE_VERSION', `No xa_rvalue_minimums row for zone ${ctx.input.climateZone} / element "${element}".`, {
+      tableId: 'xa_rvalue_minimums',
+      zone: ctx.input.climateZone,
+      element,
+    })
   }
   return row
 }
 
 function resolveZone(ctx: ComputeContext<XaEnergyInput>): ZoneLimitRow {
-  const table = ctx.tables.xa_zone_limits as GuidelineTable<ZoneLimitRow>
+  const table = ctx.tables.xa_zone_limits as GuidelineTable<ZoneLimitRow> | undefined
+  if (!table || !Array.isArray(table.rows) || table.rows.length === 0) {
+    throw new CalculatorError('MISSING_TABLE', 'Guideline table "xa_zone_limits" not found or empty.', {
+      tableId: 'xa_zone_limits',
+    })
+  }
   const row = table.rows.find((r) => r.zone === ctx.input.climateZone)
-  if (!row) throw new Error(`No xa_zone_limits row for zone ${ctx.input.climateZone}`)
+  if (!row) {
+    throw new CalculatorError('MISSING_TABLE_VERSION', `No xa_zone_limits row for zone ${ctx.input.climateZone}.`, {
+      tableId: 'xa_zone_limits',
+      zone: ctx.input.climateZone,
+    })
+  }
   return row
 }
 
@@ -169,6 +190,27 @@ function compute(ctx: ComputeContext<XaEnergyInput>): CalculationResult {
 
   const { clauseResults, complianceScore } = evaluateClauseSet(xaEnergyClauseSet, ctx)
 
+  // Populate sourceVersions from resolved tables (Requirements 8.2, 8.5)
+  const sourceVersions: GuidelineVersionRef[] = []
+  const rvalueTable = ctx.tables.xa_rvalue_minimums
+  if (rvalueTable) {
+    sourceVersions.push({
+      guideline: rvalueTable.id,
+      version: rvalueTable.version,
+      effectiveFrom: rvalueTable.effectiveFrom,
+      status: rvalueTable.status,
+    })
+  }
+  const zoneLimitTable = ctx.tables.xa_zone_limits
+  if (zoneLimitTable) {
+    sourceVersions.push({
+      guideline: zoneLimitTable.id,
+      version: zoneLimitTable.version,
+      effectiveFrom: zoneLimitTable.effectiveFrom,
+      status: zoneLimitTable.status,
+    })
+  }
+
   return {
     lineResults: [
       { element: 'roof', achieved: ctx.input.roofRValue, minimum: roofMin.minRValue },
@@ -182,7 +224,7 @@ function compute(ctx: ComputeContext<XaEnergyInput>): CalculationResult {
     aggregates,
     clauseResults: clauseResults as ClauseResult[],
     complianceScore,
-    sourceVersions: [],
+    sourceVersions,
     disclaimers: DISCLAIMERS,
     warnings: [],
   }

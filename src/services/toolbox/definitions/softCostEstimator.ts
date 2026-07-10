@@ -240,7 +240,12 @@ function computeSoftCost(ctx: ComputeContext<SoftCostInput>): CalculationResult 
 
     // Track source version
     if (!sourceVersions.some((sv) => sv.guideline === table.id)) {
-      sourceVersions.push({ guideline: table.id, version: table.version })
+      sourceVersions.push({
+        guideline: table.id,
+        version: table.version,
+        effectiveFrom: table.effectiveFrom,
+        status: table.status,
+      })
     }
   }
 
@@ -263,7 +268,12 @@ function computeSoftCost(ctx: ComputeContext<SoftCostInput>): CalculationResult 
         feeType: row.feeType,
       })
     }
-    sourceVersions.push({ guideline: municipalTable.id, version: municipalTable.version })
+    sourceVersions.push({
+      guideline: municipalTable.id,
+      version: municipalTable.version,
+      effectiveFrom: municipalTable.effectiveFrom,
+      status: municipalTable.status,
+    })
   } else {
     warnings.push('Municipal fee table not loaded — statutory fees excluded.')
   }

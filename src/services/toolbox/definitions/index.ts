@@ -179,6 +179,15 @@ export {
 } from './plantRegister'
 
 export {
+  tenderBidBenchV1,
+  tenderBidInputSchema,
+  tenderBidRowSchema,
+  tenderBidClauseSet,
+  type TenderBidInput,
+  type TenderBidRow,
+} from './tenderBidBench'
+
+export {
   siteDiaryEntryV1,
   diaryInputSchema,
   diaryRowSchema,

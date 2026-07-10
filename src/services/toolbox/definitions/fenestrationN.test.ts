@@ -53,10 +53,10 @@ describe('fenestration_n_v1 — ventilation 5% / lighting 10% checks', () => {
     expect(result.lineResults[0].ventilation).toBe('pass')
     expect(result.lineResults[0].ventilationPct).toBeCloseTo(7.5, 1)
     // Traceability.
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'sans_10400_n_requirements',
       version: '2012.1',
-    })
+    }))
   })
 
   it('fails ventilation and lists the non-compliant room', () => {

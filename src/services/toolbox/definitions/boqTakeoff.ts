@@ -59,8 +59,8 @@ export const boqRateBuildUpSchema = z.object({
 export const boqRowSchema = z.object({
   description: z.string().min(1),
   unit: z.enum(['m²', 'm³', 'm', 'nr', 'kg', 'item']),
-  quantity: z.number(),
-  rate: z.number(),
+  quantity: z.number().min(0),
+  rate: z.number().min(0),
   rateBuildUp: boqRateBuildUpSchema.optional(),
 })
 
@@ -137,6 +137,27 @@ const DISCLAIMERS = [
 function compute(ctx: ComputeContext<BoQInput, BoQRow>): CalculationResult {
   const { input, rows } = ctx
   const warnings: string[] = []
+
+  // Handle edge case: all rows invalid (Req 13.6) — return empty results with warning
+  if (rows.length === 0) {
+    return {
+      lineResults: [],
+      aggregates: {
+        projectName: input.projectName,
+        section: input.section,
+        itemCount: 0,
+        subtotal: 0,
+        contingencyPercent: input.contingencyPercent,
+        contingencyAmount: 0,
+        grandTotal: 0,
+      },
+      clauseResults: [],
+      complianceScore: undefined,
+      sourceVersions: [],
+      disclaimers: DISCLAIMERS,
+      warnings: ['No valid schedule rows provided — all rows failed validation.'],
+    }
+  }
 
   // Compute per-row amounts
   const lineResults = rows.map((row) => {

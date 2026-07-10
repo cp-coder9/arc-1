@@ -165,9 +165,9 @@ describe('zoning_check_v1 — source traceability', () => {
       parkingSpaces: 2,
       numberOfUnits: 1,
     })
-    expect(result.sourceVersions).toContainEqual({
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({
       guideline: 'zoning_scheme_parameters',
       version: '2024.1',
-    })
+    }))
   })
 })

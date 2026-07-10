@@ -102,12 +102,13 @@ export function runCalculator<TInput = Record<string, unknown>, TRow = Record<st
   // 2. Validate schedule rows individually (soft — isolate invalid rows).
   const { rows: validRows, warnings: rowWarnings } = validateRows(def, rows)
 
-  // 3. Resolve consumed tables (latest unless pinned).
+  // 3. Resolve consumed tables (latest unless pinned), with jurisdiction filtering.
   const resolvedTables = resolveTables({
     tableRefs: def.tableRefs,
     available: options.tables ?? [],
     pinned: options.pinnedVersions,
     asOf: options.asOf,
+    jurisdiction: options.jurisdiction,
   })
 
   // 4. Build the compute context and delegate domain math to the definition.
@@ -136,7 +137,12 @@ export function runCalculator<TInput = Record<string, unknown>, TRow = Record<st
   const seen = new Set(sourceVersions.map(versionKey))
   for (const id of def.tableRefs) {
     const table = resolvedTables[id]
-    const ref: GuidelineVersionRef = { guideline: table.id, version: table.version }
+    const ref: GuidelineVersionRef = {
+      guideline: table.id,
+      version: table.version,
+      effectiveFrom: table.effectiveFrom,
+      status: table.status,
+    }
     if (!seen.has(versionKey(ref))) {
       sourceVersions.push(ref)
       seen.add(versionKey(ref))

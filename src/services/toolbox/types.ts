@@ -99,10 +99,16 @@ export interface GuidelineTable<TRow = unknown> {
   rows: TRow[] // bracket rows / zone limits / stage % / clause thresholds
 }
 
-/** A guideline/version pair pinned into a saved run or surfaced in a result. */
+/** A guideline/version pair pinned into a saved run or surfaced in a result.
+ *  Extended to include effectiveFrom and status for full audit traceability
+ *  (Requirements 8.2, 8.5). */
 export interface GuidelineVersionRef {
   guideline: string
   version: string
+  /** ISO date from GuidelineTable.effectiveFrom — when this version became active. */
+  effectiveFrom?: string
+  /** The regulatory status of the guideline: mandatory, recommended, or indicative. */
+  status?: GuidelineStatus
 }
 
 /**
@@ -210,6 +216,7 @@ export interface CalculatorDefinition<
 export type CalculatorErrorCode =
   | 'MISSING_TABLE'
   | 'MISSING_TABLE_VERSION'
+  | 'UNSUPPORTED_JURISDICTION'
   | 'INVALID_INPUT'
   | 'INVALID_SCHEDULE_ROW'
   | 'COMPUTE_FAILED'

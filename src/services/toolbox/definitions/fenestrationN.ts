@@ -220,12 +220,18 @@ function compute(ctx: ComputeContext<FenestrationNInput, FenestrationNRoom>): Ca
 
   const { clauseResults, complianceScore } = evaluateClauseSet(fenestrationNClauseSet, ctx)
 
+  // Build sourceVersions from consumed guideline table (Req 12.4)
+  const nTable = ctx.tables.sans_10400_n_requirements
+  const sourceVersions = nTable
+    ? [{ guideline: nTable.id, version: nTable.version, effectiveFrom: nTable.effectiveFrom, status: nTable.status }]
+    : []
+
   return {
     lineResults,
     aggregates,
     clauseResults: clauseResults as ClauseResult[],
     complianceScore,
-    sourceVersions: [],
+    sourceVersions,
     disclaimers: DISCLAIMERS,
     warnings: [],
   }

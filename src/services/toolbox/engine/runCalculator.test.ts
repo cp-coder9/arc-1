@@ -103,7 +103,7 @@ describe('runCalculator — core flow', () => {
 
   it('guarantees resolved table versions appear in sourceVersions (traceability)', () => {
     const result = runCalculator(makeDef(), { floorAreaM2: 100 }, [], { tables: allTables })
-    expect(result.sourceVersions).toContainEqual({ guideline: 'demo_zone_limits', version: '2.0.0' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'demo_zone_limits', version: '2.0.0' }))
   })
 
   it('pins the table version when requested (deterministic replay)', () => {
@@ -115,7 +115,7 @@ describe('runCalculator — core flow', () => {
     )
     // Pinned v1 limit is 0.12 → 14/100 = 0.14 > 0.12 → fail (latest would have passed).
     expect(result.clauseResults[0].outcome).toBe('fail')
-    expect(result.sourceVersions).toContainEqual({ guideline: 'demo_zone_limits', version: '1.0.0' })
+    expect(result.sourceVersions).toContainEqual(expect.objectContaining({ guideline: 'demo_zone_limits', version: '1.0.0' }))
   })
 })
 

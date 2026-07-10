@@ -164,7 +164,7 @@ function compute(ctx: ComputeContext<HsComplianceInput, HsCheckRow>): Calculatio
     },
     clauseResults: clauseResults as ClauseResult[],
     complianceScore: complianceScore ?? complianceScoreCalc,
-    sourceVersions: [{ guideline: 'OHS Act / Construction Regulations', version: '2024.1' }],
+    sourceVersions: [{ guideline: 'OHS Act / Construction Regulations', version: '2024.1', effectiveFrom: '2024-01-01', status: 'mandatory' }],
     disclaimers: DISCLAIMERS,
     warnings,
   }

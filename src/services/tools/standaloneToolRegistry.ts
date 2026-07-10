@@ -375,6 +375,7 @@ export const STANDALONE_TOOL_REGISTRY: StandaloneToolDef[] = [
     canAssignToProject: true,
     recentRunsCount: 0,
     tags: ['payment', 'claim', 'invoice', 'progress', 'evidence'],
+    calculatorDefinitionId: 'payment_claim_builder_v1',
   },
 
   // ===== Subcontractor =====

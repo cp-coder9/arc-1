@@ -173,7 +173,12 @@ function computeFeasibility(ctx: ComputeContext<FeasibilityInput>): CalculationR
       for (const row of rows) {
         municipalFees += computeMunicipalFee(row, constructionAreaM2)
       }
-      sourceVersions.push({ guideline: municipalTable.id, version: municipalTable.version })
+      sourceVersions.push({
+        guideline: municipalTable.id,
+        version: municipalTable.version,
+        effectiveFrom: municipalTable.effectiveFrom,
+        status: municipalTable.status,
+      })
     } else {
       warnings.push('Municipal fee table not available — using lump sum allowance.')
       municipalFees = municipalAllowance

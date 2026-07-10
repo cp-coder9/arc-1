@@ -11,13 +11,15 @@
 // Requirements: 6.1, 6.2, 6.3, 6.4, 8.1.
 
 import { z } from 'zod'
-import type {
-  CalculationResult,
-  CalculatorDefinition,
-  ClauseCheckDef,
-  ClauseResult,
-  ComputeContext,
-  GuidelineTable,
+import {
+  CalculatorError,
+  type CalculationResult,
+  type CalculatorDefinition,
+  type ClauseCheckDef,
+  type ClauseResult,
+  type ComputeContext,
+  type GuidelineTable,
+  type GuidelineVersionRef,
 } from '@/services/toolbox/types'
 import { evaluateClauseSet } from '@/services/toolbox/engine'
 import { registerCalculatorDefinition } from './definitionRegistry'
@@ -65,14 +67,20 @@ export type FireComplianceInput = z.infer<typeof fireComplianceInputSchema>
 // ----------------------------------------------------------------------------
 
 function resolveThreshold(ctx: ComputeContext<FireComplianceInput>): FireThresholdRow {
-  const table = ctx.tables.sans_10400_t_thresholds as GuidelineTable<FireThresholdRow>
+  const table = ctx.tables.sans_10400_t_thresholds as GuidelineTable<FireThresholdRow> | undefined
+  if (!table || !Array.isArray(table.rows) || table.rows.length === 0) {
+    throw new CalculatorError('MISSING_TABLE', 'Guideline table "sans_10400_t_thresholds" not found or empty.', {
+      tableId: 'sans_10400_t_thresholds',
+    })
+  }
   const row = table.rows.find(
     (r) => r.occupancy.toUpperCase() === ctx.input.occupancyClass.toUpperCase(),
   )
   if (!row) {
-    throw new Error(
-      `No sans_10400_t_thresholds row for occupancy class "${ctx.input.occupancyClass}"`,
-    )
+    throw new CalculatorError('MISSING_TABLE_VERSION', `No sans_10400_t_thresholds row for occupancy class "${ctx.input.occupancyClass}".`, {
+      tableId: 'sans_10400_t_thresholds',
+      occupancyClass: ctx.input.occupancyClass,
+    })
   }
   return row
 }
@@ -177,6 +185,18 @@ function compute(ctx: ComputeContext<FireComplianceInput>): CalculationResult {
 
   const { clauseResults, complianceScore } = evaluateClauseSet(fireComplianceClauseSet, ctx)
 
+  // Populate sourceVersions from resolved tables (Requirements 8.2, 8.5)
+  const sourceVersions: GuidelineVersionRef[] = []
+  const thresholdTable = ctx.tables.sans_10400_t_thresholds
+  if (thresholdTable) {
+    sourceVersions.push({
+      guideline: thresholdTable.id,
+      version: thresholdTable.version,
+      effectiveFrom: thresholdTable.effectiveFrom,
+      status: thresholdTable.status,
+    })
+  }
+
   return {
     lineResults: [],
     aggregates: {
@@ -195,7 +215,7 @@ function compute(ctx: ComputeContext<FireComplianceInput>): CalculationResult {
     },
     clauseResults: clauseResults as ClauseResult[],
     complianceScore,
-    sourceVersions: [],
+    sourceVersions,
     disclaimers: DISCLAIMERS,
     warnings: [],
   }
