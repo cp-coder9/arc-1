@@ -99,6 +99,12 @@ const ROLE_VIEW_MAP: Record<UserRole, CommandCentreView[]> = {
 
   // Freelancer: task and document access
   freelancer: ['dashboard', 'tasks', 'documents', 'notifications'],
+
+  // Land surveyor: survey deliverables, documents, and task coordination
+  land_surveyor: ['dashboard', 'tasks', 'documents', 'quality'],
+
+  // Construction project manager: broad execution coordination
+  cpm: ['dashboard', 'programme', 'tasks', 'site-diary', 'rfis', 'quality', 'team', 'contracts', 'notifications'],
 };
 
 // ── Public API ───────────────────────────────────────────────────────────────
