@@ -17,6 +17,7 @@ import { StatCardAnimated } from '@/components/animated/StatCardAnimated';
 import { DashboardSection } from '@/components/composite/DashboardSection';
 import { GlassTable } from '@/components/composite/GlassTable';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { ProviderDisclaimer } from '@/components/ProviderDisclaimer';
 const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
 
 const PAYMENT_GUARD_STEPS = [
@@ -168,6 +169,9 @@ export default function FinancialDashboard({ user }: { user?: UserProfile }) {
         <h2 className="text-2xl md:text-3xl font-heading font-bold tracking-tight flex items-center gap-3"><Landmark className="text-primary" aria-hidden="true" /> Payments, Escrow &amp; Ledger</h2>
         <p className="text-sm text-foreground-muted mt-2 max-w-3xl">Real-time Firestore-backed view of platform revenue, escrow balances, refunds, milestone releases and project-level financial activity.</p>
       </header>
+
+      {/* Persistent provider disclaimer — Requirement 11.3 */}
+      <ProviderDisclaimer />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCardAnimated icon={<ReceiptText size={20} aria-hidden="true" />} label="Total Revenue" value={currency.format(summary.totalRevenue)} delay={prefersReducedMotion ? 0 : 0 * 0.05} prefersReducedMotion={prefersReducedMotion} />

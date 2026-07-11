@@ -102,6 +102,13 @@ service cloud.firestore {
       );
     }
 
+    // ─── RBAC Hardening: Project Membership (Requirement 5.1) ─────────────────
+    // Validates that a user is a project participant by verifying one of:
+    //   - Admin role
+    //   - Project client (clientId match)
+    //   - Lead professional (leadProfessionalId, leadBepId, or leadArchitectId)
+    //   - Active team member (teamMembers[i] with status == 'active')
+    //   - Active firm member when firmAccessEnabled is true
     function isProjectParticipantByData(projectData) {
       return isAuthenticated() && (
         isAdmin() ||
@@ -190,6 +197,9 @@ service cloud.firestore {
         canManageTenderFor(tenderData.projectId, tenderData.jobId);
     }
 
+    // Requirement 5.4 — Supplier access scoping: allows read of published
+    // tender packages for eligible contractors/subcontractors/suppliers who may
+    // bid. After award, access is via awardedContractorId match (Req 5.2).
     function isEligibleContractorForTender(tenderData) {
       return isAuthenticated() && tenderData.status == 'published' && !isTenderParticipant(tenderData) && (
         getUserData() != null && getUserData().role in ['contractor', 'subcontractor', 'supplier']
@@ -215,6 +225,15 @@ service cloud.firestore {
       );
     }
 
+    // ─── RBAC Hardening: Package-Scoped Access (Requirements 5.2, 5.4) ────────
+    // Validates that a user may read a record linked to a tender package.
+    // Access is granted if:
+    //   1. User is an admin
+    //   2. User owns the record (various ownership fields)
+    //   3. User is a project participant (Req 5.1: client, lead, team member, firm)
+    //   4. User is awarded the package (Req 5.2: awardedContractorId == UID)
+    //   5. User is an eligible contractor for a published package (Req 5.4)
+    //   6. User is a tender participant (project team managing the tender)
     function canReadPackageLinkedRecord(data) {
       return isAuthenticated() && (
         isAdmin() ||
@@ -379,11 +398,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Access logs are server-owned request/correlation records. Backend/Admin SDK
-    // writes bypass rules; browser clients cannot forge access entries.
+    // Access logs are append-only audit records. Backend/Admin SDK writes bypass
+    // rules; authenticated clients may create entries but never modify or delete.
     match /access_logs/{accessLogId} {
       allow read: if isAdmin();
-      allow create, update, delete: if false;
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
 
     // Generalized user verification records for BEPs, contractors,
@@ -533,6 +553,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── RBAC Hardening: Freelancer Task-Limited Access (Req 5.3) ────────────
+    // Top-level delegated tasks: freelancers can only access tasks assigned to them
     match /delegatedTasks/{taskId} {
       allow read: if isAuthenticated() && (isAdmin() || isApplicationProfessional(resource.data) || resource.data.assigneeId == request.auth.uid);
       allow create: if isAuthenticated() && isApplicationProfessional(request.resource.data) &&
@@ -761,12 +783,19 @@ service cloud.firestore {
          request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
          request.resource.data.role in ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'];
 
+      // Deny client-side admin/platform_admin role elevation (Requirement 5.6).
+      // Users may update allowed profile fields but cannot promote to admin or platform_admin.
+      // Admin role assignment is only permitted via server-side Admin SDK.
       allow update: if isAuthenticated() && (
         (isOwner(userId) && 
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(
             ['displayName', 'bio', 'updatedAt', 'fcmTokens', 'notificationPreferences', 'professionalLabel', 'professionalLabels', 'region', 'nhbrcNumber', 'cidbGrading', 'hasPIInsurance', 'tradeLicense', 'projectType', 'budgetRange', 'sacapNumber', 'experienceYears', 'mainSpecialization']
           )
-        ) || isAdmin()
+        ) || (isAdmin() &&
+          // Even admins writing from the client cannot elevate roles to admin/platform_admin.
+          // Role changes to admin or platform_admin must go through Admin SDK (server-only).
+          (!(request.resource.data.role in ['admin', 'platform_admin']) || request.resource.data.role == resource.data.role)
+        )
       );
       allow delete: if isAdmin();
     }
@@ -978,6 +1007,8 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ─── RBAC Hardening: Freelancer Task-Limited Access (Req 5.3) ──────────
+      // Freelancers can only read/write work packages assigned to them
       match /work_packages/{packageId} {
         allow read: if canReadProject(projectId) ||
           (isAuthenticated() && resource.data.assignedFreelancerId == request.auth.uid);
@@ -993,6 +1024,8 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ─── RBAC Hardening: Freelancer Task-Limited Access (Req 5.3) ──────────
+      // Freelancers can only read/write AI issues assigned to them
       match /ai_issues/{issueId} {
         allow read: if canReadProject(projectId) ||
           (isAuthenticated() && resource.data.assigneeId == request.auth.uid);
@@ -1022,7 +1055,10 @@ service cloud.firestore {
       }
     }
 
+    // ─── RBAC Hardening: Subcontractor & Supplier Access (Reqs 5.2, 5.4) ────
     // Tender packages and contractor bids
+    // Subcontractors limited to packages where awardedContractorId == UID
+    // Suppliers limited to packages they're awarded or eligible to bid on
     match /tender_packages/{tenderId} {
       allow read: if isAuthenticated() && (
         isTenderParticipant(resource.data) ||
@@ -1174,19 +1210,17 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Payments collection
+    // Payments collection — server-only writes (Admin SDK bypasses rules)
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && (
         resource.data.payerId == request.auth.uid ||
         resource.data.payeeId == request.auth.uid ||
         isAdmin()
       );
-      allow create: if isAuthenticated() && isAdmin();
-      allow update: if isAuthenticated() && isAdmin();
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
-    // Escrow collection
+    // Escrow collection — server-only writes (Admin SDK bypasses rules)
     match /escrow/{jobId} {
       allow read: if isAuthenticated() && (
         isAdmin() ||
@@ -1196,13 +1230,41 @@ service cloud.firestore {
         getJob(jobId).data.clientId == request.auth.uid ||
         getJob(jobId).data.selectedArchitectId == request.auth.uid
       );
-      allow create: if isAuthenticated() && isAdmin();
-      // Financial state changes remain admin/server-only. Browser users may only
-      // request release through the minimal milestone-array transition supported
-      // by requestStageRelease; approvals, amounts, ledger, and invoices are not
-      // writable by non-admin clients.
-      allow update: if isAuthenticated() && isAdmin();
-      allow delete: if false;
+      allow create, update, delete: if false;
+    }
+
+    // Escrow wallets (governed FSM) — server-only writes via Admin SDK.
+    // Authenticated project participants may read wallet state.
+    match /escrow_wallets/{walletId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.ownerId == request.auth.uid ||
+        resource.data.claimInitiatorUid == request.auth.uid ||
+        (resource.data.projectId is string && canReadProject(resource.data.projectId))
+      );
+      allow create, update, delete: if false;
+    }
+
+    // Payment claims — server-only writes via Admin SDK.
+    // Authenticated project participants may read claim data.
+    match /payment_claims/{claimId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.claimantUid == request.auth.uid ||
+        (resource.data.projectId is string && canReadProject(resource.data.projectId))
+      );
+      allow create, update, delete: if false;
+    }
+
+    // Payment certificates — server-only writes via Admin SDK.
+    // Authenticated project participants may read certificate data.
+    match /payment_certificates/{certId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.certifierUid == request.auth.uid ||
+        (resource.data.projectId is string && canReadProject(resource.data.projectId))
+      );
+      allow create, update, delete: if false;
     }
 
     // Subscriptions collection

@@ -419,6 +419,42 @@ export const TOOL_NAV_CONFIGS: Record<string, ToolNavConfig> = {
       },
     ],
   },
+  'admin-governance': {
+    name: 'Admin Governance',
+    subtitle: 'Platform governance & oversight',
+    sections: [
+      {
+        label: 'Search & Overview',
+        items: [
+          { id: 'project-search', icon: Search, label: 'Project Search' },
+          { id: 'audit-viewer', icon: Shield, label: 'Audit Viewer' },
+          { id: 'override-log', icon: History, label: 'Override Log' },
+        ],
+      },
+      {
+        label: 'Users & Access',
+        items: [
+          { id: 'user-management', icon: Users, label: 'User Management' },
+          { id: 'feature-flags', icon: Flag, label: 'Feature Flags' },
+        ],
+      },
+      {
+        label: 'Commercial',
+        items: [
+          { id: 'tariff-registry', icon: FileText, label: 'Tariff Registry' },
+          { id: 'payment-rates', icon: DollarSign, label: 'Payment Rates' },
+          { id: 'escrow-oversight', icon: Landmark, label: 'Escrow Oversight' },
+        ],
+      },
+      {
+        label: 'Intelligence & Moderation',
+        items: [
+          { id: 'ai-governance', icon: Activity, label: 'AI Governance' },
+          { id: 'flagged-messages', icon: AlertTriangle, label: 'Flagged Messages' },
+        ],
+      },
+    ],
+  },
 };
 
 /**

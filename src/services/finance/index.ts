@@ -156,7 +156,39 @@ export {
   auditDispute,
   auditVariationStateChange,
   auditRetention,
+  writeImmutableAuditRecord,
+  rejectAuditMutation,
+  calculateRetentionExpiry,
 } from './auditTrailService';
+export type {
+  AuditAction,
+  EvidenceReferenceType,
+  EvidenceReference,
+  HumanConfirmation,
+  ImmutableAuditRecord,
+  ImmutableAuditRecordInput,
+  AuditMutationRejection,
+} from './auditTrailService';
+
+// Provider Validation (Requirements 11.1, 11.2, 11.4, 11.5, 11.6)
+export {
+  validateProviderRegistration,
+  validateProviderReference,
+  isDualConfirmationComplete,
+  handleProviderTimeout,
+  enrichRecordWithProviderDetails,
+  validateProviderForWrite,
+  PROVIDER_TIMEOUT_MS,
+} from './providerValidationService';
+export type {
+  ProviderValidationResult,
+  ProviderReferencedRecord,
+  ProviderReferenceValidationResult,
+  DualConfirmationStatus,
+  DualConfirmationRecord,
+  ProviderTimeoutResult,
+  TimeoutHandlingInput,
+} from './providerValidationService';
 
 // Agent Recommendations
 export {
@@ -165,3 +197,10 @@ export {
   createScheduleRecommendations,
   createRiskRecommendations,
 } from './agentRecommendationService';
+
+// Provider Disclaimer (Requirement 11.3)
+export {
+  getProviderDisclaimerText,
+  isValidProviderName,
+  DEFAULT_PROVIDER_NAME,
+} from './providerDisclaimerService';
