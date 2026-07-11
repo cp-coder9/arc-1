@@ -64,7 +64,7 @@ export function classifySection24(incident: Pick<Incident, 'injuryClassification
  */
 export function assignInvestigation(incident: Incident, investigatorId: string): Incident {
   if (incident.state !== 'reported') {
-    throw new InvalidStateTransitionError(incident.state, 'under_investigation');
+    throw new InvalidStateTransitionError('incident', incident.state, 'under_investigation');
   }
 
   return {
@@ -84,7 +84,7 @@ export function addCorrectiveAction(
   action: Omit<CorrectiveAction, 'id' | 'status'>
 ): Incident {
   if (incident.state !== 'under_investigation' && incident.state !== 'corrective_actions') {
-    throw new InvalidStateTransitionError(incident.state, 'corrective_actions');
+    throw new InvalidStateTransitionError('incident', incident.state, 'corrective_actions');
   }
 
   const newAction: CorrectiveAction = {
@@ -106,7 +106,7 @@ export function addCorrectiveAction(
  */
 export function closeIncident(incident: Incident): Incident {
   if (incident.state !== 'corrective_actions') {
-    throw new InvalidStateTransitionError(incident.state, 'closed');
+    throw new InvalidStateTransitionError('incident', incident.state, 'closed');
   }
 
   const hasOpenActions = incident.correctiveActions.some(a => a.status !== 'completed');
@@ -142,10 +142,9 @@ export function checkOverdueActions(incident: Incident, now: Date): WorkflowEven
         type: 'corrective_action_overdue',
         priority: 'high',
         title: `Overdue corrective action: ${action.description}`,
-        description: `Incident ${incident.id} corrective action assigned to ${action.assignedTo} was due ${action.dueDate}`,
+        detail: `Incident ${incident.id} corrective action assigned to ${action.assignedTo} was due ${action.dueDate}`,
         createdAt: now.toISOString(),
-        actionRequired: true,
-        assignedTo: action.assignedTo,
+        assignedRoles: [],
       });
     }
   }

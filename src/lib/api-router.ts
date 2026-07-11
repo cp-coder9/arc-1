@@ -8427,9 +8427,16 @@ function mapITPErrorToStatus(code: string): number {
 // POST /api/projects/:projectId/itps/:itpId/items — add inspection item
 router.post("/projects/:projectId/itps/:itpId/items", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itpId } = req.params;
-    const { actorUserId: bodyActorUserId, ...itemInput } = req.body as CreateInspectionItemInput & { actorUserId?: string };
-    const actorUserId = bodyActorUserId ?? (req as any).user?.uid ?? "unknown";
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+    const itemInput = req.body as CreateInspectionItemInput;
 
     const itemId = await addInspectionItem(projectId, itpId, itemInput, actorUserId);
     res.status(201).json({ id: itemId });
@@ -8441,6 +8448,9 @@ router.post("/projects/:projectId/itps/:itpId/items", async (req, res) => {
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8448,10 +8458,16 @@ router.post("/projects/:projectId/itps/:itpId/items", async (req, res) => {
 // PUT /api/projects/:projectId/itps/:itpId/items/:itemId — update inspection item
 router.put("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itpId, itemId } = req.params;
-    const body = req.body as UpdateInspectionItemInput & { actorUserId?: string };
-    const actorUserId = body.actorUserId ?? (req as any).user?.uid ?? "unknown";
-    const { actorUserId: _removed, ...updates } = body;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+    const updates = req.body as UpdateInspectionItemInput;
 
     await updateInspectionItem(projectId, itpId, itemId, updates, actorUserId);
     res.status(200).json({ success: true });
@@ -8463,6 +8479,9 @@ router.put("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) =>
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8470,8 +8489,15 @@ router.put("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) =>
 // DELETE /api/projects/:projectId/itps/:itpId/items/:itemId — remove inspection item
 router.delete("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itpId, itemId } = req.params;
-    const actorUserId = (req.body && req.body.actorUserId) ?? (req as any).user?.uid ?? "unknown";
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
 
     await removeInspectionItem(projectId, itpId, itemId, actorUserId);
     res.status(200).json({ success: true });
@@ -8483,6 +8509,9 @@ router.delete("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res)
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8490,9 +8519,16 @@ router.delete("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res)
 // POST /api/projects/:projectId/itps/:itpId/items/reorder — reorder items
 router.post("/projects/:projectId/itps/:itpId/items/reorder", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itpId } = req.params;
-    const { order, actorUserId: bodyActorUserId } = req.body as { order: string[]; actorUserId?: string };
-    const actorUserId = bodyActorUserId ?? (req as any).user?.uid ?? "unknown";
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+    const { order } = req.body as { order: string[] };
 
     if (!Array.isArray(order)) {
       return res.status(400).json({ error: "order must be an array of item IDs", code: "validation_error" });
@@ -8508,6 +8544,9 @@ router.post("/projects/:projectId/itps/:itpId/items/reorder", async (req, res) =
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8515,14 +8554,20 @@ router.post("/projects/:projectId/itps/:itpId/items/reorder", async (req, res) =
 // POST /api/projects/:projectId/inspections/request — request hold point inspection
 router.post("/projects/:projectId/inspections/request", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const requestedBy = authContext.uid;
     const body = req.body as {
       itpId: string;
       inspectionItemId: string;
       requestedInspectionDate: string;
-      requestedBy?: string;
     };
-    const requestedBy = body.requestedBy ?? (req as any).user?.uid ?? "unknown";
 
     const input: HoldPointRequestInput = {
       projectId,
@@ -8542,6 +8587,9 @@ router.post("/projects/:projectId/inspections/request", async (req, res) => {
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8549,10 +8597,17 @@ router.post("/projects/:projectId/inspections/request", async (req, res) => {
 // POST /api/projects/:projectId/inspections/:itemId/sign-off — inspector sign-off
 router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Inspector identity MUST come from auth context for regulated sign-off
+    const inspectorUserId = authContext.uid;
     const body = req.body as {
       itpId: string;
-      inspectorUserId?: string;
       inspectorRole: "engineer" | "architect" | "site_manager";
       outcome: "pass" | "fail" | "conditional_pass";
       conditions?: string;
@@ -8560,7 +8615,6 @@ router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res
       observations?: string;
       professionalRegistration?: string;
     };
-    const inspectorUserId = body.inspectorUserId ?? (req as any).user?.uid ?? "unknown";
 
     const input: InspectionSignOffInput = {
       projectId,
@@ -8585,6 +8639,9 @@ router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8592,16 +8649,23 @@ router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res
 // POST /api/projects/:projectId/inspections/:itemId/record — record witness outcome
 router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Identity fields derived from auth context, not body
+    const recordedByUserId = authContext.uid;
+    const inspectorUserId = authContext.uid;
     const body = req.body as {
       itpId: string;
       outcome: "pass" | "fail" | "conditional_pass";
       observations?: string;
       inspectorAttended: boolean;
-      inspectorUserId?: string;
       inspectorRole?: "engineer" | "architect" | "site_manager";
       professionalRegistration?: string;
-      recordedByUserId?: string;
       notificationSentAt: string;
       inspectorResponse: "acknowledged" | "no_response";
       responseTimestamp?: string;
@@ -8614,10 +8678,10 @@ router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) 
       outcome: body.outcome,
       observations: body.observations,
       inspectorAttended: body.inspectorAttended,
-      inspectorUserId: body.inspectorUserId,
+      inspectorUserId,
       inspectorRole: body.inspectorRole,
       professionalRegistration: body.professionalRegistration,
-      recordedByUserId: body.recordedByUserId,
+      recordedByUserId,
       notificationSentAt: body.notificationSentAt,
       inspectorResponse: body.inspectorResponse,
       responseTimestamp: body.responseTimestamp,
@@ -8633,6 +8697,9 @@ router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) 
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8640,13 +8707,19 @@ router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) 
 // POST /api/projects/:projectId/inspections/:itemId/acknowledge — acknowledge witness notification
 router.post("/projects/:projectId/inspections/:itemId/acknowledge", async (req, res) => {
   try {
+    const authContext = await getAuthContext(req.headers);
     const { projectId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Inspector identity derived from auth context, not body
+    const inspectorUserId = authContext.uid;
     const body = req.body as {
       itpId: string;
-      inspectorUserId?: string;
       response: "acknowledged" | "no_response";
     };
-    const inspectorUserId = body.inspectorUserId ?? (req as any).user?.uid ?? "unknown";
 
     const input: AcknowledgeWitnessNotificationInput = {
       projectId,
@@ -8666,6 +8739,9 @@ router.post("/projects/:projectId/inspections/:itemId/acknowledge", async (req, 
         fields: err.fields,
       });
     }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -8673,17 +8749,21 @@ router.post("/projects/:projectId/inspections/:itemId/acknowledge", async (req, 
 // Mount POPIA/PAIA compliance routes
 router.use("/popia", popiaRoutes);
 
-// Mount Remote Desktop Marketplace routes
-router.use("/remote-desktop-marketplace", marketplaceRouter);
-router.use("/remote-desktop-marketplace", ownerRouter);
+// Mount Remote Desktop Marketplace routes (auth-gated — marketplace routers use
+// placeholder x-user-id auth internally; requireAuth enforces real Firebase token
+// verification at the mount boundary so unauthenticated requests never reach them)
+router.use("/remote-desktop-marketplace", requireAuth, marketplaceRouter);
+router.use("/remote-desktop-marketplace", requireAuth, ownerRouter);
 
-// Mount Feedback Loop routes
+// Mount Feedback Loop routes (auth-gated — defence-in-depth; feedbackRouter also
+// applies requireAuth internally)
 import feedbackRouter from "./feedback-api-router";
-router.use("/feedback", feedbackRouter);
+router.use("/feedback", requireAuth, feedbackRouter);
 
-// Mount Copilot / Provenance / BYOAI routes
+// Mount Copilot / Provenance / BYOAI routes (auth-gated — defence-in-depth;
+// copilotRouter also applies requireAuth internally)
 import copilotRouter from "./copilot-api-router";
-router.use(copilotRouter);
+router.use(requireAuth, copilotRouter);
 
 // ── ITP (Inspection Test Plans) CRUD Routes ────────────────────────────────────
 
@@ -8711,9 +8791,8 @@ async function buildITPPermissionContext(
     status: 'active' as const,
   }));
 
-  // If no membership doc found, still allow the permission layer to evaluate
-  // (it will throw permission_denied if needed)
-  if (projectMemberships.length === 0) {
+  // Platform admin bypass — always has access
+  if (projectMemberships.length === 0 && (role === 'admin' || role === 'platform_admin')) {
     projectMemberships.push({
       userId: uid,
       projectId,
@@ -8721,12 +8800,27 @@ async function buildITPPermissionContext(
       status: 'active',
     });
   }
+  // No membership = no access for non-admin roles (fail closed)
+  // The assertITPProjectAccess helper will reject if membership is empty
 
   return {
     userId: uid,
     userRole: role,
     projectMemberships,
   };
+}
+
+/**
+ * Asserts that the user has project access via membership or admin role.
+ * Throws 403 if no membership exists and user is not an admin.
+ */
+function assertITPProjectAccess(ctx: ITPPermissionContext): void {
+  if (ctx.projectMemberships.length === 0 && ctx.userRole !== 'admin' && ctx.userRole !== 'platform_admin') {
+    const err = new Error('User does not have membership on this project');
+    (err as any).status = 403;
+    (err as any).code = 'permission_denied';
+    throw err;
+  }
 }
 
 // POST /api/projects/:projectId/itps — Create ITP

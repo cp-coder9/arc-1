@@ -60,7 +60,7 @@ export function KnowledgeFeedback({ agentRole, categoryName, issue, userRole }: 
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
+      <PopoverTrigger>
         <Button variant="ghost" size="sm" className="h-6 text-[10px] uppercase tracking-widest gap-1 hover:text-primary">
           <MessageSquarePlus size={12} /> Correct AI
         </Button>

@@ -123,7 +123,7 @@ export function ActionCentrePanel({ ctx, projects, onActionClick, compact = fals
                   {item.hasResolvableRoute ? (
                     <ChevronRight className="text-muted-foreground" size={16} aria-hidden="true" />
                   ) : (
-                    <AlertCircle className="text-muted-foreground" size={16} title="No direct action route" />
+                    <AlertCircle className="text-muted-foreground" size={16} aria-label="No direct action route" />
                   )}
                 </div>
               </div>

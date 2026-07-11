@@ -497,7 +497,7 @@ function NoticeRegistrationForm({ projectId, userId, config, onSubmit, onCancel 
         >
           <option value="">Select notice type...</option>
           {noticeTypes.map((nt) => (
-            <option key={nt.id} value={nt.id}>{nt.name}</option>
+            <option key={nt.id} value={nt.id}>{nt.label}</option>
           ))}
         </select>
       </div>

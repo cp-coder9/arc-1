@@ -2,11 +2,19 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Alert({ className, ...props }: React.ComponentProps<"div">) {
+interface AlertProps extends React.ComponentProps<"div"> {
+  variant?: "default" | "destructive";
+}
+
+function Alert({ className, variant = "default", ...props }: AlertProps) {
   return (
     <div
       role="alert"
-      className={cn("relative w-full rounded-lg border p-4 text-sm", className)}
+      className={cn(
+        "relative w-full rounded-lg border p-4 text-sm",
+        variant === "destructive" && "border-red-500/50 text-red-400",
+        className
+      )}
       {...props}
     />
   )

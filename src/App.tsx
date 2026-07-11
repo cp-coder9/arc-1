@@ -441,6 +441,8 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
   land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage land surveys, boundary pegging, and topographic data.' },
   health_safety: { label: 'H&S Officer', viewLabel: 'H&S View', accent: '#f57c00', accentSoft: 'rgba(245, 124, 0, 0.12)', description: 'Manage safety files, permits, inductions, incidents, and HIRA registers.' },
+  admin: { label: 'Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance and system configuration.' },
+  cpm: { label: 'CPM', viewLabel: 'CPM View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Construction project management oversight and coordination.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -1207,7 +1209,7 @@ function AppContent() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
-              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={selectedProjectId || undefined} />}
+              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={undefined} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}

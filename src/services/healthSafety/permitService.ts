@@ -45,7 +45,7 @@ export function requestPermit(
  */
 export function approvePermit(permit: Permit, approverId: string): Permit {
   if (permit.state !== 'submitted') {
-    throw new InvalidStateTransitionError(permit.state, 'approved');
+    throw new InvalidStateTransitionError('permit', permit.state, 'approved');
   }
 
   return {
@@ -61,7 +61,7 @@ export function approvePermit(permit: Permit, approverId: string): Permit {
  */
 export function rejectPermit(permit: Permit): Permit {
   if (permit.state !== 'submitted') {
-    throw new InvalidStateTransitionError(permit.state, 'rejected');
+    throw new InvalidStateTransitionError('permit', permit.state, 'rejected');
   }
 
   return {
@@ -78,7 +78,7 @@ export function rejectPermit(permit: Permit): Permit {
 export function transitionPermitState(permit: Permit, newState: PermitState, actor: string): Permit {
   const allowed = VALID_TRANSITIONS[permit.state];
   if (!allowed.includes(newState)) {
-    throw new InvalidStateTransitionError(permit.state, newState);
+    throw new InvalidStateTransitionError('permit', permit.state, newState);
   }
 
   return {
@@ -113,10 +113,9 @@ export function checkPermitExpiry(
         type: 'permit_expired',
         priority: 'high',
         title: `Permit ${permit.id} has expired`,
-        description: `${permit.type} permit at ${permit.location} expired at ${permit.validTo}. Requires formal close-out or renewal.`,
+        detail: `${permit.type} permit at ${permit.location} expired at ${permit.validTo}. Requires formal close-out or renewal.`,
         createdAt: now.toISOString(),
-        actionRequired: true,
-        assignedTo: permit.requestedBy,
+        assignedRoles: [],
       },
     };
   }
@@ -134,7 +133,7 @@ export function closeOutPermit(
   conditionsMet: boolean
 ): Permit {
   if (permit.state !== 'active' && permit.state !== 'expired') {
-    throw new InvalidStateTransitionError(permit.state, 'closed');
+    throw new InvalidStateTransitionError('permit', permit.state, 'closed');
   }
 
   return {

@@ -44,15 +44,15 @@ export function StageWeightingPanel({ stages, className }: StageWeightingPanelPr
     }, 0);
   }, [stageRows]);
 
-  const handleToggle = (stageId: string, checked: boolean) => {
-    dispatch({ type: 'TOGGLE_STAGE', stageId, applicable: checked });
+  const handleToggle = (stageId: string, _checked: boolean) => {
+    dispatch({ type: 'TOGGLE_STAGE', stageId });
   };
 
   const handleReductionChange = (stageId: string, value: string) => {
     const num = parseFloat(value);
     if (isNaN(num)) return;
     const clamped = Math.max(0, Math.min(100, num));
-    dispatch({ type: 'SET_STAGE_REDUCTION', stageId, reductionPercentage: clamped });
+    dispatch({ type: 'SET_STAGE_WEIGHT', stageId, reductionPercentage: clamped });
   };
 
   const barWidth = Math.min(100, Math.max(0, totalEffective));

@@ -127,7 +127,7 @@ export default function SiteInstructionManager({ projectId, currentUserId, curre
               <div>
                 <p className="font-bold flex items-center gap-2">
                   {instr.title}
-                  {!instr.authorised && <AlertTriangle size={14} className="text-amber-600" title="Pending authorisation" />}
+                  {!instr.authorised && <AlertTriangle size={14} className="text-amber-600" aria-label="Pending authorisation" />}
                 </p>
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">By {instr.issuedByRole} · {safeFormat(instr.createdAt, 'PP p')}</p>
               </div>

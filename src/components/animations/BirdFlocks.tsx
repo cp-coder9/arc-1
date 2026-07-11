@@ -185,7 +185,7 @@ export default function BirdFlocks({ onTransitionComplete }: BirdFlocksProps) {
   }, []);
 
   // ── FRAGMENT ANIMATION VARIANTS ──
-  const fragmentVariants = {
+  const fragmentVariants: import('framer-motion').Variants = {
     idle: (i: number) => ({
       x: 0,
       y: 0,

@@ -28,6 +28,7 @@ export interface DeliveryEvidenceItem {
   createdAt: string;
   requiredForCloseout?: boolean;
   dueDate?: string;
+  packageId?: string;
   metadata?: Record<string, unknown>;
 }
 

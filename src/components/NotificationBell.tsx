@@ -49,6 +49,9 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   registration_expiring: '🪪',
   cpd_shortfall: '📊',
   invoice_ready_for_review: '🧾',
+  feedback_status_changed: '📝',
+  feedback_shipped: '🚀',
+  feedback_declined: '⛔',
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {

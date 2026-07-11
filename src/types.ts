@@ -1,4 +1,8 @@
-export type UserRole = 'client' | 'architect' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'land_surveyor' | 'health_safety';
+/**
+ * @deprecated 'admin' is kept for backward compatibility. New code should use 'platform_admin'.
+ * The permissionService normalizes 'admin' → 'platform_admin' at runtime.
+ */
+export type UserRole = 'client' | 'architect' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'land_surveyor' | 'health_safety' | 'admin' | 'cpm';
 
 /**
  * A tuple type that ensures at least one element exists.
@@ -994,6 +998,7 @@ export interface AgentKnowledge {
   updatedAt?: string;
   usageCount?: number; // Track how often this knowledge is used
   lastUsedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface KnowledgeCitation {

@@ -405,8 +405,8 @@ export default function CloseoutWizard({ projectId }: { projectId: string }) {
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <MetricBadge label="Status" value={finalAccountEval.status.replaceAll('_', ' ')} tone={finalAccountEval.ready ? 'ready' : 'blocked'} />
-                  <MetricBadge label="Variations Pending" value={finalAccountEval.variations.filter((v: any) => v.status === 'pending').length} tone="blocked" />
-                  <MetricBadge label="Claims Pending" value={finalAccountEval.claims.filter((c: any) => c.status === 'submitted' || c.status === 'under_review').length} tone="blocked" />
+                  <MetricBadge label="Variations Pending" value={(finalAccountEval as any).variations?.filter((v: any) => v.status === 'pending').length ?? 0} tone="blocked" />
+                  <MetricBadge label="Claims Pending" value={(finalAccountEval as any).claims?.filter((c: any) => c.status === 'submitted' || c.status === 'under_review').length ?? 0} tone="blocked" />
                   <MetricBadge label="Retention" value={(summary?.budget.planned ?? 0) > 0 ? 'Held' : 'N/A'} tone="blocked" />
                 </div>
                 {!finalAccountEval.ready && (

@@ -21,6 +21,7 @@ import { subscribeToSiteInstructions } from '@/services/siteInstructionService';
 import { subscribeToEvidence } from '@/services/fieldEvidenceService';
 import { subscribeToPaymentBlockers } from '@/services/paymentBlockerService';
 import { subscribeToRecommendations } from '@/services/agentRecommendationService';
+import type { AgentRecommendation } from '@/services/lifecycleTypes';
 import { subscribeToProjectRecords } from '@/services/projectRecordAdapter';
 import { subscribeToInboxEvents } from '@/services/inboxEventAdapter';
 import { subscribeToAuditTrail } from '@/services/siteAuditTrailService';
@@ -75,7 +76,7 @@ export default function SiteExecutionDashboard({ projectId, jobId, user }: Props
   const [instructions, setInstructions] = useState<SiteInstruction[]>([]);
   const [evidence, setEvidence] = useState<FieldEvidence[]>([]);
   const [blockers, setBlockers] = useState<PaymentBlocker[]>([]);
-  const [recommendations, setRecommendations] = useState<SiteAgentRecommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<AgentRecommendation[]>([]);
   const [records, setRecords] = useState<SiteProjectRecord[]>([]);
   const [inboxEvents, setInboxEvents] = useState<SiteInboxEvent[]>([]);
   const [auditTrail, setAuditTrail] = useState<SiteAuditRecord[]>([]);
@@ -335,13 +336,13 @@ export default function SiteExecutionDashboard({ projectId, jobId, user }: Props
                     <div className="flex items-start justify-between gap-3">
                       <div className="font-semibold">{rec.title}</div>
                       <div className="flex gap-2">
-                        <Badge variant="outline" className="text-xs">{rec.agentKey}</Badge>
-                        <SeverityBadge severity={rec.severity} />
-                        <StatusBadge status={rec.status} />
+                        <Badge variant="outline" className="text-xs">{rec.agentKey ?? 'agent'}</Badge>
+                        <SeverityBadge severity={(rec.severity ?? 'medium') as Severity} />
+                        <StatusBadge status={(rec.status ?? 'pending') as any} />
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground">{rec.rationale}</p>
-                    <p className="text-[10px] text-muted-foreground">Created {new Date(rec.createdAt).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-muted-foreground">Created {rec.createdAt ? new Date(rec.createdAt).toLocaleDateString() : 'recently'}</p>
                   </div>
                 ))
               )}

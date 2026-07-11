@@ -28,8 +28,22 @@
  * Uses fast-check with minimum 100 iterations.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { vi } from 'vitest';
 import fc from 'fast-check';
+
+vi.mock('@/lib/firebase', () => ({
+  db: {},
+  auth: { currentUser: { uid: 'test-user' } },
+  handleFirestoreError: vi.fn(),
+  OperationType: { CREATE: 'CREATE', READ: 'READ', UPDATE: 'UPDATE', DELETE: 'DELETE', LIST: 'LIST', UPLOAD: 'UPLOAD', GET: 'GET', WRITE: 'WRITE' },
+}));
+
+vi.mock('@/demo-seed/demoFirestore', () => ({
+  getDemoDoc: vi.fn(),
+  getDemoCol: vi.fn(),
+  useDemoMode: vi.fn(() => false),
+}));
+
 import { computeComplianceScore, evaluateITPCompletion } from '@/services/itpService';
 import { emitComplianceRiskSignal, mapITPToProjectRecord } from '@/services/itpPassportAdapter';
 import type { ITP, ITPInspectionItem, ITPStatus, InspectionItemStatus, ConstructionStage } from '@/types';

@@ -15,7 +15,7 @@
 
 import type { UserRole } from '@/types';
 import type { CopilotCapability, CopilotMessage, CopilotResponse, ConversationThread, CopilotProjectContext, RFIDraftInput, RFIDraftOutput, NarrativeInput, NarrativeOutput, ComplianceGap, ComplianceGapReport, ComplianceGapCategory, ComplianceGapSeverity, StatusSummary, ClauseExplanationInput, ClauseExplanationOutput } from '@/services/copilotTypes';
-import { createHash } from 'node:crypto';
+// Context hash utility uses DJB2 (defined in computeContextHash below)
 import { CAPABILITY_ROLE_MAP, UNIVERSAL_CAPABILITIES } from '@/services/copilotTypes';
 import { checkRateLimit, recordRequest } from '@/services/copilotRateLimiter';
 import { CopilotMessageInputSchema, RFIDraftInputSchema, NarrativeInputSchema, ClauseExplanationInputSchema } from '@/lib/copilotSchemas';
@@ -198,23 +198,12 @@ async function defaultPersistMessage(message: CopilotMessage, projectId: string)
 
 function getDefaultDataSources(): ContextDataSources {
   return {
-    fetchPassport: async () => ({
-      projectName: '',
-      currentPhase: 'onboarding' as const,
-      riskLevel: 'low' as const,
-      leadProfessional: '',
-      keyDates: [],
-      teamMembers: [],
-    }),
-    fetchDocuments: async () => [],
-    fetchPendingActions: async () => [],
-    fetchAuditTrail: async () => [],
-    fetchUserContext: async (userId: string) => ({
-      role: 'client' as UserRole,
-      projectAccessRole: null,
-      displayName: '',
-    }),
-    checkReadPermission: async () => true,
+    getProjectPassport: async () => null,
+    getDocumentRegister: async () => [],
+    getPendingInboxActions: async () => [],
+    getRecentAuditTrail: async () => [],
+    getUserContext: async () => null,
+    getProjectAccessContext: async () => null,
   };
 }
 
@@ -317,7 +306,7 @@ export async function processMessage(params: ProcessMessageParams): Promise<Copi
   const sources = dataSources ?? getDefaultDataSources();
   let contextJson: string;
   try {
-    const projectContext = await assembleContext(projectId, userId, sources);
+    const projectContext = await assembleContext(projectId, userId);
     contextJson = JSON.stringify(projectContext);
   } catch {
     // If context assembly fails entirely, proceed with empty context
@@ -866,7 +855,7 @@ export async function draftRfi(params: DraftRfiParams): Promise<RFIDraftOutput> 
     throw new Error(`Validation failed: ${firstError}`);
   }
 
-  const validatedInput = validation.data;
+  const validatedInput = validation.data as RFIDraftInput;
 
   // 2. Query highest existing RFI number and calculate next sequential number
   const queryFn = queryHighestRfiNumber ?? defaultQueryHighestRfiNumber;
@@ -1031,6 +1020,7 @@ ${JSON.stringify(context)}`;
 /**
  * Computes a simple hash of the relevant context fields to detect changes.
  * Used for the "no-change since last summary" detection.
+ * Uses a fast non-cryptographic hash (DJB2) suitable for fingerprinting.
  */
 function computeContextHash(context: CopilotProjectContext): string {
   const relevantData = {
@@ -1042,7 +1032,13 @@ function computeContextHash(context: CopilotProjectContext): string {
     actions: context.pendingActions.map(a => ({ id: a.id, priority: a.priority, dueDate: a.dueDate })),
     audit: context.auditTrail.slice(0, 5).map(e => e.timestamp),
   };
-  return createHash('sha256').update(JSON.stringify(relevantData)).digest('hex').slice(0, 16);
+  const str = JSON.stringify(relevantData);
+  // DJB2 hash — sufficient for change detection fingerprints
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 /**
@@ -1409,7 +1405,7 @@ export async function generateNarrative(params: GenerateNarrativeParams): Promis
     throw new Error(`Validation failed: ${firstError}`);
   }
 
-  const validatedInput = validation.data;
+  const validatedInput = validation.data as NarrativeInput;
 
   // 1b. Check for insufficient project context (no project brief data available)
   // Requirement 9.7: return error if no project brief data is available

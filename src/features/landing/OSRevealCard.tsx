@@ -166,7 +166,6 @@ export function OSRevealCard({ onSignIn, className }: OSRevealCardProps) {
         <GlassSurface
           as="button"
           variant="pill"
-          type="submit"
           aria-label={SIGN_IN_LABEL}
           className={cn(
             'mt-2 inline-flex h-11 items-center justify-center whitespace-nowrap',
