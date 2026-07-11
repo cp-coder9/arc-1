@@ -9,10 +9,60 @@ import type {
   CommercialBaseline,
   FinanceAuditRecord,
   FinancePartyRole,
+  MoneyAmount,
   PaymentCertificate,
   ReleaseRequest,
   VariationRequest,
 } from './types';
+
+// ─── Immutable Audit Record Input ────────────────────────────────────────────
+
+/** Evidence reference attached to an immutable audit record */
+export interface AuditEvidenceReference {
+  type: string;
+  referenceId: string;
+}
+
+/** Input for writing an immutable audit record */
+export interface ImmutableAuditInput {
+  actorUid: string;
+  actorRole: string;
+  action: string;
+  timestampIso?: string;
+  monetaryAmount?: MoneyAmount;
+  targetResourceId?: string;
+  evidenceReferences?: AuditEvidenceReference[];
+  previousState?: string;
+  newState?: string;
+  humanConfirmation?: Record<string, string>;
+}
+
+/**
+ * Write an immutable audit record to the finance audit trail.
+ *
+ * This function creates a timestamped, attributable audit entry for every
+ * financial action (claims, certifications, escrow transitions, etc.).
+ * In production this would persist to Firestore; currently generates the
+ * record in-memory for validation and downstream consumption.
+ */
+export async function writeImmutableAuditRecord(input: ImmutableAuditInput): Promise<FinanceAuditRecord> {
+  const ts = input.timestampIso ?? new Date().toISOString();
+  const notes = [
+    input.action,
+    input.targetResourceId ? `resource: ${input.targetResourceId}` : '',
+    input.monetaryAmount ? `amount: R${input.monetaryAmount.amount}` : '',
+    input.previousState || input.newState ? `state: ${input.previousState ?? '—'} → ${input.newState ?? '—'}` : '',
+    input.evidenceReferences?.length ? `evidence: ${input.evidenceReferences.map((e) => e.referenceId).join(', ')}` : '',
+  ].filter(Boolean).join('; ');
+
+  return createAuditEntry(
+    `audit-${input.action}-${Date.now()}`,
+    input.action,
+    notes,
+    input.actorRole as FinancePartyRole | undefined,
+    ts,
+  );
+}
 
 /**
  * Create a complete audit trail for the core commercial control workflow.
