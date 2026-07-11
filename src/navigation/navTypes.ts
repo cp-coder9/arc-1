@@ -12,7 +12,10 @@ export type ArchitexNavKey =
   | 'analytics'
   | 'messages'
   | 'settings'
-  | 'user_settings';
+  | 'user_settings'
+  | 'verification_queue'
+  | 'ai_review_queue'
+  | 'system_health';
 
 /**
  * The Architex 8-stage project lifecycle. Field-capture entry points are

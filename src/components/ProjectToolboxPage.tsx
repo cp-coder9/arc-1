@@ -348,17 +348,16 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
-  cpm: {
-    title: 'Construction Project Manager Toolbox',
-    subtitle: 'Programme delivery, risk management, and construction oversight tools.',
-    scope: 'CPM tools for coordinating programme, cost, and delivery across the project lifecycle.',
-    primaryResponsibilities: ['Coordinate programme delivery and milestones', 'Manage project risk and resource allocation', 'Oversee construction governance and reporting'],
-    handoffBoundaries: ['Cannot certify professional compliance', 'Payment releases require client confirmation'],
+  health_safety: {
+    title: 'Health & Safety Officer Toolbox',
+    subtitle: 'Safety files, permits, inductions, incidents, and corrective action tracking.',
+    scope: 'H&S tools for managing construction site safety compliance per OHS Act and Construction Regulations.',
+    primaryResponsibilities: ['Maintain safety files and H&S plans', 'Manage permits-to-work and inductions', 'Record and investigate incidents'],
+    handoffBoundaries: ['Cannot certify professional compliance', 'Site access decisions require site manager approval'],
     toolGroups: [
-      { id: 'programme-delivery', label: 'Programme and delivery', description: 'Schedule management, milestone tracking, and construction coordination.', tools: [
-        { label: 'Programme / Gantt', description: 'Manage project schedule and milestone dependencies.', pageId: 'programme' },
-        { label: 'Tasks & Approvals', description: 'Track tasks, approvals, and coordination actions.', pageId: 'tasks' },
-        { label: 'Contract Administration', description: 'Manage notices, variations, claims, and payment schedules.', pageId: 'contract-admin' },
+      { id: 'safety-management', label: 'Safety management', description: 'Safety file management, permit tracking, and incident recording.', tools: [
+        { label: 'Health & Safety Workspace', description: 'Manage safety files, permits, inductions, and incidents.', pageId: 'health-safety' },
+        { label: 'Tasks & Approvals', description: 'Track H&S tasks, corrective actions, and approvals.', pageId: 'tasks' },
       ] },
     ],
   },

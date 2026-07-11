@@ -128,8 +128,8 @@ const ROLE_PROFILE_FIELDS: Record<UserProfile['role'], RoleProfileField[]> = {
     { key: 'platoRegistration', label: 'PLATO registration number', helper: 'Professional Land Surveyor registration with PLATO.' },
     { key: 'region', label: 'Region', helper: 'Primary operating region.' },
   ],
-  cpm: [
-    { key: 'sacpcmpRegistration', label: 'SACPCMP registration number', helper: 'Construction Project Manager registration with SACPCMP.' },
+  health_safety: [
+    { key: 'sachspaRegistration', label: 'SACHSPA registration number', helper: 'Health & Safety Professional registration.' },
     { key: 'region', label: 'Region', helper: 'Primary operating region.' },
   ],
 };

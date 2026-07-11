@@ -179,7 +179,7 @@ export interface ProjectPassport {
 
 export interface WorkflowEvent {
   id: string;
-  type: 'approval_required' | 'municipal_blocker' | 'payment_due' | 'task_overdue' | 'risk_detected' | 'project_phase_changed';
+  type: 'approval_required' | 'municipal_blocker' | 'payment_due' | 'task_overdue' | 'risk_detected' | 'project_phase_changed' | 'corrective_action_overdue' | 'permit_expired';
   projectId: string;
   title: string;
   detail: string;
