@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@jest/globals': path.resolve(__dirname, './src/test/vitest-jest-globals.ts'),
+      'vitest': path.resolve(__dirname, './src/test/vitest-globals-shim.ts'),
       'firebase/firestore': path.resolve(__dirname, './src/test/__mocks__/firebase-firestore.ts'),
       'firebase/auth': path.resolve(__dirname, './src/test/__mocks__/firebase-auth.ts'),
       'firebase/app': path.resolve(__dirname, './src/test/__mocks__/firebase-app.ts'),
