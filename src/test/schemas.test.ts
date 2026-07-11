@@ -195,7 +195,7 @@ describe('Validation Schemas', () => {
       expect(actual).toEqual(expected);
     };
 
-    const userRoles = ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier'] as const satisfies readonly UserRole[];
+    const userRoles = ['client', 'architect', 'admin', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'platform_admin', 'land_surveyor', 'health_safety', 'cpm'] as const satisfies readonly UserRole[];
     it('should accept all UserRole values', () => {
       expectOptionsMatch(UserRoleEnum.options, userRoles);
       for (const role of userRoles) {

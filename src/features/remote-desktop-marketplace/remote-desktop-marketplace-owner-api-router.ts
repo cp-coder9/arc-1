@@ -1,14 +1,16 @@
 // ─── Remote Desktop Marketplace — Owner & Favourites API Router ──────────────
 //
 // Handles favourites, owner profile, and listing management endpoints.
-// Mounted under /api/remote-desktop-marketplace (merged with main router in task 7.4).
+// Mounted under /api/remote-desktop-marketplace (merged with main router).
 //
-// Auth: Uses x-user-id header as placeholder for auth middleware.
-// Persistence: Uses placeholder data arrays with TODO comments for Firestore integration.
+// Auth: Uses requireAuth middleware (Firebase token verification via roleMiddleware).
+// Persistence: Firestore under `remoteDesktopMarketplace/` collections.
 
 import express from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { requireAuth } from '@/lib/roleMiddleware';
+import { adminDb } from '@/lib/firebase-admin';
 
 import type {
   FavouriteEntry,
@@ -41,50 +43,34 @@ import {
 
 import { createAuditEntry } from './services/integrationService';
 
-// ─── Router ───────────────────────────────────────────────────────────────────
+// ─── Firestore Collection Paths ───────────────────────────────────────────────
 
-const ownerRouter = express.Router();
+const COLLECTION = {
+  listings: 'remoteDesktopMarketplace/data/listings',
+  bookings: 'remoteDesktopMarketplace/data/bookings',
+  reviews: 'remoteDesktopMarketplace/data/reviews',
+  favourites: (userId: string) => `remoteDesktopMarketplace/data/favourites/${userId}/items`,
+  ownerProfiles: 'remoteDesktopMarketplace/data/ownerProfiles',
+  analytics: 'remoteDesktopMarketplace/data/analytics',
+  audit: 'remoteDesktopMarketplace/data/auditTrail',
+} as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Extracts user ID from x-user-id header (placeholder for auth middleware).
- * Returns null if header is missing.
- */
-function getUserId(req: Request): string | null {
-  const userId = req.headers['x-user-id'];
-  if (typeof userId === 'string' && userId.trim().length > 0) {
-    return userId.trim();
-  }
-  return null;
-}
-
-/**
- * Sends a MarketplaceApiError JSON response.
- */
 function sendError(res: Response, statusCode: number, error: MarketplaceApiError): void {
   res.status(statusCode).json(error);
 }
 
-// ─── Placeholder Data (TODO: Replace with Firestore reads) ────────────────────
+async function persistAuditEntry(entry: ReturnType<typeof createAuditEntry>): Promise<void> {
+  await adminDb.collection(COLLECTION.audit).add(entry);
+}
 
-// TODO: Replace with Firestore queries against remoteDesktopMarketplace/favourites/{userId}/items
-const userFavourites: Map<string, FavouriteEntry[]> = new Map();
+// ─── Router ───────────────────────────────────────────────────────────────────
 
-// TODO: Replace with Firestore queries against remoteDesktopMarketplace/listings
-const listings: ResourceListing[] = [];
+const ownerRouter = express.Router();
 
-// TODO: Replace with Firestore queries against remoteDesktopMarketplace/bookings
-const bookings: BookingRecord[] = [];
-
-// TODO: Replace with Firestore queries against remoteDesktopMarketplace/reviews
-const reviews: ReviewRecord[] = [];
-
-// TODO: Replace with Firestore queries against remoteDesktopMarketplace/ownerProfiles
-const ownerProfiles: Map<string, OwnerProfile> = new Map();
-
-// TODO: Replace with Firestore queries against remoteDesktopMarketplace/analytics
-const viewCounts: Map<string, number> = new Map();
+// Apply verified auth middleware to all owner/favourites routes
+ownerRouter.use(requireAuth);
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -143,26 +129,21 @@ const updateListingSchema = z.object({
  * Lists the authenticated user's favourites, sorted by most recently added.
  */
 ownerRouter.get('/favourites', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
+    const favsSnap = await adminDb.collection(COLLECTION.favourites(userId)).get();
+    const existingFavourites = favsSnap.docs.map(doc => doc.data() as FavouriteEntry);
 
-    // TODO: Read from Firestore remoteDesktopMarketplace/favourites/{userId}/items
-    const existingFavourites = userFavourites.get(userId) ?? [];
-    const result = getFavourites(existingFavourites, listings);
+    const listingsSnap = await adminDb.collection(COLLECTION.listings)
+      .where('status', '==', 'active').get();
+    const activeListings = listingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
 
+    const result = getFavourites(existingFavourites, activeListings);
     return res.status(200).json({ favourites: result });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -171,29 +152,22 @@ ownerRouter.get('/favourites', async (req: Request, res: Response) => {
  * Adds a listing to the user's favourites.
  */
 ownerRouter.post('/favourites/:listingId', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+  const { listingId } = req.params;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
-
-    const { listingId } = req.params;
-
-    // TODO: Read listing from Firestore remoteDesktopMarketplace/listings/{listingId}
-    const listing = listings.find((l) => l.id === listingId);
-    if (!listing) {
+    const listingDoc = await adminDb.collection(COLLECTION.listings).doc(listingId).get();
+    if (!listingDoc.exists) {
       return sendError(res, 404, {
         code: 'LISTING_NOT_FOUND',
         message: 'Listing not found.',
         field: 'listingId',
       });
     }
+    const listing = { id: listingDoc.id, ...listingDoc.data() } as ResourceListing;
 
-    // TODO: Read existing favourites from Firestore
-    const existingFavourites = userFavourites.get(userId) ?? [];
+    const favsSnap = await adminDb.collection(COLLECTION.favourites(userId)).get();
+    const existingFavourites = favsSnap.docs.map(doc => doc.data() as FavouriteEntry);
 
     const result = addFavourite(userId, listingId, listing, existingFavourites);
 
@@ -201,20 +175,17 @@ ownerRouter.post('/favourites/:listingId', async (req: Request, res: Response) =
       return sendError(res, 400, result.error);
     }
 
-    // TODO: Write favourite to Firestore remoteDesktopMarketplace/favourites/{userId}/items/{listingId}
-    const updatedFavourites = [...existingFavourites, result.favourite];
-    userFavourites.set(userId, updatedFavourites);
+    // Persist favourite to Firestore
+    await adminDb.collection(COLLECTION.favourites(userId)).doc(listingId).set(result.favourite);
 
-    // Audit trail: favourite added
-    createAuditEntry('favourite_added', userId, listingId, 'listing', 'default-tenant');
+    // Audit trail with listing owner as tenant
+    const auditEntry = createAuditEntry('favourite_added', userId, listingId, 'listing', listing.ownerId);
+    await persistAuditEntry(auditEntry);
 
     return res.status(201).json({ favourite: result.favourite });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -223,19 +194,12 @@ ownerRouter.post('/favourites/:listingId', async (req: Request, res: Response) =
  * Removes a listing from the user's favourites.
  */
 ownerRouter.delete('/favourites/:listingId', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+  const { listingId } = req.params;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
-
-    const { listingId } = req.params;
-
-    // TODO: Read existing favourites from Firestore
-    const existingFavourites = userFavourites.get(userId) ?? [];
+    const favsSnap = await adminDb.collection(COLLECTION.favourites(userId)).get();
+    const existingFavourites = favsSnap.docs.map(doc => doc.data() as FavouriteEntry);
 
     const result = removeFavourite(userId, listingId, existingFavourites);
 
@@ -243,16 +207,13 @@ ownerRouter.delete('/favourites/:listingId', async (req: Request, res: Response)
       return sendError(res, 404, result.error);
     }
 
-    // TODO: Delete from Firestore remoteDesktopMarketplace/favourites/{userId}/items/{listingId}
-    userFavourites.set(userId, result.favourites);
+    // Delete from Firestore
+    await adminDb.collection(COLLECTION.favourites(userId)).doc(listingId).delete();
 
     return res.status(200).json({ message: 'Favourite removed successfully.' });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -266,11 +227,11 @@ ownerRouter.delete('/favourites/:listingId', async (req: Request, res: Response)
  * Privacy: never exposes email, phone, or address.
  */
 ownerRouter.get('/owner/:ownerUid', async (req: Request, res: Response) => {
-  try {
-    const { ownerUid } = req.params;
+  const { ownerUid } = req.params;
 
-    // TODO: Read from Firestore remoteDesktopMarketplace/ownerProfiles/{ownerUid}
-    const profileData = ownerProfiles.get(ownerUid) ?? null;
+  try {
+    const profileDoc = await adminDb.collection(COLLECTION.ownerProfiles).doc(ownerUid).get();
+    const profileData = profileDoc.exists ? (profileDoc.data() as OwnerProfile) : null;
     const profile = getOwnerProfile(ownerUid, profileData);
 
     if (!profile) {
@@ -280,16 +241,23 @@ ownerRouter.get('/owner/:ownerUid', async (req: Request, res: Response) => {
       });
     }
 
-    // Calculate trust indicators from recent activity
+    // Load bookings and reviews for trust indicators
+    const bookingsSnap = await adminDb.collection(COLLECTION.bookings)
+      .where('ownerId', '==', ownerUid).get();
+    const ownerBookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRecord));
+
+    const reviewsSnap = await adminDb.collection(COLLECTION.reviews)
+      .where('ownerId', '==', ownerUid).get();
+    const ownerReviews = reviewsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReviewRecord));
+
     const trustIndicators = calculateTrustIndicators(
-      ownerUid,
-      bookings,
-      reviews,
-      new Date().toISOString()
+      ownerUid, ownerBookings, ownerReviews, new Date().toISOString()
     );
 
     // Get owner's active listings
-    const ownerListings = getOwnerListings(ownerUid, listings);
+    const listingsSnap = await adminDb.collection(COLLECTION.listings)
+      .where('ownerId', '==', ownerUid).where('status', '==', 'active').get();
+    const ownerListings = listingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
 
     return res.status(200).json({
       profile: { ...profile, ...trustIndicators },
@@ -297,10 +265,7 @@ ownerRouter.get('/owner/:ownerUid', async (req: Request, res: Response) => {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -313,44 +278,27 @@ ownerRouter.get('/owner/:ownerUid', async (req: Request, res: Response) => {
  * Returns the authenticated owner's listings (all statuses).
  */
 ownerRouter.get('/owner/me/listings', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
-
-    // TODO: Read from Firestore remoteDesktopMarketplace/listings where ownerId == userId
-    const ownerListings = listings.filter((l) => l.ownerId === userId);
-
+    const snap = await adminDb.collection(COLLECTION.listings)
+      .where('ownerId', '==', userId).get();
+    const ownerListings = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
     return res.status(200).json({ listings: ownerListings });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
 /**
  * POST /owner/me/listings
  * Publishes a new listing for the authenticated owner.
- * Validates listing data against publication requirements.
  */
 ownerRouter.post('/owner/me/listings', async (req: Request, res: Response) => {
-  try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
+  const userId = req.authContext!.uid;
 
-    // Validate request body with Zod
+  try {
     const parseResult = publishListingSchema.safeParse(req.body);
     if (!parseResult.success) {
       const fieldErrors = parseResult.error.issues.map(
@@ -365,26 +313,28 @@ ownerRouter.post('/owner/me/listings', async (req: Request, res: Response) => {
 
     const data = parseResult.data;
 
-    // Call service to validate and publish
-    const result = publishListing(userId, data as Partial<ResourceListing>, listings);
+    // Load existing owner listings for duplicate check
+    const existingSnap = await adminDb.collection(COLLECTION.listings)
+      .where('ownerId', '==', userId).get();
+    const existingListings = existingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
+
+    const result = publishListing(userId, data as Partial<ResourceListing>, existingListings);
 
     if ('error' in result) {
       return sendError(res, 400, result.error);
     }
 
-    // TODO: Write listing to Firestore remoteDesktopMarketplace/listings/{listingId}
-    listings.push(result.listing);
+    // Persist listing to Firestore
+    await adminDb.collection(COLLECTION.listings).doc(result.listing.id).set(result.listing);
 
-    // Audit trail: listing published
-    createAuditEntry('listing_published', userId, result.listing.id, 'listing', 'default-tenant');
+    // Audit trail
+    const auditEntry = createAuditEntry('listing_published', userId, result.listing.id, 'listing', userId);
+    await persistAuditEntry(auditEntry);
 
     return res.status(201).json({ listing: result.listing });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -393,18 +343,10 @@ ownerRouter.post('/owner/me/listings', async (req: Request, res: Response) => {
  * Updates an existing listing owned by the authenticated user.
  */
 ownerRouter.patch('/owner/me/listings/:listingId', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+  const { listingId } = req.params;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
-
-    const { listingId } = req.params;
-
-    // Validate request body with Zod
     const parseResult = updateListingSchema.safeParse(req.body);
     if (!parseResult.success) {
       const fieldErrors = parseResult.error.issues.map(
@@ -419,29 +361,26 @@ ownerRouter.patch('/owner/me/listings/:listingId', async (req: Request, res: Res
 
     const data = parseResult.data;
 
-    // Call service to validate and update
-    const result = updateListing(userId, listingId, data as Partial<ResourceListing>, listings);
+    // Load existing listings for ownership check
+    const existingSnap = await adminDb.collection(COLLECTION.listings)
+      .where('ownerId', '==', userId).get();
+    const existingListings = existingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
+
+    const result = updateListing(userId, listingId, data as Partial<ResourceListing>, existingListings);
 
     if ('error' in result) {
       const statusCode = result.error.code === 'LISTING_NOT_FOUND' ? 404
-        : result.error.code === 'UNAUTHORIZED' ? 403
-        : 400;
+        : result.error.code === 'UNAUTHORIZED' ? 403 : 400;
       return sendError(res, statusCode, result.error);
     }
 
-    // TODO: Update listing in Firestore remoteDesktopMarketplace/listings/{listingId}
-    const idx = listings.findIndex((l) => l.id === listingId);
-    if (idx !== -1) {
-      listings[idx] = result.listing;
-    }
+    // Update listing in Firestore
+    await adminDb.collection(COLLECTION.listings).doc(listingId).set(result.listing);
 
     return res.status(200).json({ listing: result.listing });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -450,43 +389,38 @@ ownerRouter.patch('/owner/me/listings/:listingId', async (req: Request, res: Res
  * Pauses a listing without affecting confirmed bookings.
  */
 ownerRouter.patch('/owner/me/listings/:listingId/pause', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+  const { listingId } = req.params;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
+    // Load listings and bookings from Firestore
+    const listingsSnap = await adminDb.collection(COLLECTION.listings)
+      .where('ownerId', '==', userId).get();
+    const ownerListings = listingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
 
-    const { listingId } = req.params;
+    const bookingsSnap = await adminDb.collection(COLLECTION.bookings)
+      .where('listingId', '==', listingId).get();
+    const listingBookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRecord));
 
-    // Call service — bookings array passed to verify pause doesn't affect them
-    const result = pauseListing(userId, listingId, listings, bookings);
+    const result = pauseListing(userId, listingId, ownerListings, listingBookings);
 
     if ('error' in result) {
       const statusCode = result.error.code === 'LISTING_NOT_FOUND' ? 404
-        : result.error.code === 'UNAUTHORIZED' ? 403
-        : 400;
+        : result.error.code === 'UNAUTHORIZED' ? 403 : 400;
       return sendError(res, statusCode, result.error);
     }
 
-    // TODO: Update listing status in Firestore remoteDesktopMarketplace/listings/{listingId}
-    const idx = listings.findIndex((l) => l.id === listingId);
-    if (idx !== -1) {
-      listings[idx] = result.listing;
-    }
+    // Update listing status in Firestore
+    await adminDb.collection(COLLECTION.listings).doc(listingId).set(result.listing);
 
-    // Audit trail: listing paused
-    createAuditEntry('listing_paused', userId, listingId, 'listing', 'default-tenant');
+    // Audit trail
+    const auditEntry = createAuditEntry('listing_paused', userId, listingId, 'listing', userId);
+    await persistAuditEntry(auditEntry);
 
     return res.status(200).json({ listing: result.listing });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -495,42 +429,33 @@ ownerRouter.patch('/owner/me/listings/:listingId/pause', async (req: Request, re
  * Reactivates a paused listing.
  */
 ownerRouter.patch('/owner/me/listings/:listingId/activate', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+  const { listingId } = req.params;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
+    const listingsSnap = await adminDb.collection(COLLECTION.listings)
+      .where('ownerId', '==', userId).get();
+    const ownerListings = listingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResourceListing));
 
-    const { listingId } = req.params;
-
-    const result = activateListing(userId, listingId, listings);
+    const result = activateListing(userId, listingId, ownerListings);
 
     if ('error' in result) {
       const statusCode = result.error.code === 'LISTING_NOT_FOUND' ? 404
-        : result.error.code === 'UNAUTHORIZED' ? 403
-        : 400;
+        : result.error.code === 'UNAUTHORIZED' ? 403 : 400;
       return sendError(res, statusCode, result.error);
     }
 
-    // TODO: Update listing status in Firestore remoteDesktopMarketplace/listings/{listingId}
-    const idx = listings.findIndex((l) => l.id === listingId);
-    if (idx !== -1) {
-      listings[idx] = result.listing;
-    }
+    // Update listing status in Firestore
+    await adminDb.collection(COLLECTION.listings).doc(listingId).set(result.listing);
 
-    // Audit trail: listing activated
-    createAuditEntry('listing_activated', userId, listingId, 'listing', 'default-tenant');
+    // Audit trail
+    const auditEntry = createAuditEntry('listing_activated', userId, listingId, 'listing', userId);
+    await persistAuditEntry(auditEntry);
 
     return res.status(200).json({ listing: result.listing });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
@@ -539,26 +464,20 @@ ownerRouter.patch('/owner/me/listings/:listingId/activate', async (req: Request,
  * Returns analytics data for a specific listing owned by the authenticated user.
  */
 ownerRouter.get('/owner/me/listings/:listingId/analytics', async (req: Request, res: Response) => {
+  const userId = req.authContext!.uid;
+  const { listingId } = req.params;
+
   try {
-    const userId = getUserId(req);
-    if (!userId) {
-      return sendError(res, 401, {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Provide x-user-id header.',
-      });
-    }
-
-    const { listingId } = req.params;
-
     // Verify listing exists and is owned by the user
-    const listing = listings.find((l) => l.id === listingId);
-    if (!listing) {
+    const listingDoc = await adminDb.collection(COLLECTION.listings).doc(listingId).get();
+    if (!listingDoc.exists) {
       return sendError(res, 404, {
         code: 'LISTING_NOT_FOUND',
         message: 'Listing not found.',
         field: 'listingId',
       });
     }
+    const listing = { id: listingDoc.id, ...listingDoc.data() } as ResourceListing;
 
     if (listing.ownerId !== userId) {
       return sendError(res, 403, {
@@ -567,18 +486,25 @@ ownerRouter.get('/owner/me/listings/:listingId/analytics', async (req: Request, 
       });
     }
 
-    // TODO: Read view count from Firestore remoteDesktopMarketplace/analytics/{listingId}
-    const viewCount = viewCounts.get(listingId) ?? 0;
+    // Read analytics from Firestore
+    const analyticsDoc = await adminDb.collection(COLLECTION.analytics).doc(listingId).get();
+    const viewCount = analyticsDoc.exists ? (analyticsDoc.data()?.viewCount ?? 0) : 0;
 
-    const analytics = getListingAnalytics(listingId, bookings, reviews, viewCount);
+    // Load bookings and reviews for this listing
+    const bookingsSnap = await adminDb.collection(COLLECTION.bookings)
+      .where('listingId', '==', listingId).get();
+    const listingBookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRecord));
+
+    const reviewsSnap = await adminDb.collection(COLLECTION.reviews)
+      .where('listingId', '==', listingId).get();
+    const listingReviews = reviewsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReviewRecord));
+
+    const analytics = getListingAnalytics(listingId, listingBookings, listingReviews, viewCount);
 
     return res.status(200).json({ analytics });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    return sendError(res, 500, {
-      code: 'INTERNAL_ERROR',
-      message,
-    });
+    return sendError(res, 500, { code: 'INTERNAL_ERROR', message });
   }
 });
 
