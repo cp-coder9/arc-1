@@ -10,6 +10,8 @@
  */
 
 import { createWorkflowEvent } from './inboxEventAdapter';
+import { setDoc, updateDoc } from 'firebase/firestore';
+import { getDemoDoc } from '@/demo-seed/demoFirestore';
 import type { WorkflowEvent, ArchitexRole, Priority } from './lifecycleTypes';
 
 // ── Event Parameter Types ────────────────────────────────────────────────────
@@ -75,8 +77,6 @@ export interface ConditionalFollowUpParams {
 
 // ── Action Item Tracking ─────────────────────────────────────────────────────
 
-/** In-memory resolved action item IDs for deduplication and resolution tracking. */
-const resolvedActionItems = new Set<string>();
 
 // ── Event Creation Functions ─────────────────────────────────────────────────
 
@@ -147,11 +147,6 @@ export function createTestOverdueEvent(params: TestOverdueParams): WorkflowEvent
     }
   }
 
-  // Also skip if the event was previously resolved and recreated in the same session
-  if (resolvedActionItems.has(eventId)) {
-    // Reset: allow creation after resolution (the item was resolved, so a new overdue is valid)
-    resolvedActionItems.delete(eventId);
-  }
 
   return createWorkflowEvent({
     type: 'task_overdue',
@@ -243,16 +238,17 @@ export function createConditionalFollowUpEvent(params: ConditionalFollowUpParams
  * Validates: Requirement 11.7
  */
 export async function resolveActionItem(
-  _projectId: string,
+  projectId: string,
   eventId: string,
 ): Promise<void> {
-  // Track resolved items for deduplication logic
-  resolvedActionItems.add(eventId);
+  await updateDoc(getDemoDoc('projects', projectId, 'inbox_events', eventId), {
+    resolved: true,
+    resolvedAt: new Date().toISOString(),
+  });
+}
 
-  // In a production implementation, this would update the Firestore
-  // record for the WorkflowEvent/inbox item, marking it as resolved.
-  // For now, we track resolution state in-memory for deduplication
-  // and the calling service will handle Firestore persistence.
+export async function persistActionCentreEvent(event: WorkflowEvent): Promise<void> {
+  await setDoc(getDemoDoc('projects', event.projectId, 'inbox_events', event.id), event, { merge: false });
 }
 
 // ── Utility: Map inspector role to ArchitexRole ──────────────────────────────

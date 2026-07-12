@@ -256,6 +256,8 @@ export interface QualitySummary {
   openHoldPointBreaches: number;
   pendingMaterialTests: number;
   openNCRsLinkedToITPs: number;
+  evidenceState?: 'complete' | 'partial' | 'unavailable';
+  unavailableSources?: string[];
 }
 
 export interface ComplianceScore {

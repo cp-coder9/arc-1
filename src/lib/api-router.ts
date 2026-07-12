@@ -8396,7 +8396,15 @@ import {
   calculateComplianceScore,
   getQualitySummary,
   generateComplianceReport,
+  persistITPProjectRecord,
+  refreshITPPassportContribution,
 } from "@/services/itpPassportAdapter";
+
+async function syncITPSpine(projectId: string, itpId: string, permCtx: ITPPermissionContext): Promise<void> {
+  const itp = await getITP(projectId, itpId, permCtx);
+  await persistITPProjectRecord(itp);
+  await refreshITPPassportContribution(projectId);
+}
 
 /** Maps ITPServiceError codes to HTTP status codes */
 function mapITPErrorToStatus(code: string): number {
@@ -8439,6 +8447,7 @@ router.post("/projects/:projectId/itps/:itpId/items", async (req, res) => {
     const itemInput = req.body as CreateInspectionItemInput;
 
     const itemId = await addInspectionItem(projectId, itpId, itemInput, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
     res.status(201).json({ id: itemId });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8470,6 +8479,7 @@ router.put("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) =>
     const updates = req.body as UpdateInspectionItemInput;
 
     await updateInspectionItem(projectId, itpId, itemId, updates, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8500,6 +8510,7 @@ router.delete("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res)
     const actorUserId = authContext.uid;
 
     await removeInspectionItem(projectId, itpId, itemId, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8535,6 +8546,7 @@ router.post("/projects/:projectId/itps/:itpId/items/reorder", async (req, res) =
     }
 
     await reorderInspectionItems(projectId, itpId, order, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8578,6 +8590,7 @@ router.post("/projects/:projectId/inspections/request", async (req, res) => {
     };
 
     const requestId = await requestHoldPointInspection(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
     res.status(201).json({ id: requestId });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8635,6 +8648,7 @@ router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res
     };
 
     await signOffInspection(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8691,6 +8705,7 @@ router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) 
     };
 
     await recordWitnessPointOutcome(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8733,6 +8748,7 @@ router.post("/projects/:projectId/inspections/:itemId/acknowledge", async (req, 
     };
 
     await acknowledgeWitnessNotification(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {

@@ -9,8 +9,8 @@
  * - Generate compliance reports for individual ITPs
  */
 
-import { getDocs, query, where } from 'firebase/firestore';
-import { getDemoCol } from '@/demo-seed/demoFirestore';
+import { getDocs, query, setDoc, where } from 'firebase/firestore';
+import { getDemoCol, getDemoDoc } from '@/demo-seed/demoFirestore';
 import { getITPs, getAllItems } from '@/services/itpService';
 import { getNcrs } from '@/services/ncrService';
 import type {
@@ -121,14 +121,10 @@ export async function calculateComplianceScore(projectId: string): Promise<ITPCo
   let passedMaterialTests = 0;
   let totalRequiredMaterialTests = 0;
 
-  try {
-    const testsSnap = await getDocs(materialTestsCollection(projectId));
-    const tests = testsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as MaterialTest));
-    totalRequiredMaterialTests = tests.length;
-    passedMaterialTests = tests.filter((t) => t.status === 'passed').length;
-  } catch {
-    // If material tests are unavailable, continue with inspections only
-  }
+  const testsSnap = await getDocs(materialTestsCollection(projectId));
+  const tests = testsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as MaterialTest));
+  totalRequiredMaterialTests = tests.length;
+  passedMaterialTests = tests.filter((t) => t.status === 'passed').length;
 
   // Calculate score
   const denominator = totalRequiredInspections + totalRequiredMaterialTests;
@@ -156,6 +152,7 @@ export async function calculateComplianceScore(projectId: string): Promise<ITPCo
  * If data is unavailable, returns complianceScore: null with complianceScoreUnavailable: true.
  */
 export async function getQualitySummary(projectId: string): Promise<QualitySummary> {
+  const unavailableSources: string[] = [];
   try {
     const itps = await getITPs(projectId);
 
@@ -186,6 +183,7 @@ export async function getQualitySummary(projectId: string): Promise<QualitySumma
       complianceScore = scoreResult.score;
     } catch {
       complianceScoreUnavailable = true;
+      unavailableSources.push('material_tests');
     }
 
     // Count open hold point breaches
@@ -196,7 +194,7 @@ export async function getQualitySummary(projectId: string): Promise<QualitySumma
       );
       openHoldPointBreaches = requestsSnap.size;
     } catch {
-      // If inspection requests unavailable, default to 0
+      unavailableSources.push('inspection_requests');
     }
 
     // Count pending material tests
@@ -207,7 +205,7 @@ export async function getQualitySummary(projectId: string): Promise<QualitySumma
       const pendingStatuses = ['scheduled', 'sampled', 'submitted_to_lab'];
       pendingMaterialTests = tests.filter((t) => pendingStatuses.includes(t.status)).length;
     } catch {
-      // If material tests unavailable, default to 0
+      if (!unavailableSources.includes('material_tests')) unavailableSources.push('material_tests');
     }
 
     // Count open NCRs linked to ITPs
@@ -219,7 +217,7 @@ export async function getQualitySummary(projectId: string): Promise<QualitySumma
         (ncr) => openStatuses.includes(ncr.status) && ncr.createdBy === 'system:itp_service',
       ).length;
     } catch {
-      // If NCRs unavailable, default to 0
+      unavailableSources.push('ncrs');
     }
 
     return {
@@ -230,6 +228,8 @@ export async function getQualitySummary(projectId: string): Promise<QualitySumma
       openHoldPointBreaches,
       pendingMaterialTests,
       openNCRsLinkedToITPs,
+      evidenceState: unavailableSources.length ? 'partial' : 'complete',
+      unavailableSources,
     };
   } catch {
     // If we can't retrieve data at all, return unavailable state
@@ -248,6 +248,8 @@ export async function getQualitySummary(projectId: string): Promise<QualitySumma
       openHoldPointBreaches: 0,
       pendingMaterialTests: 0,
       openNCRsLinkedToITPs: 0,
+      evidenceState: 'unavailable',
+      unavailableSources: ['itps'],
     };
   }
 }
@@ -448,6 +450,25 @@ export async function buildITPPassportData(projectId: string): Promise<QualitySu
   return getQualitySummary(projectId);
 }
 
+export async function persistITPProjectRecord(itp: ITP): Promise<void> {
+  const record = mapITPToProjectRecord(itp);
+  await setDoc(getDemoDoc(PROJECTS_COL, itp.projectId, 'project_records', record.id), record, { merge: true });
+}
+
+export async function persistQualityContribution(projectId: string, summary: QualitySummary): Promise<void> {
+  await setDoc(getDemoDoc(PROJECTS_COL, projectId, 'project_passport', 'quality'), {
+    ...summary, projectId, sourceModule: 'site', updatedAt: new Date().toISOString(),
+  }, { merge: true });
+}
+
+export async function refreshITPPassportContribution(projectId: string): Promise<void> {
+  const summary = await getQualitySummary(projectId);
+  if (summary.evidenceState !== 'complete') {
+    throw new Error(`ITP quality evidence ${summary.evidenceState}: ${(summary.unavailableSources ?? []).join(', ')}`);
+  }
+  await persistQualityContribution(projectId, summary);
+}
+
 // ── Service Export ───────────────────────────────────────────────────────────
 
 export const itpPassportAdapter = {
@@ -457,6 +478,9 @@ export const itpPassportAdapter = {
   mapITPToProjectRecord,
   generateComplianceReport,
   buildITPPassportData,
+  persistITPProjectRecord,
+  persistQualityContribution,
+  refreshITPPassportContribution,
 };
 
 export default itpPassportAdapter;

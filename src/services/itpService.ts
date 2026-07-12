@@ -40,7 +40,9 @@ import {
   mapInspectorRoleToAssignedRoles,
   buildBreachAssignedRoles,
   buildTestAssignedRoles,
+  persistActionCentreEvent,
 } from '@/services/itpActionCentreAdapter';
+import { persistITPProjectRecord, refreshITPPassportContribution } from '@/services/itpPassportAdapter';
 import type { Severity } from '@/types';
 import type {
   ITP,
@@ -1147,14 +1149,14 @@ export async function requestHoldPointInspection(input: HoldPointRequestInput, p
 
     // 7. Notify Action Centre — create hold point request event (Requirement 11.1)
     const itp = await getITPOrThrow(input.projectId, input.itpId);
-    createHoldPointRequestEvent({
+    await persistActionCentreEvent(createHoldPointRequestEvent({
       projectId: input.projectId,
       itpTitle: itp.title,
       itemTitle: item.title,
       itemId: input.inspectionItemId,
       requestedDate: input.requestedInspectionDate,
       assignedRoles: mapInspectorRoleToAssignedRoles(item.responsibleInspectorRole),
-    });
+    }));
 
     return ref.id;
   } catch (error) {
@@ -1515,14 +1517,14 @@ export async function detectHoldPointBreach(
   );
 
   // 7b. Notify Action Centre — create hold point breach event (Requirement 11.4)
-  createHoldPointBreachEvent({
+  await persistActionCentreEvent(createHoldPointBreachEvent({
     projectId,
     itpTitle: itp.title,
     itemTitle: item.title,
     itemId,
     ncrReference: ncrData.ncrId ? String(ncrData.ncrId) : 'pending',
     assignedRoles: buildBreachAssignedRoles(),
-  });
+  }));
 
   // 8. Update the inspection request status to 'breached' if one exists
   try {
@@ -1747,7 +1749,7 @@ export async function recordWitnessPointOutcome(input: WitnessPointOutcomeInput,
 
     // 11. Notify Action Centre — witness notification event (Requirement 11.2)
     // This fires when the witness point outcome is recorded, confirming the notification was triggered.
-    createWitnessNotificationEvent({
+    await persistActionCentreEvent(createWitnessNotificationEvent({
       projectId: input.projectId,
       itpTitle: itp.title,
       itemTitle: item.title,
@@ -1755,7 +1757,7 @@ export async function recordWitnessPointOutcome(input: WitnessPointOutcomeInput,
       scheduledDateTime: input.notificationSentAt,
       location: item.specificationReference,
       assignedRoles: mapInspectorRoleToAssignedRoles(item.responsibleInspectorRole),
-    });
+    }));
   } catch (error) {
     if (error instanceof ITPServiceError) throw error;
     handleFirestoreError(error, OperationType.UPDATE, `${PROJECTS_COL}/${input.projectId}/${ITPS_COL}/${input.itpId}/${ITEMS_COL}/${input.inspectionItemId}`);
@@ -2703,7 +2705,7 @@ export async function recordLabResult(input: RecordLabResultInput, permCtx?: ITP
     });
 
     // 13. Notify Action Centre — test failure event (Requirement 11.5)
-    createTestFailureEvent({
+    await persistActionCentreEvent(createTestFailureEvent({
       projectId: input.projectId,
       materialTestId: input.materialTestId,
       materialType: materialTest.materialType,
@@ -2712,7 +2714,7 @@ export async function recordLabResult(input: RecordLabResultInput, permCtx?: ITP
       acceptanceThreshold: testingSchedule.acceptanceThreshold,
       resultUnit: input.resultUnit,
       assignedRoles: buildTestAssignedRoles(),
-    });
+    }));
   }
 }
 
