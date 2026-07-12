@@ -184,6 +184,7 @@ const TemplateLibraryPage = lazyWithChunkRetry(() => import('./components/Templa
 const RegistrationTrackerPage = lazyWithChunkRetry(() => import('./components/RegistrationTracker'));
 const SpecForgeWorkspacePage = lazyWithChunkRetry(() => import('./components/specforge/SpecForgeWorkspace'));
 const HealthSafetyWorkspacePage = lazyWithChunkRetry(() => import('./components/healthSafety/HealthSafetyWorkspace'));
+const EngineersCalcHub = lazyWithChunkRetry(() => import('./components/tools/EngineersCalcHub'));
 const MarketplaceShell = lazyWithChunkRetry(() => import('@/features/marketplace/components/MarketplaceShell'));
 const FeeProposalBuilder = lazyWithChunkRetry(() => import('./components/tools/FeeProposalBuilder/index'));
 const SACouncilDrawingComplianceNavigator = lazyWithChunkRetry(() => import('./components/SACouncilDrawingComplianceNavigator'));
@@ -306,6 +307,7 @@ export const CANONICAL_DASHBOARD_PAGES: DashboardPage[] = [
 
 const SHELL_PAGE_IDS = new Set(CANONICAL_DASHBOARD_PAGES.map((page) => page.id));
 export const DIRECT_WORKFLOW_PAGE_IDS = new Set([
+  'standalone/engineers-calc-hub',
   'profile',
   'command',
   'client-intake',
@@ -1230,6 +1232,7 @@ function AppContent() {
               {activeTab === 'registrations' && <RegistrationTrackerPage user={user} />}
               {activeTab === 'specforge' && <SpecForgeWorkspacePage user={user} />}
               {activeTab === 'health-safety' && <HealthSafetyWorkspacePage user={user} />}
+              {activeTab === 'standalone/engineers-calc-hub' && <EngineersCalcHub user={user} />}
               {activeTab === 'council-navigator' && <SACouncilDrawingComplianceNavigator />}
               {activeTab === 'ncr-manager' && <NCRManagerStandalone user={user} />}
               {activeTab === 'site-instructions' && <SiteInstructionManagerStandalone user={user} />}
@@ -1243,7 +1246,7 @@ function AppContent() {
               {activeTab === 'itp-workspace' && <ITPWorkspace user={user} />}
               {PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />}
               {SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab) && <DashboardPageShell pageId={activeTab} user={user} />}
-              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
+              {(activeTab !== 'command' && activeTab !== 'invoices' && activeTab !== 'files' && activeTab !== 'profile-settings' && activeTab !== 'profile' && activeTab !== 'firm' && activeTab !== 'compliance' && activeTab !== 'cpd-assessment' && activeTab !== 'timesheets' && activeTab !== 'pipeline' && activeTab !== 'templates' && activeTab !== 'registrations' && activeTab !== 'specforge' && activeTab !== 'health-safety' && activeTab !== 'standalone/engineers-calc-hub' && activeTab !== 'council-navigator' && activeTab !== 'ncr-manager' && activeTab !== 'site-instructions' && activeTab !== 'contract-admin' && activeTab !== 'contractor-compliance' && activeTab !== 'fee-proposal-builder' && activeTab !== 'marketplace' && activeTab !== 'remote-desktop-marketplace' && activeTab !== 'messages' && activeTab !== 'itp-workspace' && !SHELL_PAGE_IDS.has(activeTab) && !PROJECT_WORKFLOW_PAGE_IDS.has(activeTab)) && (
                 <>
                   {user.role === 'client' && <ClientDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}
                   {user.role === 'architect' && <ArchitectDashboard user={user} activeTab={activeTab === 'command' ? 'overview' : activeTab} onTabChange={(page) => navigateDashboard(page, 'legacy_dashboard')} />}

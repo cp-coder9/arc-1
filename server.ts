@@ -86,6 +86,43 @@ async function startServer() {
     return next();
   });
 
+  // Mount SpecForge API router
+  app.use("/api/specforge", async (req, res, next) => {
+    try {
+      const { default: specforgeRouter } = await import("./src/lib/specforge-api-router.js");
+      return specforgeRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load SpecForge API router:", error);
+      return res.status(500).json({
+        error: "SpecForge API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Mount Town Planning API router (with Firebase auth)
+  app.use("/api/town-planning", async (req, res, next) => {
+    try {
+      const { requireAuth } = await import("./src/lib/roleMiddleware.js");
+      requireAuth(req, res, async () => {
+        try {
+          const { createTownPlanningRouter } = await import("./src/features/town-planning/router.js");
+          const { adminDb } = await import("./src/lib/firebase-admin.js");
+          const townPlanningRouter = createTownPlanningRouter({ db: adminDb as any });
+          return townPlanningRouter(req, res, next);
+        } catch (error) {
+          console.error("Failed to load Town Planning API router:", error);
+          return res.status(500).json({
+            error: "Town Planning API router failed to initialize",
+            details: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+    } catch (error) {
+      return res.status(500).json({ error: "Auth middleware failed to load" });
+    }
+  });
+
   // Mount marketplace API router
   app.use("/api/marketplace", async (req, res, next) => {
     try {
@@ -95,6 +132,20 @@ async function startServer() {
       console.error("Failed to load Marketplace API router:", error);
       return res.status(500).json({
         error: "Marketplace API router failed to initialize",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Mount Contract Administration API router
+  app.use("/api/contract-admin", async (req, res, next) => {
+    try {
+      const { default: contractAdminRouter } = await import("./src/lib/contract-admin-api-router.js");
+      return contractAdminRouter(req, res, next);
+    } catch (error) {
+      console.error("Failed to load Contract Admin API router:", error);
+      return res.status(500).json({
+        error: "Contract Admin API router failed to initialize",
         details: error instanceof Error ? error.message : String(error),
       });
     }

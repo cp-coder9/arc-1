@@ -228,7 +228,8 @@ export default function ArchitectDashboard({
   // ── Layout ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <main className="p-4 md:p-6 space-y-6" id="main-content">
+      <RoleAwareSidebar user={user} />
+      <main className="md:ml-64 p-4 md:p-6 space-y-6" id="main-content">
         {/* ── Page header ────────────────────────────────────────────────── */}
         <header className="glass-panel rounded-2xl p-5 md:p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">

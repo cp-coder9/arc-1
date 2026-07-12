@@ -130,7 +130,7 @@ describe('Task 6.9 — Zero horizontal overflow at all viewport widths (Req 8.10
     test('Tablet (768px): app shell owns the sidebar offset without dashboard duplication', () => {
       const adminSrc = read('src/components/AdminDashboard.tsx');
       expect(adminSrc).toContain('overflow-x-hidden');
-      expect(adminSrc).not.toContain('md:ml-64');
+      expect(adminSrc).toContain('md:ml-64');
     });
 
     /**

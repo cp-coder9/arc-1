@@ -39,6 +39,41 @@ app.post('/api/auth/check-admin', (req, res, next) => {
   return next();
 });
 
+app.use('/api/specforge', async (req, res, next) => {
+  try {
+    const { default: specforgeRouter } = await import('./src/lib/specforge-api-router.ts');
+    return specforgeRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load SpecForge API router:', error);
+    return res.status(500).json({
+      error: 'SpecForge API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+app.use('/api/town-planning', async (req, res, next) => {
+  try {
+    const { requireAuth } = await import('./src/lib/roleMiddleware.ts');
+    requireAuth(req, res, async () => {
+      try {
+        const { createTownPlanningRouter } = await import('./src/features/town-planning/router.ts');
+        const { adminDb } = await import('./src/lib/firebase-admin.ts');
+        const townPlanningRouter = createTownPlanningRouter({ db: adminDb as any });
+        return townPlanningRouter(req, res, next);
+      } catch (error) {
+        console.error('Failed to load Town Planning API router:', error);
+        return res.status(500).json({
+          error: 'Town Planning API router failed to initialize',
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Auth middleware failed to load' });
+  }
+});
+
 app.use('/api/marketplace', async (req, res, next) => {
   try {
     const { default: marketplaceRouter } = await import('./src/lib/marketplace-api-router.ts');
@@ -47,6 +82,19 @@ app.use('/api/marketplace', async (req, res, next) => {
     console.error('Failed to load Marketplace API router:', error);
     return res.status(500).json({
       error: 'Marketplace API router failed to initialize',
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+app.use('/api/contract-admin', async (req, res, next) => {
+  try {
+    const { default: contractAdminRouter } = await import('./src/lib/contract-admin-api-router.ts');
+    return contractAdminRouter(req, res, next);
+  } catch (error) {
+    console.error('Failed to load Contract Admin API router:', error);
+    return res.status(500).json({
+      error: 'Contract Admin API router failed to initialize',
       details: error instanceof Error ? error.message : String(error),
     });
   }
