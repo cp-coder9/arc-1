@@ -411,7 +411,7 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
                   >
                     <option value="">Select a model</option>
                     {tempAgent.llmProvider && 
-                     tempAgent.llmProvider !== 'global' && 
+                     (tempAgent.llmProvider as string) !== 'global' && 
                      PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
@@ -450,7 +450,7 @@ function AgentCard({ agent, isNew = false, onCreated, onCancel }: { agent: Agent
                   >
                     <option value="">Select a model</option>
                     {tempAgent.llmProvider && 
-                     tempAgent.llmProvider !== 'global' && 
+                     (tempAgent.llmProvider as string) !== 'global' && 
                      PROVIDER_CONFIGS[tempAgent.llmProvider as LLMProvider]?.models?.map(m => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}

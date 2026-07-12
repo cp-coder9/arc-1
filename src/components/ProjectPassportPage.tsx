@@ -102,7 +102,7 @@ export default function ProjectPassportPage({ user, project }: Props) {
               <Badge
                 variant={
                   riskLevel === 'high' ? 'destructive' :
-                  riskLevel === 'medium' ? 'warning' :
+                  riskLevel === 'medium' ? 'secondary' :
                   riskLevel === 'low' ? 'secondary' :
                   'outline'
                 }
@@ -155,7 +155,7 @@ export default function ProjectPassportPage({ user, project }: Props) {
                       <Badge
                         variant={
                           finding.priority === 'critical' ? 'destructive' :
-                          finding.priority === 'high' ? 'warning' : 'secondary'
+                          finding.priority === 'high' ? 'destructive' : 'secondary'
                         }
                         className="capitalize text-[10px]"
                       >
@@ -279,7 +279,7 @@ export default function ProjectPassportPage({ user, project }: Props) {
               actorId={user.uid}
               variant="default"
               size="default"
-              riskLevel={riskLevel}
+              riskLevel={riskLevel === 'none' ? 'low' : riskLevel}
               blockerCount={blockerCount}
             />
             <Badge variant="outline" className="text-xs">

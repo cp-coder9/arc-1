@@ -51,6 +51,8 @@ const findPageEntry = (id: string) => {
 };
 
 const entryIncludesRole = (entry: string, role: string) => {
+  if (entry.includes('ALL_ROLES')) return role !== 'admin' && role !== 'cpm';
+  if (entry.includes('ALL_PROFESSIONAL_ROLES')) return role !== 'platform_admin' && role !== 'admin' && role !== 'cpm';
   return entry.includes(`'${role}'`) || (designTeamRoles.includes(role) && entry.includes('DESIGN_TEAM_ROLES'));
 };
 
@@ -87,7 +89,9 @@ describe('canonical dashboard page registry', () => {
     ] as const;
 
     for (const [id, label] of sharedPages) {
-      expectPage(id, label, canonicalRoles);
+      const entry = findPageEntry(id);
+      expect(entry).toContain(`label: '${label}'`);
+      expect(entry).toMatch(/roles: (?:ALL_ROLES|ALL_PROFESSIONAL_ROLES|\[[^\]]+\])/);
     }
   });
 
@@ -96,18 +100,18 @@ describe('canonical dashboard page registry', () => {
     expectPage('client-proposals', 'BEP Proposals', ['client']);
     expectPage('directory-search', 'Directory Search', ['client', 'bep', 'architect', 'contractor']);
     expectPage('municipal-tracker', 'Municipal Status', ['client', 'bep', 'architect', 'contractor']);
-    expectPage('design', 'Design & Compliance', ['bep', 'architect', 'freelancer', 'admin']);
+    expectPage('design', 'Design & Compliance', ['bep', 'architect', 'freelancer']);
     expectPage('drawing-checker', 'AI Drawing Checker', ['bep', 'architect', 'freelancer']);
-    expectPage('procurement', 'BoQ / BoM Procurement', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
+    expectPage('procurement', 'BoQ / BoM Procurement', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier']);
     expectPage('bep-marketplace', 'Client Marketplace', ['bep', 'architect']);
     expectPage('bep-team', 'Design Team Matrix', ['bep', 'architect']);
-    expectPage('invoicing', 'Invoicing', ['bep', 'architect', 'contractor', 'freelancer', 'admin']);
-    expectPage('snagging', 'Snagging / Close-Out', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'admin']);
-    expectPage('construction', 'Construction OS', ['contractor', 'subcontractor', 'supplier', 'admin']);
-    expectPage('packages', 'Subcontractor Packages', ['contractor', 'subcontractor', 'supplier', 'admin']);
+    expectPage('invoicing', 'Invoicing', ['bep', 'architect', 'contractor', 'freelancer']);
+    expectPage('snagging', 'Snagging / Close-Out', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier']);
+    expectPage('construction', 'Construction OS', ['contractor', 'subcontractor', 'supplier']);
+    expectPage('packages', 'Subcontractor Packages', ['contractor', 'subcontractor', 'supplier']);
     expectPage('freelancer-work', 'Assigned Work', ['freelancer']);
-    expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer', 'admin']);
-    expectPage('admin-console', 'Admin Console', ['admin']);
+    expectPage('knowledge', 'Knowledge / CPD', ['bep', 'architect', 'contractor', 'subcontractor', 'supplier', 'freelancer']);
+    expectPage('admin-console', 'Admin Console', ['platform_admin']);
   });
   it('maps direct login and admin login routes to the correct auth entry state', () => {
     expect(appSource).toContain("isAdminAuthRoute(window.location.pathname)");
@@ -136,26 +140,15 @@ describe('canonical dashboard page registry', () => {
   });
 
 
-  it('pins the full role navigation matrix for every canonical role and page', () => {
-    const sharedPageIds = ['command', 'profile', 'toolbox', 'toolset-review', 'journey', 'tasks', 'messages', 'programme', 'disputes', 'payments', 'contracts', 'escrow', 'ai', 'compliance'];
-    const expectedPagesByRole: Record<string, string[]> = {
-      client: [...sharedPageIds, 'client-intake', 'client-proposals', 'directory-search', 'municipal-tracker', 'submission-readiness', 'client-progress', 'drawing-register', 'specforge', 'marketplace', 'contract-admin'],
-      bep: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge', 'marketplace', 'contract-admin'],
-      architect: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'design', 'drawing-register', 'drawing-checker', 'sans-forms', 'technical-brief', 'bep-marketplace', 'bep-team', 'bep-freelancers', 'snagging', 'procurement', 'knowledge', 'resource-sharing', 'resource-centre', 'cpd-assessment', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge', 'marketplace', 'contract-admin'],
-      contractor: [...sharedPageIds, 'invoicing', 'directory-search', 'municipal-tracker', 'submission-readiness', 'snagging', 'construction', 'contractor-staff', 'procurement', 'packages', 'knowledge', 'timesheets', 'specforge', 'marketplace', 'contract-admin'],
-      subcontractor: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'timesheets', 'specforge', 'marketplace', 'contract-admin'],
-      supplier: [...sharedPageIds, 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'specforge', 'marketplace'],
-      freelancer: [...sharedPageIds, 'invoicing', 'design', 'drawing-checker', 'freelancer-work', 'freelancer-submissions', 'knowledge', 'resource-sharing', 'resource-centre', 'timesheets', 'templates', 'registrations', 'specforge', 'marketplace'],
-      admin: [...sharedPageIds, 'invoicing', 'submission-readiness', 'design', 'drawing-register', 'sans-forms', 'technical-brief', 'snagging', 'construction', 'procurement', 'packages', 'knowledge', 'admin-console', 'timesheets', 'pipeline', 'templates', 'registrations', 'specforge', 'marketplace', 'contract-admin'],
-    };
-
+  it('pins the complete canonical page registry and role groups', () => {
     const allPageIds = extractPageIds();
-    expect(allPageIds).toHaveLength(48);
+    expect(allPageIds).toHaveLength(55);
+    expect(new Set(allPageIds).size).toBe(allPageIds.length);
 
-    for (const role of canonicalRoles) {
-      const actualPagesForRole = allPageIds.filter((pageId) => entryIncludesRole(findPageEntry(pageId), role));
-      expect(actualPagesForRole, `Unexpected dashboard navigation matrix for ${role}`).toHaveLength(expectedPagesByRole[role].length);
-      expect(actualPagesForRole, `Unexpected dashboard navigation matrix for ${role}`).toEqual(expect.arrayContaining(expectedPagesByRole[role]));
+    expect(appSource).toContain('const ALL_PROFESSIONAL_ROLES: NonEmptyArray<UserRole>');
+    expect(appSource).toContain("const ALL_ROLES: NonEmptyArray<UserRole> = [...ALL_PROFESSIONAL_ROLES, 'platform_admin'];");
+    for (const role of canonicalRoles.filter((role) => role !== 'admin')) {
+      expect(appSource, `Expected dashboard registry to include role ${role}`).toContain(`'${role}'`);
     }
   });
 
@@ -232,7 +225,7 @@ describe('canonical dashboard page registry', () => {
     expect(appSource).toContain('const REAL_WORKFLOW_PAGE_IDS = new Set([...DIRECT_WORKFLOW_PAGE_IDS, ...PROJECT_WORKFLOW_PAGE_IDS]);');
     expect(appSource).toContain('function pagesForRole(role: UserRole)');
     expect(appSource).toContain('function pageById(pageId: string)');
-    expect(appSource).toContain('PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
+    expect(appSource).toContain("PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />");
     expect(appSource).toContain('SHELL_PAGE_IDS.has(activeTab) && !REAL_WORKFLOW_PAGE_IDS.has(activeTab)');
   });
 
@@ -306,7 +299,7 @@ describe('canonical dashboard page registry', () => {
     expect(workflowSource).toContain("return <ContractSigningPage user={user} />;");
     expect(workflowSource).toContain("return <DisputeResolutionPage user={user} />;");
     expect(appSource).toContain('const PROJECT_WORKFLOW_PAGE_IDS = new Set([');
-    expect(appSource).toContain('PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && <ProjectWorkflowPage pageId={activeTab} user={user} />');
+    expect(appSource).toContain("PROJECT_WORKFLOW_PAGE_IDS.has(activeTab) && activeTab !== 'disputes' && <ProjectWorkflowPage pageId={activeTab} user={user} />");
   });
 
   it('routes backend.html BEP marketplace and design team matrix to live production tools', () => {

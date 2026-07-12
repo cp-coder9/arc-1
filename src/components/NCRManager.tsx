@@ -140,7 +140,7 @@ export default function NCRManager({ projectId, currentUserId, compact = false }
               <div>
                 <p className="font-bold flex items-center gap-2">
                   {ncr.title}
-                  {ncr.blocksPayment && <AlertOctagon size={14} className="text-destructive" title="Blocks payment" />}
+                  {ncr.blocksPayment && <AlertOctagon size={14} className="text-destructive" aria-label="Blocks payment" />}
                 </p>
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{safeFormat(ncr.createdAt, 'PP p')}</p>
               </div>

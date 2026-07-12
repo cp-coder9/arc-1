@@ -142,7 +142,7 @@ export function ArchitectRecommendations({ job }: ArchitectRecommendationsProps)
       )}
     </>
   ) : profile.sacapStatus === 'failed' ? (
-    <ShieldX size={14} className="text-destructive shrink-0" title="SACAP Unverified" />
+    <ShieldX size={14} className="text-destructive shrink-0" aria-label="SACAP Unverified" />
   ) : null}
 </div>
                     <div className="flex items-center gap-1 text-yellow-500">

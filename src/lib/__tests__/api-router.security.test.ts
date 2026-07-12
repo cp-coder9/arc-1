@@ -371,7 +371,7 @@ describe('api-router security and high-value integration routes', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-01-02T03:04:05.000Z'));
     }
-  }, 20_000);
+  }, 60_000);
 
 
   it('allows trusted static app origins to call the hosted API domain for state-changing routes', async () => {

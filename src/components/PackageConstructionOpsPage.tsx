@@ -67,11 +67,11 @@ function statusVariant(status?: string) {
   return 'secondary' as const;
 }
 
-function recordTitle(record: ConstructionRecord) {
-  if ('subject' in record && record.subject) return record.subject;
-  if ('title' in record && record.title) return record.title;
-  if ('workDescription' in record && record.workDescription) return record.workDescription;
-  if ('description' in record && record.description) return record.description;
+function recordTitle(record: ConstructionRecord): string {
+  if ('subject' in record && record.subject) return String(record.subject);
+  if ('title' in record && record.title) return String(record.title);
+  if ('workDescription' in record && record.workDescription) return String(record.workDescription);
+  if ('description' in record && record.description) return String(record.description);
   return 'Construction record';
 }
 

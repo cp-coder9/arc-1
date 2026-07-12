@@ -473,6 +473,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, TownPlanningAction[]> = {
     'add_comment',
     'view_all_applications',
   ],
+  health_safety: [
+    'view_application',
+    'add_comment',
+  ],
 };
 
 /**

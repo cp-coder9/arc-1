@@ -27,7 +27,7 @@ export function DemoRoleSwitcher({ onRoleChange }: DemoRoleSwitcherProps) {
   if (!isDemoMode) return null;
 
   // Find current role label
-  let currentLabel = demoRole;
+  let currentLabel: string = demoRole;
   for (const group of DEMO_ROLE_GROUPS) {
     const found = group.roles.find((r) => r.value === demoRole);
     if (found) { currentLabel = found.label; break; }

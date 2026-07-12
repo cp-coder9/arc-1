@@ -78,7 +78,7 @@ export function getVisibleSpecItems(workspace: SpecForgeWorkspace, role: SpecFor
       : undefined;
 
     if (viewerUserId && !viewerTeamMember) {
-      return visibleByStatus;
+      return [];
     }
 
     // Package-scoped: only items in the issued pipeline AND scoped to

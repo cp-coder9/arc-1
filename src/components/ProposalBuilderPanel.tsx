@@ -30,7 +30,7 @@ import {
   calculateValidityExpiry,
   daysUntilExpiry,
   isProposalExpiredFn as isProposalExpired,
-  type TermsTemplate,
+  type TemplateOption,
 } from '@/services/termsTemplateService';
 import {
   createProposalStateMachine,
@@ -123,7 +123,7 @@ export default function ProposalBuilderPanel({
 
   // New: Terms template selection
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>(['architex-standard-professional-services']);
-  const [availableTemplates, setAvailableTemplates] = useState<TermsTemplate[]>(() =>
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateOption[]>(() =>
     listAvailableTemplates('architect'),
   );
 
@@ -1092,7 +1092,7 @@ export default function ProposalBuilderPanel({
                               </p>
                             </div>
                             <Badge variant="outline" className="text-[9px]">
-                              {record.approvals.required ? 'needs approval' : 'auto'}
+                              {record.approval.requiredApproverRoles.length > 0 ? 'needs approval' : 'auto'}
                             </Badge>
                           </div>
                         ))}

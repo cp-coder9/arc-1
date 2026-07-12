@@ -362,6 +362,18 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
+  health_safety: {
+    title: 'Health & Safety Toolbox',
+    subtitle: 'OHS compliance, permits, inductions, and incident management tools.',
+    scope: 'H&S tools for managing safety governance across the construction lifecycle.',
+    primaryResponsibilities: ['Manage safety files and permits to work', 'Track incidents and corrective actions', 'Oversee site inductions and compliance'],
+    handoffBoundaries: ['Cannot issue professional engineering sign-off', 'Closeout requires project lead confirmation'],
+    toolGroups: [
+      { id: 'safety-governance', label: 'Safety governance', description: 'Permits, inductions, incidents, and OHS compliance tools.', tools: [
+        { label: 'Health & Safety Workspace', description: 'Manage H&S files, permits, and compliance.', pageId: 'health-safety' },
+      ] },
+    ],
+  },
 };
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {

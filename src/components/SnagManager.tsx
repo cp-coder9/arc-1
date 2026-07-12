@@ -137,7 +137,7 @@ export default function SnagManager({ projectId, currentUserId, compact = false 
               <div>
                 <p className="font-bold flex items-center gap-2">
                   {snag.description}
-                  {snag.blocksPayment && <AlertOctagon size={14} className="text-destructive" title="Blocks payment" />}
+                  {snag.blocksPayment && <AlertOctagon size={14} className="text-destructive" aria-label="Blocks payment" />}
                 </p>
                 <p className="text-xs text-muted-foreground">{snag.location} · Due {safeFormat(snag.dueDate, 'MMM d')}</p>
               </div>

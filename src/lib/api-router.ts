@@ -16,6 +16,8 @@ import { buildAuditEvent, type AuditEventCategory, type AuditTarget } from "../s
 import { normalizeUserRole } from "../services/permissionService";
 import { requireAdmin, requireAuth } from "./roleMiddleware";
 import popiaRoutes from "./popiaRoutes";
+import marketplaceRouter from "@/features/remote-desktop-marketplace/remote-desktop-marketplace-api-router";
+import { ownerRouter } from "@/features/remote-desktop-marketplace/remote-desktop-marketplace-owner-api-router";
 import {
   applyVerificationReview,
   assertVerificationSubjectType,
@@ -8349,7 +8351,1020 @@ router.post(["/sync-queue/flush", "/api/sync-queue/flush"], async (req, res) => 
   }
 });
 
+// ── ITP Inspection Item & Execution Endpoints ────────────────────────────────
+
+import {
+  addInspectionItem,
+  updateInspectionItem,
+  removeInspectionItem,
+  reorderInspectionItems,
+  requestHoldPointInspection,
+  signOffInspection,
+  recordWitnessPointOutcome,
+  acknowledgeWitnessNotification,
+  ITPServiceError,
+  createITP,
+  getITP,
+  getITPs,
+  updateITP,
+  deleteITP,
+  approveITP,
+  createRevision,
+  getAllItems,
+  createTestingSchedule,
+  updateTestingSchedule,
+  getTestingSchedules,
+  createMaterialTest,
+  updateMaterialTestStatus,
+  recordLabResult,
+  getMaterialTests,
+} from "@/services/itpService";
+import type {
+  CreateInspectionItemInput,
+  UpdateInspectionItemInput,
+  HoldPointRequestInput,
+  InspectionSignOffInput,
+  WitnessPointOutcomeInput,
+  AcknowledgeWitnessNotificationInput,
+  ITPPermissionContext,
+  ITPProjectMembership,
+  GetTestingSchedulesFilters,
+  GetMaterialTestsFilters,
+} from "@/services/itpService";
+import type { ITPStatus, ConstructionStage, MaterialType, MaterialTestStatus } from "@/types";
+import {
+  calculateComplianceScore,
+  getQualitySummary,
+  generateComplianceReport,
+  persistITPProjectRecord,
+  refreshITPPassportContribution,
+} from "@/services/itpPassportAdapter";
+
+async function syncITPSpine(projectId: string, itpId: string, permCtx: ITPPermissionContext): Promise<void> {
+  const itp = await getITP(projectId, itpId, permCtx);
+  await persistITPProjectRecord(itp);
+  await refreshITPPassportContribution(projectId);
+}
+
+/** Maps ITPServiceError codes to HTTP status codes */
+function mapITPErrorToStatus(code: string): number {
+  switch (code) {
+    case "validation_error":
+      return 400;
+    case "not_found":
+      return 404;
+    case "invalid_state_transition":
+      return 409;
+    case "permission_denied":
+      return 403;
+    case "max_items_exceeded":
+      return 400;
+    case "invalid_reorder":
+      return 400;
+    case "unit_mismatch":
+      return 400;
+    case "lab_not_accredited":
+      return 400;
+    case "duplicate_lab_report":
+      return 409;
+    default:
+      return 500;
+  }
+}
+
+// POST /api/projects/:projectId/itps/:itpId/items — add inspection item
+router.post("/projects/:projectId/itps/:itpId/items", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+    const itemInput = req.body as CreateInspectionItemInput;
+
+    const itemId = await addInspectionItem(projectId, itpId, itemInput, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
+    res.status(201).json({ id: itemId });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/projects/:projectId/itps/:itpId/items/:itemId — update inspection item
+router.put("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+    const updates = req.body as UpdateInspectionItemInput;
+
+    await updateInspectionItem(projectId, itpId, itemId, updates, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/projects/:projectId/itps/:itpId/items/:itemId — remove inspection item
+router.delete("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+
+    await removeInspectionItem(projectId, itpId, itemId, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/itps/:itpId/items/reorder — reorder items
+router.post("/projects/:projectId/itps/:itpId/items/reorder", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const actorUserId = authContext.uid;
+    const { order } = req.body as { order: string[] };
+
+    if (!Array.isArray(order)) {
+      return res.status(400).json({ error: "order must be an array of item IDs", code: "validation_error" });
+    }
+
+    await reorderInspectionItems(projectId, itpId, order, actorUserId, permCtx);
+    await syncITPSpine(projectId, itpId, permCtx);
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/inspections/request — request hold point inspection
+router.post("/projects/:projectId/inspections/request", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Actor identity derived from auth, not body
+    const requestedBy = authContext.uid;
+    const body = req.body as {
+      itpId: string;
+      inspectionItemId: string;
+      requestedInspectionDate: string;
+    };
+
+    const input: HoldPointRequestInput = {
+      projectId,
+      itpId: body.itpId,
+      inspectionItemId: body.inspectionItemId,
+      requestedBy,
+      requestedInspectionDate: body.requestedInspectionDate,
+    };
+
+    const requestId = await requestHoldPointInspection(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
+    res.status(201).json({ id: requestId });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/inspections/:itemId/sign-off — inspector sign-off
+router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Inspector identity MUST come from auth context for regulated sign-off
+    const inspectorUserId = authContext.uid;
+    const body = req.body as {
+      itpId: string;
+      outcome: "pass" | "fail" | "conditional_pass";
+      conditions?: string;
+      conditionsDeadlineDays?: number;
+      observations?: string;
+    };
+
+    if ((permCtx.userRole !== 'engineer' && permCtx.userRole !== 'architect') || !permCtx.professionalRegistration) {
+      return res.status(403).json({
+        error: 'Inspection sign-off requires an appointed project engineer or architect with a verified registration',
+        code: 'permission_denied',
+      });
+    }
+
+    const input: InspectionSignOffInput = {
+      projectId,
+      itpId: body.itpId,
+      inspectionItemId: itemId,
+      inspectorUserId,
+      inspectorRole: permCtx.userRole,
+      outcome: body.outcome,
+      conditions: body.conditions,
+      conditionsDeadlineDays: body.conditionsDeadlineDays,
+      observations: body.observations,
+      professionalRegistration: permCtx.professionalRegistration,
+    };
+
+    await signOffInspection(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/inspections/:itemId/record — record witness outcome
+router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Identity fields derived from auth context, not body
+    const recordedByUserId = authContext.uid;
+    const inspectorUserId = authContext.uid;
+    const body = req.body as {
+      itpId: string;
+      outcome: "pass" | "fail" | "conditional_pass";
+      observations?: string;
+      inspectorAttended: boolean;
+      notificationSentAt: string;
+      inspectorResponse: "acknowledged" | "no_response";
+      responseTimestamp?: string;
+    };
+
+    const input: WitnessPointOutcomeInput = {
+      projectId,
+      itpId: body.itpId,
+      inspectionItemId: itemId,
+      outcome: body.outcome,
+      observations: body.observations,
+      inspectorAttended: body.inspectorAttended,
+      inspectorUserId,
+      inspectorRole: permCtx.userRole as "engineer" | "architect",
+      professionalRegistration: permCtx.professionalRegistration,
+      recordedByUserId,
+      notificationSentAt: body.notificationSentAt,
+      inspectorResponse: body.inspectorResponse,
+      responseTimestamp: body.responseTimestamp,
+    };
+
+    await recordWitnessPointOutcome(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/inspections/:itemId/acknowledge — acknowledge witness notification
+router.post("/projects/:projectId/inspections/:itemId/acknowledge", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itemId } = req.params;
+
+    // Build permission context and enforce project access
+    const permCtx = await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId);
+    assertITPProjectAccess(permCtx);
+
+    // Inspector identity derived from auth context, not body
+    const inspectorUserId = authContext.uid;
+    const body = req.body as {
+      itpId: string;
+      response: "acknowledged" | "no_response";
+    };
+
+    const input: AcknowledgeWitnessNotificationInput = {
+      projectId,
+      itpId: body.itpId,
+      inspectionItemId: itemId,
+      inspectorUserId,
+      response: body.response,
+    };
+
+    await acknowledgeWitnessNotification(input, permCtx);
+    await syncITPSpine(projectId, body.itpId, permCtx);
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.message,
+        code: err.code,
+        fields: err.fields,
+      });
+    }
+    if ((err as any).status === 403) {
+      return res.status(403).json({ error: err.message, code: 'permission_denied' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Mount POPIA/PAIA compliance routes
 router.use("/popia", popiaRoutes);
+
+// Mount Remote Desktop Marketplace routes (auth-gated — marketplace routers use
+// placeholder x-user-id auth internally; requireAuth enforces real Firebase token
+// verification at the mount boundary so unauthenticated requests never reach them)
+router.use("/remote-desktop-marketplace", requireAuth, marketplaceRouter);
+router.use("/remote-desktop-marketplace", requireAuth, ownerRouter);
+
+// Mount Feedback Loop routes (auth-gated — defence-in-depth; feedbackRouter also
+// applies requireAuth internally)
+import feedbackRouter from "./feedback-api-router";
+router.use("/feedback", requireAuth, feedbackRouter);
+
+// Mount Copilot / Provenance / BYOAI routes (auth-gated — defence-in-depth;
+// copilotRouter also applies requireAuth internally)
+import copilotRouter from "./copilot-api-router";
+router.use(requireAuth, copilotRouter);
+
+// ── ITP (Inspection Test Plans) CRUD Routes ────────────────────────────────────
+
+/**
+ * Builds ITPPermissionContext from auth context and project membership data.
+ */
+async function buildITPPermissionContext(
+  uid: string,
+  role: string,
+  projectId: string,
+): Promise<ITPPermissionContext & { professionalRegistration?: string }> {
+  // Fetch project membership for user
+  const membershipSnap = await adminDb
+    .collection('projects')
+    .doc(projectId)
+    .collection('members')
+    .where('userId', '==', uid)
+    .where('status', '==', 'active')
+    .get();
+
+  const projectMemberships: ITPProjectMembership[] = membershipSnap.docs.map((doc) => ({
+    userId: uid,
+    projectId,
+    role: (doc.data().role as string) || role,
+    status: 'active' as const,
+  }));
+
+  // Platform admin bypass — always has access
+  if (projectMemberships.length === 0 && (role === 'admin' || role === 'platform_admin')) {
+    projectMemberships.push({
+      userId: uid,
+      projectId,
+      role,
+      status: 'active',
+    });
+  }
+  // No membership = no access for non-admin roles (fail closed)
+  // The assertITPProjectAccess helper will reject if membership is empty
+
+  const projectRole = projectMemberships[0]?.role || role;
+  const userSnap = await adminDb.collection('users').doc(uid).get();
+  const userData = userSnap.exists ? userSnap.data() : undefined;
+  const professionalRegistration = userData?.professionalRegistration
+    || userData?.registrationNumber
+    || userData?.sacapNumber;
+
+  return {
+    userId: uid,
+    userRole: projectRole,
+    projectMemberships,
+    professionalRegistration,
+  };
+}
+
+/**
+ * Asserts that the user has project access via membership or admin role.
+ * Throws 403 if no membership exists and user is not an admin.
+ */
+function assertITPProjectAccess(ctx: ITPPermissionContext): void {
+  if (ctx.projectMemberships.length === 0 && ctx.userRole !== 'admin' && ctx.userRole !== 'platform_admin') {
+    const err = new Error('User does not have membership on this project');
+    (err as any).status = 403;
+    (err as any).code = 'permission_denied';
+    throw err;
+  }
+}
+
+// POST /api/projects/:projectId/itps — Create ITP
+router.post("/projects/:projectId/itps", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+    const { title, description, constructionStage } = req.body;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const itpId = await createITP(
+      {
+        projectId,
+        title,
+        description,
+        constructionStage,
+        createdBy: authContext.uid,
+      },
+      permCtx,
+    );
+
+    res.status(201).json({ id: itpId });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/itps — List ITPs with optional filters
+router.get("/projects/:projectId/itps", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+    const { status, constructionStage } = req.query;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const filters: { status?: ITPStatus; constructionStage?: ConstructionStage } = {};
+    if (status && typeof status === 'string') {
+      filters.status = status as ITPStatus;
+    }
+    if (constructionStage && typeof constructionStage === 'string') {
+      filters.constructionStage = constructionStage as ConstructionStage;
+    }
+
+    const itps = await getITPs(projectId, filters, permCtx);
+    res.status(200).json({ itps });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/itps/:itpId — Get single ITP with items
+router.get("/projects/:projectId/itps/:itpId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const itp = await getITP(projectId, itpId, permCtx);
+    const items = await getAllItems(projectId, itpId);
+
+    res.status(200).json({ itp, items });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// PUT /api/projects/:projectId/itps/:itpId — Update ITP (draft only)
+router.put("/projects/:projectId/itps/:itpId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+    const { title, description } = req.body;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    await updateITP(projectId, itpId, { title, description }, authContext.uid, permCtx);
+
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// DELETE /api/projects/:projectId/itps/:itpId — Soft-delete (draft only)
+router.delete("/projects/:projectId/itps/:itpId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    await deleteITP(projectId, itpId, authContext.uid, permCtx);
+
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/itps/:itpId/approve — Approve ITP
+router.post("/projects/:projectId/itps/:itpId/approve", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+    const { professionalRegistration } = req.body;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    await approveITP(
+      {
+        projectId,
+        itpId,
+        approverUserId: authContext.uid,
+        approverRole: authContext.role as 'engineer' | 'architect',
+        professionalRegistration,
+      },
+      permCtx,
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/itps/:itpId/revise — Create new revision
+router.post("/projects/:projectId/itps/:itpId/revise", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, itpId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const newItpId = await createRevision(projectId, itpId, authContext.uid, permCtx);
+
+    res.status(201).json({ id: newItpId });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// ── Material Testing & Compliance Endpoints ────────────────────────────────────
+
+// POST /api/projects/:projectId/testing-schedules — Create testing schedule
+router.post("/projects/:projectId/testing-schedules", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const scheduleId = await createTestingSchedule(
+      {
+        ...req.body,
+        projectId,
+        createdBy: authContext.uid,
+      },
+      permCtx,
+    );
+
+    res.status(201).json({ id: scheduleId });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// PUT /api/projects/:projectId/testing-schedules/:scheduleId — Update testing schedule
+router.put("/projects/:projectId/testing-schedules/:scheduleId", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, scheduleId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    await updateTestingSchedule(
+      projectId,
+      scheduleId,
+      { ...req.body, actorUserId: authContext.uid },
+      permCtx,
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/testing-schedules — List testing schedules (optional ?materialType filter)
+router.get("/projects/:projectId/testing-schedules", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+    const { materialType } = req.query;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const filters: GetTestingSchedulesFilters = {};
+    if (materialType && typeof materialType === 'string') {
+      filters.materialType = materialType as MaterialType;
+    }
+
+    const schedules = await getTestingSchedules(projectId, filters, permCtx);
+    res.status(200).json({ schedules });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/material-tests — Create material test
+router.post("/projects/:projectId/material-tests", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const testId = await createMaterialTest(
+      {
+        ...req.body,
+        projectId,
+        createdBy: authContext.uid,
+      },
+      permCtx,
+    );
+
+    res.status(201).json({ id: testId });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// PUT /api/projects/:projectId/material-tests/:testId/status — Update material test status
+router.put("/projects/:projectId/material-tests/:testId/status", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, testId } = req.params;
+    const { status } = req.body;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    await updateMaterialTestStatus(
+      projectId,
+      testId,
+      status,
+      authContext.uid,
+      permCtx,
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// POST /api/projects/:projectId/material-tests/:testId/result — Record lab result
+router.post("/projects/:projectId/material-tests/:testId/result", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId, testId } = req.params;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    await recordLabResult(
+      {
+        ...req.body,
+        projectId,
+        materialTestId: testId,
+        recordedBy: authContext.uid,
+      },
+      permCtx,
+    );
+
+    res.status(201).json({ success: true });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/material-tests — List material tests (optional ?status, ?materialType filters)
+router.get("/projects/:projectId/material-tests", async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req.headers);
+    const { projectId } = req.params;
+    const { status, materialType } = req.query;
+
+    const permCtx = await buildITPPermissionContext(
+      authContext.uid,
+      authContext.role as string || '',
+      projectId,
+    );
+
+    const filters: GetMaterialTestsFilters = {};
+    if (status && typeof status === 'string') {
+      filters.status = status as MaterialTestStatus;
+    }
+    if (materialType && typeof materialType === 'string') {
+      filters.materialType = materialType as MaterialType;
+    }
+
+    const tests = await getMaterialTests(projectId, filters, permCtx);
+    res.status(200).json({ tests });
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/itp/compliance-score — Get compliance score
+router.get("/projects/:projectId/itp/compliance-score", requireAuth, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const authContext = req.authContext!;
+    assertITPProjectAccess(await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId));
+    const score = await calculateComplianceScore(projectId);
+    res.status(200).json(score);
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/itp/quality-summary — Get quality summary for passport
+router.get("/projects/:projectId/itp/quality-summary", requireAuth, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const authContext = req.authContext!;
+    assertITPProjectAccess(await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId));
+    const summary = await getQualitySummary(projectId);
+    res.status(200).json(summary);
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// GET /api/projects/:projectId/itps/:itpId/compliance-report — Generate compliance report
+router.get("/projects/:projectId/itps/:itpId/compliance-report", requireAuth, async (req, res) => {
+  try {
+    const { projectId, itpId } = req.params;
+    const authContext = req.authContext!;
+    assertITPProjectAccess(await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId));
+    const report = await generateComplianceReport(projectId, itpId);
+    res.status(200).json(report);
+  } catch (err: any) {
+    if (err instanceof ITPServiceError) {
+      return res.status(mapITPErrorToStatus(err.code)).json({
+        error: err.code,
+        message: err.message,
+        details: err.fields,
+      });
+    }
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
 
 export default router;

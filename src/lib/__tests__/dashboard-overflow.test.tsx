@@ -78,27 +78,13 @@ describe('Task 6.9 — Zero horizontal overflow at all viewport widths (Req 8.10
 
   // ── 3. Main content offset ─────────────────────────────────────────────────
 
-  describe('Main content uses md:ml-64 (no unconditional left margin on mobile)', () => {
+  describe('Dashboard content does not duplicate the app-shell sidebar offset', () => {
     for (const { name, path } of dashboards) {
-      test(`${name}: main content offset is md:ml-64 (responsive, not bare ml-64)`, () => {
+      test(`${name}: main content has no legacy fixed sidebar margin`, () => {
         const source = read(path);
-        // All 9 dashboards use md:ml-64 — the sidebar offset only activates at >=768px
-        expect(source).toContain('md:ml-64');
-        // Bare ml-64 (without md: prefix) would add 256px margin on ALL viewports → overflow
-        // Note: md:ml-64 itself contains "ml-64" as substring, so we check for bare "ml-64"
-        // only when NOT preceded by "md:" or similar breakpoint prefix.
-        const bareMargin = source.match(/(?<![a-z]:)(?<![a-z]:)ml-64(?![\w-])/g);
-        // Every match should be prefixed with md: (i.e., appear as part of "md:ml-64")
-        if (bareMargin) {
-          // Verify all matches occur within "md:ml-64" context
-          const allArePrefixed = bareMargin.every(
-            (_match, i) => {
-              const idx = source.indexOf('ml-64');
-              return source.slice(Math.max(0, idx - 3), idx) === 'md:';
-            }
-          );
-          expect(allArePrefixed).toBe(true);
-        }
+        // App.tsx owns the sidebar/content flex layout. A dashboard-level margin
+        // would double-offset the content and can create horizontal overflow.
+        expect(source).not.toMatch(/(?:^|\s)(?:md:)?ml-64(?:\s|$)/);
       });
     }
   });
@@ -139,10 +125,9 @@ describe('Task 6.9 — Zero horizontal overflow at all viewport widths (Req 8.10
     /**
      * 768px (tablet threshold)
      * Sidebar: md:flex activates (fixed, out of flow, w-64 = 256px)
-     * Main: md:ml-64 activates (256px left margin)
-     * Available content = 768 - 256 = 512px (responsive grid adapts)
+     * Main: the App.tsx flex shell allocates the remaining width beside the fixed sidebar
      */
-    test('Tablet (768px): sidebar shows + md:ml-64 offsets correctly, 512px content area', () => {
+    test('Tablet (768px): app shell owns the sidebar offset without dashboard duplication', () => {
       const adminSrc = read('src/components/AdminDashboard.tsx');
       expect(adminSrc).toContain('overflow-x-hidden');
       expect(adminSrc).toContain('md:ml-64');
