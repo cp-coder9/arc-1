@@ -8438,7 +8438,7 @@ router.post("/projects/:projectId/itps/:itpId/items", async (req, res) => {
     const actorUserId = authContext.uid;
     const itemInput = req.body as CreateInspectionItemInput;
 
-    const itemId = await addInspectionItem(projectId, itpId, itemInput, actorUserId);
+    const itemId = await addInspectionItem(projectId, itpId, itemInput, actorUserId, permCtx);
     res.status(201).json({ id: itemId });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8469,7 +8469,7 @@ router.put("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res) =>
     const actorUserId = authContext.uid;
     const updates = req.body as UpdateInspectionItemInput;
 
-    await updateInspectionItem(projectId, itpId, itemId, updates, actorUserId);
+    await updateInspectionItem(projectId, itpId, itemId, updates, actorUserId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8499,7 +8499,7 @@ router.delete("/projects/:projectId/itps/:itpId/items/:itemId", async (req, res)
     // Actor identity derived from auth, not body
     const actorUserId = authContext.uid;
 
-    await removeInspectionItem(projectId, itpId, itemId, actorUserId);
+    await removeInspectionItem(projectId, itpId, itemId, actorUserId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8534,7 +8534,7 @@ router.post("/projects/:projectId/itps/:itpId/items/reorder", async (req, res) =
       return res.status(400).json({ error: "order must be an array of item IDs", code: "validation_error" });
     }
 
-    await reorderInspectionItems(projectId, itpId, order, actorUserId);
+    await reorderInspectionItems(projectId, itpId, order, actorUserId, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8577,7 +8577,7 @@ router.post("/projects/:projectId/inspections/request", async (req, res) => {
       requestedInspectionDate: body.requestedInspectionDate,
     };
 
-    const requestId = await requestHoldPointInspection(input);
+    const requestId = await requestHoldPointInspection(input, permCtx);
     res.status(201).json({ id: requestId });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8608,28 +8608,33 @@ router.post("/projects/:projectId/inspections/:itemId/sign-off", async (req, res
     const inspectorUserId = authContext.uid;
     const body = req.body as {
       itpId: string;
-      inspectorRole: "engineer" | "architect" | "site_manager";
       outcome: "pass" | "fail" | "conditional_pass";
       conditions?: string;
       conditionsDeadlineDays?: number;
       observations?: string;
-      professionalRegistration?: string;
     };
+
+    if ((permCtx.userRole !== 'engineer' && permCtx.userRole !== 'architect') || !permCtx.professionalRegistration) {
+      return res.status(403).json({
+        error: 'Inspection sign-off requires an appointed project engineer or architect with a verified registration',
+        code: 'permission_denied',
+      });
+    }
 
     const input: InspectionSignOffInput = {
       projectId,
       itpId: body.itpId,
       inspectionItemId: itemId,
       inspectorUserId,
-      inspectorRole: body.inspectorRole,
+      inspectorRole: permCtx.userRole,
       outcome: body.outcome,
       conditions: body.conditions,
       conditionsDeadlineDays: body.conditionsDeadlineDays,
       observations: body.observations,
-      professionalRegistration: body.professionalRegistration,
+      professionalRegistration: permCtx.professionalRegistration,
     };
 
-    await signOffInspection(input);
+    await signOffInspection(input, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8664,8 +8669,6 @@ router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) 
       outcome: "pass" | "fail" | "conditional_pass";
       observations?: string;
       inspectorAttended: boolean;
-      inspectorRole?: "engineer" | "architect" | "site_manager";
-      professionalRegistration?: string;
       notificationSentAt: string;
       inspectorResponse: "acknowledged" | "no_response";
       responseTimestamp?: string;
@@ -8679,15 +8682,15 @@ router.post("/projects/:projectId/inspections/:itemId/record", async (req, res) 
       observations: body.observations,
       inspectorAttended: body.inspectorAttended,
       inspectorUserId,
-      inspectorRole: body.inspectorRole,
-      professionalRegistration: body.professionalRegistration,
+      inspectorRole: permCtx.userRole as "engineer" | "architect",
+      professionalRegistration: permCtx.professionalRegistration,
       recordedByUserId,
       notificationSentAt: body.notificationSentAt,
       inspectorResponse: body.inspectorResponse,
       responseTimestamp: body.responseTimestamp,
     };
 
-    await recordWitnessPointOutcome(input);
+    await recordWitnessPointOutcome(input, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8729,7 +8732,7 @@ router.post("/projects/:projectId/inspections/:itemId/acknowledge", async (req, 
       response: body.response,
     };
 
-    await acknowledgeWitnessNotification(input);
+    await acknowledgeWitnessNotification(input, permCtx);
     res.status(200).json({ success: true });
   } catch (err: any) {
     if (err instanceof ITPServiceError) {
@@ -8774,7 +8777,7 @@ async function buildITPPermissionContext(
   uid: string,
   role: string,
   projectId: string,
-): Promise<ITPPermissionContext> {
+): Promise<ITPPermissionContext & { professionalRegistration?: string }> {
   // Fetch project membership for user
   const membershipSnap = await adminDb
     .collection('projects')
@@ -8803,10 +8806,18 @@ async function buildITPPermissionContext(
   // No membership = no access for non-admin roles (fail closed)
   // The assertITPProjectAccess helper will reject if membership is empty
 
+  const projectRole = projectMemberships[0]?.role || role;
+  const userSnap = await adminDb.collection('users').doc(uid).get();
+  const userData = userSnap.exists ? userSnap.data() : undefined;
+  const professionalRegistration = userData?.professionalRegistration
+    || userData?.registrationNumber
+    || userData?.sacapNumber;
+
   return {
     userId: uid,
-    userRole: role,
+    userRole: projectRole,
     projectMemberships,
+    professionalRegistration,
   };
 }
 
@@ -9181,7 +9192,7 @@ router.put("/projects/:projectId/material-tests/:testId/status", async (req, res
   try {
     const authContext = await getAuthContext(req.headers);
     const { projectId, testId } = req.params;
-    const { status, actorUserId } = req.body;
+    const { status } = req.body;
 
     const permCtx = await buildITPPermissionContext(
       authContext.uid,
@@ -9193,7 +9204,7 @@ router.put("/projects/:projectId/material-tests/:testId/status", async (req, res
       projectId,
       testId,
       status,
-      actorUserId || authContext.uid,
+      authContext.uid,
       permCtx,
     );
 

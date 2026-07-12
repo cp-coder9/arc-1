@@ -47,16 +47,9 @@ const ownerRouter = express.Router();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Extracts user ID from x-user-id header (placeholder for auth middleware).
- * Returns null if header is missing.
- */
+/** Returns the identity verified by the mount-level Firebase auth middleware. */
 function getUserId(req: Request): string | null {
-  const userId = req.headers['x-user-id'];
-  if (typeof userId === 'string' && userId.trim().length > 0) {
-    return userId.trim();
-  }
-  return null;
+  return (req as Request & { authContext?: { uid: string } }).authContext?.uid ?? null;
 }
 
 /**

@@ -272,23 +272,19 @@ async function writeAuditRecord(
   newState: Record<string, unknown>,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
-  try {
-    const record: Omit<ITPAuditRecord, 'id'> = {
-      projectId,
-      entityType,
-      entityId,
-      action,
-      actorUserId,
-      timestamp: new Date().toISOString(),
-      previousState,
-      newState,
-      metadata,
-    };
-    await addDoc(auditCollection(projectId), record);
-  } catch (error) {
-    // Audit failures should not block the main operation
-    console.error('Failed to write ITP audit record:', error);
-  }
+  const record: Omit<ITPAuditRecord, 'id'> = {
+    projectId,
+    entityType,
+    entityId,
+    action,
+    actorUserId,
+    timestamp: new Date().toISOString(),
+    previousState,
+    newState,
+    metadata,
+  };
+  // Regulated mutations must not report success without durable audit evidence.
+  await addDoc(auditCollection(projectId), record);
 }
 
 // ── Internal Helpers ─────────────────────────────────────────────────────────
