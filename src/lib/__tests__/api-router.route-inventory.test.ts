@@ -110,7 +110,7 @@ describe('api-router route inventory', () => {
   const inventory = inventoryRoutes();
 
   it('keeps a static inventory of every Express route declaration', () => {
-    expect(inventory).toHaveLength(159);
+    expect(inventory).toHaveLength(184);
     expect(inventory.map(route => `${route.method.toUpperCase()} ${route.canonicalPath}`)).toMatchInlineSnapshot(`
       [
         "GET /directory/search",
@@ -272,6 +272,31 @@ describe('api-router route inventory', () => {
         "GET /field-reports",
         "POST /field-reports/:id/export",
         "POST /sync-queue/flush",
+        "POST /projects/:projectId/itps/:itpId/items",
+        "PUT /projects/:projectId/itps/:itpId/items/:itemId",
+        "DELETE /projects/:projectId/itps/:itpId/items/:itemId",
+        "POST /projects/:projectId/itps/:itpId/items/reorder",
+        "POST /projects/:projectId/inspections/request",
+        "POST /projects/:projectId/inspections/:itemId/sign-off",
+        "POST /projects/:projectId/inspections/:itemId/record",
+        "POST /projects/:projectId/inspections/:itemId/acknowledge",
+        "POST /projects/:projectId/itps",
+        "GET /projects/:projectId/itps",
+        "GET /projects/:projectId/itps/:itpId",
+        "PUT /projects/:projectId/itps/:itpId",
+        "DELETE /projects/:projectId/itps/:itpId",
+        "POST /projects/:projectId/itps/:itpId/approve",
+        "POST /projects/:projectId/itps/:itpId/revise",
+        "POST /projects/:projectId/testing-schedules",
+        "PUT /projects/:projectId/testing-schedules/:scheduleId",
+        "GET /projects/:projectId/testing-schedules",
+        "POST /projects/:projectId/material-tests",
+        "PUT /projects/:projectId/material-tests/:testId/status",
+        "POST /projects/:projectId/material-tests/:testId/result",
+        "GET /projects/:projectId/material-tests",
+        "GET /projects/:projectId/itp/compliance-score",
+        "GET /projects/:projectId/itp/quality-summary",
+        "GET /projects/:projectId/itps/:itpId/compliance-report",
       ]
     `);
   });
@@ -308,6 +333,6 @@ describe('api-router route inventory', () => {
 
   it('flags non-public canonical routes that lack a static auth gate signal', () => {
     const missingAuthGate = inventory.filter(route => !['public', 'webhook', 'signed-callback'].includes(route.authExpectation) && route.authGate === 'missing-static-auth-gate');
-    expect(missingAuthGate).toEqual([]);
+    expect(missingAuthGate, JSON.stringify(missingAuthGate, null, 2)).toEqual([]);
   });
 });

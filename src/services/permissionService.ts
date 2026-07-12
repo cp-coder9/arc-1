@@ -25,7 +25,7 @@ export const CANONICAL_USER_ROLES = [
   'cpm',
 ] as const satisfies readonly UserRole[];
 
-export type NormalizedUserRole = Exclude<UserRole, 'architect'>;
+export type NormalizedUserRole = Exclude<UserRole, 'architect' | 'admin'>;
 
 export type ProjectAccessRole =
   | 'project_owner'
@@ -94,23 +94,7 @@ const ROLE_PERMISSIONS: Record<NormalizedUserRole, PermissionAction[]> = {
   freelancer: ['project:read', 'profile:read', 'profile:update'],
   subcontractor: ['project:read', 'profile:read', 'profile:update', 'payment:read'],
   supplier: ['project:read', 'profile:read', 'profile:update', 'payment:read'],
-  admin: [
-    'project:read',
-    'project:update',
-    'project:manage_members',
-    'profile:read',
-    'profile:update',
-    'verification:review',
-    'audit:read',
-    'audit:write',
-    'admin:override',
-    'payment:read',
-    'payment:manage',
-    'escrow:release',
-    'compliance:sign',
-    'municipal:manage',
-    'municipal:view_insight',
-  ],
+
   engineer: ['project:read', 'profile:read', 'profile:update', 'compliance:sign'],
   quantity_surveyor: ['project:read', 'profile:read', 'profile:update', 'payment:read', 'payment:manage'],
   town_planner: ['project:read', 'profile:read', 'profile:update', 'municipal:manage'],
@@ -261,7 +245,9 @@ export function isCanonicalUserRole(role: unknown): role is UserRole {
 
 export function normalizeUserRole(role?: UserRole | string): NormalizedUserRole | null {
   if (!isCanonicalUserRole(role)) return null;
-  return role === 'architect' ? 'bep' : role;
+  if (role === 'architect') return 'bep';
+  if (role === 'admin') return 'platform_admin';
+  return role;
 }
 
 /**

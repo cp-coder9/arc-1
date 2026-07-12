@@ -37,7 +37,7 @@ vi.mock('@/services/geminiService', () => ({
 
 import { processMessage, type ProcessMessageParams } from '@/services/copilotService';
 import { resetRateLimit, recordRequest } from '@/services/copilotRateLimiter';
-import type { ContextDataSources } from '@/services/copilotContextAssembler';
+import { clearContextCache, type ContextDataSources } from '@/services/copilotContextAssembler';
 import type { CopilotMessage } from '@/services/copilotTypes';
 
 // ─── Test Helpers ──────────────────────────────────────────────────────────
@@ -89,6 +89,7 @@ function baseParams(overrides?: Partial<ProcessMessageParams>): ProcessMessagePa
 describe('processMessage', () => {
   beforeEach(() => {
     resetRateLimit('user-123');
+    clearContextCache();
     persistedMessages.length = 0;
   });
 
@@ -181,23 +182,23 @@ describe('processMessage', () => {
 
   describe('AI service call', () => {
     it('assembles the system prompt from the injected project data sources', async () => {
-      const getProjectPassport = vi.fn().mockResolvedValue({
-        projectId: 'proj-456',
-        projectName: 'Injected Project Context',
+      const fetchPassport = vi.fn().mockResolvedValue({
+        projectName: 'Injected Project Context', currentPhase: 'design_development', riskLevel: 'medium',
+        leadProfessional: 'Test User', keyDates: [], teamMembers: [],
       });
       const dataSources: ContextDataSources = {
-        getProjectPassport,
-        getDocumentRegister: async () => [],
-        getPendingInboxActions: async () => [],
-        getRecentAuditTrail: async () => [],
-        getUserContext: async () => ({ uid: 'user-123', role: 'architect', displayName: 'Test User' }),
-        getProjectAccessContext: async () => ({ projectId: 'proj-456', leadProfessionalId: 'user-123' }),
+        fetchPassport,
+        fetchDocuments: async () => [],
+        fetchPendingActions: async () => [],
+        fetchAuditTrail: async () => [],
+        fetchUserContext: async () => ({ role: 'architect', projectAccessRole: 'lead_bep', displayName: 'Test User' }),
+        checkReadPermission: async () => true,
       };
       const callAI = vi.fn().mockResolvedValue('Context-aware response');
 
       await processMessage(baseParams({ dataSources, callAI }));
 
-      expect(getProjectPassport).toHaveBeenCalledWith('proj-456');
+      expect(fetchPassport).toHaveBeenCalledWith('proj-456');
       expect(callAI.mock.calls[0][0]).toContain('Injected Project Context');
     });
 

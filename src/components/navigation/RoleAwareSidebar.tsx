@@ -52,7 +52,7 @@ export function RoleAwareSidebar({
   onSignOut,
   className,
 }: RoleAwareSidebarProps) {
-  const modules = getNavigationForRole(user.role);
+  const modules = getNavigationForRole(user.role === 'admin' ? 'platform_admin' : user.role);
 
   // Initialise all modules as expanded for first-time render so users see
   // content immediately. Per-module state is toggled on header click.

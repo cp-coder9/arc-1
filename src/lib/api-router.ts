@@ -9308,9 +9308,11 @@ router.get("/projects/:projectId/material-tests", async (req, res) => {
 });
 
 // GET /api/projects/:projectId/itp/compliance-score — Get compliance score
-router.get("/projects/:projectId/itp/compliance-score", async (req, res) => {
+router.get("/projects/:projectId/itp/compliance-score", requireAuth, async (req, res) => {
   try {
     const { projectId } = req.params;
+    const authContext = req.authContext!;
+    assertITPProjectAccess(await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId));
     const score = await calculateComplianceScore(projectId);
     res.status(200).json(score);
   } catch (err: any) {
@@ -9326,9 +9328,11 @@ router.get("/projects/:projectId/itp/compliance-score", async (req, res) => {
 });
 
 // GET /api/projects/:projectId/itp/quality-summary — Get quality summary for passport
-router.get("/projects/:projectId/itp/quality-summary", async (req, res) => {
+router.get("/projects/:projectId/itp/quality-summary", requireAuth, async (req, res) => {
   try {
     const { projectId } = req.params;
+    const authContext = req.authContext!;
+    assertITPProjectAccess(await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId));
     const summary = await getQualitySummary(projectId);
     res.status(200).json(summary);
   } catch (err: any) {
@@ -9344,9 +9348,11 @@ router.get("/projects/:projectId/itp/quality-summary", async (req, res) => {
 });
 
 // GET /api/projects/:projectId/itps/:itpId/compliance-report — Generate compliance report
-router.get("/projects/:projectId/itps/:itpId/compliance-report", async (req, res) => {
+router.get("/projects/:projectId/itps/:itpId/compliance-report", requireAuth, async (req, res) => {
   try {
     const { projectId, itpId } = req.params;
+    const authContext = req.authContext!;
+    assertITPProjectAccess(await buildITPPermissionContext(authContext.uid, authContext.role as string || '', projectId));
     const report = await generateComplianceReport(projectId, itpId);
     res.status(200).json(report);
   } catch (err: any) {

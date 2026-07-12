@@ -170,7 +170,7 @@ describe('Feature: ai-copilot-workspace, Property 9: Provenance Record Creation 
    */
 
   it('creates a record with all required fields for any valid input params', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbCreateProvenanceParams, async (params) => {
         const record = await createProvenanceRecord(params);
 
@@ -202,7 +202,7 @@ describe('Feature: ai-copilot-workspace, Property 9: Provenance Record Creation 
   });
 
   it('persists the record to Firestore on every creation', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbCreateProvenanceParams, async (params) => {
         const callsBefore = mockSet.mock.calls.length;
         await createProvenanceRecord(params);
@@ -213,7 +213,7 @@ describe('Feature: ai-copilot-workspace, Property 9: Provenance Record Creation 
   });
 
   it('rejects modelId longer than 128 characters', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         fc.array(fc.integer({ min: 33, max: 126 }), { minLength: 129, maxLength: 200 })
           .map((codes) => codes.map((c) => String.fromCharCode(c)).join('')),
@@ -231,7 +231,7 @@ describe('Feature: ai-copilot-workspace, Property 9: Provenance Record Creation 
   });
 
   it('rejects invalid confidence values outside 0.00–1.00', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         fc.oneof(
           fc.double({ min: 1.01, max: 100, noNaN: true, noDefaultInfinity: true }),
@@ -251,7 +251,7 @@ describe('Feature: ai-copilot-workspace, Property 9: Provenance Record Creation 
   });
 
   it('rejects invalid source values', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         fc.array(fc.integer({ min: 97, max: 122 }), { minLength: 1, maxLength: 20 })
           .map((codes) => codes.map((c) => String.fromCharCode(c)).join(''))
@@ -270,7 +270,7 @@ describe('Feature: ai-copilot-workspace, Property 9: Provenance Record Creation 
   });
 
   it('rejects invalid ISO 8601 timestamps for generatedAt', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         fc.array(fc.integer({ min: 32, max: 126 }), { minLength: 1, maxLength: 30 })
           .map((codes) => codes.map((c) => String.fromCharCode(c)).join(''))
@@ -304,7 +304,7 @@ describe('Feature: ai-copilot-workspace, Property 10: Provenance Failure Blocks 
    */
 
   it('blocks record insertion when provenance record does not exist', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbUid, arbProjectId, arbUid, arbUid,
         async (provenanceId, projectId, targetRecordId, targetRecordType) => {
           mockGet.mockResolvedValue({ exists: false });
@@ -322,7 +322,7 @@ describe('Feature: ai-copilot-workspace, Property 10: Provenance Failure Blocks 
   });
 
   it('blocks record insertion when Firestore write fails during attachment', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbUid, arbProjectId, arbUid, arbUid,
         async (provenanceId, projectId, targetRecordId, targetRecordType) => {
           mockGet.mockResolvedValue({ exists: true, data: () => ({ targetRecordId: null }) });
@@ -338,7 +338,7 @@ describe('Feature: ai-copilot-workspace, Property 10: Provenance Failure Blocks 
   });
 
   it('returns an error when provenance does not exist — never silently succeeds', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbUid, arbProjectId, arbUid, arbUid,
         async (provenanceId, projectId, targetRecordId, targetRecordType) => {
           mockGet.mockResolvedValue({ exists: false });
@@ -353,7 +353,7 @@ describe('Feature: ai-copilot-workspace, Property 10: Provenance Failure Blocks 
   });
 
   it('blocks re-attachment when provenance is already attached to another record', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbUid, arbProjectId, arbUid, arbUid, arbUid,
         async (provenanceId, projectId, targetRecordId, targetRecordType, existingTargetId) => {
           mockGet.mockResolvedValue({
@@ -388,7 +388,7 @@ describe('Feature: ai-copilot-workspace, Property 11: Provenance Immutability', 
    */
 
   it('updateProvenanceRecord always throws regardless of context', () => {
-    fc.assert(
+    return fc.assert(
       fc.property(fc.anything(), () => {
         expect(() => updateProvenanceRecord()).toThrow();
       }),
@@ -397,7 +397,7 @@ describe('Feature: ai-copilot-workspace, Property 11: Provenance Immutability', 
   });
 
   it('deleteProvenanceRecord always throws regardless of context', () => {
-    fc.assert(
+    return fc.assert(
       fc.property(fc.anything(), () => {
         expect(() => deleteProvenanceRecord()).toThrow();
       }),
@@ -406,7 +406,7 @@ describe('Feature: ai-copilot-workspace, Property 11: Provenance Immutability', 
   });
 
   it('update rejection message communicates immutability', () => {
-    fc.assert(
+    return fc.assert(
       fc.property(fc.anything(), () => {
         try { updateProvenanceRecord(); }
         catch (e: any) { expect(e.message.toLowerCase()).toContain('immutable'); }
@@ -416,7 +416,7 @@ describe('Feature: ai-copilot-workspace, Property 11: Provenance Immutability', 
   });
 
   it('delete rejection message communicates immutability', () => {
-    fc.assert(
+    return fc.assert(
       fc.property(fc.anything(), () => {
         try { deleteProvenanceRecord(); }
         catch (e: any) { expect(e.message.toLowerCase()).toContain('immutable'); }
@@ -426,7 +426,7 @@ describe('Feature: ai-copilot-workspace, Property 11: Provenance Immutability', 
   });
 
   it('created records preserve all input fields unchanged', () => {
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(arbCreateProvenanceParams, async (params) => {
         const record = await createProvenanceRecord(params);
 
@@ -463,7 +463,7 @@ describe('Feature: ai-copilot-workspace, Property 12: Provenance Override Struct
     // Set mock so provenance record always exists for this test
     mockGet.mockResolvedValue({ exists: true, data: () => ({}) });
 
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         arbProjectId, arbUid, arbUid, arbProfessionalRole, arbValidDeclaration,
         async (projectId, provenanceRecordId, attestedBy, attestedRole, declaration) => {
@@ -489,7 +489,7 @@ describe('Feature: ai-copilot-workspace, Property 12: Provenance Override Struct
   it('rejects declarations shorter than 20 characters', () => {
     mockGet.mockResolvedValue({ exists: true, data: () => ({}) });
 
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         arbProjectId, arbUid, arbUid, arbProfessionalRole, arbInvalidDeclaration,
         async (projectId, provenanceRecordId, attestedBy, attestedRole, shortDeclaration) => {
@@ -507,7 +507,7 @@ describe('Feature: ai-copilot-workspace, Property 12: Provenance Override Struct
   it('rejects override creation when parent provenance record does not exist', () => {
     mockGet.mockResolvedValue({ exists: false });
 
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         arbProjectId, arbUid, arbUid, arbProfessionalRole, arbValidDeclaration,
         async (projectId, provenanceRecordId, attestedBy, attestedRole, declaration) => {
@@ -525,7 +525,7 @@ describe('Feature: ai-copilot-workspace, Property 12: Provenance Override Struct
   it('attestedAt timestamp is always a valid ISO 8601 date', () => {
     mockGet.mockResolvedValue({ exists: true, data: () => ({}) });
 
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         arbProjectId, arbUid, arbUid, arbProfessionalRole, arbValidDeclaration,
         async (projectId, provenanceRecordId, attestedBy, attestedRole, declaration) => {
@@ -547,7 +547,7 @@ describe('Feature: ai-copilot-workspace, Property 12: Provenance Override Struct
   it('override persists to Firestore subcollection when valid', () => {
     mockGet.mockResolvedValue({ exists: true, data: () => ({}) });
 
-    fc.assert(
+    return fc.assert(
       fc.asyncProperty(
         arbProjectId, arbUid, arbUid, arbProfessionalRole, arbValidDeclaration,
         async (projectId, provenanceRecordId, attestedBy, attestedRole, declaration) => {

@@ -42,6 +42,17 @@ vi.mock('@vercel/blob', () => ({
   del: mockDel,
 }));
 
+const intelligenceMocks = vi.hoisted(() => ({
+  processSubmission: vi.fn().mockResolvedValue(undefined),
+  createCluster: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/services/feedbackIntelligenceEngine', () => ({
+  processSubmission: intelligenceMocks.processSubmission,
+}));
+vi.mock('@/services/feedbackClusterManager', () => ({
+  createCluster: intelligenceMocks.createCluster,
+}));
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 function buildChainableMock(overrides: Record<string, any> = {}) {
@@ -132,6 +143,7 @@ const arbUserId = fc.uuid();
 const arbTimestamp = fc.date({
   min: new Date('2024-01-01T00:00:00Z'),
   max: new Date('2026-12-31T23:59:59Z'),
+  noInvalidDate: true,
 }).map(d => d.toISOString());
 
 

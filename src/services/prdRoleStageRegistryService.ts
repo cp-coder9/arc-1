@@ -105,7 +105,7 @@ const STAKEHOLDER_PROFILES: PrdStakeholderProfile[] = [
   {
     key: 'admin_governance',
     label: 'Admin / Governance',
-    appRoles: ['admin'],
+    appRoles: ['admin', 'platform_admin'],
     objective: 'Verify credentials, arbitrate disputes, manage monetisation, and audit automated AI actions.',
     responsibilities: ['Process verification queues', 'Resolve disputes', 'Curate marketplace opportunities', 'Set platform fees and audit AI orchestration'],
     baseTools: ['Admin Whole-System Governance Console', 'Payment Rate Settings', 'AI Orchestration'],

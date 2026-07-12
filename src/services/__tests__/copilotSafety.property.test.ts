@@ -120,7 +120,7 @@ const multiWordStringArb = (minLen: number, maxLen: number) =>
   fc.array(
     fc.oneof(
       fc.constantFrom(' '),
-      fc.char().filter((c) => c !== ' ' && c.charCodeAt(0) >= 33 && c.charCodeAt(0) <= 126),
+      fc.integer({ min: 33, max: 126 }).map((code) => String.fromCharCode(code)),
     ),
     { minLength: minLen, maxLength: maxLen },
   ).map((chars) => chars.join('')).filter((s) => s.trim().length > 0);

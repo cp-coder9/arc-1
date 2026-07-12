@@ -19,7 +19,7 @@ import type { CopilotCapability, CopilotMessage, CopilotResponse, ConversationTh
 import { CAPABILITY_ROLE_MAP, UNIVERSAL_CAPABILITIES } from '@/services/copilotTypes';
 import { checkRateLimit, recordRequest } from '@/services/copilotRateLimiter';
 import { CopilotMessageInputSchema, RFIDraftInputSchema, NarrativeInputSchema, ClauseExplanationInputSchema } from '@/lib/copilotSchemas';
-import { assembleContext, ContextAssembler } from '@/services/copilotContextAssembler';
+import { assembleContext } from '@/services/copilotContextAssembler';
 import type { ContextDataSources } from '@/services/copilotContextAssembler';
 import { applyGuardrails, checkCopyrightCompliance } from '@/services/copilotGuardrailFilter';
 import { createProvenanceRecord } from '@/services/provenanceService';
@@ -197,16 +197,6 @@ async function defaultPersistMessage(message: CopilotMessage, projectId: string)
 
 // â”€â”€â”€ Default Context Data Sources (stub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function getDefaultDataSources(): ContextDataSources {
-  return {
-    getProjectPassport: async () => null,
-    getDocumentRegister: async () => [],
-    getPendingInboxActions: async () => [],
-    getRecentAuditTrail: async () => [],
-    getUserContext: async () => null,
-    getProjectAccessContext: async () => null,
-  };
-}
 
 // â”€â”€â”€ Helper: Build Empty Message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -306,9 +296,7 @@ export async function processMessage(params: ProcessMessageParams): Promise<Copi
   // 4. Assemble project context
   let contextJson: string;
   try {
-    const projectContext = dataSources
-      ? await new ContextAssembler(dataSources).assembleContext(projectId, userId)
-      : await assembleContext(projectId, userId);
+    const projectContext = await assembleContext(projectId, userId, dataSources);
     contextJson = JSON.stringify(projectContext);
   } catch {
     // If context assembly fails entirely, proceed with empty context

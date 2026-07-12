@@ -49,7 +49,7 @@ describe('Feature: intelligent-feedback-loop, Property 8: Cluster staleness rule
     fc.assert(
       fc.property(
         // Generate a "now" date (any reasonable date)
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         // Generate an offset from 0 to 30 days (in ms) — within threshold
         fc.integer({ min: 0, max: THIRTY_DAYS_MS }),
         (now, offsetMs) => {
@@ -66,7 +66,7 @@ describe('Feature: intelligent-feedback-loop, Property 8: Cluster staleness rule
     fc.assert(
       fc.property(
         // Generate a "now" date
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         // Generate an offset strictly greater than 30 days (30 days + 1ms to 90 days)
         fc.integer({ min: THIRTY_DAYS_MS + 1, max: 90 * 24 * 60 * 60 * 1000 }),
         (now, offsetMs) => {
@@ -83,7 +83,7 @@ describe('Feature: intelligent-feedback-loop, Property 8: Cluster staleness rule
     fc.assert(
       fc.property(
         // Generate a "now" date
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         // Generate an offset from 0 to 90 days in ms
         fc.integer({ min: 0, max: 90 * 24 * 60 * 60 * 1000 }),
         (now, offsetMs) => {
@@ -102,7 +102,7 @@ describe('Feature: intelligent-feedback-loop, Property 8: Cluster staleness rule
   it('exactly 30 days is still open (boundary inclusive)', () => {
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         (now) => {
           const exactlyThirtyDaysAgo = new Date(now.getTime() - THIRTY_DAYS_MS).toISOString();
           const result = isClusterOpen(exactlyThirtyDaysAgo, now);
@@ -116,7 +116,7 @@ describe('Feature: intelligent-feedback-loop, Property 8: Cluster staleness rule
   it('30 days + 1ms is stale (boundary exclusive)', () => {
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         (now) => {
           const justPastThreshold = new Date(now.getTime() - THIRTY_DAYS_MS - 1).toISOString();
           const result = isClusterOpen(justPastThreshold, now);

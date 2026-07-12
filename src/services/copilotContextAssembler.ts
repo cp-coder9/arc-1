@@ -85,7 +85,7 @@ const AUDIT_TRAIL_LIMIT = 20;
  * Wraps a promise with a timeout. Rejects with a timeout error if the
  * promise doesn't resolve within the specified duration.
  */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+function withTimeoutStrict<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`Timeout: ${label} exceeded ${ms}ms`));
@@ -143,12 +143,12 @@ export class ContextAssembler {
 
     // Get user context and project access for permission checks
     const [userContextResult, projectAccessResult] = await Promise.allSettled([
-      withTimeout(
+      withTimeoutStrict(
         this.dataProvider.getUserContext(userId, projectId),
         DATA_SOURCE_TIMEOUT_MS,
         'getUserContext',
       ),
-      withTimeout(
+      withTimeoutStrict(
         this.dataProvider.getProjectAccessContext(userId, projectId),
         DATA_SOURCE_TIMEOUT_MS,
         'getProjectAccessContext',
@@ -175,22 +175,22 @@ export class ContextAssembler {
 
     // Fetch all data sources in parallel with timeout
     const [passportResult, docsResult, inboxResult, auditResult] = await Promise.allSettled([
-      withTimeout(
+      withTimeoutStrict(
         this.dataProvider.getProjectPassport(projectId),
         DATA_SOURCE_TIMEOUT_MS,
         'projectPassport',
       ),
-      withTimeout(
+      withTimeoutStrict(
         this.dataProvider.getDocumentRegister(projectId),
         DATA_SOURCE_TIMEOUT_MS,
         'documentRegister',
       ),
-      withTimeout(
+      withTimeoutStrict(
         this.dataProvider.getPendingInboxActions(projectId, userId),
         DATA_SOURCE_TIMEOUT_MS,
         'pendingInboxActions',
       ),
-      withTimeout(
+      withTimeoutStrict(
         this.dataProvider.getRecentAuditTrail(projectId, AUDIT_TRAIL_LIMIT),
         DATA_SOURCE_TIMEOUT_MS,
         'auditTrail',
@@ -511,17 +511,73 @@ export const contextAssembler = new ContextAssembler(new DefaultContextDataProvi
  * Context data sources interface — re-exported as ContextDataSources
  * for backward compatibility with copilotService imports.
  */
-export type ContextDataSources = ContextDataProvider;
+export type PassportData = CopilotProjectContext['passport'];
+export type DocumentEntry = CopilotProjectContext['documentRegister'][number];
+export type PendingAction = CopilotProjectContext['pendingActions'][number];
+export type AuditEntry = CopilotProjectContext['auditTrail'][number];
+export type UserContextData = CopilotProjectContext['userContext'];
 
-/**
- * Convenience function wrapping the singleton's assembleContext method.
- * Used by copilotService for direct import.
- */
+/** Legacy injectable contract retained for the property-test and plugin API. */
+export interface ContextDataSources {
+  fetchPassport(projectId: string): Promise<PassportData>;
+  fetchDocuments(projectId: string): Promise<DocumentEntry[]>;
+  fetchPendingActions(projectId: string, userId: string): Promise<PendingAction[]>;
+  fetchAuditTrail(projectId: string, limit: number): Promise<AuditEntry[]>;
+  fetchUserContext(userId: string, projectId: string): Promise<UserContextData>;
+  checkReadPermission(userId: string, projectId: string): Promise<boolean>;
+}
+
+export const MAX_CONTEXT_CHARS = MAX_CHARS;
+const legacyCache = new Map<string, CopilotProjectContext>();
+export const cacheKey = (projectId: string, userId: string): string => `${projectId}::${userId}`;
+
+export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  try { return await withTimeoutStrict(promise, ms, 'data source'); }
+  catch { return null; }
+}
+
+export function invalidateContext(projectId: string): void {
+  contextAssembler.invalidateCache(projectId);
+  legacyCache.forEach((_value, key) => { if (key.startsWith(`${projectId}::`)) legacyCache.delete(key); });
+}
+
+/** Convenience function with optional injected legacy data sources. */
 export async function assembleContext(
   projectId: string,
   userId: string,
+  sources?: ContextDataSources,
 ): Promise<CopilotProjectContext> {
-  return contextAssembler.assembleContext(projectId, userId);
+  if (!sources) return contextAssembler.assembleContext(projectId, userId);
+  const key = cacheKey(projectId, userId);
+  const cached = legacyCache.get(key);
+  if (cached) return cached;
+  if (!await sources.checkReadPermission(userId, projectId)) {
+    throw new Error('Permission denied: user cannot read this project');
+  }
+  const settled = await Promise.allSettled([
+    withTimeoutStrict(sources.fetchPassport(projectId), DATA_SOURCE_TIMEOUT_MS, 'passport'),
+    withTimeoutStrict(sources.fetchDocuments(projectId), DATA_SOURCE_TIMEOUT_MS, 'documents'),
+    withTimeoutStrict(sources.fetchPendingActions(projectId, userId), DATA_SOURCE_TIMEOUT_MS, 'actions'),
+    withTimeoutStrict(sources.fetchAuditTrail(projectId, AUDIT_TRAIL_LIMIT), DATA_SOURCE_TIMEOUT_MS, 'audit'),
+    withTimeoutStrict(sources.fetchUserContext(userId, projectId), DATA_SOURCE_TIMEOUT_MS, 'user'),
+  ]);
+  const unavailableSources: string[] = [];
+  const value = <T>(index: number, name: string, fallback: T): T => {
+    const result = settled[index];
+    if (result.status === 'fulfilled') return result.value as T;
+    unavailableSources.push(name); return fallback;
+  };
+  const context: CopilotProjectContext = {
+    passport: value(0, 'passport', { projectName: '', currentPhase: 'onboarding', riskLevel: 'low', leadProfessional: '', keyDates: [], teamMembers: [] }),
+    documentRegister: value(1, 'documentRegister', []),
+    pendingActions: value(2, 'pendingActions', []),
+    auditTrail: value(3, 'auditTrail', []),
+    userContext: value(4, 'userContext', { role: 'client', projectAccessRole: null, displayName: userId }),
+    unavailableSources,
+  };
+  const bounded = applyTokenBudget(context);
+  legacyCache.set(key, bounded);
+  return bounded;
 }
 
 /**
@@ -530,6 +586,7 @@ export async function assembleContext(
  */
 export function clearContextCache(): void {
   contextAssembler.clearCache();
+  legacyCache.clear();
 }
 
 /**

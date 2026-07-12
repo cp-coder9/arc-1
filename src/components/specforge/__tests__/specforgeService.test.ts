@@ -331,7 +331,7 @@ describe('getVisibleSpecItems with viewerUserId', () => {
     expect(items[0].id).toBe('item-1');
   });
 
-  it('returns all package items when viewerUserId does not match any team member', () => {
+  it('fails closed when viewerUserId does not match any team member', () => {
     const ws: SpecForgeWorkspace = {
       ...SAMPLE_WORKSPACE,
       team: [
@@ -347,9 +347,8 @@ describe('getVisibleSpecItems with viewerUserId', () => {
         },
       ],
     };
-    // viewerUserId 'u-unknown' not found in team, so no further filtering happens
     const items = getVisibleSpecItems(ws, 'supplier', 'u-unknown');
-    expect(items.length).toBe(1);
+    expect(items.length).toBe(0);
   });
 });
 
