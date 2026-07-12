@@ -180,6 +180,27 @@ describe('processMessage', () => {
   });
 
   describe('AI service call', () => {
+    it('assembles the system prompt from the injected project data sources', async () => {
+      const getProjectPassport = vi.fn().mockResolvedValue({
+        projectId: 'proj-456',
+        projectName: 'Injected Project Context',
+      });
+      const dataSources: ContextDataSources = {
+        getProjectPassport,
+        getDocumentRegister: async () => [],
+        getPendingInboxActions: async () => [],
+        getRecentAuditTrail: async () => [],
+        getUserContext: async () => ({ uid: 'user-123', role: 'architect', displayName: 'Test User' }),
+        getProjectAccessContext: async () => ({ projectId: 'proj-456', leadProfessionalId: 'user-123' }),
+      };
+      const callAI = vi.fn().mockResolvedValue('Context-aware response');
+
+      await processMessage(baseParams({ dataSources, callAI }));
+
+      expect(getProjectPassport).toHaveBeenCalledWith('proj-456');
+      expect(callAI.mock.calls[0][0]).toContain('Injected Project Context');
+    });
+
     it('returns service_unavailable when AI call throws', async () => {
       const result = await processMessage(
         baseParams({

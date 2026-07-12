@@ -19,7 +19,7 @@ import type { CopilotCapability, CopilotMessage, CopilotResponse, ConversationTh
 import { CAPABILITY_ROLE_MAP, UNIVERSAL_CAPABILITIES } from '@/services/copilotTypes';
 import { checkRateLimit, recordRequest } from '@/services/copilotRateLimiter';
 import { CopilotMessageInputSchema, RFIDraftInputSchema, NarrativeInputSchema, ClauseExplanationInputSchema } from '@/lib/copilotSchemas';
-import { assembleContext } from '@/services/copilotContextAssembler';
+import { assembleContext, ContextAssembler } from '@/services/copilotContextAssembler';
 import type { ContextDataSources } from '@/services/copilotContextAssembler';
 import { applyGuardrails, checkCopyrightCompliance } from '@/services/copilotGuardrailFilter';
 import { createProvenanceRecord } from '@/services/provenanceService';
@@ -47,6 +47,7 @@ const PROFESSIONAL_ROLES: UserRole[] = [
   'firm_admin',
   'land_surveyor',
   'health_safety',
+  'cpm',
 ];
 
 /** All valid capability strings for quick lookup. */
@@ -56,7 +57,7 @@ const VALID_CAPABILITIES = new Set<string>(Object.keys(CAPABILITY_ROLE_MAP));
  * Determines whether a role is a professional role (i.e. not platform_admin).
  */
 function isProfessionalRole(role: UserRole): boolean {
-  return role !== 'platform_admin';
+  return role !== 'platform_admin' && role !== 'admin';
 }
 
 /**
@@ -303,10 +304,11 @@ export async function processMessage(params: ProcessMessageParams): Promise<Copi
   }
 
   // 4. Assemble project context
-  const sources = dataSources ?? getDefaultDataSources();
   let contextJson: string;
   try {
-    const projectContext = await assembleContext(projectId, userId);
+    const projectContext = dataSources
+      ? await new ContextAssembler(dataSources).assembleContext(projectId, userId)
+      : await assembleContext(projectId, userId);
     contextJson = JSON.stringify(projectContext);
   } catch {
     // If context assembly fails entirely, proceed with empty context

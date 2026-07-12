@@ -71,6 +71,18 @@ describe('Copilot API — Auth token validation', () => {
     expect(capabilities).toEqual([]);
   });
 
+  it('normalizes legacy admin to platform_admin capability restrictions', () => {
+    expect(getCapabilitiesForRole('admin')).toEqual([]);
+    expect(validateCapabilityAccess('admin', 'draft_rfi')).toMatchObject({
+      allowed: false,
+      error: 'Copilot capabilities require a professional role.',
+    });
+  });
+
+  it('grants cpm the universal professional capabilities', () => {
+    expect(getCapabilitiesForRole('cpm')).toContain('summarise_status');
+  });
+
   it('professional role gets capabilities', () => {
     const capabilities = getCapabilitiesForRole('architect');
     expect(capabilities.length).toBeGreaterThan(0);

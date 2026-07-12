@@ -22,6 +22,7 @@ export const CANONICAL_USER_ROLES = [
   'platform_admin',
   'land_surveyor',
   'health_safety',
+  'cpm',
 ] as const satisfies readonly UserRole[];
 
 export type NormalizedUserRole = Exclude<UserRole, 'architect'>;

@@ -160,12 +160,22 @@ copilotRouter.post('/copilot/threads', async (req: Request, res: Response) => {
  */
 copilotRouter.get('/copilot/threads/:threadId/messages', async (req: Request, res: Response) => {
   try {
-    const { uid } = req.authContext!;
+    const { uid, role } = req.authContext!;
     const { threadId } = req.params;
-    const { limit, startAfter } = req.query;
+    const { projectId, page } = req.query;
+
+    if (!projectId || typeof projectId !== 'string') {
+      return res.status(400).json({ error: 'projectId query parameter is required.' });
+    }
 
     const { getMessages } = await import('../services/copilotService');
-    const result = await getMessages(threadId, uid, limit ? Number(limit) : 1);
+    const result = await getMessages(
+      threadId,
+      projectId,
+      page ? Number(page) : 1,
+      uid,
+      (role as any) || 'client',
+    );
 
     return res.status(200).json(result);
   } catch (err: any) {

@@ -47,6 +47,11 @@ describe('permissionService', () => {
     expect(new Set(UserRoleEnum.options)).toEqual(new Set(CANONICAL_USER_ROLES));
   });
 
+  it('includes cpm in both the canonical and runtime role sets', () => {
+    expect(CANONICAL_USER_ROLES).toContain('cpm');
+    expect(UserRoleEnum.safeParse('cpm').success).toBe(true);
+  });
+
   it('treats architect as a BEP subtype for authorization', () => {
     expect(normalizeUserRole('architect')).toBe('bep');
     expect(getRolePermissions('architect')).toEqual(getRolePermissions('bep'));

@@ -1066,6 +1066,8 @@ function AppContent() {
   }
 
   const currentPage = pageById(activeTab);
+  // Project-aware routes carry the selected scope in the URL.
+  const selectedProjectId = new URLSearchParams(window.location.search).get('projectId') || undefined;
   const currentPageLabel = pageLabelFor(activeTab);
   const currentSectionLabel = currentPage ? dashboardSectionLabel(currentPage.group) : 'Workspace';
   const roleVisual = roleVisualFor(user.role);
@@ -1209,7 +1211,7 @@ function AppContent() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
-              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={undefined} />}
+              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={selectedProjectId} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}
