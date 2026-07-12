@@ -109,8 +109,8 @@ const invalidCapabilityArb = fc
 
 /** Generate a valid ISO 8601 timestamp. */
 const isoTimestampArb = fc
-  .date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') })
-  .map((d) => d.toISOString());
+  .integer({ min: Date.UTC(2020, 0, 1), max: Date.UTC(2030, 11, 31) })
+  .map((ms) => new Date(ms).toISOString());
 
 /** Generate a valid CopilotMessage role. */
 const messageRoleArb = fc.constantFrom('user' as const, 'assistant' as const);
