@@ -8681,6 +8681,10 @@ router.use("/remote-desktop-marketplace", ownerRouter);
 import feedbackRouter from "./feedback-api-router";
 router.use("/feedback", feedbackRouter);
 
+// Mount Town Planning Application Tracker routes
+import planningRouter from "./planning-api-router";
+router.use("/planning", planningRouter);
+
 // Mount Copilot / Provenance / BYOAI routes
 import copilotRouter from "./copilot-api-router";
 router.use(copilotRouter);

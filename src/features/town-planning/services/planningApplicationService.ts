@@ -12,31 +12,31 @@ import type {
 } from '../types';
 
 import { PLANNING_STAGES, REFERENCE_NUMBER_PREFIX, DEFAULT_DOCUMENT_TYPES } from '../constants';
+import { adminDb } from '@/lib/firebase-admin';
 
-// ─── In-Memory Store ─────────────────────────────────────────────────────────
+// ─── Firestore Collections ───────────────────────────────────────────────────
 
-const applications: PlanningApplication[] = [];
-const stageTransitions: StageTransition[] = [];
-let referenceSequence = 0;
+const applicationsCollection = () => adminDb.collection('planning_applications');
+const transitionsCollection = () => adminDb.collection('planning_stage_transitions');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
  * Generates a unique reference number in the format TP-{YEAR}-{SEQ}.
- * Sequential counter is zero-padded to 3 digits.
+ * Uses Firestore counter document for atomic sequencing.
  */
-function generateReferenceNumber(): string {
-  referenceSequence += 1;
+async function generateReferenceNumber(): Promise<string> {
+  const counterRef = adminDb.collection('planning_counters').doc('reference_sequence');
+  const result = await adminDb.runTransaction(async (tx) => {
+    const doc = await tx.get(counterRef);
+    const current = doc.exists ? (doc.data()?.value ?? 0) : 0;
+    const next = current + 1;
+    tx.set(counterRef, { value: next }, { merge: true });
+    return next;
+  });
   const year = new Date().getFullYear();
-  const seq = String(referenceSequence).padStart(3, '0');
+  const seq = String(result).padStart(3, '0');
   return `${REFERENCE_NUMBER_PREFIX}-${year}-${seq}`;
-}
-
-/**
- * Generates a simple unique ID for records.
- */
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 // ─── Application CRUD ────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ function generateId(): string {
  * Creates a new planning application with initial stage set to `pre_consultation`
  * and status set to `draft`. Generates a unique reference number.
  */
-export function createApplication(params: {
+export async function createApplication(params: {
   projectId: string;
   tenantId: string;
   applicationType: PlanningApplicationType;
@@ -56,13 +56,16 @@ export function createApplication(params: {
   titleDeedReference: string;
   applicantName: string;
   applicantContactDetails: ContactDetails;
-}): PlanningApplication {
+}): Promise<PlanningApplication> {
   const now = new Date().toISOString();
+  const referenceNumber = await generateReferenceNumber();
+  const docRef = applicationsCollection().doc();
+
   const application: PlanningApplication = {
-    id: generateId(),
+    id: docRef.id,
     tenantId: params.tenantId,
     projectId: params.projectId,
-    referenceNumber: generateReferenceNumber(),
+    referenceNumber,
     applicationType: params.applicationType,
     currentStage: 'pre_consultation',
     status: 'draft',
@@ -78,29 +81,37 @@ export function createApplication(params: {
     updatedAt: now,
   };
 
-  applications.push(application);
+  await docRef.set(application);
   return application;
 }
 
 /**
  * Returns a single application by ID, or null if not found.
  */
-export function getApplication(applicationId: string): PlanningApplication | null {
-  return applications.find((app) => app.id === applicationId) ?? null;
+export async function getApplication(applicationId: string): Promise<PlanningApplication | null> {
+  const doc = await applicationsCollection().doc(applicationId).get();
+  if (!doc.exists) return null;
+  return doc.data() as PlanningApplication;
 }
 
 /**
  * Returns all applications for a given project.
  */
-export function getApplicationsByProject(projectId: string): PlanningApplication[] {
-  return applications.filter((app) => app.projectId === projectId);
+export async function getApplicationsByProject(projectId: string): Promise<PlanningApplication[]> {
+  const snapshot = await applicationsCollection()
+    .where('projectId', '==', projectId)
+    .get();
+  return snapshot.docs.map((doc) => doc.data() as PlanningApplication);
 }
 
 /**
  * Returns all applications assigned to a specific town planner.
  */
-export function getApplicationsByTownPlanner(townPlannerId: string): PlanningApplication[] {
-  return applications.filter((app) => app.assignedTownPlannerId === townPlannerId);
+export async function getApplicationsByTownPlanner(townPlannerId: string): Promise<PlanningApplication[]> {
+  const snapshot = await applicationsCollection()
+    .where('assignedTownPlannerId', '==', townPlannerId)
+    .get();
+  return snapshot.docs.map((doc) => doc.data() as PlanningApplication);
 }
 
 // ─── Stage Management ────────────────────────────────────────────────────────
@@ -130,12 +141,12 @@ export function getNextStage(currentStage: PlanningStage): PlanningStage | null 
  * - All required documents for the current stage are uploaded
  * - No unresolved parallel process blockers at tribunal_decision stage
  */
-export function validateStageGate(
+export async function validateStageGate(
   applicationId: string,
   documents: DocumentChecklistItem[] = [],
   triggers: EnvironmentalHeritageTrigger[] = []
-): StageGateResult {
-  const application = getApplication(applicationId);
+): Promise<StageGateResult> {
+  const application = await getApplication(applicationId);
   if (!application) {
     return {
       canAdvance: false,
@@ -162,7 +173,7 @@ export function validateStageGate(
     );
     if (!doc || doc.status === 'required') {
       missingDocuments.push({
-        id: generateId(),
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         applicationId,
         documentType: docType,
         description: `Required: ${docType}`,
@@ -214,11 +225,11 @@ export function validateStageGate(
  * Returns an array of StageRequirement objects showing what's needed for the
  * current stage and their fulfilment status.
  */
-export function getCurrentStageRequirements(
+export async function getCurrentStageRequirements(
   applicationId: string,
   documents: DocumentChecklistItem[] = []
-): StageRequirement[] {
-  const application = getApplication(applicationId);
+): Promise<StageRequirement[]> {
+  const application = await getApplication(applicationId);
   if (!application) {
     return [];
   }
@@ -253,20 +264,20 @@ export function getCurrentStageRequirements(
  * Creates a StageTransition record, updates the application's currentStage.
  * If advancing to `circulation_advertising`, auto-sets status to `active` (if still `draft`).
  */
-export function advanceStage(
+export async function advanceStage(
   applicationId: string,
   userId: string,
   notes: string,
   documents: DocumentChecklistItem[] = [],
   triggers: EnvironmentalHeritageTrigger[] = []
-): StageTransition {
-  const application = getApplication(applicationId);
+): Promise<StageTransition> {
+  const application = await getApplication(applicationId);
   if (!application) {
     throw new Error(`Application not found: ${applicationId}`);
   }
 
   // Validate stage gate
-  const gateResult = validateStageGate(applicationId, documents, triggers);
+  const gateResult = await validateStageGate(applicationId, documents, triggers);
   if (!gateResult.canAdvance) {
     const reasons = [
       ...gateResult.blockers,
@@ -286,8 +297,9 @@ export function advanceStage(
   }
 
   // Create transition record
+  const transitionRef = transitionsCollection().doc();
   const transition: StageTransition = {
-    id: generateId(),
+    id: transitionRef.id,
     applicationId,
     fromStage,
     toStage,
@@ -297,16 +309,20 @@ export function advanceStage(
     documentsVerified: gateResult.missingDocuments.length === 0,
   };
 
-  stageTransitions.push(transition);
+  await transitionRef.set(transition);
 
   // Update the application's current stage
-  application.currentStage = toStage;
-  application.updatedAt = new Date().toISOString();
+  const updateData: Record<string, unknown> = {
+    currentStage: toStage,
+    updatedAt: new Date().toISOString(),
+  };
 
   // Auto-set status to active when entering circulation_advertising (if still draft)
   if (toStage === 'circulation_advertising' && application.status === 'draft') {
-    application.status = 'active';
+    updateData.status = 'active';
   }
+
+  await applicationsCollection().doc(applicationId).update(updateData);
 
   return transition;
 }
@@ -316,42 +332,52 @@ export function advanceStage(
 /**
  * Updates the application status.
  */
-export function updateStatus(applicationId: string, status: ApplicationStatus): void {
-  const application = getApplication(applicationId);
-  if (!application) {
+export async function updateStatus(applicationId: string, status: ApplicationStatus): Promise<void> {
+  const doc = await applicationsCollection().doc(applicationId).get();
+  if (!doc.exists) {
     throw new Error(`Application not found: ${applicationId}`);
   }
-  application.status = status;
-  application.updatedAt = new Date().toISOString();
+  await applicationsCollection().doc(applicationId).update({
+    status,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /**
  * Sets status to `deemed_refused`.
  * Called when 60-day decision period expires without a decision per SPLUMA Section 56.
  */
-export function markDeemedRefused(applicationId: string): void {
-  const application = getApplication(applicationId);
-  if (!application) {
+export async function markDeemedRefused(applicationId: string): Promise<void> {
+  const doc = await applicationsCollection().doc(applicationId).get();
+  if (!doc.exists) {
     throw new Error(`Application not found: ${applicationId}`);
   }
-  application.status = 'deemed_refused';
-  application.updatedAt = new Date().toISOString();
+  await applicationsCollection().doc(applicationId).update({
+    status: 'deemed_refused',
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 // ─── Test Helpers (for resetting state in tests) ─────────────────────────────
 
 /**
- * Resets the in-memory store. Only intended for use in tests.
+ * Resets the Firestore collections. Only intended for use in tests.
  */
-export function _resetStore(): void {
-  applications.length = 0;
-  stageTransitions.length = 0;
-  referenceSequence = 0;
+export async function _resetStore(): Promise<void> {
+  const appSnapshot = await applicationsCollection().get();
+  const transSnapshot = await transitionsCollection().get();
+  const batch = adminDb.batch();
+  appSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  transSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  // Reset counter
+  await adminDb.collection('planning_counters').doc('reference_sequence').set({ value: 0 });
 }
 
 /**
  * Returns all stored stage transitions. Useful for assertions in tests.
  */
-export function _getTransitions(): StageTransition[] {
-  return [...stageTransitions];
+export async function _getTransitions(): Promise<StageTransition[]> {
+  const snapshot = await transitionsCollection().get();
+  return snapshot.docs.map((doc) => doc.data() as StageTransition);
 }

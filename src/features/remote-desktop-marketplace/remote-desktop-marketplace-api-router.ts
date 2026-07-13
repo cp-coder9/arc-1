@@ -143,6 +143,15 @@ function sendUnauthorized(res: Response): void {
 
 const marketplaceRouter = express.Router();
 
+// ─── Production Guard ─────────────────────────────────────────────────────────
+// This feature uses in-memory state and is not production-ready.
+// Return 503 in production until Firestore persistence is integrated.
+if (process.env.NODE_ENV === 'production') {
+  marketplaceRouter.use((_req, res) => res.status(503).json({ 
+    error: 'Remote Desktop Marketplace API is not available in production. Persistent storage integration pending.' 
+  }));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CATALOGUE ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════

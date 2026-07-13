@@ -5,7 +5,7 @@
  * Pure functions for CRUD operations, profile resolution with SPLUMA default
  * fallback, and lookups for required documents, fees, and timeframes.
  *
- * Firestore collection: `planning_municipality_profiles` (scoped by tenantId)
+ * Firestore collection: `municipality_profiles/{id}`
  */
 
 import type {
@@ -18,22 +18,11 @@ import type {
 } from '../types';
 
 import { SPLUMA_DEFAULT_TIMEFRAMES } from '../constants';
+import { adminDb } from '@/lib/firebase-admin';
 
-// ── In-Memory Store ─────────────────────────────────────────────────────────
+// ── Firestore Collection ────────────────────────────────────────────────────
 
-/** In-memory store for municipality profiles (MVP — replaces Firestore). */
-let profiles: MunicipalityProfile[] = [];
-
-/** Auto-incrementing counter for generating unique IDs. */
-let idCounter = 0;
-
-/**
- * Generate a unique profile ID.
- */
-function generateId(): string {
-  idCounter += 1;
-  return `muni_profile_${Date.now()}_${idCounter}`;
-}
+const profilesCollection = () => adminDb.collection('municipality_profiles');
 
 /**
  * Get the current ISO timestamp string.
@@ -102,22 +91,23 @@ export function getDefaultProfile(): MunicipalityProfile {
 /**
  * Creates a new municipality profile with auto-generated ID and timestamps.
  *
- * Stores in the in-memory collection scoped by the provided tenantId.
+ * Stores in the Firestore collection scoped by the provided tenantId.
  *
  * @param params - Profile data excluding id, createdAt, and updatedAt
  * @returns The newly created MunicipalityProfile with generated fields
  */
-export function createProfile(
+export async function createProfile(
   params: Omit<MunicipalityProfile, 'id' | 'createdAt' | 'updatedAt'>,
-): MunicipalityProfile {
+): Promise<MunicipalityProfile> {
   const now = nowTimestamp();
+  const docRef = profilesCollection().doc();
   const profile: MunicipalityProfile = {
     ...params,
-    id: generateId(),
+    id: docRef.id,
     createdAt: now,
     updatedAt: now,
   };
-  profiles.push(profile);
+  await docRef.set(profile);
   return profile;
 }
 
@@ -132,16 +122,17 @@ export function createProfile(
  * @returns The updated MunicipalityProfile
  * @throws Error if no profile with the given ID exists
  */
-export function updateProfile(
+export async function updateProfile(
   profileId: string,
   updates: Partial<Omit<MunicipalityProfile, 'id' | 'createdAt'>>,
-): MunicipalityProfile {
-  const index = profiles.findIndex((p) => p.id === profileId);
-  if (index === -1) {
+): Promise<MunicipalityProfile> {
+  const docRef = profilesCollection().doc(profileId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
     throw new Error(`Municipality profile not found: ${profileId}`);
   }
 
-  const existing = profiles[index];
+  const existing = doc.data() as MunicipalityProfile;
   const updated: MunicipalityProfile = {
     ...existing,
     ...updates,
@@ -149,7 +140,7 @@ export function updateProfile(
     createdAt: existing.createdAt,
     updatedAt: nowTimestamp(),
   };
-  profiles[index] = updated;
+  await docRef.set(updated);
   return updated;
 }
 
@@ -159,21 +150,37 @@ export function updateProfile(
  * @param profileId - The ID of the profile to fetch
  * @returns The MunicipalityProfile if found, or null
  */
-export function getProfile(profileId: string): MunicipalityProfile | null {
-  return profiles.find((p) => p.id === profileId) ?? null;
+export async function getProfile(profileId: string): Promise<MunicipalityProfile | null> {
+  const doc = await profilesCollection().doc(profileId).get();
+  if (!doc.exists) return null;
+  return doc.data() as MunicipalityProfile;
 }
 
 /**
  * Fetches a municipality profile by municipality name.
  *
- * Performs a case-insensitive comparison.
+ * Performs a case-insensitive comparison by querying all profiles
+ * and filtering client-side (Firestore doesn't support case-insensitive queries natively).
  *
  * @param name - The municipality name to search for
  * @returns The MunicipalityProfile if found, or null
  */
-export function getProfileByName(name: string): MunicipalityProfile | null {
+export async function getProfileByName(name: string): Promise<MunicipalityProfile | null> {
+  // Query by exact name first (most common case)
+  const snapshot = await profilesCollection().where('name', '==', name).limit(1).get();
+  if (!snapshot.empty) {
+    return snapshot.docs[0].data() as MunicipalityProfile;
+  }
+  // Fallback: query all and compare case-insensitively
+  const allSnapshot = await profilesCollection().get();
   const lower = name.toLowerCase();
-  return profiles.find((p) => p.name.toLowerCase() === lower) ?? null;
+  for (const doc of allSnapshot.docs) {
+    const profile = doc.data() as MunicipalityProfile;
+    if (profile.name.toLowerCase() === lower) {
+      return profile;
+    }
+  }
+  return null;
 }
 
 /**
@@ -182,8 +189,11 @@ export function getProfileByName(name: string): MunicipalityProfile | null {
  * @param tenantId - The tenant identifier to scope the query
  * @returns Array of MunicipalityProfile records for the tenant
  */
-export function listProfiles(tenantId: string): MunicipalityProfile[] {
-  return profiles.filter((p) => p.tenantId === tenantId);
+export async function listProfiles(tenantId: string): Promise<MunicipalityProfile[]> {
+  const snapshot = await profilesCollection()
+    .where('tenantId', '==', tenantId)
+    .get();
+  return snapshot.docs.map((doc) => doc.data() as MunicipalityProfile);
 }
 
 // ── Resolution ──────────────────────────────────────────────────────────────
@@ -199,8 +209,8 @@ export function listProfiles(tenantId: string): MunicipalityProfile[] {
  * @param municipalityId - The ID of the municipality profile to resolve
  * @returns The matching MunicipalityProfile, or the SPLUMA default
  */
-export function resolveProfile(municipalityId: string): MunicipalityProfile {
-  const profile = getProfile(municipalityId);
+export async function resolveProfile(municipalityId: string): Promise<MunicipalityProfile> {
+  const profile = await getProfile(municipalityId);
   if (profile) return profile;
   return getDefaultProfile();
 }
@@ -217,11 +227,11 @@ export function resolveProfile(municipalityId: string): MunicipalityProfile {
  * @param applicationType - The planning application type to filter by
  * @returns Array of RequiredForm entries matching the application type
  */
-export function getRequiredDocuments(
+export async function getRequiredDocuments(
   profileId: string,
   applicationType: PlanningApplicationType,
-): RequiredForm[] {
-  const profile = getProfile(profileId);
+): Promise<RequiredForm[]> {
+  const profile = await getProfile(profileId);
   if (!profile) return [];
   return profile.requiredForms.filter((form) =>
     form.applicationType.includes(applicationType),
@@ -238,11 +248,11 @@ export function getRequiredDocuments(
  * @param applicationType - The planning application type to filter by
  * @returns Array of FeeScheduleItem entries matching the application type
  */
-export function getFees(
+export async function getFees(
   profileId: string,
   applicationType: PlanningApplicationType,
-): FeeScheduleItem[] {
-  const profile = getProfile(profileId);
+): Promise<FeeScheduleItem[]> {
+  const profile = await getProfile(profileId);
   if (!profile) return [];
   return profile.feeSchedule.filter(
     (fee) => fee.applicationType === applicationType,
@@ -258,8 +268,8 @@ export function getFees(
  * @param profileId - The municipality profile ID
  * @returns Array of CustomTimeframe entries (profile-specific or SPLUMA defaults)
  */
-export function getTimeframes(profileId: string): CustomTimeframe[] {
-  const profile = getProfile(profileId);
+export async function getTimeframes(profileId: string): Promise<CustomTimeframe[]> {
+  const profile = await getProfile(profileId);
   if (!profile || profile.customTimeframes.length === 0) {
     return getDefaultProfile().customTimeframes;
   }
@@ -269,16 +279,19 @@ export function getTimeframes(profileId: string): CustomTimeframe[] {
 // ── Store Management (for testing) ──────────────────────────────────────────
 
 /**
- * Resets the in-memory store. Intended for use in tests only.
+ * Resets the Firestore collection. Intended for use in tests only.
  */
-export function _resetStore(): void {
-  profiles = [];
-  idCounter = 0;
+export async function _resetStore(): Promise<void> {
+  const snapshot = await profilesCollection().get();
+  const batch = adminDb.batch();
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
 }
 
 /**
  * Returns the current store contents. Intended for use in tests only.
  */
-export function _getStore(): MunicipalityProfile[] {
-  return [...profiles];
+export async function _getStore(): Promise<MunicipalityProfile[]> {
+  const snapshot = await profilesCollection().get();
+  return snapshot.docs.map((doc) => doc.data() as MunicipalityProfile);
 }

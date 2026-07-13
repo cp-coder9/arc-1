@@ -170,7 +170,9 @@ export class ContextAssembler {
     const canReadProject = canUserPerform(authzUser, 'project:read', projectAccess);
 
     if (!canReadProject) {
-      return this.buildEmptyContext(userId, projectId);
+      const error = new Error('Access denied: insufficient project permissions');
+      (error as Error & { status?: number }).status = 403;
+      throw error;
     }
 
     // Fetch all data sources in parallel with timeout
