@@ -76,20 +76,17 @@ jest.mock('@vercel/blob', () => ({
   del: jest.fn<any>().mockResolvedValue(undefined),
 }));
 
-// Mock environment variables
-globalThis.process = {
-  ...globalThis.process,
-  env: {
-    ...globalThis.process?.env,
-    VITE_FIREBASE_API_KEY: 'test-api-key',
-    VITE_FIREBASE_AUTH_DOMAIN: 'test.firebaseapp.com',
-    VITE_FIREBASE_PROJECT_ID: 'test-project',
-    VITE_BLOB_READ_WRITE_TOKEN: 'test-token',
-    GEMINI_API_KEY: 'test-gemini-key',
-    VITE_PAYFAST_MERCHANT_ID: '10000100',
-    VITE_PAYFAST_MERCHANT_KEY: '46f0cd694581a',
-  },
-};
+// Mock environment variables — assign to process.env directly to preserve
+// EventEmitter methods (addListener, removeListener) required by packages like ExcelJS/tmp.
+Object.assign(process.env, {
+  VITE_FIREBASE_API_KEY: 'test-api-key',
+  VITE_FIREBASE_AUTH_DOMAIN: 'test.firebaseapp.com',
+  VITE_FIREBASE_PROJECT_ID: 'test-project',
+  VITE_BLOB_READ_WRITE_TOKEN: 'test-token',
+  GEMINI_API_KEY: 'test-gemini-key',
+  VITE_PAYFAST_MERCHANT_ID: '10000100',
+  VITE_PAYFAST_MERCHANT_KEY: '46f0cd694581a',
+});
 
 // Mock window.crypto for MD5 hashing
 Object.defineProperty(globalThis, 'crypto', {

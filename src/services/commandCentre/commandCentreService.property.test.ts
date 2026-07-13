@@ -40,7 +40,7 @@ function appendAuditEntry(trail: AuditEntry[], newEntry: AuditEntry): AuditEntry
 const actionTypeArb = fc.constantFrom('create', 'update', 'delete', 'status_change', 'escalation') as fc.Arbitrary<AuditEntry['actionType']>;
 const entityTypeArb = fc.constantFrom('task', 'milestone', 'risk', 'payment_certificate', 'procurement_order', 'contract', 'activity', 'variation', 'budget_package');
 const nonEmptyStringArb = fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0);
-const timestampArb = fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }).map((d) => d.toISOString());
+const timestampArb = fc.integer({ min: new Date('2020-01-01T00:00:00.000Z').getTime(), max: new Date('2030-12-31T00:00:00.000Z').getTime() }).map((ts) => new Date(ts).toISOString());
 
 const auditEntryArb: fc.Arbitrary<AuditEntry> = fc.record({
   id: fc.uuid(),

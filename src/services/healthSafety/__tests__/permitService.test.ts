@@ -262,10 +262,10 @@ describe('Property 18: Permit close-out records details', () => {
  */
 describe('Property 17: Permit time-window enforcement and expiry transition', () => {
   // Constrain dates to a reasonable range to avoid overflow
-  const reasonableDate = fc.date({
-    min: new Date('2000-01-01T00:00:00.000Z'),
-    max: new Date('2100-12-31T23:59:59.999Z'),
-  });
+  const reasonableDate = fc.integer({
+    min: new Date('2000-01-01T00:00:00.000Z').getTime(),
+    max: new Date('2100-12-31T23:59:59.999Z').getTime(),
+  }).map((ts) => new Date(ts));
 
   it('active permit with now > validTo returns expired with high-priority event', () => {
     fc.assert(

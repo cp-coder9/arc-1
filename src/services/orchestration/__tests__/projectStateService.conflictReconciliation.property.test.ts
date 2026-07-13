@@ -58,11 +58,10 @@ const arbConflictScenario = (): fc.Arbitrary<ConflictScenario> =>
       recordB: arbProjectRecord(),
       // A base instant plus a strictly-positive offset guarantees two distinct
       // timestamps (one earlier, one strictly later).
-      base: fc.date({
-        min: new Date('2020-01-01T00:00:00.000Z'),
-        max: new Date('2035-01-01T00:00:00.000Z'),
-        noInvalidDate: true,
-      }),
+      base: fc.integer({
+        min: new Date('2020-01-01T00:00:00.000Z').getTime(),
+        max: new Date('2035-01-01T00:00:00.000Z').getTime(),
+      }).map((ts) => new Date(ts)),
       offsetMs: fc.integer({ min: 1, max: 5 * 365 * 24 * 60 * 60 * 1000 }),
       aIsLater: fc.boolean(),
     })

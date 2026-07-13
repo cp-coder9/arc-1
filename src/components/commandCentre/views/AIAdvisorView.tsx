@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BrainCircuit, CheckCircle, X, RefreshCw } from 'lucide-react';
+import { useDemoMode } from '@/demo-context/DemoModeProvider';
 import type { AIRecommendation } from '@/services/commandCentre/types';
 
 interface AIAdvisorViewProps {
@@ -20,12 +21,20 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function AIAdvisorView({ projectId }: AIAdvisorViewProps) {
+  const { isDemoMode } = useDemoMode();
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    void projectId;
-  }, [projectId]);
+  if (!isDemoMode) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <p className="text-lg text-muted-foreground">No live data connected yet</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Data integration pending for project {projectId}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

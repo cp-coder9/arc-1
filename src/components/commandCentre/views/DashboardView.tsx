@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Activity, DollarSign, AlertTriangle, MessageSquare, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { useDemoMode } from '@/demo-context/DemoModeProvider';
 import type { AIRecommendation, CommandCentreMilestone } from '@/services/commandCentre/types';
 
 interface DashboardViewProps {
@@ -14,14 +15,10 @@ interface DashboardViewProps {
 const LIFECYCLE_STAGES = ['Brief', 'Appoint', 'Design', 'Comply', 'Procure', 'Build', 'Pay', 'Closeout'];
 
 export default function DashboardView({ projectId }: DashboardViewProps) {
+  const { isDemoMode } = useDemoMode();
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [milestones, setMilestones] = useState<CommandCentreMilestone[]>([]);
   const [currentStage] = useState(4); // Index of active stage
-
-  useEffect(() => {
-    // Service integration point — load dashboard data
-    void projectId;
-  }, [projectId]);
 
   const statCards = [
     { label: 'Overall Progress', value: '62%', icon: Activity, trend: '+3% this week' },
@@ -30,8 +27,23 @@ export default function DashboardView({ projectId }: DashboardViewProps) {
     { label: 'Active RFIs', value: '5', icon: MessageSquare, trend: '2 pending response' },
   ];
 
+  if (!isDemoMode) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <p className="text-lg text-muted-foreground">No data loaded</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Live data integration pending for project {projectId}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Demo Data Indicator */}
+      <div className="flex justify-end">
+        <span className="text-xs text-orange-400 bg-orange-500/20 rounded-full px-2 py-0.5">Demo Data</span>
+      </div>
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card) => {

@@ -61,16 +61,16 @@ const arbCategory = fc.constantFrom<FeedbackCategory>(...CATEGORIES);
 const arbStatus = fc.constantFrom<FeedbackStatus>(...STATUSES);
 
 /** Generate a realistic ISO-8601 datetime string. */
-const arbISODateTime = fc.date({
-  min: new Date('2023-01-01'),
-  max: new Date('2026-12-31'),
-}).filter(d => !isNaN(d.getTime())).map(d => d.toISOString());
+const arbISODateTime = fc.integer({
+  min: new Date('2023-01-01T00:00:00.000Z').getTime(),
+  max: new Date('2026-12-31T00:00:00.000Z').getTime(),
+}).map((ts) => new Date(ts).toISOString());
 
 /** Generate a realistic ISO date string (YYYY-MM-DD). */
-const arbISODate = fc.date({
-  min: new Date('2023-01-01'),
-  max: new Date('2026-12-31'),
-}).filter(d => !isNaN(d.getTime())).map(d => d.toISOString().slice(0, 10));
+const arbISODate = fc.integer({
+  min: new Date('2023-01-01T00:00:00.000Z').getTime(),
+  max: new Date('2026-12-31T00:00:00.000Z').getTime(),
+}).map((ts) => new Date(ts).toISOString().slice(0, 10));
 
 /** Generate a minimal FeedbackCluster with the fields relevant to filtering. */
 const arbCluster: fc.Arbitrary<FeedbackCluster> = fc.record({

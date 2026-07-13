@@ -42,6 +42,9 @@ const VARIATIONS_COL = 'variations';
 /** Over-budget threshold: 5% */
 const OVER_BUDGET_THRESHOLD = 0.05;
 
+/** Epsilon tolerance for IEEE 754 floating-point comparison */
+const FLOAT_EPSILON = 1e-7;
+
 // ── Firestore Path Helpers ───────────────────────────────────────────────────
 
 function budgetPackagesCollection(projectId: string) {
@@ -73,11 +76,13 @@ export function computeVariance(spent: number, budget: number): number {
 
 /**
  * Returns true when expenditure exceeds budget by more than 5%.
- * Formula: (spent - budget) / budget > 0.05
+ * Formula: (spent - budget) / budget > 0.05 + FLOAT_EPSILON
+ * Uses epsilon tolerance to prevent IEEE 754 imprecision from causing
+ * false positives at the exact 5% boundary.
  */
 export function isOverBudgetThreshold(spent: number, budget: number): boolean {
   if (budget === 0) return spent > 0;
-  return (spent - budget) / budget > OVER_BUDGET_THRESHOLD;
+  return (spent - budget) / budget > OVER_BUDGET_THRESHOLD + FLOAT_EPSILON;
 }
 
 /**

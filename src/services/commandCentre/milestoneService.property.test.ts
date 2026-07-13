@@ -26,8 +26,8 @@ function sortMilestonesAscending(milestones: CommandCentreMilestone[]): CommandC
 
 // ── Arbitraries ──────────────────────────────────────────────────────────────
 
-const isoDateArb = fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') }).map((d) => d.toISOString().split('T')[0]);
-const timestampArb = fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') }).map((d) => d.toISOString());
+const isoDateArb = fc.integer({ min: new Date('2024-01-01T00:00:00.000Z').getTime(), max: new Date('2026-12-31T00:00:00.000Z').getTime() }).map((ts) => new Date(ts).toISOString().split('T')[0]);
+const timestampArb = fc.integer({ min: new Date('2024-01-01T00:00:00.000Z').getTime(), max: new Date('2026-12-31T00:00:00.000Z').getTime() }).map((ts) => new Date(ts).toISOString());
 const nonEmptyStringArb = fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.trim().length > 0);
 
 const milestoneArb: fc.Arbitrary<CommandCentreMilestone> = fc.record({

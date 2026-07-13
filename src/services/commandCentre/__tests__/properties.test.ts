@@ -83,10 +83,10 @@ import type { UserRole } from '@/types';
 
 // ── Arbitraries (Generators) ─────────────────────────────────────────────────
 
-const isoDateArb = fc.date({
-  min: new Date('2020-01-01'),
-  max: new Date('2030-12-31'),
-}).map((d) => d.toISOString().split('T')[0]);
+const isoDateArb = fc.integer({
+  min: new Date('2020-01-01T00:00:00.000Z').getTime(),
+  max: new Date('2030-12-31T00:00:00.000Z').getTime(),
+}).map((ts) => new Date(ts).toISOString().split('T')[0]);
 
 const priorityArb = fc.constantFrom('low', 'medium', 'high', 'critical') as fc.Arbitrary<'low' | 'medium' | 'high' | 'critical'>;
 
@@ -231,7 +231,7 @@ const diaryEntryArb: fc.Arbitrary<SiteDiaryEntry> = fc.record({
   workCompleted: nonEmptyStringArb,
   issuesDelays: fc.option(nonEmptyStringArb, { nil: undefined }),
   createdBy: fc.uuid(),
-  createdAt: fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }).map((d) => d.toISOString()),
+  createdAt: fc.integer({ min: new Date('2020-01-01T00:00:00.000Z').getTime(), max: new Date('2030-12-31T00:00:00.000Z').getTime() }).map((ts) => new Date(ts).toISOString()),
   mentionsDelays: fc.boolean(),
 });
 
@@ -533,7 +533,7 @@ describe('Property 2: Deadline and Threshold Detection', () => {
     fc.assert(
       fc.property(
         taskArb.map((t) => ({ ...t, status: 'done' as const })),
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        fc.integer({ min: new Date('2020-01-01T00:00:00.000Z').getTime(), max: new Date('2030-12-31T00:00:00.000Z').getTime() }).map((ts) => new Date(ts)),
         (task, currentDate) => {
           const entity: DeadlineEntity = { type: 'task', entity: task };
           const result = classifyDeadlineStatus(entity, currentDate);
@@ -1349,7 +1349,7 @@ describe('Property 16: Audit Trail Recording', () => {
       entityId: fc.uuid(),
       before: fc.option(fc.dictionary(nonEmptyStringArb, fc.anything()), { nil: undefined }),
       after: fc.option(fc.dictionary(nonEmptyStringArb, fc.anything()), { nil: undefined }),
-      timestamp: fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }).map((d) => d.toISOString()),
+      timestamp: fc.integer({ min: new Date('2020-01-01T00:00:00.000Z').getTime(), max: new Date('2030-12-31T00:00:00.000Z').getTime() }).map((ts) => new Date(ts).toISOString()),
     });
 
     fc.assert(

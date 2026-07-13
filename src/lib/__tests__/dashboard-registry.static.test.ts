@@ -261,9 +261,9 @@ describe('canonical dashboard page registry', () => {
   });
 
   it('routes the shared command page to the real project command centre projection', () => {
-    expect(appSource).toContain("const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));"
+    expect(appSource).toContain("const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/commandCentre/ProjectCommandCentre'));"
     );
-    expect(appSource).toContain(`activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />`);
+    expect(appSource).toContain(`activeTab === 'command' && <ProjectCommandCentre user={user} projectId={commandCentreProjectId} />`);
     expect(appSource).not.toContain(`(user.role === 'subcontractor' || user.role === 'supplier') && <DashboardPageShell pageId="command" user={user} />`);
   });
 

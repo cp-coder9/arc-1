@@ -8,7 +8,7 @@
  * Requirements: 6.5, 6.6, 6.7, 12.3
  */
 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type {
   BoqDocument,
   BoqSection,
@@ -68,25 +68,34 @@ function escapeCsvField(value: string): string {
  * @param boq - The BoQ document to export
  * @returns Buffer containing the .xlsx file data
  */
-export function exportToExcel(boq: BoqDocument): Buffer {
-  const wb = XLSX.utils.book_new();
+export async function exportToExcel(boq: BoqDocument): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Bill of Quantities');
 
-  // Build worksheet data
-  const wsData: (string | number | undefined)[][] = [];
+  // Set column widths for readability
+  ws.columns = [
+    { width: 22 },  // Section
+    { width: 10 },  // Item No
+    { width: 50 },  // Description
+    { width: 8 },   // Unit
+    { width: 12 },  // Quantity
+    { width: 14 },  // Rate
+    { width: 14 },  // Amount
+  ];
 
   // Header row
-  wsData.push(['Section', 'Item No', 'Description', 'Unit', 'Quantity', 'Rate (ZAR)', 'Amount (ZAR)']);
+  ws.addRow(['Section', 'Item No', 'Description', 'Unit', 'Quantity', 'Rate (ZAR)', 'Amount (ZAR)']);
 
   let grandTotalQuantity = 0;
 
   for (const section of boq.sections) {
     // Section header row
-    wsData.push([`Section ${section.sectionNumber}: ${section.title}`, '', '', '', '', '', '']);
+    ws.addRow([`Section ${section.sectionNumber}: ${section.title}`, '', '', '', '', '', '']);
 
     let sectionQuantityTotal = 0;
 
     for (const item of section.lineItems) {
-      wsData.push([
+      ws.addRow([
         section.title,
         item.itemNumber,
         item.description,
@@ -99,32 +108,16 @@ export function exportToExcel(boq: BoqDocument): Buffer {
     }
 
     // Subtotal row for section
-    wsData.push(['', '', `Subtotal — ${section.title}`, '', sectionQuantityTotal, '', '']);
+    ws.addRow(['', '', `Subtotal — ${section.title}`, '', sectionQuantityTotal, '', '']);
     grandTotalQuantity += sectionQuantityTotal;
   }
 
   // Grand total row
-  wsData.push(['', '', 'GRAND TOTAL', '', grandTotalQuantity, '', '']);
-
-  // Create worksheet from array of arrays
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-  // Set column widths for readability
-  ws['!cols'] = [
-    { wch: 22 }, // Section
-    { wch: 10 }, // Item No
-    { wch: 50 }, // Description
-    { wch: 8 },  // Unit
-    { wch: 12 }, // Quantity
-    { wch: 14 }, // Rate
-    { wch: 14 }, // Amount
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Bill of Quantities');
+  ws.addRow(['', '', 'GRAND TOTAL', '', grandTotalQuantity, '', '']);
 
   // Write workbook to buffer
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  return Buffer.from(buf);
+  const arrayBuffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 // ─── JSON Export ────────────────────────────────────────────────────────────
@@ -150,42 +143,47 @@ export function exportToJson(boq: BoqDocument): string {
  * @param pkg - The procurement package to export
  * @returns Buffer containing the .xlsx file data
  */
-export function exportProcurementPackage(pkg: ProcurementPackage): Buffer {
-  const wb = XLSX.utils.book_new();
+export async function exportProcurementPackage(pkg: ProcurementPackage): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
 
   // ─── Cover Sheet ──────────────────────────────────────────────────────────
 
-  const coverData: (string | number | undefined)[][] = [
-    ['PROCUREMENT PACKAGE — COVER SHEET'],
-    [],
-    ['Project Name', pkg.coverSheet.projectName],
-    ['Project Number', pkg.coverSheet.projectNumber],
-    ['Package Title', pkg.coverSheet.packageTitle],
-    ['Issue Date', pkg.coverSheet.issueDate],
-    ['Revision', pkg.coverSheet.revisionNumber],
-    [],
-    ['QS Contact Name', pkg.coverSheet.qsContactName],
-    ['QS Contact Email', pkg.coverSheet.qsContactEmail],
-    [],
-    ['Trade Sections', pkg.tradeSections.join(', ')],
-    ['Total Line Items', pkg.lineItems.length],
+  const coverWs = wb.addWorksheet('Cover Sheet');
+  coverWs.columns = [
+    { width: 20 },
+    { width: 50 },
   ];
 
-  const coverWs = XLSX.utils.aoa_to_sheet(coverData);
-  coverWs['!cols'] = [
-    { wch: 20 },
-    { wch: 50 },
-  ];
-  XLSX.utils.book_append_sheet(wb, coverWs, 'Cover Sheet');
+  coverWs.addRow(['PROCUREMENT PACKAGE — COVER SHEET']);
+  coverWs.addRow([]);
+  coverWs.addRow(['Project Name', pkg.coverSheet.projectName]);
+  coverWs.addRow(['Project Number', pkg.coverSheet.projectNumber]);
+  coverWs.addRow(['Package Title', pkg.coverSheet.packageTitle]);
+  coverWs.addRow(['Issue Date', pkg.coverSheet.issueDate]);
+  coverWs.addRow(['Revision', pkg.coverSheet.revisionNumber]);
+  coverWs.addRow([]);
+  coverWs.addRow(['QS Contact Name', pkg.coverSheet.qsContactName]);
+  coverWs.addRow(['QS Contact Email', pkg.coverSheet.qsContactEmail]);
+  coverWs.addRow([]);
+  coverWs.addRow(['Trade Sections', pkg.tradeSections.join(', ')]);
+  coverWs.addRow(['Total Line Items', pkg.lineItems.length]);
 
   // ─── Line Items Sheet ─────────────────────────────────────────────────────
 
-  const itemsData: (string | number | undefined)[][] = [
-    ['Item No', 'Description', 'Unit', 'Quantity', 'Rate (ZAR)', 'Amount (ZAR)'],
+  const itemsWs = wb.addWorksheet('Line Items');
+  itemsWs.columns = [
+    { width: 10 },  // Item No
+    { width: 50 },  // Description
+    { width: 8 },   // Unit
+    { width: 12 },  // Quantity
+    { width: 14 },  // Rate
+    { width: 14 },  // Amount
   ];
 
+  itemsWs.addRow(['Item No', 'Description', 'Unit', 'Quantity', 'Rate (ZAR)', 'Amount (ZAR)']);
+
   for (const item of pkg.lineItems) {
-    itemsData.push([
+    itemsWs.addRow([
       item.itemNumber,
       item.description,
       item.unit,
@@ -197,20 +195,9 @@ export function exportProcurementPackage(pkg: ProcurementPackage): Buffer {
 
   // Grand total row
   const totalQuantity = pkg.lineItems.reduce((sum, item) => sum + item.quantity, 0);
-  itemsData.push(['', 'TOTAL', '', totalQuantity, '', '']);
-
-  const itemsWs = XLSX.utils.aoa_to_sheet(itemsData);
-  itemsWs['!cols'] = [
-    { wch: 10 },  // Item No
-    { wch: 50 },  // Description
-    { wch: 8 },   // Unit
-    { wch: 12 },  // Quantity
-    { wch: 14 },  // Rate
-    { wch: 14 },  // Amount
-  ];
-  XLSX.utils.book_append_sheet(wb, itemsWs, 'Line Items');
+  itemsWs.addRow(['', 'TOTAL', '', totalQuantity, '', '']);
 
   // Write workbook to buffer
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  return Buffer.from(buf);
+  const arrayBuffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
 }

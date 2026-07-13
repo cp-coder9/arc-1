@@ -179,11 +179,10 @@ describe('toSast — SAST (UTC+02:00) minute-precision rendering', () => {
   it('always renders +02:00 to the minute across arbitrary UTC instants', () => {
     assertProperty(
       fc.property(
-        fc.date({
-          min: new Date('2020-01-01T00:00:00.000Z'),
-          max: new Date('2035-12-31T23:59:59.000Z'),
-          noInvalidDate: true,
-        }),
+        fc.integer({
+          min: new Date('2020-01-01T00:00:00.000Z').getTime(),
+          max: new Date('2035-12-31T23:59:59.000Z').getTime(),
+        }).map((ts) => new Date(ts)),
         (instant) => {
           const rendered = toSast(instant.toISOString());
           expect(rendered).toMatch(SAST_MINUTE_REGEX);

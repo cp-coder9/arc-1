@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, CheckCircle, AlertCircle, Clock, Wrench } from 'lucide-react';
+import { useDemoMode } from '@/demo-context/DemoModeProvider';
 
 interface QualityViewProps {
   projectId: string;
@@ -21,11 +22,19 @@ interface SnagItem {
 }
 
 export default function QualityView({ projectId }: QualityViewProps) {
+  const { isDemoMode } = useDemoMode();
   const [snags, setSnags] = useState<SnagItem[]>([]);
 
-  useEffect(() => {
-    void projectId;
-  }, [projectId]);
+  if (!isDemoMode) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <p className="text-lg text-muted-foreground">No live data connected yet</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Data integration pending for project {projectId}
+        </p>
+      </div>
+    );
+  }
 
   const stats = {
     openSnags: snags.filter((s) => s.status === 'open').length,

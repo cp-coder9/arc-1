@@ -129,10 +129,10 @@ const arbUserId = fc.uuid();
 // ─── Generators for Property 13 ─────────────────────────────────────────────────
 
 /** Generate a random ISO timestamp */
-const arbTimestamp = fc.date({
-  min: new Date('2024-01-01T00:00:00Z'),
-  max: new Date('2026-12-31T23:59:59Z'),
-}).map(d => d.toISOString());
+const arbTimestamp = fc.integer({
+  min: new Date('2024-01-01T00:00:00Z').getTime(),
+  max: new Date('2026-12-31T23:59:59Z').getTime(),
+}).map((ts) => new Date(ts).toISOString());
 
 
 // ══════════════════════════════════════════════════════════════════════════════

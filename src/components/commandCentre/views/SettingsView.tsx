@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Settings, CheckCircle, XCircle } from 'lucide-react';
+import { useDemoMode } from '@/demo-context/DemoModeProvider';
 import type { ComplexityMode } from '@/services/commandCentre/types';
 
 interface SettingsViewProps {
@@ -13,6 +14,19 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ projectId, complexityMode, onComplexityChange }: SettingsViewProps) {
+  const { isDemoMode } = useDemoMode();
+
+  if (!isDemoMode) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <p className="text-lg text-muted-foreground">No live data connected yet</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Data integration pending for project {projectId}
+        </p>
+      </div>
+    );
+  }
+
   const integrations = [
     { module: 'Project Passport', connected: true, lastSync: '2 minutes ago' },
     { module: 'SpecForge', connected: true, lastSync: '5 minutes ago' },

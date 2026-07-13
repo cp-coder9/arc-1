@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Receipt } from 'lucide-react';
+import { useDemoMode } from '@/demo-context/DemoModeProvider';
 import type { PaymentCertificate } from '@/services/commandCentre/types';
 
 interface ValuationViewProps {
@@ -19,11 +20,19 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ValuationView({ projectId }: ValuationViewProps) {
+  const { isDemoMode } = useDemoMode();
   const [certificates, setCertificates] = useState<PaymentCertificate[]>([]);
 
-  useEffect(() => {
-    void projectId;
-  }, [projectId]);
+  if (!isDemoMode) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <p className="text-lg text-muted-foreground">No live data connected yet</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Data integration pending for project {projectId}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

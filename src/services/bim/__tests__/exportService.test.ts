@@ -7,7 +7,7 @@
  * Requirements: 6.5, 6.6, 6.7, 12.3
  */
 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type {
   BoqDocument,
   BoqSection,
@@ -142,6 +142,24 @@ function makeProcurementPackage(overrides: Partial<ProcurementPackage> = {}): Pr
   };
 }
 
+/** Helper to read an ExcelJS workbook from a buffer */
+async function readWorkbook(buffer: Buffer): Promise<ExcelJS.Workbook> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  return wb;
+}
+
+/** Helper to get all rows as arrays from a worksheet */
+function getSheetData(ws: ExcelJS.Worksheet): (string | number | undefined)[][] {
+  const data: (string | number | undefined)[][] = [];
+  ws.eachRow((row) => {
+    const values = row.values as (string | number | undefined)[];
+    // ExcelJS row.values is 1-indexed (index 0 is undefined), so slice from 1
+    data.push(values.slice(1));
+  });
+  return data;
+}
+
 // ─── exportToCsv ────────────────────────────────────────────────────────────
 
 describe('exportToCsv', () => {
@@ -262,25 +280,26 @@ describe('exportToCsv', () => {
 // ─── exportToExcel ──────────────────────────────────────────────────────────
 
 describe('exportToExcel', () => {
-  it('returns a Buffer', () => {
+  it('returns a Buffer', async () => {
     const boq = makeBoqDocument();
-    const result = exportToExcel(boq);
+    const result = await exportToExcel(boq);
     expect(Buffer.isBuffer(result)).toBe(true);
   });
 
-  it('produces a valid xlsx workbook', () => {
+  it('produces a valid xlsx workbook', async () => {
     const boq = makeBoqDocument();
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    expect(wb.SheetNames).toContain('Bill of Quantities');
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const sheetNames = wb.worksheets.map(ws => ws.name);
+    expect(sheetNames).toContain('Bill of Quantities');
   });
 
-  it('includes header row with Rate (ZAR) and Amount (ZAR) columns', () => {
+  it('includes header row with Rate (ZAR) and Amount (ZAR) columns', async () => {
     const boq = makeBoqDocument();
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
     const headers = data[0] as string[];
     expect(headers).toContain('Section');
     expect(headers).toContain('Item No');
@@ -291,27 +310,27 @@ describe('exportToExcel', () => {
     expect(headers).toContain('Amount (ZAR)');
   });
 
-  it('includes section header rows', () => {
+  it('includes section header rows', async () => {
     const boq = makeBoqDocument({
       sections: [makeSection()],
     });
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
-    // Row 1 is header, Row 2 should be section header
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
+    // Row 0 is header, Row 1 should be section header
     const sectionRow = data[1] as string[];
     expect(sectionRow[0]).toContain('Section 3: Concrete');
   });
 
-  it('includes subtotal rows per section', () => {
+  it('includes subtotal rows per section', async () => {
     const boq = makeBoqDocument({
       sections: [makeSection()],
     });
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
     // Find the subtotal row
     const subtotalRow = data.find(
       (row) => Array.isArray(row) && row.some((cell) => typeof cell === 'string' && cell.includes('Subtotal'))
@@ -319,17 +338,17 @@ describe('exportToExcel', () => {
     expect(subtotalRow).toBeDefined();
   });
 
-  it('includes grand total row at the bottom', () => {
+  it('includes grand total row at the bottom', async () => {
     const boq = makeBoqDocument();
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
     const lastRow = data[data.length - 1] as (string | number)[];
     expect(lastRow.some((cell) => cell === 'GRAND TOTAL')).toBe(true);
   });
 
-  it('preserves line item quantities correctly', () => {
+  it('preserves line item quantities correctly', async () => {
     const boq = makeBoqDocument({
       sections: [
         makeSection({
@@ -337,21 +356,21 @@ describe('exportToExcel', () => {
         }),
       ],
     });
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
     // Find the data row (skip header and section header)
     const dataRow = data[2] as (string | number)[];
     expect(dataRow[4]).toBe(42.75);
   });
 
-  it('handles multiple sections with correct subtotals', () => {
+  it('handles multiple sections with correct subtotals', async () => {
     const boq = makeBoqDocument();
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
 
     // Find subtotal rows
     const subtotalRows = data.filter(
@@ -360,12 +379,12 @@ describe('exportToExcel', () => {
     expect(subtotalRows.length).toBe(2); // Concrete + Masonry
   });
 
-  it('handles empty BoQ', () => {
+  it('handles empty BoQ', async () => {
     const boq = makeBoqDocument({ sections: [] });
-    const buffer = exportToExcel(boq);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Bill of Quantities'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportToExcel(boq);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Bill of Quantities')!;
+    const data = getSheetData(ws);
     // Header + grand total row only
     expect(data.length).toBe(2);
   });
@@ -461,33 +480,34 @@ describe('exportToJson', () => {
 // ─── exportProcurementPackage ───────────────────────────────────────────────
 
 describe('exportProcurementPackage', () => {
-  it('returns a Buffer', () => {
+  it('returns a Buffer', async () => {
     const pkg = makeProcurementPackage();
-    const result = exportProcurementPackage(pkg);
+    const result = await exportProcurementPackage(pkg);
     expect(Buffer.isBuffer(result)).toBe(true);
   });
 
-  it('produces a valid xlsx workbook', () => {
+  it('produces a valid xlsx workbook', async () => {
     const pkg = makeProcurementPackage();
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    expect(wb.SheetNames.length).toBeGreaterThanOrEqual(2);
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    expect(wb.worksheets.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('includes Cover Sheet and Line Items sheets', () => {
+  it('includes Cover Sheet and Line Items sheets', async () => {
     const pkg = makeProcurementPackage();
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    expect(wb.SheetNames).toContain('Cover Sheet');
-    expect(wb.SheetNames).toContain('Line Items');
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const sheetNames = wb.worksheets.map(ws => ws.name);
+    expect(sheetNames).toContain('Cover Sheet');
+    expect(sheetNames).toContain('Line Items');
   });
 
-  it('cover sheet contains project metadata', () => {
+  it('cover sheet contains project metadata', async () => {
     const pkg = makeProcurementPackage();
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Cover Sheet'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Cover Sheet')!;
+    const data = getSheetData(ws);
     const flatContent = data.map((row) => (row as string[]).join(' ')).join('\n');
 
     expect(flatContent).toContain('Office Block Phase 2');
@@ -498,12 +518,12 @@ describe('exportProcurementPackage', () => {
     expect(flatContent).toContain('john.smith@qs-firm.co.za');
   });
 
-  it('line items sheet contains correct data', () => {
+  it('line items sheet contains correct data', async () => {
     const pkg = makeProcurementPackage();
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Line Items'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Line Items')!;
+    const data = getSheetData(ws);
 
     // Header row
     const headers = data[0] as string[];
@@ -520,46 +540,46 @@ describe('exportProcurementPackage', () => {
     expect(firstItem[3]).toBe(12.5);
   });
 
-  it('line items sheet includes a total row', () => {
+  it('line items sheet includes a total row', async () => {
     const pkg = makeProcurementPackage();
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Line Items'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Line Items')!;
+    const data = getSheetData(ws);
     const lastRow = data[data.length - 1] as (string | number)[];
     expect(lastRow.some((cell) => cell === 'TOTAL')).toBe(true);
     // Total quantity: 12.5 + 85.0 = 97.5
     expect(lastRow[3]).toBe(97.5);
   });
 
-  it('cover sheet includes trade sections list', () => {
+  it('cover sheet includes trade sections list', async () => {
     const pkg = makeProcurementPackage({
       tradeSections: ['Concrete', 'Formwork'] as AsaqsTradeSection[],
     });
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Cover Sheet'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Cover Sheet')!;
+    const data = getSheetData(ws);
     const flatContent = data.map((row) => (row as string[]).join(' ')).join('\n');
     expect(flatContent).toContain('Concrete, Formwork');
   });
 
-  it('handles package with no line items', () => {
+  it('handles package with no line items', async () => {
     const pkg = makeProcurementPackage({ lineItems: [] });
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Line Items'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Line Items')!;
+    const data = getSheetData(ws);
     // Header + total row
     expect(data.length).toBe(2);
   });
 
-  it('includes Rate (ZAR) and Amount (ZAR) columns in line items', () => {
+  it('includes Rate (ZAR) and Amount (ZAR) columns in line items', async () => {
     const pkg = makeProcurementPackage();
-    const buffer = exportProcurementPackage(pkg);
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    const ws = wb.Sheets['Line Items'];
-    const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+    const buffer = await exportProcurementPackage(pkg);
+    const wb = await readWorkbook(buffer);
+    const ws = wb.getWorksheet('Line Items')!;
+    const data = getSheetData(ws);
     const headers = data[0] as string[];
     expect(headers).toContain('Rate (ZAR)');
     expect(headers).toContain('Amount (ZAR)');

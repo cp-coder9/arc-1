@@ -33,7 +33,7 @@ function toIsoDate(d: Date): string {
 
 // ── Arbitraries ──────────────────────────────────────────────────────────────
 
-const currentDateArb = fc.date({ min: new Date('2024-06-01'), max: new Date('2025-06-01') });
+const currentDateArb = fc.integer({ min: new Date('2024-06-01T00:00:00.000Z').getTime(), max: new Date('2025-06-01T00:00:00.000Z').getTime() }).map((ts) => new Date(ts));
 const daysOffsetArb = fc.integer({ min: -60, max: 60 });
 
 // ── Property Tests ───────────────────────────────────────────────────────────

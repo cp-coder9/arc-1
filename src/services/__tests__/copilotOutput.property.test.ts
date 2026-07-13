@@ -171,8 +171,8 @@ const arbComplianceGap: fc.Arbitrary<ComplianceGap> = fc.record({
   ),
   suggestedRemediation: fc.string({ minLength: 5, maxLength: 200 }),
   resolved: arbResolved,
-  detectedAt: fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') })
-    .map(d => d.toISOString()),
+  detectedAt: fc.integer({ min: new Date('2024-01-01T00:00:00.000Z').getTime(), max: new Date('2026-12-31T00:00:00.000Z').getTime() })
+    .map((ts) => new Date(ts).toISOString()),
 });
 
 /** Generate a list of compliance gaps (0–60 items to test 50-limit enforcement). */

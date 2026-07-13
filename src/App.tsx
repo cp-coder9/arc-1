@@ -152,7 +152,7 @@ const OnboardingFlow = lazyWithChunkRetry(() => import('./components/OnboardingF
 const MunicipalTracker = lazyWithChunkRetry(() => import('./components/MunicipalTracker'));
 const SubmissionReadinessDashboard = lazyWithChunkRetry(() => import('./components/SubmissionReadinessDashboard'));
 const KnowledgeSources = lazyWithChunkRetry(() => import('./components/KnowledgeSources').then((module) => ({ default: module.KnowledgeSources })));
-const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/ProjectCommandCentre'));
+const ProjectCommandCentre = lazyWithChunkRetry(() => import('./components/commandCentre/ProjectCommandCentre'));
 const ProjectWorkflowPage = lazyWithChunkRetry(() => import('./components/ProjectWorkflowPage'));
 const ProjectCommunicationCentrePage = lazyWithChunkRetry(() => import('./components/ProjectCommunicationCentrePage'));
 const GuidedBriefWizard = lazyWithChunkRetry(() => import('./components/GuidedBriefWizard'));
@@ -470,6 +470,8 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
   land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage land surveys, boundary pegging, and topographic data.' },
   health_safety: { label: 'H&S Officer', viewLabel: 'H&S View', accent: '#f57c00', accentSoft: 'rgba(245, 124, 0, 0.12)', description: 'Manage safety files, permits, inductions, incidents, and HIRA registers.' },
+  admin: { label: 'Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'System administration and platform management.' },
+  cpm: { label: 'Construction PM', viewLabel: 'CPM View', accent: '#1a237e', accentSoft: 'rgba(26, 35, 126, 0.12)', description: 'Coordinate programme delivery, risk management, and delivery governance.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -533,6 +535,14 @@ function AppContent() {
   }, []);
   const [activeTab, setActiveTab] = useState('command');
   const activeNavKey = user ? getNavKeyForActiveTab(activeTab) : null;
+
+  // Demo mode context — used to derive project context for Command Centre
+  const { isDemoMode } = useDemoMode();
+
+  // Derive projectId for the Command Centre shell.
+  // In demo mode, use the first seeded demo project; in production, fall back to the user's UID
+  // (project selection will be wired when project state is added to App shell).
+  const commandCentreProjectId = isDemoMode ? 'project_parkview_01' : (user?.uid ?? '');
 
   // Passive friction detection — monitors for user struggle patterns (rage clicks, repeated errors, etc.)
   useFrictionDetector(user);
@@ -1220,7 +1230,7 @@ function AppContent() {
               {activeTab === 'profile-settings' && <UserSettings user={user} />}
               {activeTab === 'profile' && <ProfileWorkspacePage user={user} />}
               {activeTab === 'firm' && <FirmDashboard user={user} />}
-              {activeTab === 'command' && <ProjectCommandCentre user={user} onNavigate={setActiveTab} />}
+              {activeTab === 'command' && <ProjectCommandCentre user={user} projectId={commandCentreProjectId} />}
               {activeTab === 'client-intake' && <GuidedBriefWizard user={user} />}
               {activeTab === 'client-proposals' && <ClientProposalComparison user={user} />}
               {activeTab === 'bep-marketplace' && <BEPClientMarketplacePage user={user} />}
@@ -1236,7 +1246,7 @@ function AppContent() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
-              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={selectedProjectId || undefined} />}
+              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={undefined} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}
