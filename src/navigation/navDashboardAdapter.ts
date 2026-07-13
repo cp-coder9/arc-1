@@ -28,6 +28,10 @@ const NAV_TO_DASHBOARD: Record<ArchitexNavKey, string[]> = {
   messages: ['messages'],
   settings: ['profile', 'admin-console'],
   user_settings: ['profile'],
+  verification_queue: ['verification-queue'],
+  ai_review_queue: ['ai-review-queue'],
+  system_health: ['system-health'],
+  feedback_intelligence: ['feedback-roadmap'],
 };
 
 /**
@@ -79,6 +83,10 @@ const NAV_KEY_TO_ICON_HINT: Record<ArchitexNavKey, string> = {
   messages: 'Mail',
   settings: 'Settings2',
   user_settings: 'UserCog',
+  verification_queue: 'ShieldCheck',
+  ai_review_queue: 'Bot',
+  system_health: 'Activity',
+  feedback_intelligence: 'MessageSquare',
 };
 
 export function getIconHintForNavKey(navKey: ArchitexNavKey): string {

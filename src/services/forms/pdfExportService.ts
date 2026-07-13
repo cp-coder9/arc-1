@@ -187,7 +187,7 @@ export async function exportFormToPdf(
     const blobPath = `forms/exports/${instance.id}/${template.name.replace(/\s+/g, '_')}_v${template.version}.pdf`;
 
     const blob = await put(blobPath, pdfBuffer, {
-      access: 'public',
+      access: 'private',
       token: BLOB_READ_WRITE_TOKEN,
       contentType: 'application/pdf',
       addRandomSuffix: true,
@@ -360,7 +360,7 @@ async function exportCombined(instanceIds: string[]): Promise<PdfExportResult> {
     const blobPath = `forms/exports/combined/batch_${Date.now()}.pdf`;
 
     const blob = await put(blobPath, pdfBuffer, {
-      access: 'public',
+      access: 'private',
       token: BLOB_READ_WRITE_TOKEN,
       contentType: 'application/pdf',
       addRandomSuffix: true,

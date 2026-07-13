@@ -15,7 +15,7 @@
 
 import type { UserRole } from '@/types';
 import type { CopilotCapability, CopilotMessage, CopilotResponse, ConversationThread, CopilotProjectContext, RFIDraftInput, RFIDraftOutput, NarrativeInput, NarrativeOutput, ComplianceGap, ComplianceGapReport, ComplianceGapCategory, ComplianceGapSeverity, StatusSummary, ClauseExplanationInput, ClauseExplanationOutput } from '@/services/copilotTypes';
-import { createHash } from 'node:crypto';
+
 import { CAPABILITY_ROLE_MAP, UNIVERSAL_CAPABILITIES } from '@/services/copilotTypes';
 import { checkRateLimit, recordRequest } from '@/services/copilotRateLimiter';
 import { CopilotMessageInputSchema, RFIDraftInputSchema, NarrativeInputSchema, ClauseExplanationInputSchema } from '@/lib/copilotSchemas';
@@ -37,6 +37,7 @@ const PROFESSIONAL_ROLES: UserRole[] = [
   'contractor',
   'subcontractor',
   'supplier',
+  'admin',
   'engineer',
   'quantity_surveyor',
   'town_planner',
@@ -47,6 +48,7 @@ const PROFESSIONAL_ROLES: UserRole[] = [
   'firm_admin',
   'land_surveyor',
   'health_safety',
+  'cpm',
 ];
 
 /** All valid capability strings for quick lookup. */
@@ -198,23 +200,12 @@ async function defaultPersistMessage(message: CopilotMessage, projectId: string)
 
 function getDefaultDataSources(): ContextDataSources {
   return {
-    fetchPassport: async () => ({
-      projectName: '',
-      currentPhase: 'onboarding' as const,
-      riskLevel: 'low' as const,
-      leadProfessional: '',
-      keyDates: [],
-      teamMembers: [],
-    }),
-    fetchDocuments: async () => [],
-    fetchPendingActions: async () => [],
-    fetchAuditTrail: async () => [],
-    fetchUserContext: async (userId: string) => ({
-      role: 'client' as UserRole,
-      projectAccessRole: null,
-      displayName: '',
-    }),
-    checkReadPermission: async () => true,
+    getProjectPassport: async () => null,
+    getDocumentRegister: async () => [],
+    getPendingInboxActions: async () => [],
+    getRecentAuditTrail: async () => [],
+    getUserContext: async () => null,
+    getProjectAccessContext: async () => null,
   };
 }
 
@@ -314,10 +305,9 @@ export async function processMessage(params: ProcessMessageParams): Promise<Copi
   }
 
   // 4. Assemble project context
-  const sources = dataSources ?? getDefaultDataSources();
   let contextJson: string;
   try {
-    const projectContext = await assembleContext(projectId, userId, sources);
+    const projectContext = await assembleContext(projectId, userId);
     contextJson = JSON.stringify(projectContext);
   } catch {
     // If context assembly fails entirely, proceed with empty context
@@ -866,7 +856,7 @@ export async function draftRfi(params: DraftRfiParams): Promise<RFIDraftOutput> 
     throw new Error(`Validation failed: ${firstError}`);
   }
 
-  const validatedInput = validation.data;
+  const validatedInput = validation.data as RFIDraftInput;
 
   // 2. Query highest existing RFI number and calculate next sequential number
   const queryFn = queryHighestRfiNumber ?? defaultQueryHighestRfiNumber;
@@ -1042,7 +1032,15 @@ function computeContextHash(context: CopilotProjectContext): string {
     actions: context.pendingActions.map(a => ({ id: a.id, priority: a.priority, dueDate: a.dueDate })),
     audit: context.auditTrail.slice(0, 5).map(e => e.timestamp),
   };
-  return createHash('sha256').update(JSON.stringify(relevantData)).digest('hex').slice(0, 16);
+  const str = JSON.stringify(relevantData);
+  let h1 = 0x811c9dc5 >>> 0;
+  let h2 = 0x01000193 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x811c9dc5) >>> 0;
+  }
+  return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0'));
 }
 
 /**
@@ -1409,7 +1407,7 @@ export async function generateNarrative(params: GenerateNarrativeParams): Promis
     throw new Error(`Validation failed: ${firstError}`);
   }
 
-  const validatedInput = validation.data;
+  const validatedInput = validation.data as NarrativeInput;
 
   // 1b. Check for insufficient project context (no project brief data available)
   // Requirement 9.7: return error if no project brief data is available

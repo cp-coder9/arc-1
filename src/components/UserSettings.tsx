@@ -132,6 +132,10 @@ const ROLE_PROFILE_FIELDS: Record<UserProfile['role'], RoleProfileField[]> = {
     { key: 'sacpcmpRegistration', label: 'SACPCMP registration number', helper: 'Construction Project Manager registration with SACPCMP.' },
     { key: 'region', label: 'Region', helper: 'Primary operating region.' },
   ],
+  health_safety: [
+    { key: 'registrationNumber', label: 'SACOSH / SHE registration', helper: 'Safety practitioner registration number.' },
+    { key: 'healthSafetyFiles', label: 'Health & safety credentials', helper: 'SHE file references or uploaded document names.', kind: 'array' },
+  ],
 };
 
 const ARRAY_FIELDS = new Set(['disciplines', 'healthSafetyFiles', 'plantCapacity', 'tradeCategories', 'packageTypes', 'serviceAreas', 'productCategories', 'deliveryRegions', 'catalogueUrls', 'skills', 'software', 'portfolioUrls']);

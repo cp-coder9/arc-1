@@ -64,7 +64,7 @@ export function classifySection24(incident: Pick<Incident, 'injuryClassification
  */
 export function assignInvestigation(incident: Incident, investigatorId: string): Incident {
   if (incident.state !== 'reported') {
-    throw new InvalidStateTransitionError(incident.state, 'under_investigation');
+    throw new InvalidStateTransitionError('Incident', incident.state, 'under_investigation');
   }
 
   return {
@@ -84,7 +84,7 @@ export function addCorrectiveAction(
   action: Omit<CorrectiveAction, 'id' | 'status'>
 ): Incident {
   if (incident.state !== 'under_investigation' && incident.state !== 'corrective_actions') {
-    throw new InvalidStateTransitionError(incident.state, 'corrective_actions');
+    throw new InvalidStateTransitionError('Incident', incident.state, 'corrective_actions');
   }
 
   const newAction: CorrectiveAction = {
@@ -106,7 +106,7 @@ export function addCorrectiveAction(
  */
 export function closeIncident(incident: Incident): Incident {
   if (incident.state !== 'corrective_actions') {
-    throw new InvalidStateTransitionError(incident.state, 'closed');
+    throw new InvalidStateTransitionError('Incident', incident.state, 'closed');
   }
 
   const hasOpenActions = incident.correctiveActions.some(a => a.status !== 'completed');

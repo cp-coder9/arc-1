@@ -24,7 +24,9 @@ export type ArchitexRole =
   | 'contractor'
   | 'supplier'
   | 'candidate_professional'
-  | 'admin';
+  | 'admin'
+  | 'platform_admin'
+  | 'site_manager';
 
 /** The nine project lifecycle phases. */
 export type ProjectPhase =

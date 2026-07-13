@@ -41,11 +41,11 @@ copilotRouter.post('/copilot/message', async (req: Request, res: Response) => {
 
     const response = await processMessage({
       userId: uid,
-      projectId: projectId || null,
-      threadId: threadId || null,
+      projectId: projectId || '',
+      threadId: threadId || '',
       prompt,
-      capability: capability || null,
-      userRole: (role as any) || 'client',
+      capability: capability || 'summarise_status',
+      role: (role as any) || 'client',
     });
 
     if (response.error) {
@@ -162,13 +162,14 @@ copilotRouter.get('/copilot/threads/:threadId/messages', async (req: Request, re
   try {
     const { uid } = req.authContext!;
     const { threadId } = req.params;
-    const { limit, startAfter } = req.query;
+    const { limit, startAfter, projectId } = req.query;
+
+    if (!projectId || typeof projectId !== 'string') {
+      return res.status(400).json({ error: 'projectId query parameter is required.' });
+    }
 
     const { getMessages } = await import('../services/copilotService');
-    const result = await getMessages(threadId, uid, {
-      limit: limit ? Number(limit) : undefined,
-      startAfter: startAfter as string | undefined,
-    });
+    const result = await getMessages(threadId, projectId, limit ? Number(limit) : 1, uid);
 
     return res.status(200).json(result);
   } catch (err: any) {
@@ -192,7 +193,11 @@ copilotRouter.patch('/copilot/threads/:threadId', async (req: Request, res: Resp
   try {
     const { uid } = req.authContext!;
     const { threadId } = req.params;
-    const { title, status } = req.body;
+    const { title, status, projectId } = req.body;
+
+    if (!projectId || typeof projectId !== 'string') {
+      return res.status(400).json({ error: 'projectId is required.' });
+    }
 
     if (!title && !status) {
       return res.status(400).json({ error: 'At least one of title or status must be provided.' });
@@ -203,7 +208,7 @@ copilotRouter.patch('/copilot/threads/:threadId', async (req: Request, res: Resp
     if (status !== undefined) updates.status = status;
 
     const { updateThread } = await import('../services/copilotService');
-    const thread = await updateThread(threadId, uid, updates);
+    const thread = await updateThread(threadId, projectId, uid, updates);
 
     return res.status(200).json({ thread });
   } catch (err: any) {

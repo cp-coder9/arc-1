@@ -48,7 +48,7 @@ function isDraftStale(draft: FormDraft): boolean {
   const lastModified = draft.lastModifiedAt?.toMillis
     ? draft.lastModifiedAt.toMillis()
     : typeof draft.lastModifiedAt === 'object' && '_seconds' in (draft.lastModifiedAt as object)
-      ? (draft.lastModifiedAt as { _seconds: number })._seconds * 1000
+      ? (draft.lastModifiedAt as unknown as { _seconds: number })._seconds * 1000
       : Date.now();
 
   return Date.now() - lastModified > STALE_THRESHOLD_MS;

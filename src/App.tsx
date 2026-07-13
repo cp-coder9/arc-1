@@ -245,7 +245,7 @@ type DashboardResourceLink = {
 const DESIGN_TEAM_ROLES: NonEmptyArray<UserRole> = ['bep', 'architect'];
 
 /** All professional roles (every UserRole except platform_admin). Used for universal pages accessible to all professionals. */
-const ALL_PROFESSIONAL_ROLES: NonEmptyArray<UserRole> = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'land_surveyor', 'health_safety'];
+const ALL_PROFESSIONAL_ROLES: NonEmptyArray<UserRole> = ['client', 'architect', 'freelancer', 'bep', 'contractor', 'subcontractor', 'supplier', 'admin', 'engineer', 'quantity_surveyor', 'town_planner', 'energy_professional', 'fire_engineer', 'site_manager', 'developer', 'firm_admin', 'land_surveyor', 'health_safety', 'cpm'];
 
 /** All roles including platform_admin — used for universal pages (command centre, inbox, profile, etc.) */
 const ALL_ROLES: NonEmptyArray<UserRole> = [...ALL_PROFESSIONAL_ROLES, 'platform_admin'];
@@ -449,8 +449,10 @@ const ROLE_VISUALS: Record<UserRole, { label: string; viewLabel: string; accent:
   developer: { label: 'Developer', viewLabel: 'Developer View', accent: '#37474f', accentSoft: 'rgba(55, 71, 79, 0.12)', description: 'Oversee project portfolio, investment governance, and programme strategy.' },
   firm_admin: { label: 'Firm Admin', viewLabel: 'Firm View', accent: '#4e342e', accentSoft: 'rgba(78, 52, 46, 0.12)', description: 'Manage practice operations, staff, CPD, and professional registrations.' },
   platform_admin: { label: 'Platform Admin', viewLabel: 'Platform View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'Full platform governance, system configuration, and compliance oversight.' },
+  admin: { label: 'Admin', viewLabel: 'Admin View', accent: '#ba1a1a', accentSoft: 'rgba(186, 26, 26, 0.11)', description: 'System administration, governance, and operational controls.' },
   land_surveyor: { label: 'Land Surveyor', viewLabel: 'Surveyor View', accent: '#5d4037', accentSoft: 'rgba(93, 64, 55, 0.12)', description: 'Manage land surveys, boundary pegging, and topographic data.' },
   health_safety: { label: 'H&S Officer', viewLabel: 'H&S View', accent: '#f57c00', accentSoft: 'rgba(245, 124, 0, 0.12)', description: 'Manage safety files, permits, inductions, incidents, and HIRA registers.' },
+  cpm: { label: 'CPM', viewLabel: 'CPM View', accent: '#4a148c', accentSoft: 'rgba(74, 20, 140, 0.12)', description: 'Construction project management coordination and oversight.' },
 };
 
 function roleVisualFor(role: UserRole) {
@@ -1217,7 +1219,7 @@ function AppContent() {
               {activeTab === 'knowledge' && <ResourceCentre user={user} />}
               {activeTab === 'admin-console' && <AdminGovernanceConsolePage user={user} />}
               {activeTab === 'feedback-roadmap' && <FeedbackRoadmapDashboard user={user} />}
-              {activeTab === 'wingman' && <CopilotPanel user={user} projectId={selectedProjectId || undefined} />}
+              {activeTab === 'wingman' && <CopilotPanel user={user} />}
               {activeTab === 'design' && <DesignCompliancePage user={user} />}
               {activeTab === 'toolbox' && <ProjectToolboxPage user={user} onNavigate={setActiveTab} />}
               {activeTab === 'toolset-review' && <ToolsetReviewDashboard user={user} />}

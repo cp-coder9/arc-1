@@ -45,7 +45,7 @@ export function requestPermit(
  */
 export function approvePermit(permit: Permit, approverId: string): Permit {
   if (permit.state !== 'submitted') {
-    throw new InvalidStateTransitionError(permit.state, 'approved');
+    throw new InvalidStateTransitionError('Permit', permit.state, 'approved');
   }
 
   return {
@@ -61,7 +61,7 @@ export function approvePermit(permit: Permit, approverId: string): Permit {
  */
 export function rejectPermit(permit: Permit): Permit {
   if (permit.state !== 'submitted') {
-    throw new InvalidStateTransitionError(permit.state, 'rejected');
+    throw new InvalidStateTransitionError('Permit', permit.state, 'rejected');
   }
 
   return {
@@ -78,7 +78,7 @@ export function rejectPermit(permit: Permit): Permit {
 export function transitionPermitState(permit: Permit, newState: PermitState, actor: string): Permit {
   const allowed = VALID_TRANSITIONS[permit.state];
   if (!allowed.includes(newState)) {
-    throw new InvalidStateTransitionError(permit.state, newState);
+    throw new InvalidStateTransitionError('Permit', permit.state, newState);
   }
 
   return {
@@ -134,7 +134,7 @@ export function closeOutPermit(
   conditionsMet: boolean
 ): Permit {
   if (permit.state !== 'active' && permit.state !== 'expired') {
-    throw new InvalidStateTransitionError(permit.state, 'closed');
+    throw new InvalidStateTransitionError('Permit', permit.state, 'closed');
   }
 
   return {

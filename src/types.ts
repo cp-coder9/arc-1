@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'architect' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'land_surveyor' | 'health_safety';
+export type UserRole = 'client' | 'architect' | 'freelancer' | 'bep' | 'contractor' | 'subcontractor' | 'supplier' | 'engineer' | 'quantity_surveyor' | 'town_planner' | 'energy_professional' | 'fire_engineer' | 'site_manager' | 'developer' | 'firm_admin' | 'platform_admin' | 'admin' | 'land_surveyor' | 'health_safety' | 'cpm';
 
 /**
  * A tuple type that ensures at least one element exists.
@@ -973,6 +973,7 @@ export interface AgentKnowledge {
   submittedByRole: UserRole | 'system';
   reviewedBy?: string; // admin userId
   reviewedAt?: string;
+  rejectionReason?: string; // reason for rejection when status is 'rejected'
   relatedSubmissionId?: string;
   relatedJobId?: string;
   searchQuery?: string; // if source is web_search

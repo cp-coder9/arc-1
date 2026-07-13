@@ -362,6 +362,19 @@ const TOOLBOX_CONFIG: Record<UserRole, RoleToolboxConfig> = {
       ] },
     ],
   },
+  health_safety: {
+    title: 'Health & Safety Toolbox',
+    subtitle: 'Construction safety file management, permits, incidents, and compliance tools.',
+    scope: 'H&S tools for safety governance per Construction Regulations 2014.',
+    primaryResponsibilities: ['Manage safety files and permits to work', 'Record and investigate incidents', 'Conduct inductions and manage HIRA registers'],
+    handoffBoundaries: ['Professional sign-off requires registered H&S practitioner', 'Incident notifications require DoEL compliance'],
+    toolGroups: [
+      { id: 'safety-tools', label: 'Safety governance', description: 'Safety file management, permits, incidents, and induction tracking.', tools: [
+        { label: 'Health & Safety', description: 'Manage safety files, permits, incidents, and HIRA registers.', pageId: 'health-safety' },
+        { label: 'Tasks & Approvals', description: 'Track safety-related tasks and approvals.', pageId: 'tasks' },
+      ] },
+    ],
+  },
 };
 
 export default function ProjectToolboxPage({ user, onNavigate }: { user: UserProfile; onNavigate?: (pageId: string) => void }) {
